@@ -54,6 +54,10 @@ projects/ledger-app/public/icons/
 
 品牌类账户（支付宝/微信/花呗…）用**首字母色块**表示，不做品牌图形。
 
+已交付账户 key：`ic_asset_cash`、`ic_asset_savings_card`、`ic_asset_credit_card`、`ic_asset_debit_card`、`ic_asset_wallet`、`ic_asset_fund`、`ic_asset_stock`、`ic_asset_investment`、`ic_asset_insurance`、`ic_asset_fixed_deposit`、`ic_asset_property`、`ic_asset_vehicle`、`ic_asset_deposit`、`ic_asset_default`。银行卡类型目前共用卡片轮廓，适合搭配文字区分。
+
+分类和账户图标基于 Lucide 1.69.0，许可见 `public/icons/LICENSE-lucide.txt`。`build_icons.cjs` 记录清单到原图标的映射。品牌标识是独立绘制的暖色小金币与账本，横版中的“记账”为暂定通用字样；`logo-mono.svg` 是图形标的单色版。
+
 ## 交付后我做什么
 
 1. 按 key 映射进 `taxonomy.ts` 的 `icon` 字段，替换现在的 emoji 占位
