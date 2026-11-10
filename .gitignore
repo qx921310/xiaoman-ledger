@@ -7,3 +7,5 @@ server/data/
 .deploy/
 
 server/data/
+
+.tmp/
