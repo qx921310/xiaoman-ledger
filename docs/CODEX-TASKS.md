@@ -89,3 +89,10 @@
 页面里已有 "其他" 复用 `ic_misc_other`（已交付），不用重画。
 
 交付时直接覆盖 `public/icons/categories/` 下同名文件即可，文件名必须一致。
+
+---
+
+## 任务 4 的最新版清单
+
+以 `docs/icons/待补清单.md` 为准（当前 34 个待重绘：2 个支出大类 + 32 个二级）。
+交付时**直接覆盖 `public/icons/categories/{parent|child|income}/` 下的同名文件即可**，文件名必须一字不差。
