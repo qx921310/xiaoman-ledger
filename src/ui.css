@@ -195,3 +195,10 @@ button[disabled] { opacity: .5; cursor: not-allowed; }
 }
 .ghost.wide { display: block; width: 100%; margin-top: 8px; }
 .chip .ico { font-size: 14px; line-height: 1; }
+
+/* 预算 */
+.budget-box { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+.budget-box.small { padding: 10px 12px; }
+.budget-line { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; margin-bottom: 8px; }
+.budget-line b { font-variant-numeric: tabular-nums; font-size: 13px; }
+.budget-foot { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-top: 6px; }

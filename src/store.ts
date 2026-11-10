@@ -6,6 +6,14 @@ import { TAXONOMY_CHILDREN, TAXONOMY_INCOME, TAXONOMY_PARENTS } from './taxonomy
 
 const NOW = () => Date.now()
 
+export interface Budget {
+  /** 'YYYY-MM'，或 'all' 表示默认每月生效 */
+  month: string
+  /** 0 = 总预算 */
+  categoryId: number
+  amount: number
+}
+
 interface LedgerState {
   userId: number
   token: string | null
@@ -16,9 +24,17 @@ interface LedgerState {
   parentCategories: Category[]
   childCategories: Category[]
   transfers: Transfer[]
+  budgets: Budget[]
+  /** 上次使用的分类/账户，用于快速记账 */
+  lastParentId: number
+  lastChildId: number
+  lastAssetId: number
   seeded: boolean
 
   addBill: (patch: Partial<Bill>) => Bill
+  deleteTransfer: (transferId: number) => void
+  setBudget: (budget: Budget) => void
+  removeBudget: (month: string, categoryId: number) => void
   deleteBill: (billId: number) => void
   updateBill: (billId: number, patch: Partial<Bill>) => void
   addTransfer: (patch: { fromAssetId: number; toAssetId: number; cost: number; serviceCharge?: number; time?: number; remark?: string }) => Transfer
@@ -45,6 +61,10 @@ export const useLedger = create<LedgerState>()(
       parentCategories: [...TAXONOMY_PARENTS, ...TAXONOMY_INCOME],
       childCategories: TAXONOMY_CHILDREN,
       transfers: [],
+      budgets: [],
+      lastParentId: 7,
+      lastChildId: 0,
+      lastAssetId: 0,
       seeded: false,
 
       addBill: (patch) => {
@@ -83,7 +103,13 @@ export const useLedger = create<LedgerState>()(
           const delta = isIncome ? bill.cost : -bill.cost
           return { ...a, assetNumber: +(a.assetNumber + delta).toFixed(2), updateTime: NOW() }
         })
-        set({ bills: [bill, ...s.bills], assets })
+        set({
+          bills: [bill, ...s.bills],
+          assets,
+          lastParentId: bill.parentCategoryId,
+          lastChildId: bill.childCategoryId,
+          lastAssetId: bill.assetId
+        })
         return bill
       },
 
@@ -198,6 +224,30 @@ export const useLedger = create<LedgerState>()(
         return { assets: [...s.assets, asset] }
       }),
 
+      // 删转账：转出方退回本金+手续费，转入方扣回本金
+      deleteTransfer: (transferId) => set((s) => {
+        const t = s.transfers.find((x) => x.transferId === transferId)
+        if (!t) return {}
+        const back = t.cost + t.serviceCharge
+        return {
+          transfers: s.transfers.filter((x) => x.transferId !== transferId),
+          assets: s.assets.map((a) => {
+            if (a.assetId === t.fromAssetId) return { ...a, assetNumber: +(a.assetNumber + back).toFixed(2), updateTime: NOW() }
+            if (a.assetId === t.toAssetId) return { ...a, assetNumber: +(a.assetNumber - t.cost).toFixed(2), updateTime: NOW() }
+            return a
+          })
+        }
+      }),
+
+      setBudget: (budget) => set((s) => {
+        const rest = s.budgets.filter((b) => !(b.month === budget.month && b.categoryId === budget.categoryId))
+        return { budgets: budget.amount > 0 ? [...rest, budget] : rest }
+      }),
+
+      removeBudget: (month, categoryId) => set((s) => ({
+        budgets: s.budgets.filter((b) => !(b.month === month && b.categoryId === categoryId))
+      })),
+
       updateAsset: (asset) => set((s) => ({
         assets: s.assets.map((a) => a.assetId === asset.assetId ? { ...asset, updateTime: NOW() } : a)
       })),
@@ -226,7 +276,7 @@ export const useLedger = create<LedgerState>()(
       },
 
       reset: () => set({
-        assets: [], bills: [], transfers: [], seeded: false,
+        assets: [], bills: [], transfers: [], budgets: [], seeded: false,
         parentCategories: [...TAXONOMY_PARENTS, ...TAXONOMY_INCOME],
         childCategories: TAXONOMY_CHILDREN
       }),
@@ -240,6 +290,7 @@ export const useLedger = create<LedgerState>()(
           assets: s.assets,
           bills: s.bills,
           transfers: s.transfers,
+          budgets: s.budgets,
           parentCategories: s.parentCategories,
           childCategories: s.childCategories
         }
@@ -294,6 +345,7 @@ export const useLedger = create<LedgerState>()(
         assets: data.assets ?? [],
         bills: data.bills ?? [],
         transfers: data.transfers ?? [],
+        budgets: data.budgets ?? [],
         parentCategories: data.parentCategories ?? s.parentCategories,
         childCategories: data.childCategories ?? s.childCategories,
         seeded: true
