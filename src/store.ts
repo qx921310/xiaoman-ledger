@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
-import type { AccountBook, Asset, Bill, Category, Cycle, Lend, Refund, Reimbursement, Transfer } from './types'
+import type { AccountBook, Asset, Bill, Category, Currency, Cycle, Lend, Refund, Reimbursement, Transfer } from './types'
 import type { ImportPlan } from './importer'
 import { TAXONOMY_CHILDREN, TAXONOMY_INCOME, TAXONOMY_PARENTS } from './taxonomy'
 import { userStorage } from './auth'
@@ -30,6 +30,9 @@ interface LedgerState {
   refunds: Refund[]
   lends: Lend[]
   cycles: Cycle[]
+  /** 币种表；默认币种固定为 CNY，其余按 rate 折算 */
+  currencies: Currency[]
+  defaultCurrency: string
   /** 删除墓碑：同步时要把删除动作也推上去，否则别的设备会把数据拉回来 */
   tombstones: { kind: string; id: string; updatedAt: number }[]
   lastSync: number
@@ -67,6 +70,9 @@ interface LedgerState {
   importAll: (data: any) => void
   applyImport: (plan: ImportPlan) => void
   mergeTaxonomy: () => void
+  setCurrencyRate: (code: string, rate: number) => void
+  addCurrency: (c: Currency) => void
+  removeCurrency: (code: string) => void
   applyRemote: (records: any[]) => void
   setLastSync: (t: number) => void
   tombstone: (kind: string, id: string | number) => void
@@ -89,6 +95,14 @@ export const useLedger = create<LedgerState>()(
       refunds: [],
       lends: [],
       cycles: [],
+      currencies: [
+        { code: 'CNY', name: '人民币', symbol: '¥', rate: 1, positionWeight: 100 },
+        { code: 'USD', name: '美元', symbol: '$', rate: 7.2, positionWeight: 90 },
+        { code: 'EUR', name: '欧元', symbol: '€', rate: 7.8, positionWeight: 80 },
+        { code: 'JPY', name: '日元', symbol: '¥', rate: 0.048, positionWeight: 70 },
+        { code: 'HKD', name: '港币', symbol: 'HK$', rate: 0.92, positionWeight: 60 }
+      ],
+      defaultCurrency: 'CNY',
       tombstones: [],
       lastSync: 0,
       lastParentId: 7,
@@ -115,7 +129,6 @@ export const useLedger = create<LedgerState>()(
           remark: patch.remark ?? '',
           billType: patch.billType ?? 2,
           tags: patch.tags ?? [],
-          files: [],
           userId: s.userId,
           updateTime: NOW(),
           // 冗余快照：改名不影响历史账单
@@ -123,7 +136,20 @@ export const useLedger = create<LedgerState>()(
             parentCategoryName: parent?.name ?? '',
             childCategoryName: child?.name ?? '',
             assetName: asset?.assetName ?? ''
-          }
+          },
+          // 可选字段原样透传（多币种、标记、地址、附件等）
+          files: patch.files ?? [],
+          currencyInfo: patch.currencyInfo,
+          currencyAssetNumber: patch.currencyAssetNumber,
+          currencyDiscountNumber: patch.currencyDiscountNumber,
+          notIntoTotal: patch.notIntoTotal,
+          notIntoBudget: patch.notIntoBudget,
+          discountNumber: patch.discountNumber,
+          refundNum: patch.refundNum,
+          poiAddress: patch.poiAddress,
+          fromUserId: patch.fromUserId,
+          isReimbursement: patch.isReimbursement,
+          reimbursementNum: patch.reimbursementNum
         }
         // 计入账户余额（信用卡为负向）
         const assets = s.assets.map((a) => {
@@ -542,6 +568,18 @@ export const useLedger = create<LedgerState>()(
       },
 
       setLastSync: (t) => set({ lastSync: t }),
+
+      setCurrencyRate: (code, rate) => set((s) => ({
+        currencies: s.currencies.map((c) => c.code === code
+          ? { ...c, rate: c.code === s.defaultCurrency ? 1 : Number(rate) || 0 } : c)
+      })),
+
+      addCurrency: (c) => set((s) => s.currencies.some((x) => x.code === c.code)
+        ? {}
+        : { currencies: [...s.currencies, c] }),
+
+      removeCurrency: (code) => set((s) => code === s.defaultCurrency ? {}
+        : { currencies: s.currencies.filter((c) => c.code !== code) }),
 
       tombstone: (kind, id) => set((s) => ({
         tombstones: [

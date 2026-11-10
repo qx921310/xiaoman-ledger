@@ -6,6 +6,7 @@ import { api } from './api'
 import type { ImportPlan } from './importer'
 import { adoptAnonymousData, auth, setCurrentUid, type User } from './auth'
 import { syncNow } from './sync'
+import { currencySymbol, findCurrency, toBase } from './money'
 
 const money = (n: number) => '¥' + (n < 0 ? '-' : '') + Math.abs(n).toFixed(2)
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -243,6 +244,9 @@ function AddBill({ notify }: { notify: (m: string) => void }) {
   const lastChildId = useLedger((s) => s.lastChildId)
   const lastAssetId = useLedger((s) => s.lastAssetId)
 
+  const currencies = useLedger((s) => s.currencies)
+  const defaultCurrency = useLedger((s) => s.defaultCurrency)
+  const [currency, setCurrency] = useState(defaultCurrency)
   const [mode, setMode] = useState<'expense' | 'income' | 'transfer'>('expense')
   const [cost, setCost] = useState('')
   const [pid, setPid] = useState(lastParentId)
@@ -288,11 +292,15 @@ function AddBill({ notify }: { notify: (m: string) => void }) {
     }
 
     if (!aid) return notify('请选择账户')
+    const foreign = currency !== defaultCurrency
     addBill({
-      cost: v, parentCategoryId: cur, childCategoryId: cid,
+      cost: foreign ? toBase(v, currency, currencies, defaultCurrency) : v,
+      currencyInfo: foreign ? currency : undefined,
+      currencyAssetNumber: foreign ? v : undefined,
+      parentCategoryId: cur, childCategoryId: cid,
       assetId: aid, remark, time: new Date(time).getTime(), billType: 2
     })
-    setCost(''); setRemark(''); setCid(0)
+    setCost(''); setRemark(''); setCid(0); setCurrency(defaultCurrency)
     notify(`${mode === 'expense' ? '支出' : '收入'} ${money(v)} 已记录`)
   }
 
@@ -305,9 +313,24 @@ function AddBill({ notify }: { notify: (m: string) => void }) {
       </div>
 
       <div className="amount">
-        <span>¥</span>
+        <span>{currencySymbol(currencies, currency, defaultCurrency)}</span>
         <input value={cost} onChange={(e) => setCost(e.target.value.replace(/[^\d.]/g, ''))} placeholder="0.00" inputMode="decimal" />
+        {currencies.length > 1 && (
+          <select className="cur" value={currency} onChange={(e) => setCurrency(e.target.value)}>
+            {currencies.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
+          </select>
+        )}
       </div>
+      {currency !== defaultCurrency && Number(cost) > 0 && (
+        <p className="hint">
+          折合 {currencySymbol(currencies, defaultCurrency, defaultCurrency)}
+          {toBase(Number(cost), currency, currencies, defaultCurrency).toFixed(2)}
+          {(() => {
+            const c = findCurrency(currencies, currency)
+            return c ? `（1 ${c.code} = ${c.rate} ${defaultCurrency}）` : ''
+          })()}
+        </p>
+      )}
 
       {mode === 'transfer' ? (
         <>
@@ -521,7 +544,9 @@ function Bills() {
                     {a?.assetName ?? '无账户'} · {hhmm(b.time)} · {BILL_TYPE[b.billType]}
                     {b.notIntoTotal ? ' · 不计收支' : ''}
                     {b.notIntoBudget ? ' · 不计预算' : ''}
-                    {b.currencyInfo ? ' · ' + b.currencyInfo : ''}
+                    {b.currencyInfo && b.currencyAssetNumber
+                      ? ` · ${b.currencyInfo} ${b.currencyAssetNumber.toFixed(2)}`
+                      : (b.currencyInfo ? ' · ' + b.currencyInfo : '')}
                     {b.files?.length ? ` · ${b.files.length} 个附件` : ''}
                   </small>
                   {(reimbursements.some((r) => r.billId === b.billId) || (b.refundNum ?? 0) > 0) && (

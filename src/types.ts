@@ -33,9 +33,17 @@ export interface Bill {
   discountNumber?: number
   /** 退款金额 */
   refundNum?: number
-  /** 多币种信息，如 "USD 12.5" */
+  /** 币种代码，如 'USD'；为空表示默认币种 */
   currencyInfo?: string
+  /** 外币原金额（cost 存折合本币后的金额） */
+  currencyAssetNumber?: number
+  /** 外币优惠金额 */
+  currencyDiscountNumber?: number
   poiAddress?: string
+  /** 是否报销中 */
+  isReimbursement?: number
+  /** 报销金额（冗余，便于列表展示） */
+  reimbursementNum?: number
   fromUserId?: number
 }
 
@@ -52,6 +60,15 @@ export interface Reimbursement {
   settledAt?: number
   userId: number
   updateTime: number
+}
+
+/** 币种。rate 语义：1 单位该币种 = rate 个默认币种 */
+export interface Currency {
+  code: string       // USD
+  name: string       // 美元
+  symbol: string     // $
+  rate: number       // 对本币汇率
+  positionWeight: number
 }
 
 /** 周期记账规则：每月固定日期自动生成账单 */
@@ -112,6 +129,8 @@ export interface Asset {
   groupName: string
   hide: boolean
   intoTotalAsset: boolean
+  /** 账户币种，默认 CNY */
+  currency?: string
   positionWeight: number
   remark: string
   userId: number

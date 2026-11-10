@@ -240,3 +240,9 @@ button[disabled] { opacity: .5; cursor: not-allowed; }
 .uemail { font-size: 12px; color: var(--muted); max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ghost.tiny { padding: 5px 10px; font-size: 12px; }
 @media (max-width: 820px) { .uemail { display: none; } }
+
+/* 币种选择 */
+.amount .cur {
+  width: auto; flex: none; padding: 5px 8px; font-size: 12px;
+  border-radius: 8px; background: var(--accent-soft); color: #7a5230; border-color: #f0d5a0;
+}
