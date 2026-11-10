@@ -10,7 +10,8 @@
     "api": "node server/server.mjs",
     "icons": "node scripts/icon-manifest.mjs --write",
     "icons:check": "node scripts/icon-manifest.mjs",
-    "test:balances": "node tests/run-balances.cjs"
+    "test:balances": "node tests/run-balances.cjs",
+    "test:sync-identities": "node --test tests/sync-identities.test.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

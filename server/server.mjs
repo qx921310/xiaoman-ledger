@@ -175,9 +175,9 @@ function billNumber(bookId, recordId, userId) {
   return { creator_id: userId, member_no: memberNo, sequence_no: sequenceNo }
 }
 const myBooks = (userId) =>
-  db.prepare('SELECT b.book_id AS bookId, b.name, b.owner_id AS ownerId, m.role FROM books b JOIN book_members m ON m.book_id = b.book_id WHERE m.user_id = ?').all(userId)
+  db.prepare('SELECT b.book_id AS bookId, b.name, b.owner_id AS ownerId, m.role, n.member_no AS memberNo FROM books b JOIN book_members m ON m.book_id = b.book_id LEFT JOIN book_member_numbers n ON n.book_id=m.book_id AND n.user_id=m.user_id WHERE m.user_id = ?').all(userId)
 const bookMembers = (bookId) =>
-  db.prepare('SELECT m.user_id AS userId, m.role, u.email FROM book_members m JOIN users u ON u.id = m.user_id WHERE m.book_id = ?').all(bookId)
+  db.prepare('SELECT m.user_id AS userId, m.role, u.email, n.member_no AS memberNo FROM book_members m JOIN users u ON u.id = m.user_id LEFT JOIN book_member_numbers n ON n.book_id=m.book_id AND n.user_id=m.user_id WHERE m.book_id = ? ORDER BY n.member_no').all(bookId)
 
 const emailOk = (v) => typeof v === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
 // 写接口默认关闭：只有设置了 LEDGER_WRITE_TOKEN 且请求带 x-write-token 才允许写入。
@@ -456,11 +456,12 @@ const server = createServer(async (req, res) => {
 
         // 1) 定位这条记录所属账本：优先用提交内容，墓碑则从服务端已有记录反查
         let bookId = r.bookId || (r.payload && r.payload.bookId != null ? String(r.payload.bookId) : null)
-        const existing = db.prepare(`SELECT user_id, book_id, updated_at FROM records
+        const existing = db.prepare(`SELECT user_id, book_id, updated_at, deleted FROM records
           WHERE kind = ? AND rid = ? AND (user_id = ? OR book_id IN (
             SELECT book_id FROM book_members WHERE user_id = ?))`)
           .all(r.kind, rid, user.id, user.id)
         if (!bookId && existing.length) bookId = existing[0].book_id || null
+        if (existing.some(e => e.book_id && bookId && e.book_id !== String(bookId))) { denied++; continue }
         // 记录存在于别人的账本里、而我不是成员 → 直接拒绝，避免写出一条无意义的私有墓碑
         if (!bookId && existing.some((e) => e.user_id !== user.id && e.book_id)) { denied++; continue }
 
@@ -475,7 +476,7 @@ const server = createServer(async (req, res) => {
 
         // 3) 版本比较（同一身份下）
         const mine = existing.find((e) => (e.book_id || null) === bookId)
-        if (mine && mine.updated_at > updatedAt) { skipped++; continue }
+        if (mine && (mine.updated_at > updatedAt || (mine.updated_at === updatedAt && mine.deleted && !r.deleted))) { skipped++; continue }
 
         let payload = r.payload ?? null
         if (r.kind === 'bill' && !r.deleted && bookId && payload) {

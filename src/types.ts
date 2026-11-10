@@ -12,7 +12,7 @@ export const ASSET_TYPE: Record<number, string> = {
 export const CREDIT_CARD = 2
 
 export interface Bill {
-  billId: number
+  billId: string | number
   /** Stable creation identity; old records may have only the numeric billId. */
   syncId?: string
   /** Assigned by the server within this book. */
@@ -71,7 +71,7 @@ export interface Bill {
 /** 报销：挂在账单上的附属记录（不改变账单本身） */
 export interface Reimbursement {
   reimbursementId: number
-  billId: number
+  billId: string | number
   /** 报销账户（资产） */
   assetId: number
   number: number
@@ -161,7 +161,7 @@ export const LEND_TYPE: Record<number, string> = {
 /** 退款：同样挂在账单上 */
 export interface Refund {
   refundId: number
-  billId: number
+  billId: string | number
   number: number
   userId: number
   updateTime: number
@@ -215,7 +215,7 @@ export interface Transfer {
   toCost?: number
   /** 手续费：>0 时单独生成一条支出账单，与 transfer 通过 billId 关联 */
   serviceCharge: number
-  billId: number
+  billId: string | number
   time: number
   remark: string
   tags: string[]

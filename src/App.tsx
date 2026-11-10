@@ -439,6 +439,7 @@ function AddBill({ notify }: { notify: (m: string) => void }) {
   const submit = () => {
     const v = Number(cost)
     if (!v || v <= 0) return notify('请输入金额')
+    if (String(curBookId) === '0') return notify('请先选择一个具体账本')
 
     if (mode === 'transfer') {
       if (!aid || !toAid) return notify('请选择转出和转入账户')
@@ -1555,7 +1556,7 @@ function Settings({ notify, me }: { notify: (m: string) => void; me?: { id: numb
     setSyncMsg('')
     try {
       const r = await syncNow()
-      setSyncMsg(`已推送 ${r.pushed} 条（跳过 ${r.skipped} 条较旧记录），拉回 ${r.pulled} 条`)
+      setSyncMsg(`已推送 ${r.pushed} 条（跳过 ${r.skipped} 条较旧记录），拉回 ${r.pulled} 条` + (r.denied ? `；${r.denied} 条因权限未能推送` : ''))
     } catch (e: any) {
       setSyncMsg('同步失败：' + (e?.message || '未知错误'))
     } finally {

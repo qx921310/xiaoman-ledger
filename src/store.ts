@@ -3,7 +3,7 @@ import { createJSONStorage, persist } from 'zustand/middleware'
 import type { AccountBook, Asset, Bill, Category, Currency, Cycle, Lend, Refund, Reimbursement, Tag, Transfer } from './types'
 import type { ImportPlan } from './importer'
 import { TAXONOMY_CHILDREN, TAXONOMY_INCOME, TAXONOMY_PARENTS } from './taxonomy'
-import { userStorage } from './auth'
+import { getCurrentUid, userStorage } from './auth'
 import { deriveAssets } from './balances'
 import { newBillIdentity } from './identity'
 
@@ -42,7 +42,7 @@ interface LedgerState {
   currencies: Currency[]
   defaultCurrency: string
   /** 删除墓碑：同步时要把删除动作也推上去，否则别的设备会把数据拉回来 */
-  tombstones: { kind: string; id: string; updatedAt: number }[]
+  tombstones: { kind: string; id: string; updatedAt: number; bookId?: string | number }[]
   lastSync: number
   /** 上次使用的分类/账户，用于快速记账 */
   lastParentId: number
@@ -52,7 +52,7 @@ interface LedgerState {
 
   addBill: (patch: Partial<Bill>) => Bill
   deleteTransfer: (transferId: number) => void
-  addReimbursement: (patch: { billId: number; assetId: number; number: number; detail?: string }) => void
+  addReimbursement: (patch: { billId: string | number; assetId: number; number: number; detail?: string }) => void
   settleReimbursement: (reimbursementId: number) => void
   deleteReimbursement: (reimbursementId: number) => void
   addCycle: (patch: Omit<Cycle, 'cycleId' | 'generated' | 'userId' | 'updateTime' | 'enabled'> & { enabled?: boolean }) => void
@@ -61,12 +61,12 @@ interface LedgerState {
   runCycles: () => number
   addLend: (patch: { type: 1 | 2 | 3 | 4; assetId: number; counterparty: string; number: number; interest?: number; repaymentAssetId?: number; time?: number; remark?: string }) => void
   deleteLend: (lendId: number) => void
-  addRefund: (patch: { billId: number; number: number }) => void
+  addRefund: (patch: { billId: string | number; number: number }) => void
   deleteRefund: (refundId: number) => void
   setBudget: (budget: Budget) => void
   removeBudget: (month: string, categoryId: number) => void
-  deleteBill: (billId: number) => void
-  updateBill: (billId: number, patch: Partial<Bill>) => void
+  deleteBill: (billId: string | number) => void
+  updateBill: (billId: string | number, patch: Partial<Bill>) => void
   addTransfer: (patch: { fromAssetId: number; toAssetId: number; cost: number; toCost?: number; serviceCharge?: number; time?: number; remark?: string }) => Transfer
   updateTransfer: (transferId: number, patch: Partial<Pick<Transfer, 'fromAssetId' | 'toAssetId' | 'cost' | 'toCost' | 'serviceCharge' | 'time' | 'remark'>>) => void
   addAsset: (patch: Partial<Asset>) => void
@@ -163,7 +163,7 @@ export const useLedger = create<LedgerState>()(
           remark: patch.remark ?? '',
           billType: patch.billType ?? 2,
           tags: patch.tags ?? [],
-          userId: s.userId,
+          userId: getCurrentUid() || s.userId,
           updateTime: NOW(),
           // 冗余快照：改名不影响历史账单
           billShareInfo: {
@@ -210,7 +210,7 @@ export const useLedger = create<LedgerState>()(
       deleteBill: (billId) => set((s) => {
         const old = s.bills.find((b) => b.billId === billId)
         if (!old) return {}
-        const tomb = { kind: 'bill', id: old.syncId ?? String(billId), updatedAt: NOW() }
+        const tomb = { kind: 'bill', id: old.syncId ?? String(billId), bookId: old.bookId, updatedAt: NOW() }
         const sign = s.parentCategories.find((p) => p.id === old.parentCategoryId)?.kind === 'income' ? 1 : -1
         return {
           bills: s.bills.filter((b) => b.billId !== billId),
@@ -269,7 +269,7 @@ export const useLedger = create<LedgerState>()(
         }))
 
         // 2) 手续费：单独一条支出账单（内部会给转出方再扣一次）
-        let billId = 0
+        let billId: string | number = 0
         if (fee > 0) {
           const bill = get().addBill({
             cost: fee,
@@ -314,7 +314,7 @@ export const useLedger = create<LedgerState>()(
           bills: old.billId ? st.bills.filter((b) => b.billId !== old.billId) : st.bills,
           tombstones: old.billId
             ? [...st.tombstones.filter((x) => !(x.kind === 'bill' && x.id === (feeBill?.syncId ?? String(old.billId)))),
-               { kind: 'bill', id: feeBill?.syncId ?? String(old.billId), updatedAt: NOW() }]
+               { kind: 'bill', id: feeBill?.syncId ?? String(old.billId), bookId: feeBill?.bookId, updatedAt: NOW() }]
             : st.tombstones,
           assets: st.assets.map((a) => {
             let v = a.assetNumber
@@ -358,7 +358,8 @@ export const useLedger = create<LedgerState>()(
       deleteTransfer: (transferId) => set((s) => {
         const t = s.transfers.find((x) => x.transferId === transferId)
         if (!t) return {}
-        const feeIdentity = s.bills.find(b => b.billId === t.billId)?.syncId ?? String(t.billId)
+        const feeBill = s.bills.find(b => b.billId === t.billId)
+        const feeIdentity = feeBill?.syncId ?? String(t.billId)
         // 撤销：转出方退回本金+手续费，转入方扣回到账金额；连带删掉手续费账单
         const back = t.cost + t.serviceCharge
         const toBack = t.toCost ?? t.cost
@@ -370,7 +371,7 @@ export const useLedger = create<LedgerState>()(
             ...s.tombstones.filter((x) => !(t.billId && x.kind === 'bill' && x.id === feeIdentity)
               && !(x.kind === 'transfer' && x.id === String(transferId))),
             { kind: 'transfer', id: String(transferId), updatedAt: NOW() },
-            ...(t.billId ? [{ kind: 'bill', id: feeIdentity, updatedAt: NOW() }] : [])
+            ...(t.billId ? [{ kind: 'bill', id: feeIdentity, bookId: feeBill?.bookId, updatedAt: NOW() }] : [])
           ],
           assets: s.assets.map((a) => {
             if (a.assetId === t.fromAssetId) return { ...a, assetNumber: +(a.assetNumber + back).toFixed(2), updateTime: NOW() }
@@ -500,7 +501,7 @@ export const useLedger = create<LedgerState>()(
               parentCategoryId: c.parentCategoryId, childCategoryId: c.childCategoryId,
               assetId: c.assetId, bookId: t.currentBookId || 1,
               remark: c.remark || c.name, billType: 4,
-              tags: [], files: [], userId: t.userId, updateTime: NOW(),
+              tags: [], files: [], userId: getCurrentUid() || t.userId, updateTime: NOW(),
               billShareInfo: {
                 parentCategoryName: parent?.name ?? '',
                 childCategoryName: t.childCategories.find((x) => x.id === c.childCategoryId)?.name ?? '',
@@ -773,7 +774,7 @@ export const useLedger = create<LedgerState>()(
           if (r.ownerId != null && r.payload.ownerId == null) r.payload = { ...r.payload, ownerId: r.ownerId }
           const idx = arr.findIndex((x) => idOf(r.kind, x) === String(r.id))
           const ownerOf = (x: any) => (x?.ownerId ?? x?.userId ?? 0)
-          if (idx >= 0 && r.kind !== 'bill' && ownerOf(arr[idx]) !== ownerOf(r.payload)) {
+          if (idx >= 0 && (r.kind !== 'bill' || (!arr[idx].syncId && !r.payload.syncId)) && ownerOf(arr[idx]) !== ownerOf(r.payload)) {
             // 同 ID 但身份不同：不覆盖，顺位给一个新 ID，两条并存
             const idField = k[1]
             const taken = new Set(arr.map((x) => String(x[idField])))

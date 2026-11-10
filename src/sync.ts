@@ -6,6 +6,7 @@ export interface SyncRecord {
   payload: any
   updatedAt: number
   deleted?: boolean
+  bookId?: string | number
 }
 
 /** kind → [store 里的集合名, 主键字段] */
@@ -40,7 +41,7 @@ export function collectRecords(): SyncRecord[] {
     }
   }
   for (const t of s.tombstones || []) {
-    out.push({ kind: t.kind, id: String(t.id), payload: null, updatedAt: t.updatedAt, deleted: true })
+    out.push({ kind: t.kind, id: String(t.id), bookId: t.bookId, payload: null, updatedAt: t.updatedAt, deleted: true })
   }
   return out
 }
@@ -68,6 +69,7 @@ export async function syncNow() {
   return {
     pushed: pushed.accepted as number,
     skipped: pushed.skipped as number,
+    denied: pushed.denied as number,
     pulled: (pulled.records || []).length as number
   }
 }

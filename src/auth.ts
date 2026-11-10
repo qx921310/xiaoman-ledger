@@ -25,6 +25,7 @@ export interface BookInfo {
   name: string
   ownerId: number
   role: 'silent' | 'peer' | 'admin'
+  memberNo?: number
 }
 
 export const books = {
