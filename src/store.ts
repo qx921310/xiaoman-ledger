@@ -733,8 +733,23 @@ export const useLedger = create<LedgerState>()(
           const idx = arr.findIndex((x) => idOf(r.kind, x) === String(r.id))
           const localTime = idx >= 0 ? (arr[idx].updateTime ?? 0) : -1
           if (idx < 0 || (r.updatedAt ?? 0) > localTime) {
-            if (idx >= 0) arr[idx] = r.payload
-            else arr.push(r.payload)
+            if (idx >= 0) {
+              const prev = arr[idx]
+              // 并发冲突：同一条记录被不同的人写过（同一秒记账撞了 ID）
+              const clash = (prev.ownerId != null && r.ownerId != null && prev.ownerId !== r.ownerId)
+                || (prev.ownerId == null && r.ownerId != null && prev.userId !== r.ownerId)
+              arr[idx] = clash
+                ? { ...r.payload, conflict: true, conflictOwnerId: prev.ownerId ?? prev.userId }
+                : r.payload
+            } else {
+              // 不同账本/不同人的同 ID 记录：保留一条，标记冲突
+              const dup = arr.filter((x) => idOf(r.kind, x) === String(r.id))
+              arr.push(r.payload)
+              if (dup.length) {
+                const i2 = arr.findIndex((x) => idOf(r.kind, x) === String(r.id) && x !== r.payload)
+                if (i2 >= 0) arr[i2] = { ...arr[i2], conflict: true }
+              }
+            }
           }
           next[k[0]] = arr
         }

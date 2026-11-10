@@ -489,8 +489,6 @@ function Bills({ me }: { me?: { id: number; email: string } }) {
   const accountBooks = useLedger((s) => s.accountBooks)
   const myRole = accountBooks.find((b) => b.bookId && String(b.bookId) === String(currentBookId))?.role
   const readOnly = myRole === 'silent'
-  // 共享账本里别人记的账，列表上用 ❗ 标记（记账人本身在明细里看）
-  const isForeign = (b: Bill) => b.ownerId != null && me?.id != null && b.ownerId !== me.id
   const updateTransfer = useLedger((s) => s.updateTransfer)
   const [editingTransfer, setEditingTransfer] = useState<Transfer | null>(null)
 
@@ -613,7 +611,7 @@ function Bills({ me }: { me?: { id: number; email: string } }) {
                 <div className="grow">
                   <div>
                     {p?.name ?? '未分类'}
-                    {isForeign(b) && <span className="foreign" title="由其他成员记录 — 点「明细」查看记账人">❗</span>}
+                    {b.conflict && <span className="foreign" title="并发冲突：与他人同一秒记账撞了 ID，可能有一条未并入 — 点「明细」查看">❗</span>}
                     {b.remark ? <span className="remark"> · {b.remark}</span> : null}
                   </div>
                   <small>
@@ -749,6 +747,13 @@ function BillDetail({ bill, me, onClose, onEdit }: {
         {bill.currencyInfo && (
           <Row label="币种">
             {bill.currencyInfo}{bill.currencyAssetNumber ? ` ${bill.currencyAssetNumber.toFixed(2)}` : ''}
+          </Row>
+        )}
+        {bill.conflict && (
+          <Row label="冲突提示">
+            <span style={{ color: 'var(--out)' }}>
+              与他人同一秒记账撞了 ID，这条已保留{bill.conflictOwnerId != null ? `（对方 #${bill.conflictOwnerId}）` : ''}
+            </span>
           </Row>
         )}
         <Row label="记账人">

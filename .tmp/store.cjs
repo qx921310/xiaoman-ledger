@@ -3032,6 +3032,7 @@ var useLedger = create()(
       refunds: [],
       lends: [],
       cycles: [],
+      tags: [],
       currencies: [
         { code: "CNY", name: "\u4EBA\u6C11\u5E01", symbol: "\xA5", rate: 1, positionWeight: 100 },
         { code: "USD", name: "\u7F8E\u5143", symbol: "$", rate: 7.2, positionWeight: 90 },
@@ -3460,6 +3461,22 @@ var useLedger = create()(
         assets: s.assets.map((a) => a.assetId === asset.assetId ? { ...asset, updateTime: NOW() } : a)
       })),
       setBook: (id) => set({ currentBookId: id }),
+      // 老数据的 bookId 是数字（本地账本），切到服务端账本后要把它们迁过去，否则会被过滤掉
+      migrateBookIds: (targetBookId) => {
+        let n = 0;
+        set((s) => ({
+          bills: s.bills.map((b) => {
+            if (typeof b.bookId === "string") return b;
+            n++;
+            return { ...b, bookId: targetBookId };
+          })
+        }));
+        return n;
+      },
+      setAccountBooks: (list) => set((s) => {
+        const local = s.accountBooks.filter((b) => !b.bookId);
+        return { accountBooks: [...local, ...list] };
+      }),
       seed: () => {
         const assets = [
           { assetId: 1, assetName: "\u62DB\u884C\u50A8\u84C4\u5361", assetType: 1, assetNumber: 12500.5, groupName: "\u94F6\u884C\u5361", hide: false, intoTotalAsset: true, positionWeight: 0, remark: "", userId: 1, updateTime: NOW() },
@@ -3516,6 +3533,39 @@ var useLedger = create()(
         };
       },
       setLastSync: (t) => set({ lastSync: t }),
+      addTag: (patch) => {
+        const tag = {
+          tagId: NOW() + Math.floor(Math.random() * 1e3),
+          name: patch.name,
+          color: patch.color || "#FED778",
+          parentName: patch.parentName || void 0,
+          positionWeight: patch.positionWeight ?? 0
+        };
+        set((s) => ({ tags: [...s.tags, tag] }));
+        return tag;
+      },
+      updateTag: (tagId, patch) => set((s) => ({
+        tags: s.tags.map((t) => t.tagId === tagId ? { ...t, ...patch } : t)
+      })),
+      deleteTag: (tagId) => set((s) => ({ tags: s.tags.filter((t) => t.tagId !== tagId) })),
+      // 导入/输入时按名字补齐标签实体，返回补齐数量
+      ensureTags: (names) => {
+        const s = get();
+        const have = new Set(s.tags.map((t) => t.name));
+        const missing = [...new Set(names.map((n) => n.trim()).filter(Boolean))].filter((n) => !have.has(n));
+        if (!missing.length) return 0;
+        const palette = ["#FED778", "#F8C8B0", "#CFE3F7", "#D9F0C8", "#E6D9F7", "#F7D9E6"];
+        let i = s.tags.length;
+        set((st) => ({
+          tags: [...st.tags, ...missing.map((n) => ({
+            tagId: NOW() + i++,
+            name: n,
+            color: palette[i % palette.length],
+            positionWeight: i
+          }))]
+        }));
+        return missing.length;
+      },
       setCurrencyRate: (code, rate) => set((s) => {
         const r = Number(rate);
         if (!Number.isFinite(r) || r <= 0) return {};
@@ -3561,11 +3611,22 @@ var useLedger = create()(
             continue;
           }
           if (!r.payload) continue;
+          if (r.ownerId != null && r.payload.ownerId == null) r.payload = { ...r.payload, ownerId: r.ownerId };
           const idx = arr.findIndex((x) => idOf(r.kind, x) === String(r.id));
           const localTime = idx >= 0 ? arr[idx].updateTime ?? 0 : -1;
           if (idx < 0 || (r.updatedAt ?? 0) > localTime) {
-            if (idx >= 0) arr[idx] = r.payload;
-            else arr.push(r.payload);
+            if (idx >= 0) {
+              const prev = arr[idx];
+              const clash = prev.ownerId != null && r.ownerId != null && prev.ownerId !== r.ownerId || prev.ownerId == null && r.ownerId != null && prev.userId !== r.ownerId;
+              arr[idx] = clash ? { ...r.payload, conflict: true, conflictOwnerId: prev.ownerId ?? prev.userId } : r.payload;
+            } else {
+              const dup = arr.filter((x) => idOf(r.kind, x) === String(r.id));
+              arr.push(r.payload);
+              if (dup.length) {
+                const i2 = arr.findIndex((x) => idOf(r.kind, x) === String(r.id) && x !== r.payload);
+                if (i2 >= 0) arr[i2] = { ...arr[i2], conflict: true };
+              }
+            }
           }
           next[k[0]] = arr;
         }

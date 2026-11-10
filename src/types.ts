@@ -51,6 +51,10 @@ export interface Bill {
   displayAsSelf?: boolean
   /** 记录人 userId（共享账本用于显示「谁记的」） */
   ownerId?: number
+  /** 并发冲突标记：与他人同一秒记账撞了 ID，这条是保留下来的那条 */
+  conflict?: boolean
+  /** 冲突时对方的记录人（仅用于提示） */
+  conflictOwnerId?: number
   /** 是否报销中 */
   isReimbursement?: number
   /** 报销金额（冗余，便于列表展示） */
