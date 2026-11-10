@@ -71,6 +71,7 @@ interface LedgerState {
   updateAsset: (asset: Asset) => void
   setBook: (id: string | number) => void
   setAccountBooks: (list: AccountBook[]) => void
+  migrateBookIds: (targetBookId: string) => number
   seed: () => void
   reset: () => void
   exportAll: () => object
@@ -572,6 +573,19 @@ export const useLedger = create<LedgerState>()(
 
       setBook: (id) => set({ currentBookId: id }),
 
+      // 老数据的 bookId 是数字（本地账本），切到服务端账本后要把它们迁过去，否则会被过滤掉
+      migrateBookIds: (targetBookId) => {
+        let n = 0
+        set((s) => ({
+          bills: s.bills.map((b) => {
+            if (typeof b.bookId === 'string') return b
+            n++
+            return { ...b, bookId: targetBookId }
+          })
+        }))
+        return n
+      },
+
       setAccountBooks: (list) => set((s) => {
         // 保留本地账本（数字 id），替换服务端账本
         const local = s.accountBooks.filter((b) => !b.bookId)
@@ -715,6 +729,7 @@ export const useLedger = create<LedgerState>()(
             continue
           }
           if (!r.payload) continue
+          if (r.ownerId != null && r.payload.ownerId == null) r.payload = { ...r.payload, ownerId: r.ownerId }
           const idx = arr.findIndex((x) => idOf(r.kind, x) === String(r.id))
           const localTime = idx >= 0 ? (arr[idx].updateTime ?? 0) : -1
           if (idx < 0 || (r.updatedAt ?? 0) > localTime) {

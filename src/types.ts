@@ -49,6 +49,8 @@ export interface Bill {
   inAssetTime?: number
   /** 共享账本中是否按本人显示 */
   displayAsSelf?: boolean
+  /** 记录人 userId（共享账本用于显示「谁记的」） */
+  ownerId?: number
   /** 是否报销中 */
   isReimbursement?: number
   /** 报销金额（冗余，便于列表展示） */

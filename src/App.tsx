@@ -105,6 +105,10 @@ export default function App() {
         ownerId: b.ownerId,
         role: b.role
       })))
+      if (list[0]) {
+        // 老账单的 bookId 是数字，统一迁到服务端第一个账本
+        useLedger.getState().migrateBookIds(list[0].bookId)
+      }
       const cur = useLedger.getState().currentBookId
       const match = list.find((b) => b.bookId === localStorage.getItem('xm-current-book'))
       if (match) useLedger.getState().setBook(match.bookId as any)
@@ -238,7 +242,7 @@ function Shell({ user, onLogout }: { user: User; onLogout: () => void }) {
 
       <main className="main">
         {tab === 'add' && <AddBill notify={notify} />}
-        {tab === 'bills' && <Bills />}
+        {tab === 'bills' && <Bills me={user} />}
         {tab === 'assets' && <Assets notify={notify} />}
         {tab === 'stats' && <Stats />}
         {tab === 'settings' && <Settings notify={notify} />}
@@ -465,7 +469,7 @@ function AddBill({ notify }: { notify: (m: string) => void }) {
   )
 }
 
-function Bills() {
+function Bills({ me }: { me?: { id: number; email: string } }) {
   const bills = useLedger((s) => s.bills)
   const transfers = useLedger((s) => s.transfers)
   const parents = useLedger((s) => s.parentCategories)
@@ -486,6 +490,7 @@ function Bills() {
   const [fPid, setFPid] = useState(0)
   const [fAid, setFAid] = useState(0)
   const [editing, setEditing] = useState<Bill | null>(null)
+  const [detail, setDetail] = useState<Bill | null>(null)
 
   const nameOf = (pid: number) => parents.find((p) => p.id === pid)?.name ?? ''
   const isIncome = (pid: number) => parents.find((p) => p.id === pid)?.kind === 'income'
@@ -623,6 +628,7 @@ function Bills() {
                   )}
                 </div>
                 <b className={inc ? 'in' : 'out'}>{inc ? '+' : '-'}{money(b.cost)}</b>
+                <button className="link" onClick={() => setDetail(b)}>明细</button>
                 <button className="link" onClick={() => setEditing(b)}>改</button>
                 <button className="del" onClick={() => del(b.billId)}>删</button>
               </div>
@@ -630,6 +636,15 @@ function Bills() {
           })}
         </div>
       ))}
+
+      {detail && (
+        <BillDetail
+          bill={detail}
+          me={me}
+          onClose={() => setDetail(null)}
+          onEdit={() => { setEditing(detail); setDetail(null) }}
+        />
+      )}
 
       {editingTransfer && (
         <TransferEditor
@@ -646,6 +661,96 @@ function Bills() {
         }} />
       )}
     </section>
+  )
+}
+
+function BillDetail({ bill, me, onClose, onEdit }: {
+  bill: Bill; me?: { id: number; email: string }
+  onClose: () => void; onEdit: () => void
+}) {
+  const parents = useLedger((s) => s.parentCategories)
+  const children = useLedger((s) => s.childCategories)
+  const assets = useLedger((s) => s.assets)
+  const books = useLedger((s) => s.accountBooks)
+  const tags = useLedger((s) => s.tags)
+  const updateBill = useLedger((s) => s.updateBill)
+  const del = useLedger((s) => s.deleteBill)
+
+  const p = parents.find((x) => x.id === bill.parentCategoryId)
+  const c = children.find((x) => x.id === bill.childCategoryId)
+  const a = assets.find((x) => x.assetId === bill.assetId)
+  const bk = books.find((b) => String(b.bookId ?? b.accountBookId) === String(bill.bookId))
+  const isIncome = p?.kind === 'income'
+  const tagColor = (name: string) => tags.find((t) => t.name === name)?.color
+  const [memberMap, setMemberMap] = useState<Record<number, string>>({})
+  useEffect(() => {
+    bookApi.members(String(bill.bookId)).then((r) => {
+      const m: Record<number, string> = {}
+      for (const x of r.members ?? []) m[x.userId] = x.email
+      setMemberMap(m)
+    }).catch(() => {})
+  }, [bill.bookId])
+
+  const Row = ({ label, children }: { label: string; children: React.ReactNode }) => (
+    <div className="drow"><span className="dl">{label}</span><span className="dv">{children}</span></div>
+  )
+  const Toggle = ({ label, on }: { label: string; on: boolean }) => (
+    <div className="drow">
+      <span className="dl">{label}</span>
+      <button className={'switch' + (on ? ' on' : '')} onClick={() => updateBill(bill.billId, { [label === '不计入收支' ? 'notIntoTotal' : 'notIntoBudget']: !on } as any)}>
+        <i />
+      </button>
+    </div>
+  )
+
+  return (
+    <div className="modal-mask" onClick={onClose}>
+      <div className="modal detail" onClick={(e) => e.stopPropagation()}>
+        <div className="dhead" style={{ background: p?.bg ?? 'var(--accent-soft)', color: p?.color ?? 'var(--ink)' }}>
+          <CatIcon k={p?.icon} size={34} />
+          <div className="grow">
+            <div className="dt">{p?.name}{c ? ` - ${c.name}` : ''}</div>
+            <div className="ds">{dayOf(bill.time)} {hhmm(bill.time)}</div>
+            {bill.remark && <div className="ds">{bill.remark}</div>}
+          </div>
+          <div className="damt">{isIncome ? '+' : '-'}{money(bill.cost)}</div>
+        </div>
+
+        <Row label="账单分类">{p?.name}{c ? ` - ${c.name}` : ''}</Row>
+        <Row label="账单日期">{dayOf(bill.time)} {hhmm(bill.time)}</Row>
+        <Row label="收支账户">{a?.assetName ?? '无'}</Row>
+        <Row label="备注">{bill.remark || '无'}</Row>
+        <Row label="标签">
+          {(bill.tags && bill.tags.length)
+            ? bill.tags.map((t) => (
+              <span key={t} className="tag" style={{ background: tagColor(t) ?? undefined, color: '#4a2f16' }}>{t}</span>
+            ))
+            : '无'}
+        </Row>
+        <Row label="附件">{bill.files && bill.files.length ? `${bill.files.length} 个` : '无'}</Row>
+        <Toggle label="不计入收支" on={!!bill.notIntoTotal} />
+        <Toggle label="不计入预算" on={!!bill.notIntoBudget} />
+        <Row label="所属账本">{bk?.accountBookName ?? '默认账本'}</Row>
+        <Row label="记录时间">{dayOf(bill.recordTime ?? bill.time)} {hhmm(bill.recordTime ?? bill.time)}</Row>
+        <Row label="记录方式">{BILL_TYPE[bill.billType] ?? '手动记账'}</Row>
+        {bill.currencyInfo && (
+          <Row label="币种">
+            {bill.currencyInfo}{bill.currencyAssetNumber ? ` ${bill.currencyAssetNumber.toFixed(2)}` : ''}
+          </Row>
+        )}
+        <Row label="记账人">
+          {bill.ownerId == null || bill.ownerId === me?.id
+            ? `${me?.email ?? '我'}（我）`
+            : (memberMap[bill.ownerId] ?? `用户 #${bill.ownerId}`)}
+        </Row>
+
+        <div className="modal-btns">
+          <button className="ghost" onClick={onClose}>关闭</button>
+          <button className="ghost" onClick={() => { del(bill.billId); onClose() }}>删除</button>
+          <button className="primary" onClick={onEdit}>编辑</button>
+        </div>
+      </div>
+    </div>
   )
 }
 
