@@ -31,6 +31,18 @@ export const TAXONOMY_INCOME: Category[] = [
 ]
 
 export const TAXONOMY_CHILDREN: Category[] = [
+  { id: 601, name: '其他', parentId: 1, kind: 'expense', color: '#cbd5e1', positionWeight: 0, icon: 'ic_misc_other' },
+  { id: 602, name: '其他', parentId: 2, kind: 'expense', color: '#cbd5e1', positionWeight: 0, icon: 'ic_misc_other' },
+  { id: 603, name: '其他', parentId: 3, kind: 'expense', color: '#cbd5e1', positionWeight: 0, icon: 'ic_misc_other' },
+  { id: 604, name: '其他', parentId: 4, kind: 'expense', color: '#cbd5e1', positionWeight: 0, icon: 'ic_misc_other' },
+  { id: 605, name: '其他', parentId: 5, kind: 'expense', color: '#cbd5e1', positionWeight: 0, icon: 'ic_misc_other' },
+  { id: 606, name: '其他', parentId: 6, kind: 'expense', color: '#cbd5e1', positionWeight: 0, icon: 'ic_misc_other' },
+  { id: 607, name: '其他', parentId: 7, kind: 'expense', color: '#cbd5e1', positionWeight: 0, icon: 'ic_misc_other' },
+  { id: 608, name: '其他', parentId: 8, kind: 'expense', color: '#cbd5e1', positionWeight: 0, icon: 'ic_misc_other' },
+  { id: 701, name: '蔬菜', parentId: 7, kind: 'expense', color: '#cbd5e1', positionWeight: 0, icon: 'ic_restaurant_vegetable' },
+  { id: 702, name: '水果', parentId: 7, kind: 'expense', color: '#cbd5e1', positionWeight: 0, icon: 'ic_restaurant_fruit' },
+  { id: 703, name: '下午茶', parentId: 7, kind: 'expense', color: '#cbd5e1', positionWeight: 0, icon: 'ic_restaurant_afternoon_tea' },
+  { id: 704, name: '夜宵', parentId: 7, kind: 'expense', color: '#cbd5e1', positionWeight: 0, icon: 'ic_restaurant_night_snack' },
   { id: 801, name: '装修装饰', parentId: 8, kind: 'expense', color: '#cbd5e1', positionWeight: 0, icon: 'ic_shopping_renovation' },
   { id: 802, name: '办公用品', parentId: 8, kind: 'expense', color: '#cbd5e1', positionWeight: 0, icon: 'ic_shopping_office' },
   { id: 803, name: '宠物用品', parentId: 8, kind: 'expense', color: '#cbd5e1', positionWeight: 0, icon: 'ic_shopping_pets' },

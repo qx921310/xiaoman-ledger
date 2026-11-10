@@ -71,17 +71,29 @@ export default function App() {
         adoptAnonymousData(u.id)
         await useLedger.persist.rehydrate()
         setUser(u)
+        autoSyncOnce()
       } else {
         setUser(null)
       }
     })
   }, [])
 
+  // 打开应用时自动同步一次；失败不打扰用户，手动同步仍可用
+  const autoSyncOnce = async () => {
+    try {
+      const r = await syncNow()
+      console.log('[sync] 自动同步完成', r)
+    } catch (e) {
+      console.warn('[sync] 自动同步失败（可手动重试）', e)
+    }
+  }
+
   const afterAuth = async (u: User) => {
     setCurrentUid(u.id)
     adoptAnonymousData(u.id)
     await useLedger.persist.rehydrate()
     setUser(u)
+    autoSyncOnce()
   }
 
   const logout = async () => {
