@@ -53,7 +53,36 @@ const ASSET_ICON: Record<number, string> = {
   4: 'ic_asset_investment', 5: 'ic_asset_default', 6: 'ic_asset_deposit',
   7: 'ic_asset_cash', 8: 'ic_asset_fixed_deposit', 9: 'ic_asset_insurance'
 }
-function AssetIcon({ type, size = 18 }: { type: number; size?: number }) {
+
+/** 账户名 → 品牌图标（Simple Icons，CC0，单色可用 mask 上色） */
+const BRAND_RULES: [RegExp, string, string][] = [
+  [/支付宝|alipay/i, 'alipay', '#1677FF'],
+  [/微信|wechat|weixin/i, 'wechat', '#07C160'],
+  [/apple\s*pay/i, 'applepay', '#111111'],
+  [/google\s*pay/i, 'googlepay', '#4285F4'],
+  [/paypal/i, 'paypal', '#003087'],
+  [/visa/i, 'visa', '#1A1F71'],
+  [/master/i, 'mastercard', '#EB001B'],
+  [/stripe/i, 'stripe', '#635BFF'],
+  [/paytm/i, 'paytm', '#00BAF2']
+]
+const brandOf = (name: string) => BRAND_RULES.find(([re]) => re.test(name ?? ''))
+
+function AssetIcon({ type, size = 18, name }: { type: number; size?: number; name?: string }) {
+  const brand = name ? brandOf(name) : undefined
+  if (brand) {
+    const [, key, color] = brand
+    return (
+      <span
+        className="asset-ico"
+        title={name}
+        style={{
+          width: size, height: size, color,
+          WebkitMaskImage: `url(/icons/brands/${key}.svg)`, maskImage: `url(/icons/brands/${key}.svg)`
+        } as React.CSSProperties}
+      />
+    )
+  }
   const k = ASSET_ICON[type] ?? 'ic_asset_default'
   return (
     <span
@@ -979,7 +1008,7 @@ function Assets({ notify }: { notify: (m: string) => void }) {
 
       {assets.map((a) => (
         <div key={a.assetId} className="row">
-          <span className="asset-badge"><AssetIcon type={a.assetType} size={16} /></span>
+          <span className="asset-badge"><AssetIcon type={a.assetType} name={a.assetName} size={16} /></span>
           <div className="grow">
             <div>
               {a.assetName}

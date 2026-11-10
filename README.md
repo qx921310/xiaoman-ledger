@@ -4,6 +4,12 @@
 
 参考市面个人记账产品的**功能结构**自行实现，不复用任何第三方的品牌、文案、图标或样式资源。
 
+## 图标来源
+
+- 分类与账户：Codex 绘制（基于 Lucide 1.69，ISC），`public/icons/{categories,assets}`
+- 第三方钱包/卡组织：**Simple Icons（CC0）**，`public/icons/brands`，按账户名匹配（支付宝/微信/Apple Pay/PayPal/Visa…），用 CSS mask 上品牌色
+- 银行图标暂用类型图标兜底；如需彩色行徽，从银行官网品牌资源下载后放 `public/icons/brands/` 并加规则即可
+
 ## 账号
 
 - 邮箱 + 密码注册/登录，密码用 **scrypt + 随机 salt** 哈希，服务端不保存明文
@@ -30,7 +36,7 @@
 ## 视觉
 
 - 暖色主题（取自设计画布），全部走 CSS 变量，换色不改布局
-- 图标：74 个分类 + 14 个账户 + 品牌标，`public/icons/`，线性 `currentColor`，用 CSS mask 上色
+- 图标：分类/账户/品牌标，`public/icons/`，线性 `currentColor`，用 CSS mask 上色
 - 品牌标记用 `logo-mark.svg`；横版 logo 的占位文字待正式命名后替换
 
 ## 技术栈
