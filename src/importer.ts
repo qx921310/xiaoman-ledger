@@ -387,7 +387,7 @@ export function exportXlsx(
   const ws = XLSX.utils.aoa_to_sheet([header, ...rows])
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, '账单')
-  XLSX.writeFile(wb, `青账导出_${new Date().toISOString().slice(0, 10)}.xlsx`)
+  XLSX.writeFile(wb, `小满记账导出_${new Date().toISOString().slice(0, 10)}.xlsx`)
 }
 
 function fmtTime(t: number) {

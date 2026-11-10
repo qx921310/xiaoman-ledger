@@ -79,10 +79,10 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <div className="brand">
-          <img className="logo-img" src="/icons/brand/logo-mark.svg" alt="青账" />
+          <img className="logo-img" src="/icons/brand/logo-mark.svg" alt="小满记账" />
           <div>
-            <strong>青账</strong>
-            <small>个人记账 · 自建版</small>
+            <strong>小满记账</strong>
+            <small>小有盈余，日子清楚</small>
           </div>
         </div>
         <BookSwitch />
