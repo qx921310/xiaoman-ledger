@@ -3296,27 +3296,48 @@ var useLedger = create()(
       // 补生成所有到期未生成的周期账单；返回本次生成条数
       runCycles: () => {
         const s = get();
-        const now = /* @__PURE__ */ new Date();
-        const todayDay = now.getDate();
-        const cy = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-        let count = 0;
-        const pending = s.cycles.filter((c) => c.enabled).map((c) => {
+        const today = /* @__PURE__ */ new Date();
+        today.setHours(23, 59, 59, 999);
+        const dkey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        const dueDates = (c) => {
           const start = new Date(c.startTime);
-          const gen = [];
-          for (let d = new Date(start.getFullYear(), start.getMonth(), 1); ; d.setMonth(d.getMonth() + 1)) {
-            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-            const isCurrent = key === cy;
-            const due = isCurrent ? todayDay >= c.dayOfMonth : key < cy;
-            if (due && !c.generated.includes(key) && !gen.includes(key)) gen.push(key);
-            if (key >= cy) break;
+          start.setHours(0, 0, 0, 0);
+          const out = [];
+          const push = (d) => {
+            if (d >= start && d <= today) out.push(d);
+          };
+          const type = c.cycleType ?? "month";
+          if (type === "week") {
+            const days = (c.weekdays && c.weekdays.length ? c.weekdays : [1]).map(Number);
+            for (let d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
+              if (days.includes(d.getDay())) push(new Date(d));
+            }
+          } else if (type === "year") {
+            const m = (c.monthOfYear ?? 1) - 1;
+            for (let y = start.getFullYear(); y <= today.getFullYear(); y++) {
+              const days = c.monthLast ? [new Date(y, m + 1, 0).getDate()] : c.monthDays && c.monthDays.length ? c.monthDays : [c.dayOfMonth];
+              for (const day of days) push(new Date(y, m, Math.min(day, 28)));
+            }
+          } else {
+            for (let d = new Date(start.getFullYear(), start.getMonth(), 1); d <= today; d.setMonth(d.getMonth() + 1)) {
+              const y = d.getFullYear(), m = d.getMonth();
+              if (c.monthLast) {
+                push(new Date(y, m + 1, 0));
+                continue;
+              }
+              const days = c.monthDays && c.monthDays.length ? c.monthDays : [c.dayOfMonth];
+              for (const day of days) push(new Date(y, m, Math.min(day, 28)));
+            }
           }
-          return { c, gen };
-        });
+          return out;
+        };
+        let count = 0;
         const updated = [];
-        for (const { c, gen } of pending) {
-          for (const key of gen) {
-            const [y, m] = key.split("-").map(Number);
-            const time = new Date(y, m - 1, Math.min(c.dayOfMonth, 28), 9, 0, 0).getTime();
+        for (const c of s.cycles.filter((x) => x.enabled)) {
+          const done = new Set(c.generated);
+          const fresh = dueDates(c).filter((d) => !done.has(dkey(d)));
+          for (const d of fresh) {
+            const time = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 9, 0, 0).getTime();
             const t = get();
             let billId = Math.floor(time / 1e3);
             while (t.bills.some((b) => b.billId === billId)) billId++;
@@ -3347,9 +3368,10 @@ var useLedger = create()(
               bills: [bill, ...st.bills],
               assets: st.assets.map((a) => a.assetId === c.assetId ? { ...a, assetNumber: +(a.assetNumber + sign * c.cost).toFixed(2), updateTime: NOW() } : a)
             }));
+            done.add(dkey(d));
             count++;
           }
-          if (gen.length) updated.push({ ...c, generated: [...c.generated, ...gen], updateTime: NOW() });
+          if (fresh.length) updated.push({ ...c, generated: [...done], updateTime: NOW() });
         }
         if (updated.length) {
           const map = new Map(updated.map((u) => [u.cycleId, u]));

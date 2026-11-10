@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLedger, useTotalAssets } from './store'
 import { ASSET_TYPE, BILL_TYPE, LEND_TYPE } from './types'
+import type { Cycle } from './types'
 import type { Asset, Bill, Transfer } from './types'
 import { api } from './api'
 import type { ImportPlan } from './importer'
@@ -743,6 +744,22 @@ function RateInput({ value, onCommit }: { value: number; onCommit: (v: number) =
   )
 }
 
+/** 把周期规则翻译成一句人话 */
+function describeCycle(c: Cycle): string {
+  const t = c.cycleType ?? 'month'
+  if (t === 'week') {
+    const names = ['日', '一', '二', '三', '四', '五', '六']
+    const days = (c.weekdays && c.weekdays.length ? c.weekdays : [1]).map((d) => '周' + names[d]).join('、')
+    return `每${days}`
+  }
+  if (t === 'year') {
+    return `每年 ${c.monthOfYear ?? 1} 月 ${c.dayOfMonth} 日`
+  }
+  if (c.monthLast && !(c.monthDays && c.monthDays.length)) return '每月最后一天'
+  const days = c.monthDays && c.monthDays.length ? c.monthDays : [c.dayOfMonth]
+  return `每月 ${days.join('、')} 日`
+}
+
 function Assets({ notify }: { notify: (m: string) => void }) {
   const assets = useLedger((s) => s.assets)
   const total = useTotalAssets()
@@ -1184,6 +1201,8 @@ function Settings({ notify }: { notify: (m: string) => void }) {
   const [cycleForm, setCycleForm] = useState<{
     name: string; kind: 'expense' | 'income'; parentCategoryId: number; childCategoryId: number
     assetId: number; cost: string; dayOfMonth: number; remark: string
+    cycleType: 'month' | 'week' | 'year'; weekdays: number[]; extraDays: string
+    monthLast: boolean; monthOfYear: number
   } | null>(null)
 
   const fmtLabel = (f: string) =>
@@ -1343,7 +1362,10 @@ function Settings({ notify }: { notify: (m: string) => void }) {
         return (
           <div key={c.cycleId} className="row">
             <div className="grow">
-              <div>{c.name} <span className="tag">每月 {c.dayOfMonth} 日</span></div>
+              <div>
+                {c.name}
+                <span className="tag">{describeCycle(c)}</span>
+              </div>
               <small>{p?.name ?? '分类'} · {a?.assetName ?? '账户'} · {money(c.cost)} · {c.enabled ? '启用中' : '已暂停'}</small>
             </div>
             <button className="link" onClick={() => toggleCycle(c.cycleId)}>{c.enabled ? '暂停' : '启用'}</button>
@@ -1353,7 +1375,8 @@ function Settings({ notify }: { notify: (m: string) => void }) {
       })}
       <button className="ghost wide" onClick={() => setCycleForm({
         name: '', kind: 'expense', parentCategoryId: 4, childCategoryId: 0,
-        assetId: assets[0]?.assetId ?? 0, cost: '', dayOfMonth: 1, remark: ''
+        assetId: assets[0]?.assetId ?? 0, cost: '', dayOfMonth: 1, remark: '',
+        cycleType: 'month', weekdays: [1], extraDays: '', monthLast: false, monthOfYear: 1
       })}>新增周期规则</button>
 
       {cycleForm && (
@@ -1373,6 +1396,12 @@ function Settings({ notify }: { notify: (m: string) => void }) {
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
+            <div className="label">周期</div>
+            <select value={cycleForm.cycleType} onChange={(e) => setCycleForm({ ...cycleForm, cycleType: e.target.value as any })}>
+              <option value="month">每月</option>
+              <option value="week">每周</option>
+              <option value="year">每年</option>
+            </select>
             <div className="row2">
               <div>
                 <div className="label">金额</div>
@@ -1380,14 +1409,49 @@ function Settings({ notify }: { notify: (m: string) => void }) {
                   onChange={(e) => setCycleForm({ ...cycleForm, cost: e.target.value.replace(/[^\d.]/g, '') })} />
               </div>
               <div>
-                <div className="label">每月几号</div>
-                <input value={String(cycleForm.dayOfMonth)} inputMode="numeric"
-                  onChange={(e) => {
-                    const n = Math.min(28, Math.max(1, Number(e.target.value.replace(/\D/g, '')) || 1))
-                    setCycleForm({ ...cycleForm, dayOfMonth: n })
-                  }} />
+                <div className="label">
+                  {cycleForm.cycleType === 'week' ? '星期' : (cycleForm.cycleType === 'year' ? '月份' : '日期')}
+                </div>
+                {cycleForm.cycleType === 'week' ? (
+                  <div className="chips">
+                    {['日', '一', '二', '三', '四', '五', '六'].map((w, i) => (
+                      <button key={i} className={'chip small' + (cycleForm.weekdays.includes(i) ? ' on' : '')}
+                        onClick={() => setCycleForm({
+                          ...cycleForm,
+                          weekdays: cycleForm.weekdays.includes(i)
+                            ? cycleForm.weekdays.filter((x) => x !== i)
+                            : [...cycleForm.weekdays, i].sort()
+                        })}>{w}</button>
+                    ))}
+                  </div>
+                ) : cycleForm.cycleType === 'year' ? (
+                  <select value={cycleForm.monthOfYear}
+                    onChange={(e) => setCycleForm({ ...cycleForm, monthOfYear: Number(e.target.value) })}>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                      <option key={m} value={m}>{m} 月</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input value={String(cycleForm.dayOfMonth)} inputMode="numeric"
+                    onChange={(e) => {
+                      const n = Math.min(28, Math.max(1, Number(e.target.value.replace(/\D/g, '')) || 1))
+                      setCycleForm({ ...cycleForm, dayOfMonth: n })
+                    }} />
+                )}
               </div>
             </div>
+            {cycleForm.cycleType !== 'week' && (
+              <>
+                <div className="label">额外日期（可选，逗号分隔，如 15,25）</div>
+                <input value={cycleForm.extraDays} placeholder="留空则只用上面的日期"
+                  onChange={(e) => setCycleForm({ ...cycleForm, extraDays: e.target.value.replace(/[^\d,，]/g, '') })} />
+                <label className="inline">
+                  <input type="checkbox" checked={cycleForm.monthLast}
+                    onChange={(e) => setCycleForm({ ...cycleForm, monthLast: e.target.checked })} />
+                  每月最后一天
+                </label>
+              </>
+            )}
             <div className="label">账户</div>
             <select value={cycleForm.assetId} onChange={(e) => setCycleForm({ ...cycleForm, assetId: Number(e.target.value) })}>
               {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
@@ -1398,6 +1462,8 @@ function Settings({ notify }: { notify: (m: string) => void }) {
             <div className="modal-btns">
               <button className="ghost" onClick={() => setCycleForm(null)}>取消</button>
               <button className="primary" onClick={() => {
+                const extra = cycleForm.extraDays
+                  .split(/[,，]/).map((x) => Number(x.trim())).filter((x) => x >= 1 && x <= 28)
                 addCycle({
                   name: cycleForm.name || '周期账单',
                   kind: cycleForm.kind,
@@ -1406,6 +1472,11 @@ function Settings({ notify }: { notify: (m: string) => void }) {
                   assetId: cycleForm.assetId,
                   cost: Number(cycleForm.cost) || 0,
                   dayOfMonth: cycleForm.dayOfMonth,
+                  cycleType: cycleForm.cycleType,
+                  weekdays: cycleForm.cycleType === 'week' ? cycleForm.weekdays : undefined,
+                  monthDays: extra.length ? [...new Set([cycleForm.dayOfMonth, ...extra])].sort((a, b) => a - b) : undefined,
+                  monthLast: cycleForm.monthLast || undefined,
+                  monthOfYear: cycleForm.monthOfYear,
                   remark: cycleForm.remark,
                   startTime: Date.now()
                 })

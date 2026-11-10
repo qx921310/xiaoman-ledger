@@ -248,3 +248,7 @@ button[disabled] { opacity: .5; cursor: not-allowed; }
 }
 
 input.rate { width: 96px; flex: none; text-align: right; }
+
+.chip.small { padding: 2px 9px; font-size: 12px; }
+label.inline { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-top: 8px; color: var(--muted); }
+label.inline input { width: auto; }

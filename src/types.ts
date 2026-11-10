@@ -80,13 +80,23 @@ export interface Cycle {
   childCategoryId: number
   assetId: number
   cost: number
-  /** 每月第几天（1–28） */
+  /** 周期类型：每月 / 每周 / 每年 */
+  cycleType?: 'month' | 'week' | 'year'
+  /** 每月第几天（1–28），cycleType=month/year 时用 */
   dayOfMonth: number
+  /** 每月多天，如 [1, 15]；有值时优先于 dayOfMonth */
+  monthDays?: number[]
+  /** 每月最后一天 */
+  monthLast?: boolean
+  /** 每周的星期几，0=周日 */
+  weekdays?: number[]
+  /** 每年几月（1-12），cycleType=year 时用 */
+  monthOfYear?: number
   remark: string
   enabled: boolean
   /** 生效起始月（时间戳，取当月即可） */
   startTime: number
-  /** 已生成过的月份，格式 YYYY-MM，保证不重复 */
+  /** 已生成过的日期，格式 YYYY-MM-DD，保证不重复 */
   generated: string[]
   userId: number
   updateTime: number
