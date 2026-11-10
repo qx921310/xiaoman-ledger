@@ -1,0 +1,221 @@
+import { useState } from 'react'
+import { useLedger, useTotalAssets } from '../store'
+import { ASSET_TYPE, LEND_TYPE } from '../types'
+import type { Asset } from '../types'
+import { money, dayOf } from '../ui-format'
+import { AssetIcon } from '../ui/icons'
+
+export function Assets({ notify }: { notify: (m: string) => void }) {
+  const assets = useLedger((s) => s.assets)
+  const total = useTotalAssets()
+  const addAsset = useLedger((s) => s.addAsset)
+  const updateAsset = useLedger((s) => s.updateAsset)
+  const lends = useLedger((s) => s.lends)
+  const addLend = useLedger((s) => s.addLend)
+  const deleteLend = useLedger((s) => s.deleteLend)
+  const [editingAsset, setEditingAsset] = useState<Asset | null>(null)
+  const [lendForm, setLendForm] = useState<{ type: 1 | 2 | 3 | 4; assetId: number; counterparty: string; number: string; interest: string; repaymentAssetId: number; remark: string } | null>(null)
+  const receivable = lends.filter((l) => l.type === 1).reduce((s, l) => s + l.number + (l.interest ?? 0), 0)
+    - lends.filter((l) => l.type === 2).reduce((s, l) => s + l.number, 0)
+  const payable = lends.filter((l) => l.type === 3).reduce((s, l) => s + l.number + (l.interest ?? 0), 0)
+    - lends.filter((l) => l.type === 4).reduce((s, l) => s + l.number, 0)
+
+  const [name, setName] = useState('')
+  const [type, setType] = useState(1)
+  const [num, setNum] = useState('')
+
+  const create = () => {
+    if (!name.trim()) return notify('请输入账户名')
+    addAsset({ assetName: name.trim(), assetType: type, assetNumber: Number(num) || 0 })
+    setName(''); setNum('')
+    notify('账户已添加')
+  }
+
+  const debts = assets.filter((a) => a.assetType === 2 || a.assetType === 7 || a.assetType === 8).reduce((s, a) => s + a.assetNumber, 0)
+
+  return (
+    <section className="card">
+      <div className="totalbox">
+        <small>净资产</small>
+        <strong>{money(total)}</strong>
+        <span>负资产 {money(debts)}</span>
+      </div>
+
+      <p className="hint">余额会随记账自动变动；点右侧「改」可填入实际余额（迁移后建议先对一次账）。</p>
+
+      {assets.map((a) => (
+        <div key={a.assetId} className="row">
+          <span className="asset-badge"><AssetIcon type={a.assetType} name={a.assetName} size={16} /></span>
+          <div className="grow">
+            <div>
+              {a.assetName}
+              {a.cardCode && <span className="tag">尾号 {a.cardCode}</span>}
+            </div>
+            <small>{ASSET_TYPE[a.assetType]}{a.groupName ? ' · ' + a.groupName : ''}</small>
+          </div>
+          <b className={a.assetNumber < 0 ? 'out' : ''}>{money(a.assetNumber)}</b>
+          <button className="link" onClick={() => setEditingAsset(a)}>改</button>
+        </div>
+      ))}
+
+      {editingAsset && (
+        <AssetEditor
+          asset={editingAsset}
+          onClose={() => setEditingAsset(null)}
+          onSave={(next) => { updateAsset(next); setEditingAsset(null); notify('账户已更新') }}
+        />
+      )}
+
+      <h3>借入借出</h3>
+      {(receivable !== 0 || payable !== 0) && (
+        <p className="hint">待收回 {money(receivable)} · 待归还 {money(payable)}</p>
+      )}
+      {lends.length === 0 && <p className="hint">还没有借贷记录。</p>}
+      {lends.slice(0, 8).map((l) => (
+        <div key={l.lendId} className="row">
+          <div className="grow">
+            <div>{LEND_TYPE[l.type]} · {l.counterparty || '未填对方'}</div>
+            <small>
+              {assets.find((a) => a.assetId === l.assetId)?.assetName ?? '账户'} · {dayOf(l.time)}
+              {l.interest ? ` · 利息 ${money(l.interest)}` : ''}
+              {l.remark ? ' · ' + l.remark : ''}
+            </small>
+          </div>
+          <b className={l.type === 2 || l.type === 4 ? 'neutral' : ''}>{money(l.number)}</b>
+          <button className="del" onClick={() => deleteLend(l.lendId)}>删</button>
+        </div>
+      ))}
+      <button className="ghost wide" onClick={() => setLendForm({
+        type: 1, assetId: assets[0]?.assetId ?? 0, counterparty: '', number: '',
+        interest: '', repaymentAssetId: 0, remark: ''
+      })}>记一笔借贷</button>
+
+      {lendForm && (
+        <div className="modal-mask" onClick={() => setLendForm(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>借入借出</h3>
+            <div className="label">类型</div>
+            <select value={lendForm.type} onChange={(e) => setLendForm({ ...lendForm, type: Number(e.target.value) as any })}>
+              {Object.entries(LEND_TYPE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+            <div className="label">对方</div>
+            <input value={lendForm.counterparty} onChange={(e) => setLendForm({ ...lendForm, counterparty: e.target.value })} placeholder="借给谁 / 向谁借" />
+            <div className="label">金额</div>
+            <input value={lendForm.number} autoFocus inputMode="decimal"
+              onChange={(e) => setLendForm({ ...lendForm, number: e.target.value.replace(/[^\d.]/g, '') })} />
+            <div className="row2">
+              <div>
+                <div className="label">利息（可选）</div>
+                <input value={lendForm.interest} inputMode="decimal"
+                  onChange={(e) => setLendForm({ ...lendForm, interest: e.target.value.replace(/[^\d.]/g, '') })} />
+              </div>
+              <div>
+                <div className="label">
+                  {lendForm.type === 2 || lendForm.type === 4 ? '收款账户' : '资金账户'}
+                </div>
+                <select
+                  value={lendForm.repaymentAssetId || lendForm.assetId}
+                  onChange={(e) => setLendForm({
+                    ...lendForm,
+                    ...(lendForm.type === 2 || lendForm.type === 4
+                      ? { repaymentAssetId: Number(e.target.value) }
+                      : { assetId: Number(e.target.value) })
+                  })}>
+                  {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="label">备注</div>
+            <input value={lendForm.remark} onChange={(e) => setLendForm({ ...lendForm, remark: e.target.value })} />
+            <p className="hint">借出减少账户余额，收回与借入增加，归还减少；不计入收支。</p>
+            <div className="modal-btns">
+              <button className="ghost" onClick={() => setLendForm(null)}>取消</button>
+              <button className="primary" onClick={() => {
+                addLend({
+                  type: lendForm.type, assetId: lendForm.assetId,
+                  counterparty: lendForm.counterparty, number: Number(lendForm.number) || 0,
+                  interest: Number(lendForm.interest) || 0,
+                  repaymentAssetId: lendForm.repaymentAssetId || undefined,
+                  remark: lendForm.remark
+                })
+                setLendForm(null)
+              }}>保存</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="label">新增账户</div>
+      <div className="row2">
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="账户名" />
+        <select value={type} onChange={(e) => setType(Number(e.target.value))}>
+          {Object.entries(ASSET_TYPE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+      </div>
+      <div className="row2">
+        <input value={num} onChange={(e) => setNum(e.target.value.replace(/[^\d.-]/g, ''))} placeholder="余额（信用卡填负数）" />
+        <button onClick={create}>添加</button>
+      </div>
+    </section>
+  )
+}
+
+
+function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => void; onSave: (a: Asset) => void }) {
+  const currencies = useLedger((s) => s.currencies)
+  const defaultCurrency = useLedger((s) => s.defaultCurrency)
+  const [currency, setCurrency] = useState(asset.currency ?? defaultCurrency)
+  const [quota, setQuota] = useState(asset.totalQuota ? String(asset.totalQuota) : '')
+  const [cardCode, setCardCode] = useState(asset.cardCode ?? '')
+  const [name, setName] = useState(asset.assetName)
+  const [type, setType] = useState(asset.assetType)
+  // 留空＝保持原余额；填入即覆盖（避免把新值追加在旧值后面）
+  const [num, setNum] = useState('')
+
+  return (
+    <div className="modal-mask" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h3>编辑账户</h3>
+        <div className="label">名称</div>
+        <input value={name} onChange={(e) => setName(e.target.value)} />
+        <div className="label">币种</div>
+    <select value={currency} onChange={(e) => setCurrency(e.target.value)}>
+      {currencies.map((c) => <option key={c.code} value={c.code}>{c.code} · {c.name}</option>)}
+    </select>
+    <div className="label">类型</div>
+        <select value={type} onChange={(e) => setType(Number(e.target.value))}>
+          {Object.entries(ASSET_TYPE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+        <div className="row2">
+          <div>
+            <div className="label">总额度（信用卡）</div>
+            <input value={quota} inputMode="decimal" placeholder="可留空"
+              onChange={(e) => setQuota(e.target.value.replace(/[^\d.]/g, ''))} />
+          </div>
+          <div>
+            <div className="label">卡号后四位</div>
+            <input value={cardCode} placeholder="可留空" maxLength={4}
+              onChange={(e) => setCardCode(e.target.value.replace(/\D/g, ''))} />
+          </div>
+        </div>
+        <div className="label">设为实际余额（当前 {money(asset.assetNumber)}，信用卡填负数）</div>
+        <input
+          value={num}
+          autoFocus
+          placeholder="留空则保持不变"
+          onChange={(e) => setNum(e.target.value.replace(/[^\d.-]/g, ''))}
+          inputMode="decimal"
+        />
+        <div className="modal-btns">
+          <button className="ghost" onClick={onClose}>取消</button>
+          <button className="primary" onClick={() => onSave({
+            ...asset,
+            assetName: name.trim() || asset.assetName,
+            assetType: type,
+            assetNumber: num.trim() === '' ? asset.assetNumber : (Number(num) || 0)
+          })}>保存</button>
+        </div>
+      </div>
+    </div>
+  )
+}
