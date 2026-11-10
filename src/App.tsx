@@ -711,6 +711,28 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
   )
 }
 
+/** 汇率输入：内部保留草稿，失焦或回车才提交，输入过程不会写坏数据 */
+function RateInput({ value, onCommit }: { value: number; onCommit: (v: number) => void }) {
+  const [draft, setDraft] = useState<string | null>(null)
+  const commit = () => {
+    if (draft === null) return
+    const n = Number(draft)
+    if (Number.isFinite(n) && n > 0) onCommit(n)
+    setDraft(null)
+  }
+  return (
+    <input
+      className="rate"
+      inputMode="decimal"
+      value={draft ?? String(value)}
+      onFocus={(e) => e.currentTarget.select()}
+      onChange={(e) => setDraft(e.target.value.replace(/[^\d.]/g, ''))}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === 'Enter') { commit(); (e.currentTarget as HTMLInputElement).blur() } }}
+    />
+  )
+}
+
 function Assets({ notify }: { notify: (m: string) => void }) {
   const assets = useLedger((s) => s.assets)
   const total = useTotalAssets()
@@ -902,6 +924,9 @@ function TransferEditor({ transfer, onClose, onSave }: {
 }
 
 function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => void; onSave: (a: Asset) => void }) {
+  const currencies = useLedger((s) => s.currencies)
+  const defaultCurrency = useLedger((s) => s.defaultCurrency)
+  const [currency, setCurrency] = useState(asset.currency ?? defaultCurrency)
   const [name, setName] = useState(asset.assetName)
   const [type, setType] = useState(asset.assetType)
   // 留空＝保持原余额；填入即覆盖（避免把新值追加在旧值后面）
@@ -913,7 +938,11 @@ function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => 
         <h3>编辑账户</h3>
         <div className="label">名称</div>
         <input value={name} onChange={(e) => setName(e.target.value)} />
-        <div className="label">类型</div>
+        <div className="label">币种</div>
+    <select value={currency} onChange={(e) => setCurrency(e.target.value)}>
+      {currencies.map((c) => <option key={c.code} value={c.code}>{c.code} · {c.name}</option>)}
+    </select>
+    <div className="label">类型</div>
         <select value={type} onChange={(e) => setType(Number(e.target.value))}>
           {Object.entries(ASSET_TYPE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
@@ -1093,6 +1122,9 @@ function Settings({ notify }: { notify: (m: string) => void }) {
   const [err, setErr] = useState('')
   const [syncMsg, setSyncMsg] = useState('')
   const [syncing, setSyncing] = useState(false)
+  const currencies = useLedger((s) => s.currencies)
+  const defaultCurrency = useLedger((s) => s.defaultCurrency)
+  const setCurrencyRate = useLedger((s) => s.setCurrencyRate)
   const lastSync = useLedger((s) => s.lastSync)
   const runSync = async () => {
     setSyncing(true)
@@ -1353,6 +1385,28 @@ function Settings({ notify }: { notify: (m: string) => void }) {
         <button onClick={() => { seed(); notify('已填充演示数据') }}>填充演示数据</button>
         <button className="danger" onClick={() => { reset(); notify('已清空') }}>清空数据</button>
       </div>
+
+      <h3>币种与汇率</h3>
+      <p className="hint">
+        汇率含义：1 单位该币种 = 多少 {defaultCurrency}。记账时选外币会自动折算成本币入账。
+      </p>
+      {currencies.map((c) => (
+        <div key={c.code} className="row">
+          <div className="grow">
+            <div>{c.name} <span className="tag">{c.code}</span></div>
+            <small>
+              {c.symbol}
+              {c.code === defaultCurrency ? ' · 默认币种' : ` · 1 ${c.code} = ${c.rate} ${defaultCurrency}`}
+            </small>
+          </div>
+          {c.code !== defaultCurrency && (
+            <RateInput
+              value={c.rate}
+              onCommit={(v) => setCurrencyRate(c.code, v)}
+            />
+          )}
+        </div>
+      ))}
 
       <h3>云端同步</h3>
       <p className="hint">

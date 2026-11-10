@@ -246,3 +246,5 @@ button[disabled] { opacity: .5; cursor: not-allowed; }
   width: auto; flex: none; padding: 5px 8px; font-size: 12px;
   border-radius: 8px; background: var(--accent-soft); color: #7a5230; border-color: #f0d5a0;
 }
+
+input.rate { width: 96px; flex: none; text-align: right; }

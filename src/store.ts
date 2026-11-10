@@ -569,10 +569,15 @@ export const useLedger = create<LedgerState>()(
 
       setLastSync: (t) => set({ lastSync: t }),
 
-      setCurrencyRate: (code, rate) => set((s) => ({
-        currencies: s.currencies.map((c) => c.code === code
-          ? { ...c, rate: c.code === s.defaultCurrency ? 1 : Number(rate) || 0 } : c)
-      })),
+      setCurrencyRate: (code, rate) => set((s) => {
+        const r = Number(rate)
+        // 非法或非正数一律忽略，绝不允许把汇率写成 0（否则金额会按 1:1 记账）
+        if (!Number.isFinite(r) || r <= 0) return {}
+        return {
+          currencies: s.currencies.map((c) => c.code === code
+            ? { ...c, rate: c.code === s.defaultCurrency ? 1 : r } : c)
+        }
+      }),
 
       addCurrency: (c) => set((s) => s.currencies.some((x) => x.code === c.code)
         ? {}
@@ -628,6 +633,10 @@ export const useLedger = create<LedgerState>()(
 
       // 补齐内置分类（缺失的加上），并把老数据里的 emoji 图标迁移成图标键
       mergeTaxonomy: () => set((s) => {
+        // 汇率自修复：任何非正汇率都恢复为默认值（0 会导致外币按 1:1 记账）
+        const DEFAULT_RATE: Record<string, number> = { CNY: 1, USD: 7.2, EUR: 7.8, JPY: 0.048, HKD: 0.92 }
+        const currencies = (s.currencies ?? []).map((c) =>
+          !c.rate || c.rate <= 0 ? { ...c, rate: DEFAULT_RATE[c.code] ?? 1 } : c)
         const key = (c: Category) => `${c.parentId}|${c.name}|${c.kind}`
         const haveP = new Set(s.parentCategories.map(key))
         const haveC = new Set(s.childCategories.map(key))
@@ -665,14 +674,17 @@ export const useLedger = create<LedgerState>()(
         const INCOME_MISPLACED = new Set(['慈善捐助', '理财支出', '罚款赔偿'])
         parents = parents.filter((c) => !(c.kind === 'income' && INCOME_MISPLACED.has(c.name) && !used.has(c.id)))
 
+        const ratesFixed = currencies.some((c, i) => c !== (s.currencies ?? [])[i])
         if (!addP.length && !addC.length) {
           const changed = parents.some((c, i) => c !== s.parentCategories[i])
             || children.some((c, i) => c !== s.childCategories[i])
-          return changed ? { parentCategories: parents, childCategories: children } : {}
+          if (!changed && !ratesFixed) return {}
+          return { parentCategories: parents, childCategories: children, ...(ratesFixed ? { currencies } : {}) }
         }
         return {
           parentCategories: [...parents, ...addP],
-          childCategories: [...children, ...addC]
+          childCategories: [...children, ...addC],
+          ...(ratesFixed ? { currencies } : {})
         }
       }),
 
@@ -729,5 +741,13 @@ export const useLedger = create<LedgerState>()(
 )
 
 export const useTotalAssets = () =>
-  useLedger((s) => s.assets.filter((a) => !a.hide && a.intoTotalAsset)
-    .reduce((sum, a) => sum + a.assetNumber, 0))
+  useLedger((s) => {
+    // 账户可带币种，汇总前统一折成本币
+    const rateOf = (code?: string) => {
+      if (!code || code === s.defaultCurrency) return 1
+      const c = s.currencies.find((x) => x.code === code)
+      return c && c.rate ? c.rate : 1
+    }
+    return s.assets.filter((a) => !a.hide && a.intoTotalAsset)
+      .reduce((sum, a) => sum + a.assetNumber * rateOf(a.currency), 0)
+  })

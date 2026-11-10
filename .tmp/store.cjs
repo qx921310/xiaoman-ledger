@@ -2883,85 +2883,135 @@ var persist = persistImpl;
 
 // src/taxonomy.ts
 var TAXONOMY_PARENTS = [
-  { id: 1, name: "\u5065\u5EB7\u533B\u7597", parentId: 0, kind: "expense", color: "#94a3b8", positionWeight: 1, icon: "\u{1F3E5}" },
-  { id: 2, name: "\u9001\u793C\u4EBA\u60C5", parentId: 0, kind: "expense", color: "#94a3b8", positionWeight: 2, icon: "\u{1F381}" },
-  { id: 3, name: "\u6587\u5316\u6559\u80B2", parentId: 0, kind: "expense", color: "#94a3b8", positionWeight: 3, icon: "\u{1F4DA}" },
-  { id: 4, name: "\u5C45\u5BB6\u751F\u6D3B", parentId: 0, kind: "expense", color: "#94a3b8", positionWeight: 4, icon: "\u{1F3E0}" },
-  { id: 5, name: "\u4F11\u95F2\u5A31\u4E50", parentId: 0, kind: "expense", color: "#94a3b8", positionWeight: 5, icon: "\u{1F3AE}" },
-  { id: 6, name: "\u51FA\u884C\u4EA4\u901A", parentId: 0, kind: "expense", color: "#94a3b8", positionWeight: 6, icon: "\u{1F687}" },
-  { id: 7, name: "\u98DF\u54C1\u9910\u996E", parentId: 0, kind: "expense", color: "#94a3b8", positionWeight: 7, icon: "\u{1F35C}" },
-  { id: 8, name: "\u8D2D\u7269\u6D88\u8D39", parentId: 0, kind: "expense", color: "#94a3b8", positionWeight: 8, icon: "\u{1F6CD}\uFE0F" }
+  { id: 1, name: "\u5065\u5EB7\u533B\u7597", parentId: 0, kind: "expense", color: "#C2410C", bg: "#FFE0CC", positionWeight: 1, icon: "ic_parent_medical" },
+  { id: 2, name: "\u9001\u793C\u4EBA\u60C5", parentId: 0, kind: "expense", color: "#C2410C", bg: "#FFE0CC", positionWeight: 2, icon: "ic_parent_gift" },
+  { id: 3, name: "\u6587\u5316\u6559\u80B2", parentId: 0, kind: "expense", color: "#C2410C", bg: "#FFE0CC", positionWeight: 3, icon: "ic_parent_education" },
+  { id: 4, name: "\u5C45\u5BB6\u751F\u6D3B", parentId: 0, kind: "expense", color: "#C2410C", bg: "#FFE0CC", positionWeight: 4, icon: "ic_parent_home" },
+  { id: 5, name: "\u4F11\u95F2\u5A31\u4E50", parentId: 0, kind: "expense", color: "#C2410C", bg: "#FFE0CC", positionWeight: 5, icon: "ic_parent_game" },
+  { id: 6, name: "\u51FA\u884C\u4EA4\u901A", parentId: 0, kind: "expense", color: "#C2410C", bg: "#FFE0CC", positionWeight: 6, icon: "ic_parent_traffic" },
+  { id: 7, name: "\u98DF\u54C1\u9910\u996E", parentId: 0, kind: "expense", color: "#C2410C", bg: "#FFE0CC", positionWeight: 7, icon: "ic_parent_restaurant" },
+  { id: 9, name: "\u65C5\u6E38\u5EA6\u5047", parentId: 0, kind: "expense", color: "#0F766E", bg: "#CCFBF1", positionWeight: 9, icon: "ic_parent_travel" },
+  { id: 10, name: "\u5176\u4ED6", parentId: 0, kind: "expense", color: "#57534E", bg: "#EDE9E3", positionWeight: 10, icon: "ic_parent_other" },
+  { id: 8, name: "\u8D2D\u7269\u6D88\u8D39", parentId: 0, kind: "expense", color: "#C2410C", bg: "#FFE0CC", positionWeight: 8, icon: "ic_parent_shopping" }
 ];
 var TAXONOMY_INCOME = [
-  { id: 901, name: "\u62A5\u9500", parentId: 0, kind: "income", color: "#22c55e", positionWeight: 0, icon: "\u{1F9FE}" },
-  { id: 902, name: "\u8865\u8D34", parentId: 0, kind: "income", color: "#22c55e", positionWeight: 0, icon: "\u{1F4B5}" },
-  { id: 903, name: "\u4E8C\u624B\u95F2\u7F6E", parentId: 0, kind: "income", color: "#22c55e", positionWeight: 0, icon: "\u267B\uFE0F" },
-  { id: 904, name: "\u5DE5\u8D44", parentId: 0, kind: "income", color: "#22c55e", positionWeight: 0, icon: "\u{1F4BC}" },
-  { id: 905, name: "\u517C\u804C\u5916\u5FEB", parentId: 0, kind: "income", color: "#22c55e", positionWeight: 0, icon: "\u23F1\uFE0F" },
-  { id: 906, name: "\u5956\u91D1", parentId: 0, kind: "income", color: "#22c55e", positionWeight: 0, icon: "\u{1F389}" },
-  { id: 907, name: "\u501F\u5165", parentId: 0, kind: "income", color: "#22c55e", positionWeight: 0, icon: "\u{1F932}" },
-  { id: 908, name: "\u793C\u91D1\u4EBA\u60C5", parentId: 0, kind: "income", color: "#22c55e", positionWeight: 0, icon: "\u{1F9E7}" },
-  { id: 909, name: "\u7406\u8D22\u76C8\u5229", parentId: 0, kind: "income", color: "#22c55e", positionWeight: 0, icon: "\u{1F4C8}" },
-  { id: 910, name: "\u4E2D\u5956", parentId: 0, kind: "income", color: "#22c55e", positionWeight: 0, icon: "\u{1F3C6}" },
-  { id: 911, name: "\u5176\u4ED6", parentId: 0, kind: "income", color: "#22c55e", positionWeight: 0, icon: "\u2728" },
-  { id: 9901, name: "\u6148\u5584\u6350\u52A9", parentId: 0, kind: "income", color: "#22c55e", positionWeight: 0, icon: "\u2764\uFE0F" },
-  { id: 9902, name: "\u7406\u8D22\u652F\u51FA", parentId: 0, kind: "income", color: "#22c55e", positionWeight: 0, icon: "\u{1F4C9}" },
-  { id: 9903, name: "\u7F5A\u6B3E\u8D54\u507F", parentId: 0, kind: "income", color: "#22c55e", positionWeight: 0, icon: "\u26A0\uFE0F" }
+  { id: 901, name: "\u5DE5\u8D44", parentId: 0, kind: "income", color: "#22c55e", positionWeight: 0, icon: "ic_income_wages" },
+  { id: 902, name: "\u5956\u91D1", parentId: 0, kind: "income", color: "#22c55e", positionWeight: 0, icon: "ic_income_bonus" },
+  { id: 903, name: "\u8865\u8D34", parentId: 0, kind: "income", color: "#22c55e", positionWeight: 0, icon: "ic_income_subsidy" },
+  { id: 904, name: "\u517C\u804C\u5916\u5FEB", parentId: 0, kind: "income", color: "#22c55e", positionWeight: 0, icon: "ic_income_part_time_job" },
+  { id: 905, name: "\u7406\u8D22\u76C8\u5229", parentId: 0, kind: "income", color: "#22c55e", positionWeight: 0, icon: "ic_income_manager_money" },
+  { id: 906, name: "\u793C\u91D1\u4EBA\u60C5", parentId: 0, kind: "income", color: "#22c55e", positionWeight: 0, icon: "ic_income_cash_gift" },
+  { id: 907, name: "\u501F\u5165", parentId: 0, kind: "income", color: "#22c55e", positionWeight: 0, icon: "ic_income_borrow" },
+  { id: 908, name: "\u4E2D\u5956", parentId: 0, kind: "income", color: "#22c55e", positionWeight: 0, icon: "ic_income_winning" },
+  { id: 909, name: "\u4E8C\u624B\u95F2\u7F6E", parentId: 0, kind: "income", color: "#22c55e", positionWeight: 0, icon: "ic_income_second_hand" },
+  { id: 910, name: "\u62A5\u9500", parentId: 0, kind: "income", color: "#22c55e", positionWeight: 0, icon: "ic_income_reimbursement" },
+  { id: 911, name: "\u5176\u4ED6", parentId: 0, kind: "income", color: "#22c55e", positionWeight: 0, icon: "ic_income_other" }
 ];
 var TAXONOMY_CHILDREN = [
-  { id: 801, name: "\u88C5\u4FEE\u88C5\u9970", parentId: 8, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F528}" },
-  { id: 802, name: "\u529E\u516C\u7528\u54C1", parentId: 8, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F4CE}" },
-  { id: 803, name: "\u5BA0\u7269\u7528\u54C1", parentId: 8, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F43E}" },
-  { id: 804, name: "\u670D\u9970\u8FD0\u52A8", parentId: 8, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F45F}" },
-  { id: 805, name: "\u6BCD\u5A74\u73A9\u5177", parentId: 8, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F37C}" },
-  { id: 806, name: "\u914D\u9970\u8155\u8868", parentId: 8, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u231A" },
-  { id: 807, name: "\u751F\u6D3B\u7535\u5668", parentId: 8, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F50C}" },
-  { id: 808, name: "\u865A\u62DF\u5145\u503C", parentId: 8, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F4F1}" },
-  { id: 809, name: "\u624B\u673A\u6570\u7801", parentId: 8, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F4F2}" },
-  { id: 810, name: "\u4E2A\u62A4\u7F8E\u5986", parentId: 8, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F484}" },
-  { id: 811, name: "\u65E5\u5E38\u5BB6\u5C45", parentId: 8, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F9FA}" },
-  { id: 701, name: "\u7CAE\u6CB9\u8C03\u5473", parentId: 7, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F33E}" },
-  { id: 702, name: "\u8BF7\u5BA2\u5403\u996D", parentId: 7, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F37D}\uFE0F" },
-  { id: 703, name: "\u751F\u9C9C\u98DF\u54C1", parentId: 7, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F96C}" },
-  { id: 704, name: "\u4F11\u95F2\u96F6\u98DF", parentId: 7, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F37F}" },
-  { id: 705, name: "\u996E\u6599\u9152\u6C34", parentId: 7, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F377}" },
-  { id: 706, name: "\u665A\u9910", parentId: 7, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F319}" },
-  { id: 707, name: "\u5348\u9910", parentId: 7, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u2600\uFE0F" },
-  { id: 708, name: "\u65E9\u9910", parentId: 7, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F950}" },
-  { id: 601, name: "\u4FDD\u517B\u4FEE\u8F66", parentId: 6, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F527}" },
-  { id: 602, name: "\u98DE\u673A", parentId: 6, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u2708\uFE0F" },
-  { id: 603, name: "\u706B\u8F66", parentId: 6, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F684}" },
-  { id: 604, name: "\u52A0\u6CB9", parentId: 6, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u26FD" },
-  { id: 605, name: "\u505C\u8F66\u8D39", parentId: 6, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F17F}\uFE0F" },
-  { id: 606, name: "\u516C\u5171\u4EA4\u901A", parentId: 6, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F68C}" },
-  { id: 607, name: "\u6253\u8F66", parentId: 6, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F695}" },
-  { id: 501, name: "\u6F14\u51FA", parentId: 5, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F3AC}" },
-  { id: 502, name: "\u9152\u5427", parentId: 5, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F37A}" },
-  { id: 503, name: "\u68CB\u724C\u684C\u6E38", parentId: 5, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F3B2}" },
-  { id: 504, name: "\u8DB3\u6D74\u6309\u6469", parentId: 5, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F486}" },
-  { id: 505, name: "\u8FD0\u52A8\u5065\u8EAB", parentId: 5, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F3CB}\uFE0F" },
-  { id: 506, name: "\u7535\u5F71\u5531\u6B4C", parentId: 5, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F3A4}" },
-  { id: 507, name: "\u65C5\u6E38\u5EA6\u5047", parentId: 5, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F3D6}\uFE0F" },
-  { id: 401, name: "\u5BB6\u653F\u6E05\u6D01", parentId: 4, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F9F9}" },
-  { id: 402, name: "\u8F66\u4F4D\u8D39", parentId: 4, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F697}" },
-  { id: 403, name: "\u623F\u79DF\u8FD8\u8D37", parentId: 4, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F3E6}" },
-  { id: 404, name: "\u7269\u4E1A\u8D39", parentId: 4, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F3E2}" },
-  { id: 405, name: "\u71C3\u6C14\u8D39", parentId: 4, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F525}" },
-  { id: 406, name: "\u6C34\u8D39", parentId: 4, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F4A7}" },
-  { id: 407, name: "\u7535\u8D39", parentId: 4, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F4A1}" },
-  { id: 408, name: "\u8BDD\u8D39\u5BBD\u5E26", parentId: 4, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F4DE}" },
-  { id: 301, name: "\u57F9\u8BAD\u8003\u8BD5", parentId: 3, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F393}" },
-  { id: 302, name: "\u4E66\u62A5\u6742\u5FD7", parentId: 3, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F4D6}" },
-  { id: 303, name: "\u5B66\u8D39", parentId: 3, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F4B0}" },
-  { id: 201, name: "\u6253\u8D4F", parentId: 2, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F9E7}" },
-  { id: 202, name: "\u7EA2\u5305", parentId: 2, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F9E7}" },
-  { id: 203, name: "\u501F\u51FA", parentId: 2, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F91D}" },
-  { id: 204, name: "\u793C\u7269", parentId: 2, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F380}" },
-  { id: 205, name: "\u5B5D\u656C\u957F\u8F88", parentId: 2, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F474}" },
-  { id: 101, name: "\u4E70\u836F", parentId: 1, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F48A}" },
-  { id: 102, name: "\u533B\u9662", parentId: 1, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1F3E5}" },
-  { id: 103, name: "\u6ECB\u8865\u4FDD\u5065", parentId: 1, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "\u{1FA7A}" }
+  { id: 801, name: "\u793E\u4FDD", parentId: 1, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_medical_social_insurance" },
+  { id: 802, name: "\u4FDD\u9669", parentId: 1, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_medical_insurance" },
+  { id: 803, name: "\u623F\u79DF", parentId: 4, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_home_rent" },
+  { id: 804, name: "\u53D1\u8D22\u6811", parentId: 4, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_home_money_tree" },
+  { id: 805, name: "\u6E38\u620F", parentId: 5, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_game_video_game" },
+  { id: 806, name: "APP\u4F1A\u5458", parentId: 5, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_game_app_member" },
+  { id: 807, name: "ETC", parentId: 6, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_traffic_etc" },
+  { id: 808, name: "\u9152\u5E97", parentId: 6, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_traffic_hotel" },
+  { id: 809, name: "\u6E38\u73A9\u95E8\u7968", parentId: 6, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_traffic_ticket" },
+  { id: 810, name: "\u6D77\u8FD0", parentId: 8, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_shopping_overseas" },
+  { id: 811, name: "\u62FC\u591A\u591A", parentId: 8, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_shopping_pdd" },
+  { id: 812, name: "\u7406\u53D1", parentId: 8, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_shopping_haircut" },
+  { id: 820, name: "\u5176\u4ED6", parentId: 9, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_misc_other" },
+  { id: 821, name: "\u9152\u5E97\u6C11\u5BBF", parentId: 9, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_travel_hotel" },
+  { id: 822, name: "\u9152\u6C34\u996E\u6599", parentId: 9, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_travel_drinks" },
+  { id: 823, name: "\u5730\u94C1", parentId: 9, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_travel_subway" },
+  { id: 824, name: "\u8F6E\u8239", parentId: 9, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_travel_ship" },
+  { id: 825, name: "\u6309\u6469", parentId: 9, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_travel_massage" },
+  { id: 826, name: "\u673A\u7968", parentId: 9, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_travel_flight" },
+  { id: 827, name: "\u95E8\u7968", parentId: 9, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_travel_ticket" },
+  { id: 828, name: "\u6253\u8F66", parentId: 9, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_travel_taxi" },
+  { id: 829, name: "\u9910\u98DF", parentId: 9, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_travel_meal" },
+  { id: 830, name: "\u8D2D\u7269", parentId: 9, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_travel_shopping" },
+  { id: 831, name: "\u7948\u613F\u8FD8\u613F", parentId: 9, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_travel_pray" },
+  { id: 832, name: "\u706B\u8F66\u9AD8\u94C1", parentId: 9, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_travel_train" },
+  { id: 840, name: "\u5176\u4ED6", parentId: 10, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_misc_other" },
+  { id: 841, name: "\u6148\u5584\u6350\u52A9", parentId: 10, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_misc_charity" },
+  { id: 842, name: "\u7406\u8D22\u652F\u51FA", parentId: 10, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_misc_invest_loss" },
+  { id: 843, name: "\u7F5A\u6B3E\u8D54\u507F", parentId: 10, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_misc_penalty" },
+  { id: 601, name: "\u5176\u4ED6", parentId: 1, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_misc_other" },
+  { id: 602, name: "\u5176\u4ED6", parentId: 2, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_misc_other" },
+  { id: 603, name: "\u5176\u4ED6", parentId: 3, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_misc_other" },
+  { id: 604, name: "\u5176\u4ED6", parentId: 4, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_misc_other" },
+  { id: 605, name: "\u5176\u4ED6", parentId: 5, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_misc_other" },
+  { id: 606, name: "\u5176\u4ED6", parentId: 6, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_misc_other" },
+  { id: 607, name: "\u5176\u4ED6", parentId: 7, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_misc_other" },
+  { id: 608, name: "\u5176\u4ED6", parentId: 8, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_misc_other" },
+  { id: 701, name: "\u852C\u83DC", parentId: 7, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_restaurant_vegetable" },
+  { id: 702, name: "\u6C34\u679C", parentId: 7, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_restaurant_fruit" },
+  { id: 703, name: "\u4E0B\u5348\u8336", parentId: 7, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_restaurant_afternoon_tea" },
+  { id: 704, name: "\u591C\u5BB5", parentId: 7, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_restaurant_night_snack" },
+  { id: 801, name: "\u88C5\u4FEE\u88C5\u9970", parentId: 8, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_shopping_renovation" },
+  { id: 802, name: "\u529E\u516C\u7528\u54C1", parentId: 8, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_shopping_office" },
+  { id: 803, name: "\u5BA0\u7269\u7528\u54C1", parentId: 8, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_shopping_pets" },
+  { id: 804, name: "\u670D\u9970\u8FD0\u52A8", parentId: 8, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_shopping_motion" },
+  { id: 805, name: "\u6BCD\u5A74\u73A9\u5177", parentId: 8, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_shopping_baby" },
+  { id: 806, name: "\u914D\u9970\u8155\u8868", parentId: 8, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_shopping_watch" },
+  { id: 807, name: "\u751F\u6D3B\u7535\u5668", parentId: 8, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_shopping_electric" },
+  { id: 808, name: "\u865A\u62DF\u5145\u503C", parentId: 8, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_shopping_recharge" },
+  { id: 809, name: "\u624B\u673A\u6570\u7801", parentId: 8, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_shopping_phone" },
+  { id: 810, name: "\u4E2A\u62A4\u7F8E\u5986", parentId: 8, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_shopping_makeup" },
+  { id: 811, name: "\u65E5\u5E38\u5BB6\u5C45", parentId: 8, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_shopping_home" },
+  { id: 701, name: "\u7CAE\u6CB9\u8C03\u5473", parentId: 7, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_restaurant_foodstuff" },
+  { id: 702, name: "\u8BF7\u5BA2\u5403\u996D", parentId: 7, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_restaurant_treat" },
+  { id: 703, name: "\u751F\u9C9C\u98DF\u54C1", parentId: 7, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_restaurant_fresh" },
+  { id: 704, name: "\u4F11\u95F2\u96F6\u98DF", parentId: 7, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_restaurant_snacks" },
+  { id: 705, name: "\u996E\u6599\u9152\u6C34", parentId: 7, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_restaurant_wine" },
+  { id: 706, name: "\u665A\u9910", parentId: 7, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_restaurant_dinner" },
+  { id: 707, name: "\u5348\u9910", parentId: 7, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_restaurant_lunch" },
+  { id: 708, name: "\u65E9\u9910", parentId: 7, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_restaurant_breakfast" },
+  { id: 601, name: "\u4FDD\u517B\u4FEE\u8F66", parentId: 6, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_traffic_maintain" },
+  { id: 602, name: "\u98DE\u673A", parentId: 6, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_traffic_aircraft" },
+  { id: 603, name: "\u706B\u8F66", parentId: 6, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_traffic_train" },
+  { id: 604, name: "\u52A0\u6CB9", parentId: 6, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_traffic_oil" },
+  { id: 605, name: "\u505C\u8F66\u8D39", parentId: 6, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_traffic_parking" },
+  { id: 606, name: "\u516C\u5171\u4EA4\u901A", parentId: 6, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_traffic_bus" },
+  { id: 607, name: "\u6253\u8F66", parentId: 6, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_traffic_taxi" },
+  { id: 501, name: "\u6F14\u51FA", parentId: 5, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_game_show" },
+  { id: 502, name: "\u9152\u5427", parentId: 5, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_game_bar" },
+  { id: 503, name: "\u68CB\u724C\u684C\u6E38", parentId: 5, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_game_chess" },
+  { id: 504, name: "\u8DB3\u6D74\u6309\u6469", parentId: 5, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_game_foot_bath" },
+  { id: 505, name: "\u8FD0\u52A8\u5065\u8EAB", parentId: 5, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_game_keep_fit" },
+  { id: 506, name: "\u7535\u5F71\u5531\u6B4C", parentId: 5, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_game_film" },
+  { id: 507, name: "\u65C5\u6E38\u5EA6\u5047", parentId: 5, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_game_travel" },
+  { id: 401, name: "\u5BB6\u653F\u6E05\u6D01", parentId: 4, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_home_husekeeping" },
+  { id: 402, name: "\u8F66\u4F4D\u8D39", parentId: 4, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_home_parking_lot" },
+  { id: 403, name: "\u623F\u8D37", parentId: 4, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_home_loan" },
+  { id: 404, name: "\u7269\u4E1A\u8D39", parentId: 4, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_home_property" },
+  { id: 405, name: "\u71C3\u6C14\u8D39", parentId: 4, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_home_gas" },
+  { id: 406, name: "\u6C34\u8D39", parentId: 4, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_home_water" },
+  { id: 407, name: "\u7535\u8D39", parentId: 4, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_home_electricity_fees" },
+  { id: 408, name: "\u8BDD\u8D39\u5BBD\u5E26", parentId: 4, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_home_telephone_bill" },
+  { id: 301, name: "\u57F9\u8BAD\u8003\u8BD5", parentId: 3, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_education_train" },
+  { id: 302, name: "\u4E66\u62A5\u6742\u5FD7", parentId: 3, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_education_book" },
+  { id: 303, name: "\u5B66\u8D39", parentId: 3, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_education_tuition" },
+  { id: 201, name: "\u6253\u8D4F", parentId: 2, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_gift_reward" },
+  { id: 202, name: "\u7EA2\u5305", parentId: 2, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_gift_red_paper" },
+  { id: 203, name: "\u501F\u51FA", parentId: 2, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_gift_lend" },
+  { id: 204, name: "\u793C\u7269", parentId: 2, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_gift_gift" },
+  { id: 205, name: "\u5B5D\u656C\u957F\u8F88", parentId: 2, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_gift_filial_piety" },
+  { id: 101, name: "\u4E70\u836F", parentId: 1, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_medical_medicine" },
+  { id: 102, name: "\u533B\u9662", parentId: 1, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_medical_hospital" },
+  { id: 103, name: "\u6ECB\u8865\u4FDD\u5065", parentId: 1, kind: "expense", color: "#cbd5e1", positionWeight: 0, icon: "ic_medical_healthcare" }
 ];
+
+// src/auth.ts
+var currentUid = 0;
+var PREFIX = "xiaoman-data";
+var keyFor = (uid) => `${PREFIX}:${uid || "anon"}`;
+var userStorage = {
+  getItem: (_name) => localStorage.getItem(keyFor(currentUid)),
+  setItem: (_name, value) => localStorage.setItem(keyFor(currentUid), value),
+  removeItem: (_name) => localStorage.removeItem(keyFor(currentUid))
+};
 
 // src/store.ts
 var NOW = () => Date.now();
@@ -2982,6 +3032,16 @@ var useLedger = create()(
       refunds: [],
       lends: [],
       cycles: [],
+      currencies: [
+        { code: "CNY", name: "\u4EBA\u6C11\u5E01", symbol: "\xA5", rate: 1, positionWeight: 100 },
+        { code: "USD", name: "\u7F8E\u5143", symbol: "$", rate: 7.2, positionWeight: 90 },
+        { code: "EUR", name: "\u6B27\u5143", symbol: "\u20AC", rate: 7.8, positionWeight: 80 },
+        { code: "JPY", name: "\u65E5\u5143", symbol: "\xA5", rate: 0.048, positionWeight: 70 },
+        { code: "HKD", name: "\u6E2F\u5E01", symbol: "HK$", rate: 0.92, positionWeight: 60 }
+      ],
+      defaultCurrency: "CNY",
+      tombstones: [],
+      lastSync: 0,
       lastParentId: 7,
       lastChildId: 0,
       lastAssetId: 0,
@@ -3004,7 +3064,6 @@ var useLedger = create()(
           remark: patch.remark ?? "",
           billType: patch.billType ?? 2,
           tags: patch.tags ?? [],
-          files: [],
           userId: s.userId,
           updateTime: NOW(),
           // 冗余快照：改名不影响历史账单
@@ -3012,7 +3071,20 @@ var useLedger = create()(
             parentCategoryName: parent?.name ?? "",
             childCategoryName: child?.name ?? "",
             assetName: asset?.assetName ?? ""
-          }
+          },
+          // 可选字段原样透传（多币种、标记、地址、附件等）
+          files: patch.files ?? [],
+          currencyInfo: patch.currencyInfo,
+          currencyAssetNumber: patch.currencyAssetNumber,
+          currencyDiscountNumber: patch.currencyDiscountNumber,
+          notIntoTotal: patch.notIntoTotal,
+          notIntoBudget: patch.notIntoBudget,
+          discountNumber: patch.discountNumber,
+          refundNum: patch.refundNum,
+          poiAddress: patch.poiAddress,
+          fromUserId: patch.fromUserId,
+          isReimbursement: patch.isReimbursement,
+          reimbursementNum: patch.reimbursementNum
         };
         const assets = s.assets.map((a) => {
           if (a.assetId !== bill.assetId) return a;
@@ -3031,12 +3103,14 @@ var useLedger = create()(
       },
       // 删除同样要冲正：把该账单对账户的影响退回
       deleteBill: (billId) => set((s) => {
+        const tomb = { kind: "bill", id: String(billId), updatedAt: NOW() };
         const old = s.bills.find((b) => b.billId === billId);
         if (!old) return {};
         const sign = s.parentCategories.find((p) => p.id === old.parentCategoryId)?.kind === "income" ? 1 : -1;
         return {
           bills: s.bills.filter((b) => b.billId !== billId),
-          assets: s.assets.map((a) => a.assetId === old.assetId ? { ...a, assetNumber: +(a.assetNumber - sign * old.cost).toFixed(2), updateTime: NOW() } : a)
+          assets: s.assets.map((a) => a.assetId === old.assetId ? { ...a, assetNumber: +(a.assetNumber - sign * old.cost).toFixed(2), updateTime: NOW() } : a),
+          tombstones: [...s.tombstones, tomb]
         };
       }),
       // 改单：先把旧账单对账户的影响撤回，再按新值重新记一次
@@ -3155,7 +3229,8 @@ var useLedger = create()(
             if (a.assetId === t.fromAssetId) return { ...a, assetNumber: +(a.assetNumber + back).toFixed(2), updateTime: NOW() };
             if (a.assetId === t.toAssetId) return { ...a, assetNumber: +(a.assetNumber - t.cost).toFixed(2), updateTime: NOW() };
             return a;
-          })
+          }),
+          tombstones: [...s.tombstones, { kind: "transfer", id: String(transferId), updatedAt: NOW() }]
         };
       }),
       // 登记报销：只落记录，钱还没到；确认到账时才进报销账户
@@ -3192,7 +3267,8 @@ var useLedger = create()(
         return {
           reimbursements: s.reimbursements.filter((r) => r.reimbursementId !== reimbursementId),
           assets: refundBack ? s.assets.map((a) => a.assetId === rec.assetId ? { ...a, assetNumber: +(a.assetNumber - refundBack).toFixed(2), updateTime: NOW() } : a) : s.assets,
-          bills: s.bills.map((b) => b.billId === rec.billId ? { ...b, isReimbursement: 0, reimbursementNum: 0, updateTime: NOW() } : b)
+          bills: s.bills.map((b) => b.billId === rec.billId ? { ...b, isReimbursement: 0, reimbursementNum: 0, updateTime: NOW() } : b),
+          tombstones: [...s.tombstones, { kind: "reimbursement", id: String(reimbursementId), updatedAt: NOW() }]
         };
       }),
       addCycle: (patch) => set((s) => ({
@@ -3205,7 +3281,10 @@ var useLedger = create()(
           updateTime: NOW()
         }]
       })),
-      deleteCycle: (cycleId) => set((s) => ({ cycles: s.cycles.filter((c) => c.cycleId !== cycleId) })),
+      deleteCycle: (cycleId) => set((s) => ({
+        cycles: s.cycles.filter((c) => c.cycleId !== cycleId),
+        tombstones: [...s.tombstones, { kind: "cycle", id: String(cycleId), updatedAt: NOW() }]
+      })),
       toggleCycle: (cycleId) => set((s) => ({
         cycles: s.cycles.map((c) => c.cycleId === cycleId ? { ...c, enabled: !c.enabled, updateTime: NOW() } : c)
       })),
@@ -3300,7 +3379,8 @@ var useLedger = create()(
         const sign = rec.type === 1 || rec.type === 4 ? 1 : -1;
         return {
           lends: s.lends.filter((x) => x.lendId !== lendId),
-          assets: s.assets.map((a) => a.assetId === rec.assetId ? { ...a, assetNumber: +(a.assetNumber + sign * rec.number).toFixed(2), updateTime: NOW() } : a)
+          assets: s.assets.map((a) => a.assetId === rec.assetId ? { ...a, assetNumber: +(a.assetNumber + sign * rec.number).toFixed(2), updateTime: NOW() } : a),
+          tombstones: [...s.tombstones, { kind: "lend", id: String(lendId), updatedAt: NOW() }]
         };
       }),
       // 退款：钱退回原支付账户，直接冲减这笔支出
@@ -3328,6 +3408,7 @@ var useLedger = create()(
         const bill = s.bills.find((b) => b.billId === rec.billId);
         return {
           refunds: s.refunds.filter((r) => r.refundId !== refundId),
+          tombstones: [...s.tombstones, { kind: "refund", id: String(refundId), updatedAt: NOW() }],
           bills: s.bills.map((b) => b.billId === rec.billId ? { ...b, refundNum: 0, updateTime: NOW() } : b),
           assets: bill ? s.assets.map((a) => a.assetId === bill.assetId ? { ...a, assetNumber: +(a.assetNumber - rec.number).toFixed(2), updateTime: NOW() } : a) : s.assets
         };
@@ -3337,7 +3418,8 @@ var useLedger = create()(
         return { budgets: budget.amount > 0 ? [...rest, budget] : rest };
       }),
       removeBudget: (month, categoryId) => set((s) => ({
-        budgets: s.budgets.filter((b) => !(b.month === month && b.categoryId === categoryId))
+        budgets: s.budgets.filter((b) => !(b.month === month && b.categoryId === categoryId)),
+        tombstones: [...s.tombstones, { kind: "budget", id: `${month}:${categoryId}`, updatedAt: NOW() }]
       })),
       updateAsset: (asset) => set((s) => ({
         assets: s.assets.map((a) => a.assetId === asset.assetId ? { ...asset, updateTime: NOW() } : a)
@@ -3398,17 +3480,105 @@ var useLedger = create()(
           childCategories: s.childCategories
         };
       },
-      // 把内置分类体系缺失的部分补进来（老数据不会被覆盖，只是补齐）
+      setLastSync: (t) => set({ lastSync: t }),
+      setCurrencyRate: (code, rate) => set((s) => {
+        const r = Number(rate);
+        if (!Number.isFinite(r) || r <= 0) return {};
+        return {
+          currencies: s.currencies.map((c) => c.code === code ? { ...c, rate: c.code === s.defaultCurrency ? 1 : r } : c)
+        };
+      }),
+      addCurrency: (c) => set((s) => s.currencies.some((x) => x.code === c.code) ? {} : { currencies: [...s.currencies, c] }),
+      removeCurrency: (code) => set((s) => code === s.defaultCurrency ? {} : { currencies: s.currencies.filter((c) => c.code !== code) }),
+      tombstone: (kind, id) => set((s) => ({
+        tombstones: [
+          ...s.tombstones.filter((t) => !(t.kind === kind && t.id === String(id))),
+          { kind, id: String(id), updatedAt: NOW() }
+        ]
+      })),
+      // 合并云端记录：逐条 last-write-wins，删除墓碑生效
+      applyRemote: (records) => set((s) => {
+        const next = {};
+        const tombstones = [...s.tombstones];
+        const spec = {
+          bill: ["bills", "billId"],
+          asset: ["assets", "assetId"],
+          transfer: ["transfers", "transferId"],
+          lend: ["lends", "lendId"],
+          cycle: ["cycles", "cycleId"],
+          parent: ["parentCategories", "id"],
+          child: ["childCategories", "id"],
+          book: ["accountBooks", "accountBookId"],
+          reimbursement: ["reimbursements", "reimbursementId"],
+          refund: ["refunds", "refundId"],
+          budget: ["budgets", "month"]
+        };
+        const idOf = (kind, item) => kind === "budget" ? `${item.month}:${item.categoryId}` : String(item[spec[kind][1]]);
+        for (const r of records || []) {
+          const k = spec[r.kind];
+          if (!k) continue;
+          const arr = next[k[0]] ?? [...s[k[0]] || []];
+          if (r.deleted) {
+            next[k[0]] = arr.filter((x) => idOf(r.kind, x) !== String(r.id));
+            if (!tombstones.some((t) => t.kind === r.kind && t.id === String(r.id))) {
+              tombstones.push({ kind: r.kind, id: String(r.id), updatedAt: r.updatedAt || NOW() });
+            }
+            continue;
+          }
+          if (!r.payload) continue;
+          const idx = arr.findIndex((x) => idOf(r.kind, x) === String(r.id));
+          const localTime = idx >= 0 ? arr[idx].updateTime ?? 0 : -1;
+          if (idx < 0 || (r.updatedAt ?? 0) > localTime) {
+            if (idx >= 0) arr[idx] = r.payload;
+            else arr.push(r.payload);
+          }
+          next[k[0]] = arr;
+        }
+        return { ...next, tombstones };
+      }),
+      // 补齐内置分类（缺失的加上），并把老数据里的 emoji 图标迁移成图标键
       mergeTaxonomy: () => set((s) => {
+        const DEFAULT_RATE = { CNY: 1, USD: 7.2, EUR: 7.8, JPY: 0.048, HKD: 0.92 };
+        const currencies = (s.currencies ?? []).map((c) => !c.rate || c.rate <= 0 ? { ...c, rate: DEFAULT_RATE[c.code] ?? 1 } : c);
         const key = (c) => `${c.parentId}|${c.name}|${c.kind}`;
         const haveP = new Set(s.parentCategories.map(key));
         const haveC = new Set(s.childCategories.map(key));
         const addP = [...TAXONOMY_PARENTS, ...TAXONOMY_INCOME].filter((c) => !haveP.has(key(c)));
         const addC = TAXONOMY_CHILDREN.filter((c) => !haveC.has(key(c)));
-        if (addP.length === 0 && addC.length === 0) return {};
+        const byName = /* @__PURE__ */ new Map();
+        for (const c of [...TAXONOMY_PARENTS, ...TAXONOMY_INCOME, ...TAXONOMY_CHILDREN]) {
+          byName.set(`${c.name}|${c.kind}`, c);
+        }
+        const RENAMED = { "\u623F\u79DF\u8FD8\u8D37": "\u623F\u8D37" };
+        const fix = (c) => {
+          const renamed = RENAMED[c.name];
+          if (renamed) c = { ...c, name: renamed };
+          if (c.icon?.startsWith("ic_")) return c;
+          const t = byName.get(`${c.name}|${c.kind}`);
+          return t ? { ...c, icon: t.icon, color: t.color, bg: t.bg } : c;
+        };
+        let parents = s.parentCategories.map(fix);
+        let children = s.childCategories.map(fix);
+        const JUNK = /* @__PURE__ */ new Set(["\u901A\u8BAF", "\u4EBA\u60C5", "\u5916\u5356", "\u4E09\u9910", "\u96F6\u98DF\u996E\u6599", "\u836F\u54C1"]);
+        const used = /* @__PURE__ */ new Set();
+        for (const b of s.bills) {
+          used.add(b.parentCategoryId);
+          if (b.childCategoryId) used.add(b.childCategoryId);
+        }
+        children = children.filter((c) => !JUNK.has(c.name) || used.has(c.id));
+        parents = parents.filter((c) => !JUNK.has(c.name) || used.has(c.id));
+        const INCOME_MISPLACED = /* @__PURE__ */ new Set(["\u6148\u5584\u6350\u52A9", "\u7406\u8D22\u652F\u51FA", "\u7F5A\u6B3E\u8D54\u507F"]);
+        parents = parents.filter((c) => !(c.kind === "income" && INCOME_MISPLACED.has(c.name) && !used.has(c.id)));
+        const ratesFixed = currencies.some((c, i) => c !== (s.currencies ?? [])[i]);
+        if (!addP.length && !addC.length) {
+          const changed = parents.some((c, i) => c !== s.parentCategories[i]) || children.some((c, i) => c !== s.childCategories[i]);
+          if (!changed && !ratesFixed) return {};
+          return { parentCategories: parents, childCategories: children, ...ratesFixed ? { currencies } : {} };
+        }
         return {
-          parentCategories: [...s.parentCategories, ...addP],
-          childCategories: [...s.childCategories, ...addC]
+          parentCategories: [...parents, ...addP],
+          childCategories: [...children, ...addC],
+          ...ratesFixed ? { currencies } : {}
         };
       }),
       // 合并式导入：新增分类/账户先落地，账单像正常记账一样冲账户余额
@@ -3453,10 +3623,17 @@ var useLedger = create()(
         seeded: true
       }))
     }),
-    { name: "ledger-data-store" }
+    { name: "xiaoman-data", storage: createJSONStorage(() => userStorage) }
   )
 );
-var useTotalAssets = () => useLedger((s) => s.assets.filter((a) => !a.hide && a.intoTotalAsset).reduce((sum, a) => sum + a.assetNumber, 0));
+var useTotalAssets = () => useLedger((s) => {
+  const rateOf = (code) => {
+    if (!code || code === s.defaultCurrency) return 1;
+    const c = s.currencies.find((x) => x.code === code);
+    return c && c.rate ? c.rate : 1;
+  };
+  return s.assets.filter((a) => !a.hide && a.intoTotalAsset).reduce((sum, a) => sum + a.assetNumber * rateOf(a.currency), 0);
+});
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   useLedger,
