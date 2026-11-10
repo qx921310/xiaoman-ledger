@@ -623,6 +623,10 @@ export const useLedger = create<LedgerState>()(
         children = children.filter((c) => !JUNK.has(c.name) || used.has(c.id))
         parents = parents.filter((c) => !JUNK.has(c.name) || used.has(c.id))
 
+        // 这 3 个原先被错放进「收入」，实际属于「支出 > 其他」
+        const INCOME_MISPLACED = new Set(['慈善捐助', '理财支出', '罚款赔偿'])
+        parents = parents.filter((c) => !(c.kind === 'income' && INCOME_MISPLACED.has(c.name) && !used.has(c.id)))
+
         if (!addP.length && !addC.length) {
           const changed = parents.some((c, i) => c !== s.parentCategories[i])
             || children.some((c, i) => c !== s.childCategories[i])

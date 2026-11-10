@@ -16,20 +16,17 @@ export const TAXONOMY_PARENTS: Category[] = [
 ]
 
 export const TAXONOMY_INCOME: Category[] = [
-  { id: 901, name: '报销', parentId: 0, kind: 'income', color: '#22c55e', positionWeight: 0, icon: 'ic_income_reimbursement' },
-  { id: 902, name: '补贴', parentId: 0, kind: 'income', color: '#22c55e', positionWeight: 0, icon: 'ic_income_subsidy' },
-  { id: 903, name: '二手闲置', parentId: 0, kind: 'income', color: '#22c55e', positionWeight: 0, icon: 'ic_income_second_hand' },
-  { id: 904, name: '工资', parentId: 0, kind: 'income', color: '#22c55e', positionWeight: 0, icon: 'ic_income_wages' },
-  { id: 905, name: '兼职外快', parentId: 0, kind: 'income', color: '#22c55e', positionWeight: 0, icon: 'ic_income_part_time_job' },
-  { id: 906, name: '奖金', parentId: 0, kind: 'income', color: '#22c55e', positionWeight: 0, icon: 'ic_income_bonus' },
+  { id: 901, name: '工资', parentId: 0, kind: 'income', color: '#22c55e', positionWeight: 0, icon: 'ic_income_wages' },
+  { id: 902, name: '奖金', parentId: 0, kind: 'income', color: '#22c55e', positionWeight: 0, icon: 'ic_income_bonus' },
+  { id: 903, name: '补贴', parentId: 0, kind: 'income', color: '#22c55e', positionWeight: 0, icon: 'ic_income_subsidy' },
+  { id: 904, name: '兼职外快', parentId: 0, kind: 'income', color: '#22c55e', positionWeight: 0, icon: 'ic_income_part_time_job' },
+  { id: 905, name: '理财盈利', parentId: 0, kind: 'income', color: '#22c55e', positionWeight: 0, icon: 'ic_income_manager_money' },
+  { id: 906, name: '礼金人情', parentId: 0, kind: 'income', color: '#22c55e', positionWeight: 0, icon: 'ic_income_cash_gift' },
   { id: 907, name: '借入', parentId: 0, kind: 'income', color: '#22c55e', positionWeight: 0, icon: 'ic_income_borrow' },
-  { id: 908, name: '礼金人情', parentId: 0, kind: 'income', color: '#22c55e', positionWeight: 0, icon: 'ic_income_cash_gift' },
-  { id: 909, name: '理财盈利', parentId: 0, kind: 'income', color: '#22c55e', positionWeight: 0, icon: 'ic_income_manager_money' },
-  { id: 910, name: '中奖', parentId: 0, kind: 'income', color: '#22c55e', positionWeight: 0, icon: 'ic_income_winning' },
+  { id: 908, name: '中奖', parentId: 0, kind: 'income', color: '#22c55e', positionWeight: 0, icon: 'ic_income_winning' },
+  { id: 909, name: '二手闲置', parentId: 0, kind: 'income', color: '#22c55e', positionWeight: 0, icon: 'ic_income_second_hand' },
+  { id: 910, name: '报销', parentId: 0, kind: 'income', color: '#22c55e', positionWeight: 0, icon: 'ic_income_reimbursement' },
   { id: 911, name: '其他', parentId: 0, kind: 'income', color: '#22c55e', positionWeight: 0, icon: 'ic_income_other' },
-  { id: 9901, name: '慈善捐助', parentId: 0, kind: 'income', color: '#22c55e', positionWeight: 0, icon: 'ic_other_charitable' },
-  { id: 9902, name: '理财支出', parentId: 0, kind: 'income', color: '#22c55e', positionWeight: 0, icon: 'ic_r_manager_money' },
-  { id: 9903, name: '罚款赔偿', parentId: 0, kind: 'income', color: '#22c55e', positionWeight: 0, icon: 'ic_other_fine' },
 ]
 
 export const TAXONOMY_CHILDREN: Category[] = [
