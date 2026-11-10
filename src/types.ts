@@ -154,7 +154,10 @@ export interface Transfer {
   transferId: number
   fromAssetId: number
   toAssetId: number
+  /** 转出金额（按转出账户币种） */
   cost: number
+  /** 实际到账金额（按转入账户币种）；缺省等于 cost */
+  toCost?: number
   /** 手续费：>0 时单独生成一条支出账单，与 transfer 通过 billId 关联 */
   serviceCharge: number
   billId: number

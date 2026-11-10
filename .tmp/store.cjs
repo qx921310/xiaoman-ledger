@@ -3139,10 +3139,11 @@ var useLedger = create()(
         while (s.transfers.some((t2) => t2.transferId === transferId)) transferId++;
         const fee = Number(patch.serviceCharge ?? 0);
         const time = patch.time ?? NOW();
+        const toCost = Number(patch.toCost ?? patch.cost);
         set((st) => ({
           assets: st.assets.map((a) => {
             if (a.assetId === patch.fromAssetId) return { ...a, assetNumber: +(a.assetNumber - patch.cost).toFixed(2), updateTime: NOW() };
-            if (a.assetId === patch.toAssetId) return { ...a, assetNumber: +(a.assetNumber + patch.cost).toFixed(2), updateTime: NOW() };
+            if (a.assetId === patch.toAssetId) return { ...a, assetNumber: +(a.assetNumber + toCost).toFixed(2), updateTime: NOW() };
             return a;
           })
         }));
@@ -3164,6 +3165,7 @@ var useLedger = create()(
           fromAssetId: patch.fromAssetId,
           toAssetId: patch.toAssetId,
           cost: Number(patch.cost),
+          toCost,
           serviceCharge: fee,
           billId,
           time,
@@ -3188,7 +3190,7 @@ var useLedger = create()(
           assets: st.assets.map((a) => {
             let v = a.assetNumber;
             if (a.assetId === old.fromAssetId) v += old.cost + feeBack;
-            if (a.assetId === old.toAssetId) v -= old.cost;
+            if (a.assetId === old.toAssetId) v -= old.toCost ?? old.cost;
             return v === a.assetNumber ? a : { ...a, assetNumber: +v.toFixed(2), updateTime: NOW() };
           })
         }));
@@ -3196,6 +3198,7 @@ var useLedger = create()(
           fromAssetId: patch.fromAssetId ?? old.fromAssetId,
           toAssetId: patch.toAssetId ?? old.toAssetId,
           cost: patch.cost ?? old.cost,
+          toCost: patch.toCost ?? old.toCost ?? old.cost,
           serviceCharge: patch.serviceCharge ?? old.serviceCharge,
           time: patch.time ?? old.time,
           remark: patch.remark ?? old.remark
@@ -3223,11 +3226,13 @@ var useLedger = create()(
         const t = s.transfers.find((x) => x.transferId === transferId);
         if (!t) return {};
         const back = t.cost + t.serviceCharge;
+        const toBack = t.toCost ?? t.cost;
         return {
           transfers: s.transfers.filter((x) => x.transferId !== transferId),
+          bills: t.billId ? s.bills.filter((b) => b.billId !== t.billId) : s.bills,
           assets: s.assets.map((a) => {
             if (a.assetId === t.fromAssetId) return { ...a, assetNumber: +(a.assetNumber + back).toFixed(2), updateTime: NOW() };
-            if (a.assetId === t.toAssetId) return { ...a, assetNumber: +(a.assetNumber - t.cost).toFixed(2), updateTime: NOW() };
+            if (a.assetId === t.toAssetId) return { ...a, assetNumber: +(a.assetNumber - toBack).toFixed(2), updateTime: NOW() };
             return a;
           }),
           tombstones: [...s.tombstones, { kind: "transfer", id: String(transferId), updatedAt: NOW() }]

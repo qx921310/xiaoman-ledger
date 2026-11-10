@@ -59,8 +59,8 @@ interface LedgerState {
   removeBudget: (month: string, categoryId: number) => void
   deleteBill: (billId: number) => void
   updateBill: (billId: number, patch: Partial<Bill>) => void
-  addTransfer: (patch: { fromAssetId: number; toAssetId: number; cost: number; serviceCharge?: number; time?: number; remark?: string }) => Transfer
-  updateTransfer: (transferId: number, patch: Partial<Pick<Transfer, 'fromAssetId' | 'toAssetId' | 'cost' | 'serviceCharge' | 'time' | 'remark'>>) => void
+  addTransfer: (patch: { fromAssetId: number; toAssetId: number; cost: number; toCost?: number; serviceCharge?: number; time?: number; remark?: string }) => Transfer
+  updateTransfer: (transferId: number, patch: Partial<Pick<Transfer, 'fromAssetId' | 'toAssetId' | 'cost' | 'toCost' | 'serviceCharge' | 'time' | 'remark'>>) => void
   addAsset: (patch: Partial<Asset>) => void
   updateAsset: (asset: Asset) => void
   setBook: (id: number) => void
@@ -219,12 +219,13 @@ export const useLedger = create<LedgerState>()(
         while (s.transfers.some((t) => t.transferId === transferId)) transferId++
         const fee = Number(patch.serviceCharge ?? 0)
         const time = patch.time ?? NOW()
+        const toCost = Number(patch.toCost ?? patch.cost)
 
         // 1) 本金：转出方 -，转入方 +
         set((st) => ({
           assets: st.assets.map((a) => {
             if (a.assetId === patch.fromAssetId) return { ...a, assetNumber: +(a.assetNumber - patch.cost).toFixed(2), updateTime: NOW() }
-            if (a.assetId === patch.toAssetId) return { ...a, assetNumber: +(a.assetNumber + patch.cost).toFixed(2), updateTime: NOW() }
+            if (a.assetId === patch.toAssetId) return { ...a, assetNumber: +(a.assetNumber + toCost).toFixed(2), updateTime: NOW() }
             return a
           })
         }))
@@ -249,6 +250,7 @@ export const useLedger = create<LedgerState>()(
           fromAssetId: patch.fromAssetId,
           toAssetId: patch.toAssetId,
           cost: Number(patch.cost),
+          toCost,
           serviceCharge: fee,
           billId,
           time,
@@ -275,7 +277,7 @@ export const useLedger = create<LedgerState>()(
           assets: st.assets.map((a) => {
             let v = a.assetNumber
             if (a.assetId === old.fromAssetId) v += old.cost + feeBack
-            if (a.assetId === old.toAssetId) v -= old.cost
+            if (a.assetId === old.toAssetId) v -= (old.toCost ?? old.cost)
             return v === a.assetNumber ? a : { ...a, assetNumber: +v.toFixed(2), updateTime: NOW() }
           })
         }))
@@ -284,6 +286,7 @@ export const useLedger = create<LedgerState>()(
           fromAssetId: patch.fromAssetId ?? old.fromAssetId,
           toAssetId: patch.toAssetId ?? old.toAssetId,
           cost: patch.cost ?? old.cost,
+          toCost: patch.toCost ?? old.toCost ?? old.cost,
           serviceCharge: patch.serviceCharge ?? old.serviceCharge,
           time: patch.time ?? old.time,
           remark: patch.remark ?? old.remark
@@ -312,12 +315,15 @@ export const useLedger = create<LedgerState>()(
       deleteTransfer: (transferId) => set((s) => {
         const t = s.transfers.find((x) => x.transferId === transferId)
         if (!t) return {}
+        // 撤销：转出方退回本金+手续费，转入方扣回到账金额；连带删掉手续费账单
         const back = t.cost + t.serviceCharge
+        const toBack = t.toCost ?? t.cost
         return {
           transfers: s.transfers.filter((x) => x.transferId !== transferId),
+          bills: t.billId ? s.bills.filter((b) => b.billId !== t.billId) : s.bills,
           assets: s.assets.map((a) => {
             if (a.assetId === t.fromAssetId) return { ...a, assetNumber: +(a.assetNumber + back).toFixed(2), updateTime: NOW() }
-            if (a.assetId === t.toAssetId) return { ...a, assetNumber: +(a.assetNumber - t.cost).toFixed(2), updateTime: NOW() }
+            if (a.assetId === t.toAssetId) return { ...a, assetNumber: +(a.assetNumber - toBack).toFixed(2), updateTime: NOW() }
             return a
           }),
           tombstones: [...s.tombstones, { kind: 'transfer', id: String(transferId), updatedAt: NOW() }]

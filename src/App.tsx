@@ -254,6 +254,7 @@ function AddBill({ notify }: { notify: (m: string) => void }) {
   const [aid, setAid] = useState(lastAssetId || 0)
   const [toAid, setToAid] = useState(0)
   const [fee, setFee] = useState('')
+  const [toCost, setToCost] = useState('')
   const [remark, setRemark] = useState('')
   const [time, setTime] = useState(toLocalInput(Date.now()))
 
@@ -283,12 +284,14 @@ function AddBill({ notify }: { notify: (m: string) => void }) {
       if (!aid || !toAid) return notify('请选择转出和转入账户')
       if (aid === toAid) return notify('转出和转入不能是同一个账户')
       const f = Number(fee) || 0
+      const tc = Number(toCost) || 0
       addTransfer({
+        toCost: tc > 0 ? tc : undefined,
         fromAssetId: aid, toAssetId: toAid, cost: v,
         serviceCharge: f, remark, time: new Date(time).getTime()
       })
-      setCost(''); setFee(''); setRemark('')
-      return notify(`已转账 ${money(v)}` + (f > 0 ? `，手续费 ${money(f)} 已单独记为支出` : ''))
+      setCost(''); setFee(''); setRemark(''); setToCost('')
+      return notify(`已转账 ${money(v)}` + (tc > 0 && tc !== v ? `（到账 ${money(tc)}）` : '') + (f > 0 ? `，手续费 ${money(f)} 已单独记为支出` : ''))
     }
 
     if (!aid) return notify('请选择账户')
@@ -360,7 +363,14 @@ function AddBill({ notify }: { notify: (m: string) => void }) {
               <input type="datetime-local" value={time} onChange={(e) => setTime(e.target.value)} />
             </div>
           </div>
-          <p className="tip">转账本金不计入收支；手续费会单独生成一条支出账单。</p>
+          <div className="label">到账金额（跨币种或对方扣费时填，留空＝与金额相同）</div>
+          <input value={toCost} onChange={(e) => setToCost(e.target.value.replace(/[^\d.]/g, ''))} placeholder="默认等于金额" inputMode="decimal" />
+          <p className="tip">
+            转账本金不计入收支；手续费会单独生成一条支出账单。
+            {toCost && Number(toCost) !== Number(cost) && Number(cost) > 0 && (
+              <> 转出 {money(Number(cost))}，到账 {money(Number(toCost))}。</>
+            )}
+          </p>
         </>
       ) : (
         <>
@@ -865,13 +875,14 @@ function Assets({ notify }: { notify: (m: string) => void }) {
 
 function TransferEditor({ transfer, onClose, onSave }: {
   transfer: Transfer; onClose: () => void
-  onSave: (p: { fromAssetId: number; toAssetId: number; cost: number; serviceCharge: number; remark: string; time: number }) => void
+  onSave: (p: { fromAssetId: number; toAssetId: number; cost: number; toCost: number; serviceCharge: number; remark: string; time: number }) => void
 }) {
   const assets = useLedger((s) => s.assets)
   const [from, setFrom] = useState(transfer.fromAssetId)
   const [to, setTo] = useState(transfer.toAssetId)
   const [cost, setCost] = useState(String(transfer.cost))
   const [fee, setFee] = useState(String(transfer.serviceCharge))
+  const [toCost, setToCost] = useState(String(transfer.toCost ?? transfer.cost))
   const [remark, setRemark] = useState(transfer.remark)
   const [time, setTime] = useState(toLocalInput(transfer.time))
 
@@ -905,6 +916,9 @@ function TransferEditor({ transfer, onClose, onSave }: {
               onChange={(e) => setFee(e.target.value.replace(/[^\d.]/g, ''))} />
           </div>
         </div>
+        <div className="label">到账金额</div>
+        <input value={toCost} inputMode="decimal"
+          onChange={(e) => setToCost(e.target.value.replace(/[^\d.]/g, ''))} />
         <div className="label">时间</div>
         <input type="datetime-local" value={time} onChange={(e) => setTime(e.target.value)} />
         <div className="label">备注</div>
@@ -914,7 +928,9 @@ function TransferEditor({ transfer, onClose, onSave }: {
           <button className="ghost" onClick={onClose}>取消</button>
           <button className="primary" onClick={() => onSave({
             fromAssetId: from, toAssetId: to,
-            cost: Number(cost) || 0, serviceCharge: Number(fee) || 0,
+            cost: Number(cost) || 0,
+            toCost: Number(toCost) || Number(cost) || 0,
+            serviceCharge: Number(fee) || 0,
             remark, time: new Date(time).getTime()
           })}>保存</button>
         </div>
