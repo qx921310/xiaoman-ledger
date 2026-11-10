@@ -3082,6 +3082,10 @@ var useLedger = create()(
           discountNumber: patch.discountNumber,
           refundNum: patch.refundNum,
           poiAddress: patch.poiAddress,
+          totalAddress: patch.totalAddress,
+          recordTime: patch.recordTime,
+          inAssetTime: patch.inAssetTime,
+          displayAsSelf: patch.displayAsSelf,
           fromUserId: patch.fromUserId,
           isReimbursement: patch.isReimbursement,
           reimbursementNum: patch.reimbursementNum

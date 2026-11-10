@@ -39,7 +39,16 @@ export interface Bill {
   currencyAssetNumber?: number
   /** 外币优惠金额 */
   currencyDiscountNumber?: number
+  /** 地点名（POI） */
   poiAddress?: string
+  /** 完整地址 */
+  totalAddress?: string
+  /** 记录时间（≠ 账单时间，用于补记） */
+  recordTime?: number
+  /** 计入资产的时间 */
+  inAssetTime?: number
+  /** 共享账本中是否按本人显示 */
+  displayAsSelf?: boolean
   /** 是否报销中 */
   isReimbursement?: number
   /** 报销金额（冗余，便于列表展示） */
@@ -146,6 +155,13 @@ export interface Asset {
   intoTotalAsset: boolean
   /** 账户币种，默认 CNY */
   currency?: string
+  /** 总额度（信用卡常用） */
+  totalQuota?: number
+  /** 卡号后四位 */
+  cardCode?: string
+  /** 账单日 / 还款日（1-28） */
+  inAccountDate?: number
+  outAccountDate?: number
   positionWeight: number
   remark: string
   userId: number

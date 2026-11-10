@@ -802,7 +802,10 @@ function Assets({ notify }: { notify: (m: string) => void }) {
         <div key={a.assetId} className="row">
           <span className="asset-badge"><AssetIcon type={a.assetType} size={16} /></span>
           <div className="grow">
-            <div>{a.assetName}</div>
+            <div>
+              {a.assetName}
+              {a.cardCode && <span className="tag">尾号 {a.cardCode}</span>}
+            </div>
             <small>{ASSET_TYPE[a.assetType]}{a.groupName ? ' · ' + a.groupName : ''}</small>
           </div>
           <b className={a.assetNumber < 0 ? 'out' : ''}>{money(a.assetNumber)}</b>
@@ -982,6 +985,8 @@ function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => 
   const currencies = useLedger((s) => s.currencies)
   const defaultCurrency = useLedger((s) => s.defaultCurrency)
   const [currency, setCurrency] = useState(asset.currency ?? defaultCurrency)
+  const [quota, setQuota] = useState(asset.totalQuota ? String(asset.totalQuota) : '')
+  const [cardCode, setCardCode] = useState(asset.cardCode ?? '')
   const [name, setName] = useState(asset.assetName)
   const [type, setType] = useState(asset.assetType)
   // 留空＝保持原余额；填入即覆盖（避免把新值追加在旧值后面）
@@ -1001,6 +1006,18 @@ function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => 
         <select value={type} onChange={(e) => setType(Number(e.target.value))}>
           {Object.entries(ASSET_TYPE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
+        <div className="row2">
+          <div>
+            <div className="label">总额度（信用卡）</div>
+            <input value={quota} inputMode="decimal" placeholder="可留空"
+              onChange={(e) => setQuota(e.target.value.replace(/[^\d.]/g, ''))} />
+          </div>
+          <div>
+            <div className="label">卡号后四位</div>
+            <input value={cardCode} placeholder="可留空" maxLength={4}
+              onChange={(e) => setCardCode(e.target.value.replace(/\D/g, ''))} />
+          </div>
+        </div>
         <div className="label">设为实际余额（当前 {money(asset.assetNumber)}，信用卡填负数）</div>
         <input
           value={num}

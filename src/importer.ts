@@ -285,6 +285,8 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
       refundNum: Math.abs(num(r[col('退款')])),
       currencyInfo: str(r[col('多币种')]),
       poiAddress: str(r[col('地址')]),
+      totalAddress: str(r[col('完整地址')]) || undefined,
+      recordTime: time,
       fromUserId: num(r[col('创建用户')]) || 0
     }
     bills.push(bill)
