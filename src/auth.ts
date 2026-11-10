@@ -74,6 +74,11 @@ export const userStorage = {
  * 只在**这台机器上还没有任何账号数据**时执行一次（即第一个登录的账号），
  * 避免第二个账号把同一份数据又接一遍。
  */
+/** 这个账号在这台机器上是否已有本地数据 */
+export function hasUserData(uid: number) {
+  return !!localStorage.getItem(keyFor(uid))
+}
+
 export function adoptAnonymousData(uid: number) {
   const target = keyFor(uid)
   if (localStorage.getItem(target)) return false

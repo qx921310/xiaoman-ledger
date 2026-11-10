@@ -5,7 +5,7 @@ import type { Cycle } from './types'
 import type { Asset, Bill, Transfer } from './types'
 import { api } from './api'
 import type { ImportPlan } from './importer'
-import { adoptAnonymousData, auth, books as bookApi, setCurrentUid, type BookInfo, type User } from './auth'
+import { adoptAnonymousData, auth, books as bookApi, hasUserData, setCurrentUid, type BookInfo, type User } from './auth'
 import { syncNow } from './sync'
 import { currencySymbol, findCurrency, toBase } from './money'
 
@@ -174,6 +174,8 @@ export default function App() {
       if (u) {
         setCurrentUid(u.id)
         adoptAnonymousData(u.id)
+        // 新账号且本机没有它的数据 → 先清空内存状态，避免把上一个账号的数据带进来
+        if (!hasUserData(u.id)) useLedger.getState().reset()
         await useLedger.persist.rehydrate()
         setUser(u)
         await loadBooks()
@@ -225,6 +227,7 @@ export default function App() {
   const afterAuth = async (u: User) => {
     setCurrentUid(u.id)
     adoptAnonymousData(u.id)
+    if (!hasUserData(u.id)) useLedger.getState().reset()
     await useLedger.persist.rehydrate()
     setUser(u)
     await loadBooks()

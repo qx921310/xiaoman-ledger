@@ -10,8 +10,6 @@ const dataDir = join(here, 'data')
 mkdirSync(dataDir, { recursive: true })
 
 const db = new DatabaseSync(join(dataDir, 'ledger.db'))
-try { db.exec('ALTER TABLE records ADD COLUMN book_id TEXT'); } catch { /* 已存在 */ }
-
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -58,6 +56,14 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS bills (bill_id INTEGER PRIMARY KEY, payload TEXT NOT NULL, user_id INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS assets (asset_id INTEGER PRIMARY KEY, payload TEXT NOT NULL, user_id INTEGER NOT NULL);
 `)
+
+// 迁移要在建表之后：新库先建出 records，再按需补 book_id 列
+try {
+  const cols = db.prepare('PRAGMA table_info(records)').all().map((c) => c.name)
+  if (!cols.includes('book_id')) db.exec('ALTER TABLE records ADD COLUMN book_id TEXT')
+} catch (e) {
+  console.error('[migrate] records.book_id 补列失败:', e.message)
+}
 
 const PORT = Number(process.env.PORT || 8787)
 
@@ -468,6 +474,7 @@ const server = createServer(async (req, res) => {
     }
 
     if (path === '/api/sync/pull' && req.method === 'GET') {
+      if (!currentUser(req)) return fail(res, '请先登录')
       const bills = db.prepare('SELECT payload FROM bills WHERE user_id = ?').all(userId).map((r) => JSON.parse(r.payload))
       const assets = db.prepare('SELECT payload FROM assets WHERE user_id = ?').all(userId).map((r) => JSON.parse(r.payload))
       return ok(res, { bills, assets, lastSync: getKv(`lastSync:${userId}`) })

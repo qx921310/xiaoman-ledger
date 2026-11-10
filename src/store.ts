@@ -292,6 +292,10 @@ export const useLedger = create<LedgerState>()(
         set((st) => ({
           transfers: st.transfers.filter((t) => t.transferId !== transferId),
           bills: old.billId ? st.bills.filter((b) => b.billId !== old.billId) : st.bills,
+          tombstones: old.billId
+            ? [...st.tombstones.filter((x) => !(x.kind === 'bill' && x.id === String(old.billId))),
+               { kind: 'bill', id: String(old.billId), updatedAt: NOW() }]
+            : st.tombstones,
           assets: st.assets.map((a) => {
             let v = a.assetNumber
             if (a.assetId === old.fromAssetId) v += old.cost + feeBack
@@ -339,12 +343,18 @@ export const useLedger = create<LedgerState>()(
         return {
           transfers: s.transfers.filter((x) => x.transferId !== transferId),
           bills: t.billId ? s.bills.filter((b) => b.billId !== t.billId) : s.bills,
+          // 转账本身和它的手续费账单都要写墓碑，否则下次拉取会被同步回来
+          tombstones: [
+            ...s.tombstones.filter((x) => !(t.billId && x.kind === 'bill' && x.id === String(t.billId))
+              && !(x.kind === 'transfer' && x.id === String(transferId))),
+            { kind: 'transfer', id: String(transferId), updatedAt: NOW() },
+            ...(t.billId ? [{ kind: 'bill', id: String(t.billId), updatedAt: NOW() }] : [])
+          ],
           assets: s.assets.map((a) => {
             if (a.assetId === t.fromAssetId) return { ...a, assetNumber: +(a.assetNumber + back).toFixed(2), updateTime: NOW() }
             if (a.assetId === t.toAssetId) return { ...a, assetNumber: +(a.assetNumber - toBack).toFixed(2), updateTime: NOW() }
             return a
-          }),
-          tombstones: [...s.tombstones, { kind: 'transfer', id: String(transferId), updatedAt: NOW() }]
+          })
         }
       }),
 
@@ -724,6 +734,9 @@ export const useLedger = create<LedgerState>()(
           if (!k) continue
           const arr: any[] = next[k[0]] ?? [...(s[k[0]] || [])]
           if (r.deleted) {
+            const local = arr.find((x) => idOf(r.kind, x) === String(r.id))
+            // 本地版本比墓碑更新 → 说明墓碑过期，保留本地记录
+            if (local && (local.updateTime ?? 0) > (r.updatedAt ?? 0)) continue
             next[k[0]] = arr.filter((x) => idOf(r.kind, x) !== String(r.id))
             if (!tombstones.some((t) => t.kind === r.kind && t.id === String(r.id))) {
               tombstones.push({ kind: r.kind, id: String(r.id), updatedAt: r.updatedAt || NOW() })
