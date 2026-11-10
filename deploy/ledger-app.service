@@ -1,0 +1,15 @@
+[Unit]
+Description=Ledger App (self-hosted bookkeeping)
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/ledger-app
+Environment=PORT=8090
+ExecStart=/usr/bin/node /opt/ledger-app/server/server.mjs
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
