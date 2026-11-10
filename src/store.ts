@@ -125,8 +125,9 @@ export const useLedger = create<LedgerState>()(
 
       addBill: (patch) => {
         const s = get()
-        // 与用户端一致：billId 用秒级时间戳，冲突时递增
-        let billId = patch.billId ?? Math.floor(NOW() / 1000)
+        // billId = 秒级时间戳 * 1000 + 用户后缀：多人同秒记账也不会撞 ID
+        const uidSuffix = Math.abs(s.userId || 0) % 1000
+        let billId = patch.billId ?? Math.floor(NOW() / 1000) * 1000 + uidSuffix
         while (s.bills.some((b) => b.billId === billId)) billId++
         const parent = s.parentCategories.find((c) => c.id === patch.parentCategoryId)
         const child = s.childCategories.find((c) => c.id === patch.childCategoryId)
@@ -457,7 +458,8 @@ export const useLedger = create<LedgerState>()(
           for (const d of fresh) {
             const time = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 9, 0, 0).getTime()
             const t = get()
-            let billId = Math.floor(time / 1000)
+            const uidSuffix = Math.abs(t.userId || 0) % 1000
+            let billId = Math.floor(time / 1000) * 1000 + uidSuffix
             while (t.bills.some((b) => b.billId === billId)) billId++
             const parent = t.parentCategories.find((p) => p.id === c.parentCategoryId)
             const asset = t.assets.find((a) => a.assetId === c.assetId)

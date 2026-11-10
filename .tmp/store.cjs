@@ -3049,7 +3049,8 @@ var useLedger = create()(
       seeded: false,
       addBill: (patch) => {
         const s = get();
-        let billId = patch.billId ?? Math.floor(NOW() / 1e3);
+        const uidSuffix = Math.abs(s.userId || 0) % 1e3;
+        let billId = patch.billId ?? Math.floor(NOW() / 1e3) * 1e3 + uidSuffix;
         while (s.bills.some((b) => b.billId === billId)) billId++;
         const parent = s.parentCategories.find((c) => c.id === patch.parentCategoryId);
         const child = s.childCategories.find((c) => c.id === patch.childCategoryId);
@@ -3344,7 +3345,8 @@ var useLedger = create()(
           for (const d of fresh) {
             const time = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 9, 0, 0).getTime();
             const t = get();
-            let billId = Math.floor(time / 1e3);
+            const uidSuffix = Math.abs(t.userId || 0) % 1e3;
+            let billId = Math.floor(time / 1e3) * 1e3 + uidSuffix;
             while (t.bills.some((b) => b.billId === billId)) billId++;
             const parent = t.parentCategories.find((p) => p.id === c.parentCategoryId);
             const asset = t.assets.find((a) => a.assetId === c.assetId);

@@ -306,7 +306,8 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
   const used = new Set(existingBills.map((b) => b.billId))
   bills.sort((a, b) => a.time - b.time)
   bills.forEach((b) => {
-    let id = Math.floor(b.time / 1000)
+    // 与 store 一致：秒 * 1000 + 用户后缀，避免多人同秒撞 ID
+    let id = Math.floor(b.time / 1000) * 1000 + (Math.abs(userId) % 1000)
     while (used.has(id)) id++
     b.billId = id
     used.add(id)
