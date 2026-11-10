@@ -522,17 +522,35 @@ export const useLedger = create<LedgerState>()(
         }
       },
 
-      // 把内置分类体系缺失的部分补进来（老数据不会被覆盖，只是补齐）
+      // 补齐内置分类（缺失的加上），并把老数据里的 emoji 图标迁移成图标键
       mergeTaxonomy: () => set((s) => {
         const key = (c: Category) => `${c.parentId}|${c.name}|${c.kind}`
         const haveP = new Set(s.parentCategories.map(key))
         const haveC = new Set(s.childCategories.map(key))
         const addP = [...TAXONOMY_PARENTS, ...TAXONOMY_INCOME].filter((c) => !haveP.has(key(c)))
         const addC = TAXONOMY_CHILDREN.filter((c) => !haveC.has(key(c)))
-        if (addP.length === 0 && addC.length === 0) return {}
+
+        // name+kind → 内置定义，用于修正图标/配色
+        const byName = new Map<string, Category>()
+        for (const c of [...TAXONOMY_PARENTS, ...TAXONOMY_INCOME, ...TAXONOMY_CHILDREN]) {
+          byName.set(`${c.name}|${c.kind}`, c)
+        }
+        const fix = (c: Category): Category => {
+          if (c.icon?.startsWith('ic_')) return c
+          const t = byName.get(`${c.name}|${c.kind}`)
+          return t ? { ...c, icon: t.icon, color: t.color, bg: t.bg } : c
+        }
+        const parents = s.parentCategories.map(fix)
+        const children = s.childCategories.map(fix)
+
+        if (!addP.length && !addC.length) {
+          const changed = parents.some((c, i) => c !== s.parentCategories[i])
+            || children.some((c, i) => c !== s.childCategories[i])
+          return changed ? { parentCategories: parents, childCategories: children } : {}
+        }
         return {
-          parentCategories: [...s.parentCategories, ...addP],
-          childCategories: [...s.childCategories, ...addC]
+          parentCategories: [...parents, ...addP],
+          childCategories: [...children, ...addC]
         }
       }),
 

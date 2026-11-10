@@ -26,6 +26,39 @@ const toLocalInput = (t: number) => {
 
 type Tab = 'add' | 'bills' | 'assets' | 'stats' | 'settings'
 
+const iconGroup = (k: string) =>
+  k.startsWith('ic_parent_') ? 'parent'
+    : (k.startsWith('ic_income_') || k.startsWith('ic_other_') || k.startsWith('ic_r_')) ? 'income'
+      : 'child'
+
+/** 分类图标：用 CSS mask 上色，跟随 currentColor */
+function CatIcon({ k, size = 18 }: { k?: string; size?: number }) {
+  if (!k) return null
+  const url = `/icons/categories/${iconGroup(k)}/${k}.svg`
+  return (
+    <span
+      className="cat-ico"
+      style={{ width: size, height: size, WebkitMaskImage: `url(${url})`, maskImage: `url(${url})` } as React.CSSProperties}
+    />
+  )
+}
+
+/** 账户类型 → 账户图标（6–9 为近似映射） */
+const ASSET_ICON: Record<number, string> = {
+  1: 'ic_asset_wallet', 2: 'ic_asset_credit_card', 3: 'ic_asset_savings_card',
+  4: 'ic_asset_investment', 5: 'ic_asset_default', 6: 'ic_asset_deposit',
+  7: 'ic_asset_cash', 8: 'ic_asset_fixed_deposit', 9: 'ic_asset_insurance'
+}
+function AssetIcon({ type, size = 18 }: { type: number; size?: number }) {
+  const k = ASSET_ICON[type] ?? 'ic_asset_default'
+  return (
+    <span
+      className="asset-ico"
+      style={{ width: size, height: size, WebkitMaskImage: `url(/icons/assets/${k}.svg)`, maskImage: `url(/icons/assets/${k}.svg)` } as React.CSSProperties}
+    />
+  )
+}
+
 export default function App() {
   const [tab, setTab] = useState<Tab>('add')
   const mergeTaxonomy = useLedger((s) => s.mergeTaxonomy)
@@ -46,7 +79,7 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <div className="brand">
-          <span className="logo">青</span>
+          <img className="logo-img" src="/icons/brand/logo-mark.svg" alt="青账" />
           <div>
             <strong>青账</strong>
             <small>个人记账 · 自建版</small>
@@ -198,7 +231,7 @@ function AddBill({ notify }: { notify: (m: string) => void }) {
           <div className="chips">
             {list.map((p) => (
               <button key={p.id} className={'chip' + (p.id === cur ? ' on' : '')} onClick={() => { setPid(p.id); setCid(0) }}>
-                <span className="ico">{p.icon ?? '•'}</span>{p.name}
+                <CatIcon k={p.icon} size={16} />{p.name}
               </button>
             ))}
           </div>
@@ -346,7 +379,7 @@ function Bills() {
                 <div key={'t' + t.transferId} className="row">
                   <i className="dot arrow">⇄</i>
                   <div className="grow">
-                    <div>转账 · {from?.assetName ?? '?'} → {to?.assetName ?? '?'}</div>
+                    <div>转账 · {from?.assetName ?? '已删除账户'} → {to?.assetName ?? '已删除账户'}</div>
                     <small>
                       {hhmm(t.time)} · 不计收支
                       {t.serviceCharge > 0 ? ` · 手续费 ${money(t.serviceCharge)}` : ''}
@@ -365,7 +398,9 @@ function Bills() {
             const inc = p?.kind === 'income'
             return (
               <div key={b.billId} className="row">
-                <i className="dot" style={{ background: p?.color ?? '#94a3b8' }} />
+                <span className="dot-badge" style={{ background: p?.bg ?? '#F1EDE4', color: p?.color ?? '#7A5A3C' }}>
+                  <CatIcon k={p?.icon} size={16} />
+                </span>
                 <div className="grow">
                   <div>{p?.name ?? '未分类'}{b.remark ? <span className="remark"> · {b.remark}</span> : null}</div>
                   <small>
@@ -577,6 +612,7 @@ function Assets({ notify }: { notify: (m: string) => void }) {
 
       {assets.map((a) => (
         <div key={a.assetId} className="row">
+          <span className="asset-badge"><AssetIcon type={a.assetType} size={16} /></span>
           <div className="grow">
             <div>{a.assetName}</div>
             <small>{ASSET_TYPE[a.assetType]}{a.groupName ? ' · ' + a.groupName : ''}</small>
@@ -825,7 +861,7 @@ function Stats() {
         return (
           <div key={b.categoryId} className="budget-box small">
             <div className="budget-line">
-              <span>{p?.icon ?? ''} {p?.name ?? '分类'}预算</span>
+              <span><CatIcon k={p?.icon} size={14} /> {p?.name ?? '分类'}预算</span>
               <b>{money(used)} / {money(b.amount)}</b>
             </div>
             <div className="bar-track">
@@ -853,7 +889,7 @@ function Stats() {
       {rows.length === 0 && <p className="empty">暂无数据</p>}
       {rows.map((r) => (
         <div key={r.p.id} className="bar-row">
-          <span className="bar-name">{r.p.icon} {r.p.name}</span>
+          <span className="bar-name"><CatIcon k={r.p.icon} size={15} /> {r.p.name}</span>
           <div className="bar-track">
             <div className="bar" style={{ width: `${(r.v / max) * 100}%`, background: r.p.color }} />
           </div>
@@ -870,7 +906,7 @@ function Stats() {
             <select value={editing.categoryId} onChange={(e) => setEditing({ ...editing, categoryId: Number(e.target.value) })}>
               <option value={0}>全部支出（总预算）</option>
               {parents.filter((p) => p.kind === 'expense').map((p) => (
-                <option key={p.id} value={p.id}>{p.icon} {p.name}</option>
+                <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
             <div className="label">每月预算金额</div>
@@ -1111,7 +1147,7 @@ function Settings({ notify }: { notify: (m: string) => void }) {
             <div className="label">分类</div>
             <select value={cycleForm.parentCategoryId} onChange={(e) => setCycleForm({ ...cycleForm, parentCategoryId: Number(e.target.value) })}>
               {parents.filter((p) => p.kind === cycleForm.kind).map((p) => (
-                <option key={p.id} value={p.id}>{p.icon} {p.name}</option>
+                <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
             <div className="row2">

@@ -125,8 +125,10 @@ export interface Category {
   kind: 'expense' | 'income'
   color: string
   positionWeight: number
-  /** 语义图标（当前用 emoji 占位，图标规范见设计稿） */
+  /** 图标键，对应 public/icons/categories/<group>/<key>.svg */
   icon?: string
+  /** 图标底色（大类磁贴用） */
+  bg?: string
 }
 
 export interface Transfer {
