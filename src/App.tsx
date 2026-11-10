@@ -498,7 +498,8 @@ function Assets({ notify }: { notify: (m: string) => void }) {
 function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => void; onSave: (a: Asset) => void }) {
   const [name, setName] = useState(asset.assetName)
   const [type, setType] = useState(asset.assetType)
-  const [num, setNum] = useState(String(asset.assetNumber))
+  // 留空＝保持原余额；填入即覆盖（避免把新值追加在旧值后面）
+  const [num, setNum] = useState('')
 
   return (
     <div className="modal-mask" onClick={onClose}>
@@ -510,11 +511,11 @@ function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => 
         <select value={type} onChange={(e) => setType(Number(e.target.value))}>
           {Object.entries(ASSET_TYPE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
-        <div className="label">当前余额（信用卡填负数）</div>
+        <div className="label">设为实际余额（当前 {money(asset.assetNumber)}，信用卡填负数）</div>
         <input
           value={num}
           autoFocus
-          onClick={(e) => e.currentTarget.select()}
+          placeholder="留空则保持不变"
           onChange={(e) => setNum(e.target.value.replace(/[^\d.-]/g, ''))}
           inputMode="decimal"
         />
@@ -524,7 +525,7 @@ function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => 
             ...asset,
             assetName: name.trim() || asset.assetName,
             assetType: type,
-            assetNumber: Number(num) || 0
+            assetNumber: num.trim() === '' ? asset.assetNumber : (Number(num) || 0)
           })}>保存</button>
         </div>
       </div>
