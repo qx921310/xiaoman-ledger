@@ -277,3 +277,9 @@ input.color { width: 34px; height: 30px; padding: 2px; flex: none; border-radius
 .invite small { display: block; color: var(--muted); font-size: 11px; }
 
 .foreign { color: #C2410C; font-weight: 700; margin-left: 2px; }
+
+.asset-letter {
+  display: inline-grid; place-items: center; border-radius: 8px;
+  color: #fff; font-weight: 700; line-height: 1; flex: none;
+  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+}

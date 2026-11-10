@@ -1,0 +1,1194 @@
+{
+  "generatedAt": "2026-11-10T12:02:49.710Z",
+  "total": 132,
+  "entries": [
+    {
+      "key": "ic_parent_education",
+      "group": "categories/parent",
+      "file": "categories/parent/ic_parent_education.svg",
+      "bytes": 368,
+      "sha256": "953b5826fbccf0c1",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_parent_game",
+      "group": "categories/parent",
+      "file": "categories/parent/ic_parent_game.svg",
+      "bytes": 636,
+      "sha256": "9f7cfdfd19cfc6fe",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_parent_gift",
+      "group": "categories/parent",
+      "file": "categories/parent/ic_parent_gift.svg",
+      "bytes": 382,
+      "sha256": "7371e0c10a075923",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_parent_home",
+      "group": "categories/parent",
+      "file": "categories/parent/ic_parent_home.svg",
+      "bytes": 339,
+      "sha256": "b7a0cecf1f7e4b9d",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_parent_medical",
+      "group": "categories/parent",
+      "file": "categories/parent/ic_parent_medical.svg",
+      "bytes": 385,
+      "sha256": "4c1323c04a3850a4",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_parent_other",
+      "group": "categories/parent",
+      "file": "categories/parent/ic_parent_other.svg",
+      "bytes": 312,
+      "sha256": "46179567a09b615b",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_parent_restaurant",
+      "group": "categories/parent",
+      "file": "categories/parent/ic_parent_restaurant.svg",
+      "bytes": 304,
+      "sha256": "144a3c0a2f72e2da",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_parent_shopping",
+      "group": "categories/parent",
+      "file": "categories/parent/ic_parent_shopping.svg",
+      "bytes": 378,
+      "sha256": "4ea95bb6d204f12f",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_parent_traffic",
+      "group": "categories/parent",
+      "file": "categories/parent/ic_parent_traffic.svg",
+      "bytes": 383,
+      "sha256": "b4306beee14fbb83",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_parent_travel",
+      "group": "categories/parent",
+      "file": "categories/parent/ic_parent_travel.svg",
+      "bytes": 266,
+      "sha256": "bc481ccc5efb87da",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_education_book",
+      "group": "categories/child",
+      "file": "categories/child/ic_education_book.svg",
+      "bytes": 343,
+      "sha256": "fbf53f121d70a2e4",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_education_train",
+      "group": "categories/child",
+      "file": "categories/child/ic_education_train.svg",
+      "bytes": 368,
+      "sha256": "953b5826fbccf0c1",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_education_tuition",
+      "group": "categories/child",
+      "file": "categories/child/ic_education_tuition.svg",
+      "bytes": 388,
+      "sha256": "d17195e51a285455",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_game_app_member",
+      "group": "categories/child",
+      "file": "categories/child/ic_game_app_member.svg",
+      "bytes": 217,
+      "sha256": "ac4e4661fb94ef1c",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_game_bar",
+      "group": "categories/child",
+      "file": "categories/child/ic_game_bar.svg",
+      "bytes": 302,
+      "sha256": "5ae5ce5e107669aa",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_game_chess",
+      "group": "categories/child",
+      "file": "categories/child/ic_game_chess.svg",
+      "bytes": 412,
+      "sha256": "186fa62459383d24",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_game_film",
+      "group": "categories/child",
+      "file": "categories/child/ic_game_film.svg",
+      "bytes": 385,
+      "sha256": "b858c5efafaf6649",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_game_foot_bath",
+      "group": "categories/child",
+      "file": "categories/child/ic_game_foot_bath.svg",
+      "bytes": 292,
+      "sha256": "5cd9dfd27a4d1775",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_game_keep_fit",
+      "group": "categories/child",
+      "file": "categories/child/ic_game_keep_fit.svg",
+      "bytes": 576,
+      "sha256": "d49479c769fe4370",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_game_show",
+      "group": "categories/child",
+      "file": "categories/child/ic_game_show.svg",
+      "bytes": 346,
+      "sha256": "ddf52ff6a1851d11",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_game_travel",
+      "group": "categories/child",
+      "file": "categories/child/ic_game_travel.svg",
+      "bytes": 398,
+      "sha256": "06eab4d15e7bb7c5",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_game_video_game",
+      "group": "categories/child",
+      "file": "categories/child/ic_game_video_game.svg",
+      "bytes": 306,
+      "sha256": "12f29578dab37869",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_gift_filial_piety",
+      "group": "categories/child",
+      "file": "categories/child/ic_gift_filial_piety.svg",
+      "bytes": 519,
+      "sha256": "777f68ced38a6cf8",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_gift_gift",
+      "group": "categories/child",
+      "file": "categories/child/ic_gift_gift.svg",
+      "bytes": 382,
+      "sha256": "7371e0c10a075923",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_gift_lend",
+      "group": "categories/child",
+      "file": "categories/child/ic_gift_lend.svg",
+      "bytes": 429,
+      "sha256": "ea939ad3446b0ac6",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_gift_red_paper",
+      "group": "categories/child",
+      "file": "categories/child/ic_gift_red_paper.svg",
+      "bytes": 272,
+      "sha256": "636d856d433c7ecc",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_gift_reward",
+      "group": "categories/child",
+      "file": "categories/child/ic_gift_reward.svg",
+      "bytes": 429,
+      "sha256": "ea939ad3446b0ac6",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_home_electricity_fees",
+      "group": "categories/child",
+      "file": "categories/child/ic_home_electricity_fees.svg",
+      "bytes": 327,
+      "sha256": "64506ef19e99dc36",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_home_gas",
+      "group": "categories/child",
+      "file": "categories/child/ic_home_gas.svg",
+      "bytes": 270,
+      "sha256": "8ac8914e8d2ae5cc",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_home_husekeeping",
+      "group": "categories/child",
+      "file": "categories/child/ic_home_husekeeping.svg",
+      "bytes": 426,
+      "sha256": "3d478943645cff4d",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_home_loan",
+      "group": "categories/child",
+      "file": "categories/child/ic_home_loan.svg",
+      "bytes": 382,
+      "sha256": "90aa1593872da646",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_home_money_tree",
+      "group": "categories/child",
+      "file": "categories/child/ic_home_money_tree.svg",
+      "bytes": 264,
+      "sha256": "bac58ba4ddc0f679",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_home_parking_lot",
+      "group": "categories/child",
+      "file": "categories/child/ic_home_parking_lot.svg",
+      "bytes": 403,
+      "sha256": "f60e4173ddc9ff52",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_home_property",
+      "group": "categories/child",
+      "file": "categories/child/ic_home_property.svg",
+      "bytes": 397,
+      "sha256": "945818a3fc1a3735",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_home_rent",
+      "group": "categories/child",
+      "file": "categories/child/ic_home_rent.svg",
+      "bytes": 239,
+      "sha256": "6b0d53a0316a17c3",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_home_telephone_bill",
+      "group": "categories/child",
+      "file": "categories/child/ic_home_telephone_bill.svg",
+      "bytes": 393,
+      "sha256": "ba4c793da7362c83",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_home_water",
+      "group": "categories/child",
+      "file": "categories/child/ic_home_water.svg",
+      "bytes": 281,
+      "sha256": "9465b74cae71e30e",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_medical_healthcare",
+      "group": "categories/child",
+      "file": "categories/child/ic_medical_healthcare.svg",
+      "bytes": 385,
+      "sha256": "4c1323c04a3850a4",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_medical_hospital",
+      "group": "categories/child",
+      "file": "categories/child/ic_medical_hospital.svg",
+      "bytes": 398,
+      "sha256": "9b3d4d04563eef71",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_medical_insurance",
+      "group": "categories/child",
+      "file": "categories/child/ic_medical_insurance.svg",
+      "bytes": 261,
+      "sha256": "e8bdfe6cbc4ab542",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_medical_medicine",
+      "group": "categories/child",
+      "file": "categories/child/ic_medical_medicine.svg",
+      "bytes": 272,
+      "sha256": "6f0294f6f1cc14e7",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_medical_social_insurance",
+      "group": "categories/child",
+      "file": "categories/child/ic_medical_social_insurance.svg",
+      "bytes": 262,
+      "sha256": "f7bfb6a818476a9a",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_misc_charity",
+      "group": "categories/child",
+      "file": "categories/child/ic_misc_charity.svg",
+      "bytes": 291,
+      "sha256": "069b7c8a4901e27a",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_misc_invest_loss",
+      "group": "categories/child",
+      "file": "categories/child/ic_misc_invest_loss.svg",
+      "bytes": 217,
+      "sha256": "097c00c4f4be8976",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_misc_other",
+      "group": "categories/child",
+      "file": "categories/child/ic_misc_other.svg",
+      "bytes": 259,
+      "sha256": "7f003852ae957fdc",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_misc_penalty",
+      "group": "categories/child",
+      "file": "categories/child/ic_misc_penalty.svg",
+      "bytes": 210,
+      "sha256": "6c5fadd7835bfd31",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_restaurant_afternoon_tea",
+      "group": "categories/child",
+      "file": "categories/child/ic_restaurant_afternoon_tea.svg",
+      "bytes": 289,
+      "sha256": "2f5bae0239a83dda",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_restaurant_breakfast",
+      "group": "categories/child",
+      "file": "categories/child/ic_restaurant_breakfast.svg",
+      "bytes": 457,
+      "sha256": "53bc2f0198239260",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_restaurant_dinner",
+      "group": "categories/child",
+      "file": "categories/child/ic_restaurant_dinner.svg",
+      "bytes": 336,
+      "sha256": "54e0c16b8d6ff87a",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_restaurant_foodstuff",
+      "group": "categories/child",
+      "file": "categories/child/ic_restaurant_foodstuff.svg",
+      "bytes": 860,
+      "sha256": "52fe70dd79ebdabc",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_restaurant_fresh",
+      "group": "categories/child",
+      "file": "categories/child/ic_restaurant_fresh.svg",
+      "bytes": 339,
+      "sha256": "00fd93433e88d018",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_restaurant_fruit",
+      "group": "categories/child",
+      "file": "categories/child/ic_restaurant_fruit.svg",
+      "bytes": 276,
+      "sha256": "f34cb370d2f7743a",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_restaurant_lunch",
+      "group": "categories/child",
+      "file": "categories/child/ic_restaurant_lunch.svg",
+      "bytes": 441,
+      "sha256": "6e021f98ecf29a45",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_restaurant_night_snack",
+      "group": "categories/child",
+      "file": "categories/child/ic_restaurant_night_snack.svg",
+      "bytes": 294,
+      "sha256": "3999cbcfe2c58ce2",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_restaurant_snacks",
+      "group": "categories/child",
+      "file": "categories/child/ic_restaurant_snacks.svg",
+      "bytes": 412,
+      "sha256": "f85c07da01838ba7",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_restaurant_treat",
+      "group": "categories/child",
+      "file": "categories/child/ic_restaurant_treat.svg",
+      "bytes": 383,
+      "sha256": "6f4e8a848ab184aa",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_restaurant_vegetable",
+      "group": "categories/child",
+      "file": "categories/child/ic_restaurant_vegetable.svg",
+      "bytes": 296,
+      "sha256": "fbdec763d8b75609",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_restaurant_wine",
+      "group": "categories/child",
+      "file": "categories/child/ic_restaurant_wine.svg",
+      "bytes": 316,
+      "sha256": "c983499cd68a2953",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_shopping_baby",
+      "group": "categories/child",
+      "file": "categories/child/ic_shopping_baby.svg",
+      "bytes": 430,
+      "sha256": "7bb021c5f0eaff82",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_shopping_electric",
+      "group": "categories/child",
+      "file": "categories/child/ic_shopping_electric.svg",
+      "bytes": 319,
+      "sha256": "f1fe1a5f381f1357",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_shopping_haircut",
+      "group": "categories/child",
+      "file": "categories/child/ic_shopping_haircut.svg",
+      "bytes": 264,
+      "sha256": "6021b0a2712743a4",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_shopping_home",
+      "group": "categories/child",
+      "file": "categories/child/ic_shopping_home.svg",
+      "bytes": 392,
+      "sha256": "0412733466985cb8",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_shopping_makeup",
+      "group": "categories/child",
+      "file": "categories/child/ic_shopping_makeup.svg",
+      "bytes": 523,
+      "sha256": "7cc7d0205ec9037f",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_shopping_motion",
+      "group": "categories/child",
+      "file": "categories/child/ic_shopping_motion.svg",
+      "bytes": 357,
+      "sha256": "81df171c31d3e43e",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_shopping_office",
+      "group": "categories/child",
+      "file": "categories/child/ic_shopping_office.svg",
+      "bytes": 300,
+      "sha256": "fa34f6569a77380b",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_shopping_overseas",
+      "group": "categories/child",
+      "file": "categories/child/ic_shopping_overseas.svg",
+      "bytes": 277,
+      "sha256": "d04921054cceaaf2",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_shopping_pdd",
+      "group": "categories/child",
+      "file": "categories/child/ic_shopping_pdd.svg",
+      "bytes": 281,
+      "sha256": "3efbb81a74608fd3",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_shopping_pets",
+      "group": "categories/child",
+      "file": "categories/child/ic_shopping_pets.svg",
+      "bytes": 375,
+      "sha256": "221e100c305e9b05",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_shopping_phone",
+      "group": "categories/child",
+      "file": "categories/child/ic_shopping_phone.svg",
+      "bytes": 250,
+      "sha256": "89c2c47093fae0e4",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_shopping_recharge",
+      "group": "categories/child",
+      "file": "categories/child/ic_shopping_recharge.svg",
+      "bytes": 266,
+      "sha256": "e7aa045fb87b868d",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_shopping_renovation",
+      "group": "categories/child",
+      "file": "categories/child/ic_shopping_renovation.svg",
+      "bytes": 342,
+      "sha256": "2594b754151d8d96",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_shopping_watch",
+      "group": "categories/child",
+      "file": "categories/child/ic_shopping_watch.svg",
+      "bytes": 396,
+      "sha256": "2a8c1c570a596555",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_traffic_aircraft",
+      "group": "categories/child",
+      "file": "categories/child/ic_traffic_aircraft.svg",
+      "bytes": 377,
+      "sha256": "e71d029de6807ead",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_traffic_bus",
+      "group": "categories/child",
+      "file": "categories/child/ic_traffic_bus.svg",
+      "bytes": 412,
+      "sha256": "5d7cd7c9a3a8b979",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_traffic_etc",
+      "group": "categories/child",
+      "file": "categories/child/ic_traffic_etc.svg",
+      "bytes": 278,
+      "sha256": "cdb01ab7c4330a26",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_traffic_hotel",
+      "group": "categories/child",
+      "file": "categories/child/ic_traffic_hotel.svg",
+      "bytes": 255,
+      "sha256": "03ffa8ef719595c7",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_traffic_maintain",
+      "group": "categories/child",
+      "file": "categories/child/ic_traffic_maintain.svg",
+      "bytes": 373,
+      "sha256": "1833895e68998401",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_traffic_oil",
+      "group": "categories/child",
+      "file": "categories/child/ic_traffic_oil.svg",
+      "bytes": 353,
+      "sha256": "8a590f10a21b77a0",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_traffic_parking",
+      "group": "categories/child",
+      "file": "categories/child/ic_traffic_parking.svg",
+      "bytes": 260,
+      "sha256": "41c4e1cce08573f1",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_traffic_taxi",
+      "group": "categories/child",
+      "file": "categories/child/ic_traffic_taxi.svg",
+      "bytes": 425,
+      "sha256": "61f33a889c8752ee",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_traffic_ticket",
+      "group": "categories/child",
+      "file": "categories/child/ic_traffic_ticket.svg",
+      "bytes": 245,
+      "sha256": "327fd601e60e09c6",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_traffic_train",
+      "group": "categories/child",
+      "file": "categories/child/ic_traffic_train.svg",
+      "bytes": 383,
+      "sha256": "b4306beee14fbb83",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_travel_drinks",
+      "group": "categories/child",
+      "file": "categories/child/ic_travel_drinks.svg",
+      "bytes": 218,
+      "sha256": "8b9d462fcbf9602f",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_travel_flight",
+      "group": "categories/child",
+      "file": "categories/child/ic_travel_flight.svg",
+      "bytes": 244,
+      "sha256": "9d6c62548facc1cf",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_travel_hotel",
+      "group": "categories/child",
+      "file": "categories/child/ic_travel_hotel.svg",
+      "bytes": 279,
+      "sha256": "239b3a5a09a74fc6",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_travel_massage",
+      "group": "categories/child",
+      "file": "categories/child/ic_travel_massage.svg",
+      "bytes": 298,
+      "sha256": "92c0bbbd020bca48",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_travel_meal",
+      "group": "categories/child",
+      "file": "categories/child/ic_travel_meal.svg",
+      "bytes": 234,
+      "sha256": "0f36e24b21cd6587",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_travel_pray",
+      "group": "categories/child",
+      "file": "categories/child/ic_travel_pray.svg",
+      "bytes": 277,
+      "sha256": "b762a8f3d1f836a3",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_travel_ship",
+      "group": "categories/child",
+      "file": "categories/child/ic_travel_ship.svg",
+      "bytes": 302,
+      "sha256": "c961ac2e122ad10b",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_travel_shopping",
+      "group": "categories/child",
+      "file": "categories/child/ic_travel_shopping.svg",
+      "bytes": 218,
+      "sha256": "1dd5f6637c474120",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_travel_subway",
+      "group": "categories/child",
+      "file": "categories/child/ic_travel_subway.svg",
+      "bytes": 282,
+      "sha256": "fc05e8aff0faa28e",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_travel_taxi",
+      "group": "categories/child",
+      "file": "categories/child/ic_travel_taxi.svg",
+      "bytes": 264,
+      "sha256": "98b5dd16fa93d7b4",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_travel_ticket",
+      "group": "categories/child",
+      "file": "categories/child/ic_travel_ticket.svg",
+      "bytes": 245,
+      "sha256": "327fd601e60e09c6",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_travel_train",
+      "group": "categories/child",
+      "file": "categories/child/ic_travel_train.svg",
+      "bytes": 289,
+      "sha256": "ee4a37ed2b43475d",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_income_bonus",
+      "group": "categories/income",
+      "file": "categories/income/ic_income_bonus.svg",
+      "bytes": 690,
+      "sha256": "3a3ba737c4c28376",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_income_borrow",
+      "group": "categories/income",
+      "file": "categories/income/ic_income_borrow.svg",
+      "bytes": 429,
+      "sha256": "ea939ad3446b0ac6",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_income_cash_gift",
+      "group": "categories/income",
+      "file": "categories/income/ic_income_cash_gift.svg",
+      "bytes": 382,
+      "sha256": "7371e0c10a075923",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_income_manager_money",
+      "group": "categories/income",
+      "file": "categories/income/ic_income_manager_money.svg",
+      "bytes": 227,
+      "sha256": "921127ff5dfd373e",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_income_other",
+      "group": "categories/income",
+      "file": "categories/income/ic_income_other.svg",
+      "bytes": 268,
+      "sha256": "0e3e97941f2ee4e3",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_income_part_time_job",
+      "group": "categories/income",
+      "file": "categories/income/ic_income_part_time_job.svg",
+      "bytes": 227,
+      "sha256": "648db345724ef819",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_income_reimbursement",
+      "group": "categories/income",
+      "file": "categories/income/ic_income_reimbursement.svg",
+      "bytes": 697,
+      "sha256": "3c7e85ee4226d8d0",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_income_second_hand",
+      "group": "categories/income",
+      "file": "categories/income/ic_income_second_hand.svg",
+      "bytes": 302,
+      "sha256": "9dedf5d8a8926bb6",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_income_subsidy",
+      "group": "categories/income",
+      "file": "categories/income/ic_income_subsidy.svg",
+      "bytes": 419,
+      "sha256": "872d1334d8d031d3",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_income_wages",
+      "group": "categories/income",
+      "file": "categories/income/ic_income_wages.svg",
+      "bytes": 344,
+      "sha256": "b9e70ac373b9fec8",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_income_winning",
+      "group": "categories/income",
+      "file": "categories/income/ic_income_winning.svg",
+      "bytes": 510,
+      "sha256": "8c748102faea0a73",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_asset_cash",
+      "group": "assets",
+      "file": "assets/ic_asset_cash.svg",
+      "bytes": 287,
+      "sha256": "e6d4254ff475e2d1",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_asset_credit_card",
+      "group": "assets",
+      "file": "assets/ic_asset_credit_card.svg",
+      "bytes": 282,
+      "sha256": "4074f0a3af7abb69",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_asset_debit_card",
+      "group": "assets",
+      "file": "assets/ic_asset_debit_card.svg",
+      "bytes": 282,
+      "sha256": "4074f0a3af7abb69",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_asset_default",
+      "group": "assets",
+      "file": "assets/ic_asset_default.svg",
+      "bytes": 331,
+      "sha256": "42df2d449e00ff7c",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_asset_deposit",
+      "group": "assets",
+      "file": "assets/ic_asset_deposit.svg",
+      "bytes": 293,
+      "sha256": "b01d2f916dff4972",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_asset_fixed_deposit",
+      "group": "assets",
+      "file": "assets/ic_asset_fixed_deposit.svg",
+      "bytes": 378,
+      "sha256": "121c8733cbc96a34",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_asset_fund",
+      "group": "assets",
+      "file": "assets/ic_asset_fund.svg",
+      "bytes": 327,
+      "sha256": "5e75a9f75704154f",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_asset_insurance",
+      "group": "assets",
+      "file": "assets/ic_asset_insurance.svg",
+      "bytes": 371,
+      "sha256": "72b7814133ad6f81",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_asset_investment",
+      "group": "assets",
+      "file": "assets/ic_asset_investment.svg",
+      "bytes": 388,
+      "sha256": "4d83f655a7c0acb6",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_asset_property",
+      "group": "assets",
+      "file": "assets/ic_asset_property.svg",
+      "bytes": 339,
+      "sha256": "b7a0cecf1f7e4b9d",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_asset_savings_card",
+      "group": "assets",
+      "file": "assets/ic_asset_savings_card.svg",
+      "bytes": 282,
+      "sha256": "4074f0a3af7abb69",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_asset_stock",
+      "group": "assets",
+      "file": "assets/ic_asset_stock.svg",
+      "bytes": 399,
+      "sha256": "6090b3ab60646bcc",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_asset_vehicle",
+      "group": "assets",
+      "file": "assets/ic_asset_vehicle.svg",
+      "bytes": 402,
+      "sha256": "13f86ad1a168c534",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "ic_asset_wallet",
+      "group": "assets",
+      "file": "assets/ic_asset_wallet.svg",
+      "bytes": 343,
+      "sha256": "0e34b501a656aee0",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "favicon",
+      "group": "brand",
+      "file": "brand/favicon.svg",
+      "bytes": 437,
+      "sha256": "93db5f9ebbe60415",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "logo-mark",
+      "group": "brand",
+      "file": "brand/logo-mark.svg",
+      "bytes": 744,
+      "sha256": "be5d2140acb6a213",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "logo-mono",
+      "group": "brand",
+      "file": "brand/logo-mono.svg",
+      "bytes": 367,
+      "sha256": "d37c307626f7f558",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "logo",
+      "group": "brand",
+      "file": "brand/logo.svg",
+      "bytes": 692,
+      "sha256": "71dbfb3b0e15ec05",
+      "source": "Codex（自绘）",
+      "license": "自有"
+    },
+    {
+      "key": "alipay",
+      "group": "brands",
+      "file": "brands/alipay.svg",
+      "bytes": 802,
+      "sha256": "8049dde7772116e5",
+      "source": "Simple Icons",
+      "license": "CC0-1.0"
+    },
+    {
+      "key": "applepay",
+      "group": "brands",
+      "file": "brands/applepay.svg",
+      "bytes": 2633,
+      "sha256": "52e5e55305141d21",
+      "source": "Simple Icons",
+      "license": "CC0-1.0"
+    },
+    {
+      "key": "googlepay",
+      "group": "brands",
+      "file": "brands/googlepay.svg",
+      "bytes": 1415,
+      "sha256": "62774711bd85d518",
+      "source": "Simple Icons",
+      "license": "CC0-1.0"
+    },
+    {
+      "key": "mastercard",
+      "group": "brands",
+      "file": "brands/mastercard.svg",
+      "bytes": 850,
+      "sha256": "b6e25beff2c54363",
+      "source": "Simple Icons",
+      "license": "CC0-1.0"
+    },
+    {
+      "key": "paypal",
+      "group": "brands",
+      "file": "brands/paypal.svg",
+      "bytes": 452,
+      "sha256": "e8ea6928d3386f81",
+      "source": "Simple Icons",
+      "license": "CC0-1.0"
+    },
+    {
+      "key": "paytm",
+      "group": "brands",
+      "file": "brands/paytm.svg",
+      "bytes": 2110,
+      "sha256": "b4c3047c2ea81e5d",
+      "source": "Simple Icons",
+      "license": "CC0-1.0"
+    },
+    {
+      "key": "stripe",
+      "group": "brands",
+      "file": "brands/stripe.svg",
+      "bytes": 588,
+      "sha256": "130c6d957b8977f5",
+      "source": "Simple Icons",
+      "license": "CC0-1.0"
+    },
+    {
+      "key": "visa",
+      "group": "brands",
+      "file": "brands/visa.svg",
+      "bytes": 793,
+      "sha256": "7cce4eea7b16b6ed",
+      "source": "Simple Icons",
+      "license": "CC0-1.0"
+    },
+    {
+      "key": "wechat",
+      "group": "brands",
+      "file": "brands/wechat.svg",
+      "bytes": 1330,
+      "sha256": "74b48b3d315337ce",
+      "source": "Simple Icons",
+      "license": "CC0-1.0"
+    }
+  ]
+}

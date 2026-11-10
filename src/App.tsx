@@ -68,6 +68,26 @@ const BRAND_RULES: [RegExp, string, string][] = [
 ]
 const brandOf = (name: string) => BRAND_RULES.find(([re]) => re.test(name ?? ''))
 
+/** 银行机构 → 品牌色与字母（没有官方 SVG 时用它兜底，比类型图标更好认） */
+const BANK_RULES: [RegExp, string, string][] = [
+  [/招商|招行/i, '招', '#E4002B'],
+  [/工商|工行/i, '工', '#C7000B'],
+  [/建设|建行/i, '建', '#0066B3'],
+  [/农业|农行/i, '农', '#009B4C'],
+  [/中国银行|中行/i, '中', '#B01F24'],
+  [/交通|交行/i, '交', '#004B8D'],
+  [/邮储|邮政/i, '邮', '#007A33'],
+  [/平安/i, '平', '#F36F21'],
+  [/民生/i, '民', '#005BAC'],
+  [/浦发/i, '浦', '#00447C'],
+  [/兴业/i, '兴', '#003D7C'],
+  [/中信/i, '信', '#D2232A'],
+  [/光大/i, '光', '#6E2C91'],
+  [/华夏/i, '华', '#E60012'],
+  [/广发/i, '广', '#C8102E']
+]
+const bankOf = (name: string) => BANK_RULES.find(([re]) => re.test(name ?? ''))
+
 function AssetIcon({ type, size = 18, name }: { type: number; size?: number; name?: string }) {
   const brand = name ? brandOf(name) : undefined
   if (brand) {
@@ -81,6 +101,16 @@ function AssetIcon({ type, size = 18, name }: { type: number; size?: number; nam
           WebkitMaskImage: `url(/icons/brands/${key}.svg)`, maskImage: `url(/icons/brands/${key}.svg)`
         } as React.CSSProperties}
       />
+    )
+  }
+  const bank = name ? bankOf(name) : undefined
+  if (bank) {
+    const [, letter, color] = bank
+    return (
+      <span className="asset-letter" title={name}
+        style={{ width: size, height: size, background: color, fontSize: Math.round(size * 0.62) }}>
+        {letter}
+      </span>
     )
   }
   const k = ASSET_ICON[type] ?? 'ic_asset_default'

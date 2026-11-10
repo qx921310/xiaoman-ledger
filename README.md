@@ -4,6 +4,14 @@
 
 参考市面个人记账产品的**功能结构**自行实现，不复用任何第三方的品牌、文案、图标或样式资源。
 
+## 素材库
+
+- 目录：`public/icons/{categories/{parent,child,income}, assets, brands, brand}`
+- **清单**：`public/icons/manifest.json`（key / 分组 / 体积 / sha256 前 16 位 / 来源 / 许可），由脚本生成
+- **校验**：`npm run icons:check` —— 检查「taxonomy 引用的图标是否都存在」「有没有多余文件」「分类图标是否 ≤2KB」
+- 重新生成清单：`npm run icons`
+- 银行没有官方 SVG 时，用「品牌色方块 + 首字」兜底（招/工/建/农/中/交…），识别度好于通用类型图标
+
 ## 图标来源
 
 - 分类与账户：Codex 绘制（基于 Lucide 1.69，ISC），`public/icons/{categories,assets}`
