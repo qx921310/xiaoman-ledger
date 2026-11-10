@@ -1,0 +1,520 @@
+[
+ {
+  "key": "ic_parent_medical",
+  "group": "parent",
+  "name": "健康医疗",
+  "hint": "医院/买药/体检",
+  "file": "ic_parent_medical.svg"
+ },
+ {
+  "key": "ic_parent_gift",
+  "group": "parent",
+  "name": "送礼人情",
+  "hint": "红包/礼物/孝敬",
+  "file": "ic_parent_gift.svg"
+ },
+ {
+  "key": "ic_parent_education",
+  "group": "parent",
+  "name": "文化教育",
+  "hint": "书/课程/学费",
+  "file": "ic_parent_education.svg"
+ },
+ {
+  "key": "ic_parent_home",
+  "group": "parent",
+  "name": "居家生活",
+  "hint": "房租/水电/物业",
+  "file": "ic_parent_home.svg"
+ },
+ {
+  "key": "ic_parent_game",
+  "group": "parent",
+  "name": "休闲娱乐",
+  "hint": "电影/游戏/健身/旅行",
+  "file": "ic_parent_game.svg"
+ },
+ {
+  "key": "ic_parent_traffic",
+  "group": "parent",
+  "name": "出行交通",
+  "hint": "地铁/打车/加油/机票",
+  "file": "ic_parent_traffic.svg"
+ },
+ {
+  "key": "ic_parent_restaurant",
+  "group": "parent",
+  "name": "食品餐饮",
+  "hint": "三餐/外卖/零食",
+  "file": "ic_parent_restaurant.svg"
+ },
+ {
+  "key": "ic_parent_shopping",
+  "group": "parent",
+  "name": "购物消费",
+  "hint": "日用/数码/服饰",
+  "file": "ic_parent_shopping.svg"
+ },
+ {
+  "key": "ic_shopping_renovation",
+  "group": "child",
+  "name": "装修装饰",
+  "hint": "支出明细分类",
+  "file": "ic_shopping_renovation.svg"
+ },
+ {
+  "key": "ic_shopping_office",
+  "group": "child",
+  "name": "办公用品",
+  "hint": "支出明细分类",
+  "file": "ic_shopping_office.svg"
+ },
+ {
+  "key": "ic_shopping_pets",
+  "group": "child",
+  "name": "宠物用品",
+  "hint": "支出明细分类",
+  "file": "ic_shopping_pets.svg"
+ },
+ {
+  "key": "ic_shopping_motion",
+  "group": "child",
+  "name": "服饰运动",
+  "hint": "支出明细分类",
+  "file": "ic_shopping_motion.svg"
+ },
+ {
+  "key": "ic_shopping_baby",
+  "group": "child",
+  "name": "母婴玩具",
+  "hint": "支出明细分类",
+  "file": "ic_shopping_baby.svg"
+ },
+ {
+  "key": "ic_shopping_watch",
+  "group": "child",
+  "name": "配饰腕表",
+  "hint": "支出明细分类",
+  "file": "ic_shopping_watch.svg"
+ },
+ {
+  "key": "ic_shopping_electric",
+  "group": "child",
+  "name": "生活电器",
+  "hint": "支出明细分类",
+  "file": "ic_shopping_electric.svg"
+ },
+ {
+  "key": "ic_shopping_recharge",
+  "group": "child",
+  "name": "虚拟充值",
+  "hint": "支出明细分类",
+  "file": "ic_shopping_recharge.svg"
+ },
+ {
+  "key": "ic_shopping_phone",
+  "group": "child",
+  "name": "手机数码",
+  "hint": "支出明细分类",
+  "file": "ic_shopping_phone.svg"
+ },
+ {
+  "key": "ic_shopping_makeup",
+  "group": "child",
+  "name": "个护美妆",
+  "hint": "支出明细分类",
+  "file": "ic_shopping_makeup.svg"
+ },
+ {
+  "key": "ic_shopping_home",
+  "group": "child",
+  "name": "日常家居",
+  "hint": "支出明细分类",
+  "file": "ic_shopping_home.svg"
+ },
+ {
+  "key": "ic_restaurant_foodstuff",
+  "group": "child",
+  "name": "粮油调味",
+  "hint": "支出明细分类",
+  "file": "ic_restaurant_foodstuff.svg"
+ },
+ {
+  "key": "ic_restaurant_treat",
+  "group": "child",
+  "name": "请客吃饭",
+  "hint": "支出明细分类",
+  "file": "ic_restaurant_treat.svg"
+ },
+ {
+  "key": "ic_restaurant_fresh",
+  "group": "child",
+  "name": "生鲜食品",
+  "hint": "支出明细分类",
+  "file": "ic_restaurant_fresh.svg"
+ },
+ {
+  "key": "ic_restaurant_snacks",
+  "group": "child",
+  "name": "休闲零食",
+  "hint": "支出明细分类",
+  "file": "ic_restaurant_snacks.svg"
+ },
+ {
+  "key": "ic_restaurant_wine",
+  "group": "child",
+  "name": "饮料酒水",
+  "hint": "支出明细分类",
+  "file": "ic_restaurant_wine.svg"
+ },
+ {
+  "key": "ic_restaurant_dinner",
+  "group": "child",
+  "name": "晚餐",
+  "hint": "支出明细分类",
+  "file": "ic_restaurant_dinner.svg"
+ },
+ {
+  "key": "ic_restaurant_lunch",
+  "group": "child",
+  "name": "午餐",
+  "hint": "支出明细分类",
+  "file": "ic_restaurant_lunch.svg"
+ },
+ {
+  "key": "ic_restaurant_breakfast",
+  "group": "child",
+  "name": "早餐",
+  "hint": "支出明细分类",
+  "file": "ic_restaurant_breakfast.svg"
+ },
+ {
+  "key": "ic_traffic_maintain",
+  "group": "child",
+  "name": "保养修车",
+  "hint": "支出明细分类",
+  "file": "ic_traffic_maintain.svg"
+ },
+ {
+  "key": "ic_traffic_aircraft",
+  "group": "child",
+  "name": "飞机",
+  "hint": "支出明细分类",
+  "file": "ic_traffic_aircraft.svg"
+ },
+ {
+  "key": "ic_traffic_train",
+  "group": "child",
+  "name": "火车",
+  "hint": "支出明细分类",
+  "file": "ic_traffic_train.svg"
+ },
+ {
+  "key": "ic_traffic_oil",
+  "group": "child",
+  "name": "加油",
+  "hint": "支出明细分类",
+  "file": "ic_traffic_oil.svg"
+ },
+ {
+  "key": "ic_traffic_parking",
+  "group": "child",
+  "name": "停车费",
+  "hint": "支出明细分类",
+  "file": "ic_traffic_parking.svg"
+ },
+ {
+  "key": "ic_traffic_bus",
+  "group": "child",
+  "name": "公共交通",
+  "hint": "支出明细分类",
+  "file": "ic_traffic_bus.svg"
+ },
+ {
+  "key": "ic_traffic_taxi",
+  "group": "child",
+  "name": "打车",
+  "hint": "支出明细分类",
+  "file": "ic_traffic_taxi.svg"
+ },
+ {
+  "key": "ic_game_show",
+  "group": "child",
+  "name": "演出",
+  "hint": "支出明细分类",
+  "file": "ic_game_show.svg"
+ },
+ {
+  "key": "ic_game_bar",
+  "group": "child",
+  "name": "酒吧",
+  "hint": "支出明细分类",
+  "file": "ic_game_bar.svg"
+ },
+ {
+  "key": "ic_game_chess",
+  "group": "child",
+  "name": "棋牌桌游",
+  "hint": "支出明细分类",
+  "file": "ic_game_chess.svg"
+ },
+ {
+  "key": "ic_game_foot_bath",
+  "group": "child",
+  "name": "足浴按摩",
+  "hint": "支出明细分类",
+  "file": "ic_game_foot_bath.svg"
+ },
+ {
+  "key": "ic_game_keep_fit",
+  "group": "child",
+  "name": "运动健身",
+  "hint": "支出明细分类",
+  "file": "ic_game_keep_fit.svg"
+ },
+ {
+  "key": "ic_game_film",
+  "group": "child",
+  "name": "电影唱歌",
+  "hint": "支出明细分类",
+  "file": "ic_game_film.svg"
+ },
+ {
+  "key": "ic_game_travel",
+  "group": "child",
+  "name": "旅游度假",
+  "hint": "支出明细分类",
+  "file": "ic_game_travel.svg"
+ },
+ {
+  "key": "ic_home_husekeeping",
+  "group": "child",
+  "name": "家政清洁",
+  "hint": "支出明细分类",
+  "file": "ic_home_husekeeping.svg"
+ },
+ {
+  "key": "ic_home_parking_lot",
+  "group": "child",
+  "name": "车位费",
+  "hint": "支出明细分类",
+  "file": "ic_home_parking_lot.svg"
+ },
+ {
+  "key": "ic_home_loan",
+  "group": "child",
+  "name": "房租还贷",
+  "hint": "支出明细分类",
+  "file": "ic_home_loan.svg"
+ },
+ {
+  "key": "ic_home_property",
+  "group": "child",
+  "name": "物业费",
+  "hint": "支出明细分类",
+  "file": "ic_home_property.svg"
+ },
+ {
+  "key": "ic_home_gas",
+  "group": "child",
+  "name": "燃气费",
+  "hint": "支出明细分类",
+  "file": "ic_home_gas.svg"
+ },
+ {
+  "key": "ic_home_water",
+  "group": "child",
+  "name": "水费",
+  "hint": "支出明细分类",
+  "file": "ic_home_water.svg"
+ },
+ {
+  "key": "ic_home_electricity_fees",
+  "group": "child",
+  "name": "电费",
+  "hint": "支出明细分类",
+  "file": "ic_home_electricity_fees.svg"
+ },
+ {
+  "key": "ic_home_telephone_bill",
+  "group": "child",
+  "name": "话费宽带",
+  "hint": "支出明细分类",
+  "file": "ic_home_telephone_bill.svg"
+ },
+ {
+  "key": "ic_education_train",
+  "group": "child",
+  "name": "培训考试",
+  "hint": "支出明细分类",
+  "file": "ic_education_train.svg"
+ },
+ {
+  "key": "ic_education_book",
+  "group": "child",
+  "name": "书报杂志",
+  "hint": "支出明细分类",
+  "file": "ic_education_book.svg"
+ },
+ {
+  "key": "ic_education_tuition",
+  "group": "child",
+  "name": "学费",
+  "hint": "支出明细分类",
+  "file": "ic_education_tuition.svg"
+ },
+ {
+  "key": "ic_gift_reward",
+  "group": "child",
+  "name": "打赏",
+  "hint": "支出明细分类",
+  "file": "ic_gift_reward.svg"
+ },
+ {
+  "key": "ic_gift_red_paper",
+  "group": "child",
+  "name": "红包",
+  "hint": "支出明细分类",
+  "file": "ic_gift_red_paper.svg"
+ },
+ {
+  "key": "ic_gift_lend",
+  "group": "child",
+  "name": "借出",
+  "hint": "支出明细分类",
+  "file": "ic_gift_lend.svg"
+ },
+ {
+  "key": "ic_gift_gift",
+  "group": "child",
+  "name": "礼物",
+  "hint": "支出明细分类",
+  "file": "ic_gift_gift.svg"
+ },
+ {
+  "key": "ic_gift_filial_piety",
+  "group": "child",
+  "name": "孝敬长辈",
+  "hint": "支出明细分类",
+  "file": "ic_gift_filial_piety.svg"
+ },
+ {
+  "key": "ic_medical_medicine",
+  "group": "child",
+  "name": "买药",
+  "hint": "支出明细分类",
+  "file": "ic_medical_medicine.svg"
+ },
+ {
+  "key": "ic_medical_hospital",
+  "group": "child",
+  "name": "医院",
+  "hint": "支出明细分类",
+  "file": "ic_medical_hospital.svg"
+ },
+ {
+  "key": "ic_medical_healthcare",
+  "group": "child",
+  "name": "滋补保健",
+  "hint": "支出明细分类",
+  "file": "ic_medical_healthcare.svg"
+ },
+ {
+  "key": "ic_income_reimbursement",
+  "group": "income",
+  "name": "报销",
+  "hint": "收入分类",
+  "file": "ic_income_reimbursement.svg"
+ },
+ {
+  "key": "ic_income_subsidy",
+  "group": "income",
+  "name": "补贴",
+  "hint": "收入分类",
+  "file": "ic_income_subsidy.svg"
+ },
+ {
+  "key": "ic_income_second_hand",
+  "group": "income",
+  "name": "二手闲置",
+  "hint": "收入分类",
+  "file": "ic_income_second_hand.svg"
+ },
+ {
+  "key": "ic_income_wages",
+  "group": "income",
+  "name": "工资",
+  "hint": "收入分类",
+  "file": "ic_income_wages.svg"
+ },
+ {
+  "key": "ic_income_part_time_job",
+  "group": "income",
+  "name": "兼职外快",
+  "hint": "收入分类",
+  "file": "ic_income_part_time_job.svg"
+ },
+ {
+  "key": "ic_income_bonus",
+  "group": "income",
+  "name": "奖金",
+  "hint": "收入分类",
+  "file": "ic_income_bonus.svg"
+ },
+ {
+  "key": "ic_income_borrow",
+  "group": "income",
+  "name": "借入",
+  "hint": "收入分类",
+  "file": "ic_income_borrow.svg"
+ },
+ {
+  "key": "ic_income_cash_gift",
+  "group": "income",
+  "name": "礼金人情",
+  "hint": "收入分类",
+  "file": "ic_income_cash_gift.svg"
+ },
+ {
+  "key": "ic_income_manager_money",
+  "group": "income",
+  "name": "理财盈利",
+  "hint": "收入分类",
+  "file": "ic_income_manager_money.svg"
+ },
+ {
+  "key": "ic_income_winning",
+  "group": "income",
+  "name": "中奖",
+  "hint": "收入分类",
+  "file": "ic_income_winning.svg"
+ },
+ {
+  "key": "ic_income_other",
+  "group": "income",
+  "name": "其他",
+  "hint": "收入分类",
+  "file": "ic_income_other.svg"
+ },
+ {
+  "key": "ic_other_charitable",
+  "group": "income",
+  "name": "慈善捐助",
+  "hint": "收入分类",
+  "file": "ic_other_charitable.svg"
+ },
+ {
+  "key": "ic_r_manager_money",
+  "group": "income",
+  "name": "理财支出",
+  "hint": "收入分类",
+  "file": "ic_r_manager_money.svg"
+ },
+ {
+  "key": "ic_other_fine",
+  "group": "income",
+  "name": "罚款赔偿",
+  "hint": "收入分类",
+  "file": "ic_other_fine.svg"
+ }
+]
