@@ -69,4 +69,20 @@ const original = { ...sharedBase.assets[0], openingBalance: 100, assetNumber: 10
 const expense = { ...s.bills.find(b => b.parentCategoryId === 7)!, billId: 101, cost: 10, assetId: original.assetId }
 const income = { ...s.bills.find(b => b.parentCategoryId !== 7)!, billId: 102, cost: 20, assetId: original.assetId }
 assert.equal(deriveAssets({ ...sharedBase, assets: [original], bills: [expense, income] })[0].assetNumber, 110)
+
+state().reset()
+state().setBook('shared-book')
+state().addAsset({ assetId: 11, assetName: '测试', assetNumber: 30 })
+const first = state().addBill({ assetId: 11, parentCategoryId: 7, cost: 3, time: 123 })
+const second = state().addBill({ assetId: 11, parentCategoryId: 7, cost: 3, time: 123 })
+assert.notEqual(first.billId, second.billId)
+assert.notEqual(first.syncId, second.syncId)
+assert.equal(collectRecords().filter(r => r.kind === 'bill' && !r.deleted).length, 2)
+state().applyRemote([{ kind: 'bill', id: first.syncId, payload: { ...first, displayId: '1-0001', memberNo: 1, sequenceNo: 1 }, ownerId: 1, updatedAt: first.updateTime }])
+assert.equal(state().bills.find(b => b.billId === first.billId)?.displayId, '1-0001')
+state().deleteBill(first.billId)
+assert.equal(collectRecords().find(r => r.kind === 'bill' && r.id === first.syncId && r.deleted)?.bookId, 'shared-book')
+state().applyRemote([{ kind: 'bill', id: first.syncId, payload: first, updatedAt: first.updateTime }])
+assert.equal(state().bills.some(b => b.billId === first.billId), false)
+assert.equal(state().bills.some(b => b.billId === second.billId), true)
 console.log('balance and synthetic CSV tests passed')
