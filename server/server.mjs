@@ -408,25 +408,35 @@ const server = createServer(async (req, res) => {
       if (!user) return fail(res, '请先登录')
       const body = await readBody(req)
       const list = Array.isArray(body.records) ? body.records : []
-      const get = db.prepare('SELECT updated_at FROM records WHERE user_id = ? AND kind = ? AND rid = ?')
-      const put = db.prepare(`INSERT INTO records (user_id, kind, rid, payload, updated_at, deleted)
-        VALUES (?,?,?,?,?,?)
-        ON CONFLICT(user_id, kind, rid) DO UPDATE SET payload=excluded.payload, updated_at=excluded.updated_at, deleted=excluded.deleted`)
       let accepted = 0, skipped = 0, denied = 0
       for (const r of list) {
         if (!r || typeof r.kind !== 'string' || r.id == null) { skipped++; continue }
         const rid = String(r.id)
         const updatedAt = Number(r.updatedAt) || 0
-        const bookId = r.payload && r.payload.bookId != null ? String(r.payload.bookId) : null
 
-        // 账本权限：不是成员 → 拒绝；静默 → 拒绝所有写
+        // 1) 定位这条记录所属账本：优先用提交内容，墓碑则从服务端已有记录反查
+        let bookId = r.bookId || (r.payload && r.payload.bookId != null ? String(r.payload.bookId) : null)
+        const existing = db.prepare(`SELECT user_id, book_id, updated_at FROM records
+          WHERE kind = ? AND rid = ? AND (user_id = ? OR book_id IN (
+            SELECT book_id FROM book_members WHERE user_id = ?))`)
+          .all(r.kind, rid, user.id, user.id)
+        if (!bookId && existing.length) bookId = existing[0].book_id || null
+        // 记录存在于别人的账本里、而我不是成员 → 直接拒绝，避免写出一条无意义的私有墓碑
+        if (!bookId && existing.some((e) => e.user_id !== user.id && e.book_id)) { denied++; continue }
+
+        // 2) 权限：账本内必须可写；删除/改写他人记录要求 admin
         if (bookId) {
           const role = roleOf(bookId, user.id)
-          if (!role || !canWrite(role)) { denied++; continue }
+          if (!role) { denied++; continue }
+          if (!canWrite(role)) { denied++; continue }
+          const others = existing.filter((e) => e.book_id === bookId && e.user_id !== user.id)
+          if (others.length && !isAdmin(role)) { denied++; continue }
         }
 
-        const cur = get.get(user.id, r.kind, rid)
-        if (cur && cur.updated_at > updatedAt) { skipped++; continue }
+        // 3) 版本比较（同一身份下）
+        const mine = existing.find((e) => (e.book_id || null) === bookId)
+        if (mine && mine.updated_at > updatedAt) { skipped++; continue }
+
         db.prepare(`INSERT INTO records (user_id, kind, rid, payload, updated_at, deleted, book_id)
           VALUES (?,?,?,?,?,?,?)
           ON CONFLICT(user_id, kind, rid) DO UPDATE SET payload=excluded.payload, updated_at=excluded.updated_at,
