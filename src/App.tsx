@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLedger, useTotalAssets } from './store'
 import { ASSET_TYPE, BILL_TYPE } from './types'
 import { api } from './api'
@@ -80,36 +80,67 @@ function AddBill({ notify }: { notify: (m: string) => void }) {
   const children = useLedger((s) => s.childCategories)
   const assets = useLedger((s) => s.assets)
   const addBill = useLedger((s) => s.addBill)
+  const addTransfer = useLedger((s) => s.addTransfer)
 
-  const [kind, setKind] = useState<'expense' | 'income'>('expense')
+  const [mode, setMode] = useState<'expense' | 'income' | 'transfer'>('expense')
   const [cost, setCost] = useState('')
   const [pid, setPid] = useState(100)
   const [cid, setCid] = useState(0)
   const [aid, setAid] = useState(0)
+  const [toAid, setToAid] = useState(0)
+  const [fee, setFee] = useState('')
   const [remark, setRemark] = useState('')
   const [time, setTime] = useState(toLocalInput(Date.now()))
 
-  const list = parents.filter((p) => p.kind === kind)
-  const cur = parents.find((p) => p.id === pid)?.kind === kind ? pid : list[0]?.id ?? 199
+  // 默认选中第一个账户，减少一次点击
+  useEffect(() => {
+    if (!aid && assets[0]) setAid(assets[0].assetId)
+    if (!toAid && assets[1]) setToAid(assets[1].assetId)
+  }, [assets, aid, toAid])
+
+  const catKind = mode === 'income' ? 'income' : 'expense'
+  const list = parents.filter((p) => p.kind === catKind)
+  const cur = list.some((p) => p.id === pid) ? pid : (list[0]?.id ?? 199)
   const subs = children.filter((c) => c.parentId === cur)
+
+  const switchMode = (m: 'expense' | 'income' | 'transfer') => {
+    setMode(m)
+    setCid(0)
+    if (m === 'expense') setPid(100)
+    if (m === 'income') setPid(200)
+  }
 
   const submit = () => {
     const v = Number(cost)
     if (!v || v <= 0) return notify('请输入金额')
+
+    if (mode === 'transfer') {
+      if (!aid || !toAid) return notify('请选择转出和转入账户')
+      if (aid === toAid) return notify('转出和转入不能是同一个账户')
+      const f = Number(fee) || 0
+      addTransfer({
+        fromAssetId: aid, toAssetId: toAid, cost: v,
+        serviceCharge: f, remark, time: new Date(time).getTime()
+      })
+      setCost(''); setFee(''); setRemark('')
+      return notify(`已转账 ${money(v)}` + (f > 0 ? `，手续费 ${money(f)} 已单独记为支出` : ''))
+    }
+
     if (!aid) return notify('请选择账户')
     addBill({
       cost: v, parentCategoryId: cur, childCategoryId: cid,
       assetId: aid, remark, time: new Date(time).getTime(), billType: 2
     })
     setCost(''); setRemark(''); setCid(0)
-    notify(`${kind === 'expense' ? '支出' : '收入'} ${money(v)} 已记录`)
+    notify(`${mode === 'expense' ? '支出' : '收入'} ${money(v)} 已记录`)
   }
 
   return (
     <section className="card">
-      <div className="seg">
-        <button className={kind === 'expense' ? 'on' : ''} onClick={() => { setKind('expense'); setPid(100); setCid(0) }}>支出</button>
-        <button className={kind === 'income' ? 'on' : ''} onClick={() => { setKind('income'); setPid(200); setCid(0) }}>收入</button>
+      <div className="seg three">
+        <button className={mode === 'expense' ? 'on' : ''} onClick={() => switchMode('expense')}>支出</button>
+        <button className={mode === 'income' ? 'on' : ''} onClick={() => switchMode('income')}>收入</button>
+        <button className={mode === 'transfer' ? 'on' : ''} onClick={() => switchMode('transfer')}>转账</button>
       </div>
 
       <div className="amount">
@@ -117,69 +148,115 @@ function AddBill({ notify }: { notify: (m: string) => void }) {
         <input value={cost} onChange={(e) => setCost(e.target.value.replace(/[^\d.]/g, ''))} placeholder="0.00" inputMode="decimal" />
       </div>
 
-      <div className="label">分类</div>
-      <div className="chips">
-        {list.map((p) => (
-          <button key={p.id} className={'chip' + (p.id === cur ? ' on' : '')} onClick={() => { setPid(p.id); setCid(0) }}>
-            <i style={{ background: p.color }} />{p.name}
-          </button>
-        ))}
-      </div>
-
-      {subs.length > 0 && (
+      {mode === 'transfer' ? (
         <>
-          <div className="label">子分类</div>
-          <div className="chips small">
-            <button className={'chip' + (cid === 0 ? ' on' : '')} onClick={() => setCid(0)}>不选</button>
-            {subs.map((c) => (
-              <button key={c.id} className={'chip' + (cid === c.id ? ' on' : '')} onClick={() => setCid(c.id)}>{c.name}</button>
+          <div className="row2">
+            <div>
+              <div className="label">转出账户</div>
+              <select value={aid} onChange={(e) => setAid(Number(e.target.value))}>
+                <option value={0}>请选择</option>
+                {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}（{money(a.assetNumber)}）</option>)}
+              </select>
+            </div>
+            <div>
+              <div className="label">转入账户</div>
+              <select value={toAid} onChange={(e) => setToAid(Number(e.target.value))}>
+                <option value={0}>请选择</option>
+                {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="row2">
+            <div>
+              <div className="label">手续费（可选）</div>
+              <input value={fee} onChange={(e) => setFee(e.target.value.replace(/[^\d.]/g, ''))} placeholder="0.00" inputMode="decimal" />
+            </div>
+            <div>
+              <div className="label">时间</div>
+              <input type="datetime-local" value={time} onChange={(e) => setTime(e.target.value)} />
+            </div>
+          </div>
+          <p className="tip">转账本金不计入收支；手续费会单独生成一条支出账单。</p>
+        </>
+      ) : (
+        <>
+          <div className="label">分类</div>
+          <div className="chips">
+            {list.map((p) => (
+              <button key={p.id} className={'chip' + (p.id === cur ? ' on' : '')} onClick={() => { setPid(p.id); setCid(0) }}>
+                <i style={{ background: p.color }} />{p.name}
+              </button>
             ))}
+          </div>
+
+          {subs.length > 0 && (
+            <>
+              <div className="label">子分类</div>
+              <div className="chips small">
+                <button className={'chip' + (cid === 0 ? ' on' : '')} onClick={() => setCid(0)}>不选</button>
+                {subs.map((c) => (
+                  <button key={c.id} className={'chip' + (cid === c.id ? ' on' : '')} onClick={() => setCid(c.id)}>{c.name}</button>
+                ))}
+              </div>
+            </>
+          )}
+
+          <div className="row2">
+            <div>
+              <div className="label">账户</div>
+              <select value={aid} onChange={(e) => setAid(Number(e.target.value))}>
+                <option value={0}>请选择</option>
+                {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}（{money(a.assetNumber)}）</option>)}
+              </select>
+            </div>
+            <div>
+              <div className="label">时间</div>
+              <input type="datetime-local" value={time} onChange={(e) => setTime(e.target.value)} />
+            </div>
           </div>
         </>
       )}
 
-      <div className="row2">
-        <div>
-          <div className="label">账户</div>
-          <select value={aid} onChange={(e) => setAid(Number(e.target.value))}>
-            <option value={0}>请选择</option>
-            {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}（{money(a.assetNumber)}）</option>)}
-          </select>
-        </div>
-        <div>
-          <div className="label">时间</div>
-          <input type="datetime-local" value={time} onChange={(e) => setTime(e.target.value)} />
-        </div>
-      </div>
-
       <div className="label">备注</div>
       <input value={remark} onChange={(e) => setRemark(e.target.value)} placeholder="写点什么（可留空）" />
 
-      <button className="primary" onClick={submit}>记一笔</button>
+      <button className="primary" onClick={submit}>{mode === 'transfer' ? '确认转账' : '记一笔'}</button>
     </section>
   )
 }
 
 function Bills() {
   const bills = useLedger((s) => s.bills)
+  const transfers = useLedger((s) => s.transfers)
   const parents = useLedger((s) => s.parentCategories)
   const assets = useLedger((s) => s.assets)
   const del = useLedger((s) => s.deleteBill)
   const [month, setMonth] = useState(monthOf(Date.now()))
 
-  const list = useMemo(() => bills.filter((b) => monthOf(b.time) === month).sort((a, b) => b.time - a.time), [bills, month])
-  const income = list.filter((b) => parents.find((p) => p.id === b.parentCategoryId)?.kind === 'income').reduce((s, b) => s + b.cost, 0)
-  const expense = list.filter((b) => parents.find((p) => p.id === b.parentCategoryId)?.kind !== 'income').reduce((s, b) => s + b.cost, 0)
+  type Item =
+    | { kind: 'bill'; id: number; time: number; data: typeof bills[number] }
+    | { kind: 'transfer'; id: number; time: number; data: typeof transfers[number] }
+
+  const items = useMemo<Item[]>(() => {
+    const inMonth = (t: number) => monthOf(t) === month
+    const a = bills.filter((b) => inMonth(b.time)).map((b) => ({ kind: 'bill' as const, id: b.billId, time: b.time, data: b }))
+    const t = transfers.filter((x) => inMonth(x.time)).map((x) => ({ kind: 'transfer' as const, id: x.transferId, time: x.time, data: x }))
+    return [...a, ...t].sort((x, y) => y.time - x.time)
+  }, [bills, transfers, month])
+
+  const isIncome = (pid: number) => parents.find((p) => p.id === pid)?.kind === 'income'
+  const income = bills.filter((b) => monthOf(b.time) === month && isIncome(b.parentCategoryId)).reduce((s, b) => s + b.cost, 0)
+  const expense = bills.filter((b) => monthOf(b.time) === month && !isIncome(b.parentCategoryId)).reduce((s, b) => s + b.cost, 0)
 
   const groups = useMemo(() => {
-    const m = new Map<string, typeof list>()
-    list.forEach((b) => {
+    const m = new Map<string, Item[]>()
+    items.forEach((b) => {
       const k = dayOf(b.time)
       if (!m.has(k)) m.set(k, [])
       m.get(k)!.push(b)
     })
     return [...m.entries()]
-  }, [list])
+  }, [items])
 
   return (
     <section className="card">
@@ -200,10 +277,30 @@ function Bills() {
       {groups.map(([day, rows]) => (
         <div key={day} className="group">
           <div className="day">{day}</div>
-          {rows.map((b) => {
+          {rows.map((it) => {
+            if (it.kind === 'transfer') {
+              const t = it.data
+              const from = assets.find((a) => a.assetId === t.fromAssetId)
+              const to = assets.find((a) => a.assetId === t.toAssetId)
+              return (
+                <div key={'t' + t.transferId} className="row">
+                  <i className="dot arrow">⇄</i>
+                  <div className="grow">
+                    <div>转账 · {from?.assetName ?? '?'} → {to?.assetName ?? '?'}</div>
+                    <small>
+                      {hhmm(t.time)} · 不计收支
+                      {t.serviceCharge > 0 ? ` · 手续费 ${money(t.serviceCharge)}` : ''}
+                      {t.remark ? ` · ${t.remark}` : ''}
+                    </small>
+                  </div>
+                  <b className="neutral">{money(t.cost)}</b>
+                </div>
+              )
+            }
+            const b = it.data
             const p = parents.find((x) => x.id === b.parentCategoryId)
             const a = assets.find((x) => x.assetId === b.assetId)
-            const isIncome = p?.kind === 'income'
+            const inc = p?.kind === 'income'
             return (
               <div key={b.billId} className="row">
                 <i className="dot" style={{ background: p?.color ?? '#94a3b8' }} />
@@ -211,7 +308,7 @@ function Bills() {
                   <div>{p?.name ?? '未分类'}{b.remark ? <span className="remark"> · {b.remark}</span> : null}</div>
                   <small>{a?.assetName ?? '无账户'} · {hhmm(b.time)} · {BILL_TYPE[b.billType]}</small>
                 </div>
-                <b className={isIncome ? 'in' : 'out'}>{isIncome ? '+' : '-'}{money(b.cost)}</b>
+                <b className={inc ? 'in' : 'out'}>{inc ? '+' : '-'}{money(b.cost)}</b>
                 <button className="del" onClick={() => del(b.billId)}>删</button>
               </div>
             )

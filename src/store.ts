@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { AccountBook, Asset, Bill, Category } from './types'
+import type { AccountBook, Asset, Bill, Category, Transfer } from './types'
 
 const NOW = () => Date.now()
 
@@ -45,10 +45,12 @@ interface LedgerState {
   bills: Bill[]
   parentCategories: Category[]
   childCategories: Category[]
+  transfers: Transfer[]
   seeded: boolean
 
   addBill: (patch: Partial<Bill>) => Bill
   deleteBill: (billId: number) => void
+  addTransfer: (patch: { fromAssetId: number; toAssetId: number; cost: number; serviceCharge?: number; time?: number; remark?: string }) => Transfer
   addAsset: (patch: Partial<Asset>) => void
   updateAsset: (asset: Asset) => void
   setBook: (id: number) => void
@@ -69,6 +71,7 @@ export const useLedger = create<LedgerState>()(
       bills: [],
       parentCategories: makeParents(),
       childCategories: makeChildren(),
+      transfers: [],
       seeded: false,
 
       addBill: (patch) => {
@@ -112,6 +115,58 @@ export const useLedger = create<LedgerState>()(
       },
 
       deleteBill: (billId) => set((s) => ({ bills: s.bills.filter((b) => b.billId !== billId) })),
+
+      // 转账：本金不计收支；手续费若 >0 则单独生成一条支出账单（与原产品一致）
+      addTransfer: (patch) => {
+        const s = get()
+        let transferId = Math.floor(NOW() / 1000)
+        while (s.transfers.some((t) => t.transferId === transferId)) transferId++
+        const fee = Number(patch.serviceCharge ?? 0)
+        const time = patch.time ?? NOW()
+        let billId = 0
+
+        if (fee > 0) {
+          const bill = get().addBill({
+            cost: fee,
+            parentCategoryId: 199,
+            childCategoryId: 0,
+            assetId: patch.fromAssetId,
+            remark: `转账手续费${patch.remark ? '：' + patch.remark : ''}`,
+            billType: 5,
+            time
+          })
+          billId = bill.billId
+        } else {
+          // 无手续费也要扣转出方的本金
+          set((st) => ({
+            assets: st.assets.map((a) => a.assetId === patch.fromAssetId
+              ? { ...a, assetNumber: +(a.assetNumber - patch.cost).toFixed(2), updateTime: NOW() }
+              : a)
+          }))
+        }
+
+        set((st) => ({
+          assets: st.assets.map((a) => a.assetId === patch.toAssetId
+            ? { ...a, assetNumber: +(a.assetNumber + patch.cost).toFixed(2), updateTime: NOW() }
+            : a)
+        }))
+
+        const t: Transfer = {
+          transferId,
+          fromAssetId: patch.fromAssetId,
+          toAssetId: patch.toAssetId,
+          cost: Number(patch.cost),
+          serviceCharge: fee,
+          billId,
+          time,
+          remark: patch.remark ?? '',
+          tags: [],
+          userId: s.userId,
+          updateTime: NOW()
+        }
+        set((st) => ({ transfers: [t, ...st.transfers] }))
+        return t
+      },
 
       addAsset: (patch) => set((s) => {
         const id = patch.assetId ?? NOW()
@@ -158,7 +213,7 @@ export const useLedger = create<LedgerState>()(
         mk(4, 12000, 200, 0, 1, '月薪')
       },
 
-      reset: () => set({ assets: [], bills: [], seeded: false }),
+      reset: () => set({ assets: [], bills: [], transfers: [], seeded: false }),
 
       exportAll: () => {
         const s = get()
@@ -168,6 +223,7 @@ export const useLedger = create<LedgerState>()(
           accountBooks: s.accountBooks,
           assets: s.assets,
           bills: s.bills,
+          transfers: s.transfers,
           parentCategories: s.parentCategories,
           childCategories: s.childCategories
         }
@@ -177,6 +233,7 @@ export const useLedger = create<LedgerState>()(
         accountBooks: data.accountBooks ?? s.accountBooks,
         assets: data.assets ?? [],
         bills: data.bills ?? [],
+        transfers: data.transfers ?? [],
         parentCategories: data.parentCategories ?? s.parentCategories,
         childCategories: data.childCategories ?? s.childCategories,
         seeded: true

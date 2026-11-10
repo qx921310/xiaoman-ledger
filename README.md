@@ -25,7 +25,8 @@ npm run api     # 后端 http://127.0.0.1:8787
 
 ## 已实现
 
-- **记账**：支出/收入切换、两级分类、账户选择、时间、备注
+- **记账**：支出/收入/转账三种模式、两级分类、账户选择、时间、备注
+- **转账**：账户间划转，本金不计收支；**手续费单独生成一条支出账单**并通过 `billId` 关联（净资产只减少手续费）
 - **账单**：按月筛选、按日分组、收入/支出/结余汇总、删除
 - **资产**：净资产/负资产汇总、多账户列表、新增账户（信用卡余额记负数）
 - **统计**：按月支出构成条形图 + 占比
@@ -35,6 +36,7 @@ npm run api     # 后端 http://127.0.0.1:8787
 
 与逆向分析得出的结构保持一致：
 
+- `transfers`：`transferId · fromAssetId · toAssetId · cost · serviceCharge · billId · time · remark`
 - `bills`：`billId · time · cost · parentCategoryId · childCategoryId · assetId · bookId · remark · billType · tags · billShareInfo`（冗余快照）
 - `assets`：`assetId · assetName · assetType · assetNumber · groupName · hide · intoTotalAsset · positionWeight`
 - `billType`：1 快捷 / 2 手动 / 3 导入 / 4 周期 / 5 自动 / 6 模板
@@ -82,8 +84,8 @@ npm run api     # 后端 http://127.0.0.1:8787
 
 ## 待办（按优先级）
 
-1. 同步队列与离线优先（本地写入排队 → 联网重试）
-2. 转账 / 借入借出 / 报销退款（含"手续费单独成账"规则）
+1. 借入借出 / 报销退款（报销、退款是挂在账单上的附属记录）
+2. 同步队列与离线优先（本地写入排队 → 联网重试）
 3. 周期记账、预算
 4. 用户体系与登录（token 下发）
 5. 部署：反向代理 + HTTPS

@@ -51,6 +51,21 @@ export interface Category {
   positionWeight: number
 }
 
+export interface Transfer {
+  transferId: number
+  fromAssetId: number
+  toAssetId: number
+  cost: number
+  /** 手续费：>0 时单独生成一条支出账单，与 transfer 通过 billId 关联 */
+  serviceCharge: number
+  billId: number
+  time: number
+  remark: string
+  tags: string[]
+  userId: number
+  updateTime: number
+}
+
 export interface AccountBook {
   accountBookId: number
   accountBookName: string
