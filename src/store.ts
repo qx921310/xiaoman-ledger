@@ -592,7 +592,7 @@ export const useLedger = create<LedgerState>()(
       // 退款：钱退回原支付账户，直接冲减这笔支出
       addRefund: ({ billId, number, assetId, baseAmount }) => set((s) => {
         const bill = s.bills.find((b) => b.billId === billId)
-        if (!bill || s.refunds.some((r) => r.billId === billId)) return {}
+        if (!bill) return {}
         if (s.parentCategories.find((p) => p.id === bill.parentCategoryId)?.kind === 'income') return {}
         const asset = s.assets.find((a) => a.assetId === (assetId || bill.assetId))
         if (!asset) return {}
@@ -600,7 +600,10 @@ export const useLedger = create<LedgerState>()(
         if (!Number.isFinite(amt) || amt <= 0) return {}
         if (!hasCurrencyRate(asset.currency, s.currencies, s.defaultCurrency)) return {}
         const base = baseAmount ?? toBase(amt, asset.currency, s.currencies, s.defaultCurrency)
-        if (!Number.isFinite(base) || base <= 0 || base > bill.cost) return {}
+        // 多次退款：累计不得超过原账单金额
+        const refunded = s.refunds.filter((r) => r.billId === billId)
+          .reduce((sum, r) => sum + (Number(r.baseAmount) || 0), 0)
+        if (!Number.isFinite(base) || base <= 0 || base > +(bill.cost - refunded).toFixed(2)) return {}
         let refundId = Date.now()
         while (s.refunds.some((r) => r.refundId === refundId) || s.tombstones.some((t) => t.kind === 'refund' && t.id === String(refundId))) refundId++
         const rec: Refund = {

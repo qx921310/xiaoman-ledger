@@ -339,7 +339,10 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
   const deleteRefund = useLedger((s) => s.deleteRefund)
 
   const myReimb = reimbursements.find((r) => r.billId === bill.billId)
-  const myRefund = refunds.find((r) => r.billId === bill.billId)
+  const myRefunds = refunds.filter((r) => r.billId === bill.billId)
+  const myRefund = myRefunds[0]                       // 兼容旧逻辑（币种/账户回退）
+  const refundedTotal = +myRefunds.reduce((sum, r) => sum + (Number(r.baseAmount) || 0), 0).toFixed(2)
+  const refundRemaining = +Math.max(0, bill.cost - refundedTotal).toFixed(2)
   const [rAsset, setRAsset] = useState(bill.assetId || assets[0]?.assetId || 0)
   const [rAmount, setRAmount] = useState(() => {
     const account = assets.find((a) => a.assetId === bill.assetId) ?? assets[0]
@@ -428,22 +431,26 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
             )}
 
             <div className="label">退款</div>
-            {myRefund ? (
-              <div className="attach-line">
-                <span>已退 {myRefund.baseAmount != null ? money(myRefund.baseAmount) : accountMoney(myRefund.number, refundCurrency, currencies, defaultCurrency)}（到账 {accountMoney(myRefund.number, refundCurrency, currencies, defaultCurrency)} · {refundAccount?.assetName ?? '账户'}）</span>
-                <button className="del" onClick={() => deleteRefund(myRefund.refundId)}>撤销</button>
+            {myRefunds.length > 0 && (
+              <p className="hint">已退 {money(refundedTotal)} · 还可退 {money(refundRemaining)}</p>
+            )}
+            {myRefunds.map((r) => (
+              <div key={r.refundId} className="attach-line">
+                <span>{money(Number(r.baseAmount) || 0)}（到账 {accountMoney(r.number, r.currency ?? defaultCurrency, currencies, defaultCurrency)} · {assets.find((a) => a.assetId === (r.assetId ?? bill.assetId))?.assetName ?? '账户'}）</span>
+                <button className="del" onClick={() => deleteRefund(r.refundId)}>撤销</button>
               </div>
-            ) : (
+            ))}
+            {refundRemaining > 0 && (
               <>
-                <input value={fAmount} onChange={(e) => setFAmount(e.target.value.replace(/[^\d.]/g, ''))} placeholder={`退款金额（${defaultCurrency}）`} aria-label={`退款金额（${defaultCurrency}）`} inputMode="decimal" />
+                <input value={fAmount} onChange={(e) => setFAmount(e.target.value.replace(/[^\d.]/g, ''))} placeholder={`本次退款金额（${defaultCurrency}，最多 ${refundRemaining}）`} aria-label={`本次退款金额（${defaultCurrency}）`} inputMode="decimal" />
                 <select value={fAsset} onChange={(e) => setFAsset(Number(e.target.value))} aria-label="退款账户">
                   <option value={0}>默认退回支付账户（{assets.find((a) => a.assetId === bill.assetId)?.assetName ?? '未找到'}）</option>
                   {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}（{a.currency ?? defaultCurrency}）</option>)}
                 </select>
                 {!refundRateAvailable && <p className="hint">请先设置 {refundCurrency} 汇率。</p>}
-                {refundBase > bill.cost && <p className="hint">退款金额不能超过原账单金额。</p>}
+                {refundBase > refundRemaining && <p className="hint">本次退款 {money(refundBase)} 超过还可退的 {money(refundRemaining)}。</p>}
                 {refundAccount && refundCurrency !== defaultCurrency && refundBase > 0 && refundRateAvailable && <p className="hint">按当前汇率预计到账 {accountMoney(refundAccountAmount, refundCurrency, currencies, defaultCurrency)}</p>}
-                <button className="ghost wide" disabled={!refundAccount || !Number.isFinite(refundBase) || refundBase <= 0 || refundBase > bill.cost || !refundRateAvailable || refundAccountAmount <= 0} onClick={() => { addRefund({ billId: bill.billId, assetId: fAsset || undefined, number: refundAccountAmount, baseAmount: refundBase }); setFAmount('') }}>保存退款</button>
+                <button className="ghost wide" disabled={!refundAccount || !Number.isFinite(refundBase) || refundBase <= 0 || refundBase > refundRemaining || !refundRateAvailable || refundAccountAmount <= 0} onClick={() => { addRefund({ billId: bill.billId, assetId: fAsset || undefined, number: refundAccountAmount, baseAmount: refundBase }); setFAmount('') }}>保存退款</button>
               </>
             )}
           </>
@@ -451,7 +458,7 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
 
         <div className="modal-btns">
           <button className="ghost" onClick={onClose}>取消</button>
-          <button className="primary" disabled={myRefund?.baseAmount != null && Number(cost) < myRefund.baseAmount} onClick={() => onSave({
+          <button className="primary" disabled={Number(cost) < refundedTotal} onClick={() => onSave({
             cost: Number(cost) || bill.cost,
             parentCategoryId: pid,
             childCategoryId: cid,
