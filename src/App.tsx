@@ -489,6 +489,8 @@ function Bills({ me }: { me?: { id: number; email: string } }) {
   const accountBooks = useLedger((s) => s.accountBooks)
   const myRole = accountBooks.find((b) => b.bookId && String(b.bookId) === String(currentBookId))?.role
   const readOnly = myRole === 'silent'
+  // 共享账本里别人记的账，列表上用 ❗ 标记（记账人本身在明细里看）
+  const isForeign = (b: Bill) => b.ownerId != null && me?.id != null && b.ownerId !== me.id
   const updateTransfer = useLedger((s) => s.updateTransfer)
   const [editingTransfer, setEditingTransfer] = useState<Transfer | null>(null)
 
@@ -609,7 +611,11 @@ function Bills({ me }: { me?: { id: number; email: string } }) {
                   <CatIcon k={p?.icon} size={16} />
                 </span>
                 <div className="grow">
-                  <div>{p?.name ?? '未分类'}{b.remark ? <span className="remark"> · {b.remark}</span> : null}</div>
+                  <div>
+                    {p?.name ?? '未分类'}
+                    {isForeign(b) && <span className="foreign" title="由其他成员记录 — 点「明细」查看记账人">❗</span>}
+                    {b.remark ? <span className="remark"> · {b.remark}</span> : null}
+                  </div>
                   <small>
                     {a?.assetName ?? '无账户'} · {hhmm(b.time)} · {BILL_TYPE[b.billType]}
                     {b.notIntoTotal ? ' · 不计收支' : ''}
