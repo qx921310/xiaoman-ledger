@@ -179,9 +179,13 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
 
   const doExportXlsx = async () => {
     if (bills.length === 0) return notify('还没有账单可导出')
-    const { exportXlsx } = await import('../importer')
-    exportXlsx(bills, parents, children, assets, accountBooks, reimbursements, refunds)
-    notify(`已导出 ${bills.length} 条为 Excel`)
+    try {
+      const { exportXlsx } = await import('../importer')
+      exportXlsx(bills, parents, children, assets, accountBooks, reimbursements, refunds)
+      notify(`已导出 ${bills.length} 条为 Excel`)
+    } catch (e: any) {
+      notify('导出失败：' + (e?.message || '请检查账户信息'))
+    }
   }
 
   const doImportJson = (f: File) => {
@@ -258,6 +262,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
       )}
 
       <h3>导出</h3>
+      <p className="hint">Excel 用于账单交换；完整备份和恢复账户余额请使用 JSON。</p>
       <div className="btns">
         <button onClick={doExportXlsx}>导出 Excel</button>
         <button onClick={doExportJson}>导出 JSON</button>

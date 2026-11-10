@@ -1,6 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { deriveAssets } from '../src/balances'
-import { buildImportPlan, parseLedgerFile } from '../src/importer'
+import { buildExportTable, buildImportPlan, parseLedgerFile } from '../src/importer'
+import * as XLSX from 'xlsx'
 import { useLedger } from '../src/store'
 import { collectRecords } from '../src/sync'
 import { billNetAmount } from '../src/bill-amount'
@@ -216,4 +217,57 @@ summary = summarizeBills(state().bills, state().parentCategories, state().refund
 assert.equal(summary.expense, 55)
 assert.equal(summary.budget, 5)
 assert.equal(balance(61), 1035)
+
+// Export a real workbook, parse it and apply the plan into a fresh store.
+state().reset()
+state().setCurrencyRate('USD', 7.2)
+state().addAsset({ assetId: 71, assetName: '支付卡', assetNumber: 100, currency: 'CNY' })
+state().addAsset({ assetId: 72, assetName: '外币钱包', assetNumber: 0, currency: 'USD' })
+const exportedBill = state().addBill({ assetId: 71, parentCategoryId: 7, cost: 72 })
+state().addRefund({ billId: exportedBill.billId, assetId: 72, number: 10, baseAmount: 72 })
+const exportTable = buildExportTable(state().bills, state().parentCategories, state().childCategories, state().assets, state().accountBooks, state().reimbursements, state().refunds)
+const workbook = XLSX.utils.book_new()
+XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([exportTable.headers, ...exportTable.rows]), exportTable.sheetName)
+const workbookBytes = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer
+const parsedExport = parseLedgerFile(workbookBytes, 'virtual-export.xlsx')
+state().reset()
+const makePlan = (t: typeof parsedExport, existingAssets = state().assets) => buildImportPlan({ table: t, existingBills: [], existingAssets, existingBooks: state().accountBooks,
+  parentCategories: state().parentCategories, childCategories: state().childCategories, userId: 1, bookId: 1 })
+const roundTrip = makePlan(parsedExport, [])
+assert.equal(roundTrip.skipped.length, 0)
+assert.equal(roundTrip.bills.length, 1)
+assert.equal(roundTrip.refunds.length, 1)
+assert.equal(roundTrip.expense, 0)
+state().applyImport(roundTrip)
+const importedPay = state().assets.find(a => a.assetName === '支付卡')!
+const importedRefundAccount = state().assets.find(a => a.assetName === '外币钱包')!
+assert.equal(importedPay.currency, 'CNY')
+assert.equal(importedRefundAccount.currency, 'USD')
+assert.equal(importedPay.assetNumber, -72)
+assert.equal(importedRefundAccount.assetNumber, 10)
+assert.equal(state().refunds[0].baseAmount, 72)
+assert.equal(state().refunds[0].assetId, importedRefundAccount.assetId)
+assert.equal(billNetAmount(state().bills[0], state().refunds), 0)
+
+// Ambiguous currencies or incomplete metadata must not create a partial record.
+const conflict = makePlan(parsedExport, [{ ...importedRefundAccount, currency: 'CNY' }])
+assert.equal(conflict.bills.length, 0)
+assert.equal(conflict.refunds.length, 0)
+assert.equal(conflict.skipped.length, 1)
+const brokenRows = parsedExport.rows.map(row => [...row])
+brokenRows[0][parsedExport.headers.indexOf('小满退款到账金额')] = ''
+const incomplete = makePlan({ ...parsedExport, rows: brokenRows }, [])
+assert.equal(incomplete.bills.length, 0)
+assert.equal(incomplete.skipped.length, 1)
+const partialRows = parsedExport.rows.map(row => [...row])
+partialRows[0][parsedExport.headers.indexOf('退款')] = 36
+partialRows[0][parsedExport.headers.indexOf('小满退款本币金额')] = 36
+partialRows[0][parsedExport.headers.indexOf('小满退款到账金额')] = 5
+const partialPlan = makePlan({ ...parsedExport, rows: partialRows }, [])
+assert.equal(partialPlan.expense, 36)
+assert.equal(billNetAmount(partialPlan.bills[0], partialPlan.refunds), 36)
+const oldColumnCount = parsedExport.headers.indexOf('小满账户币种')
+const legacyPlan = makePlan({ ...parsedExport, headers: parsedExport.headers.slice(0, oldColumnCount), rows: parsedExport.rows.map(row => row.slice(0, oldColumnCount)) }, [])
+assert.equal(legacyPlan.refunds[0].baseAmount, undefined)
+assert.equal(billNetAmount(legacyPlan.bills[0], legacyPlan.refunds), 72)
 console.log('balance and synthetic CSV tests passed')
