@@ -73,6 +73,7 @@ export interface ImportPlan {
   refunds: Refund[]
   duplicates: number
   skipped: { row: number; reason: string }[]
+  warnings: { row: number; reason: string }[]
   income: number
   expense: number
   /** 各列的填充情况，用于告诉用户哪些字段真的带过来了 */
@@ -139,6 +140,7 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
   const bills: Bill[] = []
   const transfers: Transfer[] = []
   const skipped: { row: number; reason: string }[] = []
+  const warnings: { row: number; reason: string }[] = []
   let duplicates = 0
   let income = 0
   let expense = 0
@@ -220,7 +222,7 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
     return {
       format, headers: table.headers, total: table.rows.length, bills, transfers,
       newParents, newChildren, newAssets, newBooks, reimbursements, refunds,
-      duplicates, skipped, income, expense, columnCoverage
+      duplicates, skipped, warnings, income, expense, columnCoverage
     }
   }
 
@@ -236,13 +238,16 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
     }
 
     const typeText = str(r[col('收支类型')] ?? r[col('收/支')] ?? r[col('类型')] ?? r[col('收支')])
-    const amountRaw = num(r[col('金额')])
-    if (!amountRaw) {
+    const amountText = str(r[col('金额')]).replace(/[¥$€,，\s]/g, '')
+    const amountRaw = Number(amountText)
+    const refundAmt = Math.abs(num(r[col('退款')]))
+    const reconstructFullRefund = amountText !== '' && Number.isFinite(amountRaw) && amountRaw === 0 && /支出/.test(typeText) && refundAmt > 0
+    if (!amountText || !Number.isFinite(amountRaw) || (!amountRaw && !reconstructFullRefund)) {
       skipped.push({ row: i + 2, reason: '金额为空或为 0' })
       return
     }
     const isIncome = /收入/.test(typeText) ? true : /支出/.test(typeText) ? false : amountRaw > 0
-    const cost = Math.abs(amountRaw)
+    const cost = reconstructFullRefund ? refundAmt : Math.abs(amountRaw)
 
     // The extra columns are written only by this app. Legacy external files
     // keep their original refund semantics instead of guessing gross/net.
@@ -254,6 +259,19 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
     const refundAmountText = str(r[col('小满退款到账金额')])
     const refundBaseText = str(r[col('小满退款本币金额')])
     const refundMetadata = !!(refundAccountName || refundCurrency || refundAmountText || refundBaseText)
+    const legacyRefundAccount = str(r[col('退款账户')])
+    if (reconstructFullRefund) {
+      const sourceCurrency = str(r[col('多币种')])
+      const paymentAccounts = assets.filter((a) => a.assetName === accountName)
+      const targetAccounts = assets.filter((a) => a.assetName === (legacyRefundAccount || accountName))
+      if (refundMetadata || (sourceCurrency && !['CNY', '人民币'].includes(sourceCurrency)) ||
+          paymentAccounts.length > 1 || targetAccounts.length > 1 ||
+          [...paymentAccounts, ...targetAccounts].some((a) => (a.currency ?? 'CNY') !== 'CNY') ||
+          (accountCurrency && accountCurrency !== 'CNY')) {
+        skipped.push({ row: i + 2, reason: '全额退款的币种或到账金额不明确，请核对原始流水后导入' })
+        return
+      }
+    }
     const validAmount = (text: string) => text !== '' && Number.isFinite(Number(text)) && Number(text) > 0
     if ((accountAmountText && (!accountCurrency || !validAmount(accountAmountText))) ||
         (accountCurrency && !/^[A-Z]{3}$/.test(accountCurrency)) ||
@@ -286,7 +304,7 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
     seen.add(key)
 
     if (isIncome) income += cost
-    else expense += cost - (refundBaseText ? Number(refundBaseText) : 0)
+    else expense += cost - (reconstructFullRefund ? refundAmt : refundBaseText ? Number(refundBaseText) : 0)
 
     // 「其他」列写成 "不计入收支、不计入预算" 这类文本
     const otherText = str(r[col('其他')])
@@ -326,13 +344,16 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
     const reimbAcc = str(r[col('报销账户')])
     const reimbAmt = Math.abs(num(r[col('报销金额')]))
     const reimbDetail = str(r[col('报销明细')])
-    const refundAmt = Math.abs(num(r[col('退款')]))
     pendings.push({
       bill,
       reimb: (reimbAcc || reimbAmt > 0) ? { assetName: reimbAcc, amount: reimbAmt, detail: reimbDetail } : undefined,
-      refund: refundMetadata ? { amount: Number(refundAmountText), assetId: ensureAsset(refundAccountName, refundCurrency), currency: refundCurrency, baseAmount: refundBaseText ? Number(refundBaseText) : undefined }
+      refund: reconstructFullRefund ? { amount: refundAmt, assetId: ensureAsset(legacyRefundAccount || accountName, 'CNY'), currency: 'CNY', baseAmount: refundAmt }
+        : refundMetadata ? { amount: Number(refundAmountText), assetId: ensureAsset(refundAccountName, refundCurrency), currency: refundCurrency, baseAmount: refundBaseText ? Number(refundBaseText) : undefined }
         : refundAmt > 0 ? { amount: refundAmt } : undefined
     })
+    if (reconstructFullRefund) warnings.push({ row: i + 2, reason: legacyRefundAccount
+      ? '已按人民币全额退款还原原支出和指定退款账户，请核对'
+      : '已按人民币全额退款还原原支出，退款账户按支付账户处理，请核对' })
   })
 
   // billId 冲突消解
@@ -379,7 +400,7 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
   return {
     format, headers: table.headers, total: table.rows.length, bills, transfers,
     newParents, newChildren, newAssets, newBooks, reimbursements, refunds,
-    duplicates, skipped, income, expense, columnCoverage
+    duplicates, skipped, warnings, income, expense, columnCoverage
   }
 }
 

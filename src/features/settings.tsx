@@ -255,6 +255,9 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
           {plan.skipped.length > 0 && (
             <p className="hint">跳过示例：第 {plan.skipped.slice(0, 3).map((x) => x.row).join('、')} 行 —— {plan.skipped[0].reason}</p>
           )}
+          {plan.warnings.length > 0 && (
+            <p className="hint">需要核对 {plan.warnings.length} 条：例如第 {plan.warnings[0].row} 行，{plan.warnings[0].reason}。</p>
+          )}
           <button className="primary" onClick={confirmImport} disabled={plan.bills.length + plan.transfers.length === 0}>
             确认导入 {plan.bills.length + plan.transfers.length} 条
           </button>

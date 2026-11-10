@@ -270,4 +270,33 @@ const oldColumnCount = parsedExport.headers.indexOf('小满账户币种')
 const legacyPlan = makePlan({ ...parsedExport, headers: parsedExport.headers.slice(0, oldColumnCount), rows: parsedExport.rows.map(row => row.slice(0, oldColumnCount)) }, [])
 assert.equal(legacyPlan.refunds[0].baseAmount, undefined)
 assert.equal(billNetAmount(legacyPlan.bills[0], legacyPlan.refunds), 72)
+
+// A zero-net expense with a refund still contains a purchase and a refund movement.
+state().reset()
+const refundedCsv = [
+  '日期,收支类型,金额,类别,账户,退款,退款账户,多币种,备注',
+  '2026-03-01,支出,0,食品餐饮,钱包,3,,,可乐',
+  '2026-03-02,支出,0,食品餐饮,钱包,5,银行卡,,零食',
+  '2026-03-03,支出,0,食品餐饮,钱包,0,,,空金额',
+  '2026-03-04,支出,0,食品餐饮,钱包,7,,USD,外币',
+  '2026-03-05,收入,0,工资,钱包,8,,,收入'
+].join('\n')
+const refundBytes = new TextEncoder().encode(refundedCsv)
+const fullRefundTable = parseLedgerFile(refundBytes.buffer, 'virtual-full-refund.csv')
+const fullRefundPlan = makePlan(fullRefundTable, [])
+assert.equal(fullRefundPlan.bills.length, 2)
+assert.equal(fullRefundPlan.refunds.length, 2)
+assert.equal(fullRefundPlan.expense, 0)
+assert.equal(fullRefundPlan.warnings.length, 2)
+assert.equal(fullRefundPlan.skipped.length, 3)
+assert.equal(fullRefundPlan.bills.find(b => b.remark === '可乐')!.cost, 3)
+assert.equal(billNetAmount(fullRefundPlan.bills.find(b => b.remark === '可乐')!, fullRefundPlan.refunds), 0)
+state().applyImport(fullRefundPlan)
+assert.equal(state().assets.find(a => a.assetName === '钱包')!.assetNumber, -5)
+assert.equal(state().assets.find(a => a.assetName === '银行卡')!.assetNumber, 5)
+const importedCola = state().bills.find(b => b.remark === '可乐')!
+const importedColaRefund = state().refunds.find(r => r.billId === importedCola.billId)!
+assert.equal(importedColaRefund.number, 3)
+assert.equal(importedColaRefund.baseAmount, 3)
+assert.equal(importedColaRefund.assetId, importedCola.assetId)
 console.log('balance and synthetic CSV tests passed')
