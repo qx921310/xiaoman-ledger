@@ -2,9 +2,12 @@ import { useMemo, useState } from 'react'
 import { useLedger } from '../store'
 import { money, monthOf } from '../ui-format'
 import { CatIcon } from '../ui/icons'
+import { summarizeBills } from '../bill-summary'
 
 export function Stats() {
   const bills = useLedger((s) => s.bills)
+  const refunds = useLedger((s) => s.refunds)
+  const currentBookId = useLedger((s) => s.currentBookId)
   const parents = useLedger((s) => s.parentCategories)
   const budgets = useLedger((s) => s.budgets)
   const setBudget = useLedger((s) => s.setBudget)
@@ -13,21 +16,20 @@ export function Stats() {
   const [editing, setEditing] = useState<{ categoryId: number; amount: string; addNum?: string; type?: 'month' | 'year' } | null>(null)
 
   const monthBills = useMemo(
-    () => bills.filter((b) => monthOf(b.time) === month && parents.find((p) => p.id === b.parentCategoryId)?.kind !== 'income'),
-    [bills, parents, month]
+    () => bills.filter((b) => monthOf(b.time) === month && (currentBookId === 0 || b.bookId === currentBookId)),
+    [bills, month, currentBookId]
   )
 
+  const monthSummary = useMemo(() => summarizeBills(monthBills, parents, refunds), [monthBills, parents, refunds])
   const rows = useMemo(() => {
-    const m = new Map<number, number>()
-    monthBills.forEach((b) => m.set(b.parentCategoryId, (m.get(b.parentCategoryId) ?? 0) + b.cost))
-    return [...m.entries()]
+    return [...monthSummary.expenseByCategory.entries()]
       .map(([id, v]) => ({ p: parents.find((x) => x.id === id)!, v }))
       .sort((a, b) => b.v - a.v)
-  }, [monthBills, parents])
+  }, [monthSummary, parents])
 
-  const max = rows[0]?.v ?? 1
+  const max = rows[0]?.v || 1
   const total = rows.reduce((s, r) => s + r.v, 0)
-  const spentOf = (cid: number) => cid === 0 ? total : (rows.find((r) => r.p.id === cid)?.v ?? 0)
+  const spentOf = (cid: number) => cid === 0 ? monthSummary.budget : (monthSummary.budgetByCategory.get(cid) ?? 0)
   const limitOf = (b: { amount: number; addNum?: number }) => (b.amount ?? 0) + (b.addNum ?? 0)
   const monthBudgets = budgets.filter((b) => b.month === 'all' && (b.type ?? 'month') === 'month')
   const yearBudgets = budgets.filter((b) => b.month === 'all' && b.type === 'year')
@@ -37,10 +39,10 @@ export function Stats() {
   // 年度支出（当年）
   const yearSpend = useMemo(() => {
     const y = month.slice(0, 4)
-    return bills.filter((b) => String(monthOf(b.time)).slice(0, 4) === y
-      && parents.find((p) => p.id === b.parentCategoryId)?.kind !== 'income')
-      .reduce((s, b) => s + b.cost, 0)
-  }, [bills, parents, month])
+    const yearBills = bills.filter((b) => String(monthOf(b.time)).slice(0, 4) === y
+      && (currentBookId === 0 || b.bookId === currentBookId))
+    return summarizeBills(yearBills, parents, refunds).budget
+  }, [bills, parents, month, refunds, currentBookId])
   const totalYearBudget = limitOf(yearBudgets.find((b) => b.categoryId === 0) ?? { amount: 0 })
 
   return (
@@ -128,7 +130,7 @@ export function Stats() {
             <div className="bar" style={{ width: `${(r.v / max) * 100}%`, background: r.p.color }} />
           </div>
           <span className="bar-val">{money(r.v)}</span>
-          <span className="bar-pct">{((r.v / total) * 100).toFixed(0)}%</span>
+          <span className="bar-pct">{(total ? (r.v / total) * 100 : 0).toFixed(0)}%</span>
         </div>
       ))}
 

@@ -21,7 +21,10 @@ export function movements(data: BalanceData): Map<number, number> {
   const bills = data.bills || []
   for (const bill of bills) {
     const income = (data.parentCategories || []).find(c => c.id === bill.parentCategoryId)?.kind === 'income'
-    add(bill.assetId, (income ? 1 : -1) * bill.cost)
+    // Older bills lack an account-currency snapshot; retain their original
+    // balance semantics instead of retroactively changing historical balances.
+    const amount = Number.isFinite(bill.accountAmount) ? bill.accountAmount! : bill.cost
+    add(bill.assetId, (income ? 1 : -1) * amount)
   }
   for (const transfer of data.transfers || []) {
     // A fee is either a linked bill or part of an imported transfer, never both.
@@ -35,7 +38,7 @@ export function movements(data: BalanceData): Map<number, number> {
   }
   for (const refund of data.refunds || []) {
     const bill = bills.find(b => b.billId === refund.billId)
-    if (bill) add(bill.assetId, refund.number)
+    if (bill) add(refund.assetId ?? bill.assetId, refund.number)
   }
   for (const reimbursement of data.reimbursements || []) {
     if (reimbursement.status === 'done') add(reimbursement.assetId, reimbursement.number)

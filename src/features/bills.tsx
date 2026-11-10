@@ -6,12 +6,17 @@ import { books as bookApi } from '../auth'
 import { money, dayOf, hhmm, monthOf, toLocalInput } from '../ui-format'
 import { CatIcon } from '../ui/icons'
 import { TransferEditor } from './transfer-editor'
+import { accountMoney, fromBase, hasCurrencyRate } from '../money'
+import { billNetAmount } from '../bill-amount'
+import { summarizeBills } from '../bill-summary'
 
 export function Bills({ me }: { me?: { id: number; email: string } }) {
   const bills = useLedger((s) => s.bills)
   const transfers = useLedger((s) => s.transfers)
   const parents = useLedger((s) => s.parentCategories)
   const assets = useLedger((s) => s.assets)
+  const currencies = useLedger((s) => s.currencies)
+  const defaultCurrency = useLedger((s) => s.defaultCurrency)
   const del = useLedger((s) => s.deleteBill)
   const delTransfer = useLedger((s) => s.deleteTransfer)
   const updateBill = useLedger((s) => s.updateBill)
@@ -61,8 +66,7 @@ export function Bills({ me }: { me?: { id: number; email: string } }) {
     return true
   }), [transfers, month, kw, fPid, fAid])
 
-  const income = list.filter((b) => isIncome(b.parentCategoryId)).reduce((s, b) => s + b.cost, 0)
-  const expense = list.filter((b) => !isIncome(b.parentCategoryId)).reduce((s, b) => s + b.cost, 0)
+  const { income, expense } = summarizeBills(list, parents, refunds)
 
   type Item = { kind: 'bill'; time: number; b: Bill } | { kind: 'transfer'; time: number; t: typeof transfers[number] }
   const groups = useMemo(() => {
@@ -161,7 +165,7 @@ export function Bills({ me }: { me?: { id: number; email: string } }) {
                     <div className="tags">
                       {reimbursements.filter((r) => r.billId === b.billId).map((r) => (
                         <span key={r.reimbursementId} className={'tag' + (r.status === 'done' ? ' ok' : '')}>
-                          报销 {money(r.number)} · {r.status === 'done' ? '已到账' : '待报销'}
+                          报销 {accountMoney(r.number, assets.find((asset) => asset.assetId === r.assetId)?.currency, currencies, defaultCurrency)} · {r.status === 'done' ? '已到账' : '待报销'}
                         </span>
                       ))}
                       {(b.refundNum ?? 0) > 0 && <span className="tag">已退 {money(b.refundNum!)}</span>}
@@ -172,7 +176,7 @@ export function Bills({ me }: { me?: { id: number; email: string } }) {
                     </div>
                   )}
                 </div>
-                <b className={inc ? 'in' : 'out'}>{inc ? '+' : '-'}{money(b.cost)}</b>
+                <b className={inc ? 'in' : 'out'}>{inc ? '+' : '-'}{money(inc ? b.cost : billNetAmount(b, refunds))}</b>
                 <button className="link" onClick={() => setDetail(b)}>明细</button>
                 {!readOnly && <button className="link" onClick={() => setEditing(b)}>改</button>}
                 {!readOnly && <button className="del" onClick={() => del(b.billId)}>删</button>}
@@ -182,12 +186,12 @@ export function Bills({ me }: { me?: { id: number; email: string } }) {
         </div>
       ))}
 
-      {detail && (
+      {detail && bills.some((b) => b.billId === detail.billId) && (
         <BillDetail
-          bill={detail}
+          bill={bills.find((b) => b.billId === detail.billId)!}
           me={me}
           onClose={() => setDetail(null)}
-          onEdit={() => { setEditing(detail); setDetail(null) }}
+          onEdit={() => { setEditing(bills.find((b) => b.billId === detail.billId) ?? detail); setDetail(null) }}
         />
       )}
 
@@ -217,6 +221,9 @@ function BillDetail({ bill, me, onClose, onEdit }: {
   const children = useLedger((s) => s.childCategories)
   const assets = useLedger((s) => s.assets)
   const books = useLedger((s) => s.accountBooks)
+  const refunds = useLedger((s) => s.refunds)
+  const currencies = useLedger((s) => s.currencies)
+  const defaultCurrency = useLedger((s) => s.defaultCurrency)
   const tags = useLedger((s) => s.tags)
   const updateBill = useLedger((s) => s.updateBill)
   const del = useLedger((s) => s.deleteBill)
@@ -224,6 +231,8 @@ function BillDetail({ bill, me, onClose, onEdit }: {
   const p = parents.find((x) => x.id === bill.parentCategoryId)
   const c = children.find((x) => x.id === bill.childCategoryId)
   const a = assets.find((x) => x.assetId === bill.assetId)
+  const refund = refunds.find((r) => r.billId === bill.billId)
+  const refundAsset = assets.find((x) => x.assetId === (refund?.assetId ?? bill.assetId))
   const bk = books.find((b) => String(b.bookId ?? b.accountBookId) === String(bill.bookId))
   const isIncome = p?.kind === 'income'
   const tagColor = (name: string) => tags.find((t) => t.name === name)?.color
@@ -258,12 +267,13 @@ function BillDetail({ bill, me, onClose, onEdit }: {
             <div className="ds">{dayOf(bill.time)} {hhmm(bill.time)}</div>
             {bill.remark && <div className="ds">{bill.remark}</div>}
           </div>
-          <div className="damt">{isIncome ? '+' : '-'}{money(bill.cost)}</div>
+          <div className="damt">{isIncome ? '+' : '-'}{money(isIncome ? bill.cost : billNetAmount(bill, refunds))}</div>
         </div>
 
         <Row label="账单分类">{p?.name}{c ? ` - ${c.name}` : ''}</Row>
         <Row label="账单日期">{dayOf(bill.time)} {hhmm(bill.time)}</Row>
         <Row label="收支账户">{a?.assetName ?? '无'}</Row>
+        {refund && <Row label="已退款">{refund.baseAmount != null ? money(refund.baseAmount) : accountMoney(refund.number, refund.currency ?? refundAsset?.currency, currencies, defaultCurrency)} · {refundAsset?.assetName ?? '账户'}</Row>}
         <Row label="备注">{bill.remark || '无'}</Row>
         <Row label="标签">
           {(bill.tags && bill.tags.length)
@@ -310,6 +320,8 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
   const parents = useLedger((s) => s.parentCategories)
   const children = useLedger((s) => s.childCategories)
   const assets = useLedger((s) => s.assets)
+  const currencies = useLedger((s) => s.currencies)
+  const defaultCurrency = useLedger((s) => s.defaultCurrency)
   const reimbursements = useLedger((s) => s.reimbursements)
   const refunds = useLedger((s) => s.refunds)
   const currentBookId = useLedger((s) => s.currentBookId)
@@ -328,9 +340,19 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
 
   const myReimb = reimbursements.find((r) => r.billId === bill.billId)
   const myRefund = refunds.find((r) => r.billId === bill.billId)
-  const [rAsset, setRAsset] = useState(assets[0]?.assetId ?? 0)
-  const [rAmount, setRAmount] = useState(String(bill.cost))
+  const [rAsset, setRAsset] = useState(bill.assetId || assets[0]?.assetId || 0)
+  const [rAmount, setRAmount] = useState(() => {
+    const account = assets.find((a) => a.assetId === bill.assetId) ?? assets[0]
+    return (account?.currency ?? defaultCurrency) === defaultCurrency ? String(bill.cost) : ''
+  })
   const [fAmount, setFAmount] = useState('')
+  const [fAsset, setFAsset] = useState(0)
+  const reimbursementCurrency = assets.find((a) => a.assetId === rAsset)?.currency ?? defaultCurrency
+  const refundAccount = assets.find((a) => a.assetId === (myRefund?.assetId ?? (fAsset || bill.assetId)))
+  const refundCurrency = myRefund?.currency ?? refundAccount?.currency ?? defaultCurrency
+  const refundBase = Number(fAmount)
+  const refundRateAvailable = hasCurrencyRate(refundCurrency, currencies, defaultCurrency)
+  const refundAccountAmount = refundRateAvailable && Number.isFinite(refundBase) ? fromBase(refundBase, refundCurrency, currencies, defaultCurrency) : 0
   const isExpense = parents.find((p) => p.id === bill.parentCategoryId)?.kind !== 'income'
 
   const [cost, setCost] = useState(String(bill.cost))
@@ -354,6 +376,7 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
           onChange={(e) => setCost(e.target.value.replace(/[^\d.]/g, ''))}
           inputMode="decimal"
         />
+        {myRefund?.baseAmount != null && Number(cost) < myRefund.baseAmount && <p className="hint">原账单金额不能小于已退款金额。</p>}
         <div className="label">分类</div>
         <select value={pid} onChange={(e) => { setPid(Number(e.target.value)); setCid(0) }}>
           {parents.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -381,7 +404,7 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
             {myReimb ? (
               <div className="attach-line">
                 <span>
-                  {myReimb.status === 'done' ? '✅ 已到账' : '⏳ 待报销'} {money(myReimb.number)}
+                  {myReimb.status === 'done' ? '✅ 已到账' : '⏳ 待报销'} {accountMoney(myReimb.number, assets.find((a) => a.assetId === myReimb.assetId)?.currency, currencies, defaultCurrency)}
                   {myReimb.assetId ? ' → ' + (assets.find((a) => a.assetId === myReimb.assetId)?.assetName ?? '报销账户') : ''}
                 </span>
                 {myReimb.status !== 'done' && (
@@ -391,15 +414,15 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
               </div>
             ) : (
               <div className="row2">
-                <select value={rAsset} onChange={(e) => setRAsset(Number(e.target.value))}>
+                <select value={rAsset} onChange={(e) => { setRAsset(Number(e.target.value)); setRAmount('') }}>
                   <option value={0}>报销进哪个账户</option>
                   {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
                 </select>
-                <input value={rAmount} onChange={(e) => setRAmount(e.target.value.replace(/[^\d.]/g, ''))} placeholder="报销金额" inputMode="decimal" />
+                <input value={rAmount} onChange={(e) => setRAmount(e.target.value.replace(/[^\d.]/g, ''))} placeholder={`报销金额（${reimbursementCurrency}）`} aria-label={`报销金额（${reimbursementCurrency}）`} inputMode="decimal" />
               </div>
             )}
             {!myReimb && (
-              <button className="ghost wide" onClick={() => addReimbursement({
+              <button className="ghost wide" disabled={!rAsset || !Number.isFinite(Number(rAmount)) || Number(rAmount) <= 0} onClick={() => addReimbursement({
                 billId: bill.billId, assetId: rAsset, number: Number(rAmount) || 0, detail: remark
               })}>登记报销（钱到账后再确认）</button>
             )}
@@ -407,21 +430,28 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
             <div className="label">退款</div>
             {myRefund ? (
               <div className="attach-line">
-                <span>已退 {money(myRefund.number)}（已退回 {assets.find((a) => a.assetId === bill.assetId)?.assetName ?? '账户'}）</span>
+                <span>已退 {myRefund.baseAmount != null ? money(myRefund.baseAmount) : accountMoney(myRefund.number, refundCurrency, currencies, defaultCurrency)}（到账 {accountMoney(myRefund.number, refundCurrency, currencies, defaultCurrency)} · {refundAccount?.assetName ?? '账户'}）</span>
                 <button className="del" onClick={() => deleteRefund(myRefund.refundId)}>撤销</button>
               </div>
             ) : (
-              <div className="row2">
-                <input value={fAmount} onChange={(e) => setFAmount(e.target.value.replace(/[^\d.]/g, ''))} placeholder="退款金额" inputMode="decimal" />
-                <button className="ghost" onClick={() => { addRefund({ billId: bill.billId, number: Number(fAmount) || 0 }); setFAmount('') }}>登记退款</button>
-              </div>
+              <>
+                <input value={fAmount} onChange={(e) => setFAmount(e.target.value.replace(/[^\d.]/g, ''))} placeholder={`退款金额（${defaultCurrency}）`} aria-label={`退款金额（${defaultCurrency}）`} inputMode="decimal" />
+                <select value={fAsset} onChange={(e) => setFAsset(Number(e.target.value))} aria-label="退款账户">
+                  <option value={0}>默认退回支付账户（{assets.find((a) => a.assetId === bill.assetId)?.assetName ?? '未找到'}）</option>
+                  {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}（{a.currency ?? defaultCurrency}）</option>)}
+                </select>
+                {!refundRateAvailable && <p className="hint">请先设置 {refundCurrency} 汇率。</p>}
+                {refundBase > bill.cost && <p className="hint">退款金额不能超过原账单金额。</p>}
+                {refundAccount && refundCurrency !== defaultCurrency && refundBase > 0 && refundRateAvailable && <p className="hint">按当前汇率预计到账 {accountMoney(refundAccountAmount, refundCurrency, currencies, defaultCurrency)}</p>}
+                <button className="ghost wide" disabled={!refundAccount || !Number.isFinite(refundBase) || refundBase <= 0 || refundBase > bill.cost || !refundRateAvailable || refundAccountAmount <= 0} onClick={() => { addRefund({ billId: bill.billId, assetId: fAsset || undefined, number: refundAccountAmount, baseAmount: refundBase }); setFAmount('') }}>保存退款</button>
+              </>
             )}
           </>
         )}
 
         <div className="modal-btns">
           <button className="ghost" onClick={onClose}>取消</button>
-          <button className="primary" onClick={() => onSave({
+          <button className="primary" disabled={myRefund?.baseAmount != null && Number(cost) < myRefund.baseAmount} onClick={() => onSave({
             cost: Number(cost) || bill.cost,
             parentCategoryId: pid,
             childCategoryId: cid,

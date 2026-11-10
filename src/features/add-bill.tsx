@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLedger } from '../store'
-import { currencySymbol, findCurrency, toBase } from '../money'
+import { accountMoney, currencySymbol, findCurrency, hasCurrencyRate, toBase } from '../money'
 import { money, toLocalInput } from '../ui-format'
 import { CatIcon } from '../ui/icons'
 
@@ -60,6 +60,8 @@ export function AddBill({ notify }: { notify: (m: string) => void }) {
       if (!aid || !toAid) return notify('请选择转出和转入账户')
       if (aid === toAid) return notify('转出和转入不能是同一个账户')
       const f = Number(fee) || 0
+      const fromCurrency = assets.find((a) => a.assetId === aid)?.currency
+      if (f > 0 && !hasCurrencyRate(fromCurrency, currencies, defaultCurrency)) return notify(`请先设置 ${fromCurrency} 汇率`)
       const tc = Number(toCost) || 0
       addTransfer({
         toCost: tc > 0 ? tc : undefined,
@@ -71,6 +73,9 @@ export function AddBill({ notify }: { notify: (m: string) => void }) {
     }
 
     if (!aid) return notify('请选择账户')
+    const accountCurrency = assets.find((a) => a.assetId === aid)?.currency
+    if (!hasCurrencyRate(currency, currencies, defaultCurrency)) return notify(`请先设置 ${currency} 汇率`)
+    if (!hasCurrencyRate(accountCurrency, currencies, defaultCurrency)) return notify(`请先设置 ${accountCurrency} 汇率`)
     const foreign = currency !== defaultCurrency
     addBill({
       cost: foreign ? toBase(v, currency, currencies, defaultCurrency) : v,
@@ -118,7 +123,7 @@ export function AddBill({ notify }: { notify: (m: string) => void }) {
               <div className="label">转出账户</div>
               <select value={aid} onChange={(e) => setAid(Number(e.target.value))}>
                 <option value={0}>请选择</option>
-                {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}（{money(a.assetNumber)}）</option>)}
+                {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}（{accountMoney(a.assetNumber, a.currency, currencies, defaultCurrency)}）</option>)}
               </select>
             </div>
             <div>
@@ -176,7 +181,7 @@ export function AddBill({ notify }: { notify: (m: string) => void }) {
               <div className="label">账户</div>
               <select value={aid} onChange={(e) => setAid(Number(e.target.value))}>
                 <option value={0}>请选择</option>
-                {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}（{money(a.assetNumber)}）</option>)}
+                {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}（{accountMoney(a.assetNumber, a.currency, currencies, defaultCurrency)}）</option>)}
               </select>
             </div>
             <div>

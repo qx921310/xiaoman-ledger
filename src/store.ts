@@ -6,6 +6,7 @@ import { TAXONOMY_CHILDREN, TAXONOMY_INCOME, TAXONOMY_PARENTS } from './taxonomy
 import { getCurrentUid, userStorage } from './auth'
 import { deriveAssets } from './balances'
 import { newBillIdentity } from './identity'
+import { fromBase, hasCurrencyRate, toBase } from './money'
 
 const NOW = () => Date.now()
 
@@ -61,7 +62,7 @@ interface LedgerState {
   runCycles: () => number
   addLend: (patch: { type: 1 | 2 | 3 | 4; assetId: number; counterparty: string; number: number; interest?: number; repaymentAssetId?: number; time?: number; remark?: string }) => void
   deleteLend: (lendId: number) => void
-  addRefund: (patch: { billId: string | number; number: number }) => void
+  addRefund: (patch: { billId: string | number; number: number; assetId?: number; baseAmount?: number }) => void
   deleteRefund: (refundId: number) => void
   setBudget: (budget: Budget) => void
   removeBudget: (month: string, categoryId: number) => void
@@ -175,6 +176,13 @@ export const useLedger = create<LedgerState>()(
           files: patch.files ?? [],
           currencyInfo: patch.currencyInfo,
           currencyAssetNumber: patch.currencyAssetNumber,
+          accountAmount: patch.accountAmount ?? (asset
+            ? (asset.currency && asset.currency !== s.defaultCurrency
+              ? (patch.currencyInfo === asset.currency && Number.isFinite(patch.currencyAssetNumber)
+                ? patch.currencyAssetNumber : fromBase(Number(patch.cost ?? 0), asset.currency, s.currencies, s.defaultCurrency))
+              : Number(patch.cost ?? 0))
+            : Number(patch.cost ?? 0)),
+          accountCurrency: patch.accountCurrency ?? asset?.currency ?? s.defaultCurrency,
           currencyDiscountNumber: patch.currencyDiscountNumber,
           notIntoTotal: patch.notIntoTotal,
           notIntoBudget: patch.notIntoBudget,
@@ -226,6 +234,8 @@ export const useLedger = create<LedgerState>()(
         const s = get()
         const old = s.bills.find((b) => b.billId === billId)
         if (!old) return
+        const refunded = s.refunds.filter((r) => r.billId === billId).reduce((sum, r) => sum + (r.baseAmount ?? 0), 0)
+        if (patch.cost != null && (!Number.isFinite(patch.cost) || patch.cost < refunded)) return
         const deltaOf = (b: Bill) =>
           (s.parentCategories.find((p) => p.id === b.parentCategoryId)?.kind === 'income' ? 1 : -1) * b.cost
 
@@ -234,6 +244,18 @@ export const useLedger = create<LedgerState>()(
           : a)
 
         const next: Bill = { ...old, ...patch, updateTime: NOW() }
+        const amountChanged = next.cost !== old.cost
+        const accountChanged = next.assetId !== old.assetId
+        if (old.accountAmount != null && (amountChanged || accountChanged)) {
+          const destination = s.assets.find((a) => a.assetId === next.assetId)
+          next.accountCurrency = destination?.currency ?? s.defaultCurrency
+          next.accountAmount = !accountChanged || next.accountCurrency === old.accountCurrency
+            ? (old.cost ? +(old.accountAmount * next.cost / old.cost).toFixed(2) : 0)
+            : fromBase(next.cost, next.accountCurrency, s.currencies, s.defaultCurrency)
+          if (amountChanged && old.currencyAssetNumber != null && old.cost) {
+            next.currencyAssetNumber = +(old.currencyAssetNumber * next.cost / old.cost).toFixed(2)
+          }
+        }
         const parent = s.parentCategories.find((p) => p.id === next.parentCategoryId)
         const asset = s.assets.find((a) => a.assetId === next.assetId)
         next.billShareInfo = {
@@ -272,7 +294,8 @@ export const useLedger = create<LedgerState>()(
         let billId: string | number = 0
         if (fee > 0) {
           const bill = get().addBill({
-            cost: fee,
+            cost: toBase(fee, s.assets.find(a => a.assetId === patch.fromAssetId)?.currency, s.currencies, s.defaultCurrency),
+            accountAmount: fee,
             parentCategoryId: 199,
             childCategoryId: 0,
             assetId: patch.fromAssetId,
@@ -341,6 +364,7 @@ export const useLedger = create<LedgerState>()(
           assetId: id,
           assetName: patch.assetName ?? '未命名账户',
           assetType: patch.assetType ?? 1,
+          currency: patch.currency ?? s.defaultCurrency,
           assetNumber: Number(patch.assetNumber ?? 0),
           openingBalance: Number(patch.openingBalance ?? patch.assetNumber ?? 0),
           groupName: patch.groupName ?? '',
@@ -383,6 +407,8 @@ export const useLedger = create<LedgerState>()(
 
       // 登记报销：只落记录，钱还没到；确认到账时才进报销账户
       addReimbursement: ({ billId, assetId, number, detail }) => set((s) => {
+        if (!s.bills.some((b) => b.billId === billId) || !s.assets.some((a) => a.assetId === assetId) ||
+          !Number.isFinite(number) || number <= 0 || s.reimbursements.some((r) => r.billId === billId)) return {}
         const rid = Date.now()
         const rec: Reimbursement = {
           reimbursementId: rid, billId, assetId, number: Number(number) || 0,
@@ -563,18 +589,27 @@ export const useLedger = create<LedgerState>()(
       }),
 
       // 退款：钱退回原支付账户，直接冲减这笔支出
-      addRefund: ({ billId, number }) => set((s) => {
+      addRefund: ({ billId, number, assetId, baseAmount }) => set((s) => {
         const bill = s.bills.find((b) => b.billId === billId)
-        if (!bill) return {}
+        if (!bill || s.refunds.some((r) => r.billId === billId)) return {}
+        if (s.parentCategories.find((p) => p.id === bill.parentCategoryId)?.kind === 'income') return {}
+        const asset = s.assets.find((a) => a.assetId === (assetId || bill.assetId))
+        if (!asset) return {}
         const amt = Number(number) || 0
-        if (amt <= 0) return {}
+        if (!Number.isFinite(amt) || amt <= 0) return {}
+        if (!hasCurrencyRate(asset.currency, s.currencies, s.defaultCurrency)) return {}
+        const base = baseAmount ?? toBase(amt, asset.currency, s.currencies, s.defaultCurrency)
+        if (!Number.isFinite(base) || base <= 0 || base > bill.cost) return {}
+        let refundId = Date.now()
+        while (s.refunds.some((r) => r.refundId === refundId) || s.tombstones.some((t) => t.kind === 'refund' && t.id === String(refundId))) refundId++
         const rec: Refund = {
-          refundId: Date.now(), billId, number: amt, userId: s.userId, updateTime: NOW()
+          refundId, billId, assetId: asset.assetId, currency: asset.currency ?? s.defaultCurrency,
+          number: amt, baseAmount: base, userId: s.userId, updateTime: NOW()
         }
         return {
           refunds: [rec, ...s.refunds],
-          bills: s.bills.map((b) => b.billId === billId ? { ...b, refundNum: amt, updateTime: NOW() } : b),
-          assets: s.assets.map((a) => a.assetId === bill.assetId
+          bills: s.bills.map((b) => b.billId === billId ? { ...b, refundNum: base, updateTime: NOW() } : b),
+          assets: s.assets.map((a) => a.assetId === asset.assetId
             ? { ...a, assetNumber: +(a.assetNumber + amt).toFixed(2), updateTime: NOW() } : a)
         }
       }),

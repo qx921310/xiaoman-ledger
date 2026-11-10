@@ -4,9 +4,12 @@ import { ASSET_TYPE, LEND_TYPE } from '../types'
 import type { Asset } from '../types'
 import { money, dayOf } from '../ui-format'
 import { AssetIcon } from '../ui/icons'
+import { accountMoney, toBase } from '../money'
 
 export function Assets({ notify }: { notify: (m: string) => void }) {
   const assets = useLedger((s) => s.assets)
+  const currencies = useLedger((s) => s.currencies)
+  const defaultCurrency = useLedger((s) => s.defaultCurrency)
   const total = useTotalAssets()
   const addAsset = useLedger((s) => s.addAsset)
   const updateAsset = useLedger((s) => s.updateAsset)
@@ -31,7 +34,7 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
     notify('账户已添加')
   }
 
-  const debts = assets.filter((a) => a.assetType === 2 || a.assetType === 7 || a.assetType === 8).reduce((s, a) => s + a.assetNumber, 0)
+  const debts = assets.filter((a) => a.assetType === 2 || a.assetType === 7 || a.assetType === 8).reduce((s, a) => s + toBase(a.assetNumber, a.currency, currencies, defaultCurrency), 0)
 
   return (
     <section className="card">
@@ -53,7 +56,7 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
             </div>
             <small>{ASSET_TYPE[a.assetType]}{a.groupName ? ' · ' + a.groupName : ''}</small>
           </div>
-          <b className={a.assetNumber < 0 ? 'out' : ''}>{money(a.assetNumber)}</b>
+          <b className={a.assetNumber < 0 ? 'out' : ''}>{accountMoney(a.assetNumber, a.currency, currencies, defaultCurrency)}</b>
           <button className="link" onClick={() => setEditingAsset(a)}>改</button>
         </div>
       ))}
@@ -164,6 +167,12 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
 function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => void; onSave: (a: Asset) => void }) {
   const currencies = useLedger((s) => s.currencies)
   const defaultCurrency = useLedger((s) => s.defaultCurrency)
+  const hasActivity = useLedger((s) =>
+    s.bills.some((b) => b.assetId === asset.assetId) ||
+    s.transfers.some((t) => t.fromAssetId === asset.assetId || t.toAssetId === asset.assetId) ||
+    s.lends.some((l) => l.assetId === asset.assetId || l.repaymentAssetId === asset.assetId) ||
+    s.refunds.some((r) => r.assetId === asset.assetId) ||
+    s.reimbursements.some((r) => r.assetId === asset.assetId))
   const [currency, setCurrency] = useState(asset.currency ?? defaultCurrency)
   const [quota, setQuota] = useState(asset.totalQuota ? String(asset.totalQuota) : '')
   const [cardCode, setCardCode] = useState(asset.cardCode ?? '')
@@ -179,10 +188,11 @@ function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => 
         <div className="label">名称</div>
         <input value={name} onChange={(e) => setName(e.target.value)} />
         <div className="label">币种</div>
-    <select value={currency} onChange={(e) => setCurrency(e.target.value)}>
-      {currencies.map((c) => <option key={c.code} value={c.code}>{c.code} · {c.name}</option>)}
-    </select>
-    <div className="label">类型</div>
+        <select value={currency} disabled={hasActivity} onChange={(e) => setCurrency(e.target.value)}>
+          {currencies.map((c) => <option key={c.code} value={c.code}>{c.code} · {c.name}</option>)}
+        </select>
+        {hasActivity && <p className="hint">已有流水的账户不能直接更改币种，避免改变历史金额的含义。</p>}
+        <div className="label">类型</div>
         <select value={type} onChange={(e) => setType(Number(e.target.value))}>
           {Object.entries(ASSET_TYPE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
@@ -198,7 +208,7 @@ function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => 
               onChange={(e) => setCardCode(e.target.value.replace(/\D/g, ''))} />
           </div>
         </div>
-        <div className="label">设为实际余额（当前 {money(asset.assetNumber)}，信用卡填负数）</div>
+        <div className="label">设为实际余额（当前 {accountMoney(asset.assetNumber, asset.currency, currencies, defaultCurrency)}，信用卡填负数）</div>
         <input
           value={num}
           autoFocus
@@ -212,6 +222,7 @@ function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => 
             ...asset,
             assetName: name.trim() || asset.assetName,
             assetType: type,
+            currency,
             assetNumber: num.trim() === '' ? asset.assetNumber : (Number(num) || 0)
           })}>保存</button>
         </div>

@@ -3,6 +3,8 @@ import { deriveAssets } from '../src/balances'
 import { buildImportPlan, parseLedgerFile } from '../src/importer'
 import { useLedger } from '../src/store'
 import { collectRecords } from '../src/sync'
+import { billNetAmount } from '../src/bill-amount'
+import { summarizeBills } from '../src/bill-summary'
 
 const state = () => useLedger.getState()
 const balance = (id: number) => state().assets.find(a => a.assetId === id)!.assetNumber
@@ -85,4 +87,133 @@ assert.equal(collectRecords().find(r => r.kind === 'bill' && r.id === first.sync
 state().applyRemote([{ kind: 'bill', id: first.syncId, payload: first, updatedAt: first.updateTime }])
 assert.equal(state().bills.some(b => b.billId === first.billId), false)
 assert.equal(state().bills.some(b => b.billId === second.billId), true)
+
+// The account movement is frozen in the account's own currency.
+state().reset()
+state().addAsset({ assetId: 21, assetName: 'USD test', assetNumber: 1000, currency: 'USD' })
+const foreign = state().addBill({ assetId: 21, parentCategoryId: 7, cost: 720, currencyInfo: 'USD', currencyAssetNumber: 100 })
+assert.equal(foreign.accountAmount, 100)
+assert.equal(foreign.accountCurrency, 'USD')
+assert.equal(collectRecords().find(r => r.kind === 'bill' && r.id === foreign.syncId)?.payload.accountAmount, 100)
+assert.equal(balance(21), 900)
+state().setCurrencyRate('USD', 8)
+assert.equal(balance(21), 900)
+state().updateBill(foreign.billId, { cost: 360 })
+assert.equal(balance(21), 950)
+assert.equal(state().bills.find(b => b.billId === foreign.billId)!.currencyAssetNumber, 50)
+state().addAsset({ assetId: 22, assetName: 'CNY test', assetNumber: 0, currency: 'CNY' })
+const fxTransfer = state().addTransfer({ fromAssetId: 21, toAssetId: 22, cost: 20, toCost: 160, serviceCharge: 2 })
+assert.equal(balance(21), 928)
+assert.equal(balance(22), 160)
+assert.equal(state().bills.find(b => b.billId === fxTransfer.billId)!.cost, 16)
+state().deleteTransfer(fxTransfer.transferId)
+assert.equal(balance(21), 950)
+assert.equal(balance(22), 0)
+
+// Existing bills without the new snapshot keep the legacy balance calculation.
+const legacyForeign = { ...foreign, accountAmount: undefined, accountCurrency: undefined }
+const legacyAssets = [{ ...state().assets.find(a => a.assetId === 21)!, openingBalance: undefined, assetNumber: 280 }]
+const legacySnapshot = { ...state(), assets: legacyAssets, bills: [legacyForeign], transfers: [], refunds: [], lends: [], reimbursements: [] }
+assert.equal(deriveAssets(legacySnapshot)[0].assetNumber, 280)
+
+// A refund stays in the actual receiving account when the bill is moved later.
+state().reset()
+state().addAsset({ assetId: 31, assetName: '原账户', assetNumber: 100, currency: 'USD' })
+state().addAsset({ assetId: 32, assetName: '新账户', assetNumber: 100, currency: 'USD' })
+const refundedBill = state().addBill({ assetId: 31, parentCategoryId: 7, cost: 72, currencyInfo: 'USD', currencyAssetNumber: 10 })
+state().addRefund({ billId: refundedBill.billId, number: 4 })
+const refund = state().refunds[0]
+assert.equal(refund.assetId, 31)
+assert.equal(refund.currency, 'USD')
+assert.equal(balance(31), 94)
+state().addRefund({ billId: refundedBill.billId, number: 4 })
+assert.equal(state().refunds.length, 1)
+state().updateBill(refundedBill.billId, { assetId: 32 })
+assert.equal(balance(31), 104)
+assert.equal(balance(32), 90)
+assert.equal(collectRecords().find(r => r.kind === 'refund' && r.id === String(refund.refundId))?.payload.assetId, 31)
+state().deleteRefund(refund.refundId)
+assert.equal(balance(31), 100)
+assert.equal(balance(32), 90)
+
+// Legacy refunds retain their existing bill-account semantics.
+state().addRefund({ billId: refundedBill.billId, number: 2 })
+const legacyRefund = { ...state().refunds[0], assetId: undefined, currency: undefined }
+const oldRefundSnapshot = { ...state(), refunds: [legacyRefund] }
+assert.equal(deriveAssets(oldRefundSnapshot).find(a => a.assetId === 32)!.assetNumber, 92)
+
+// Reimbursements require a real account and a positive, finite amount.
+state().addReimbursement({ billId: refundedBill.billId, assetId: 0, number: 10 })
+state().addReimbursement({ billId: refundedBill.billId, assetId: 31, number: 0 })
+assert.equal(state().reimbursements.length, 0)
+state().addReimbursement({ billId: refundedBill.billId, assetId: 31, number: 5 })
+state().addReimbursement({ billId: refundedBill.billId, assetId: 31, number: 5 })
+assert.equal(state().reimbursements.length, 1)
+assert.equal(balance(31), 100)
+state().settleReimbursement(state().reimbursements[0].reimbursementId)
+assert.equal(balance(31), 105)
+state().deleteReimbursement(state().reimbursements[0].reimbursementId)
+assert.equal(balance(31), 100)
+
+// A refund reduces the existing bill rather than creating another bill.
+state().reset()
+state().addAsset({ assetId: 41, assetName: '支付账户', assetNumber: 10, currency: 'CNY' })
+state().addAsset({ assetId: 42, assetName: '退款账户', assetNumber: 20, currency: 'CNY' })
+const cola = state().addBill({ assetId: 41, parentCategoryId: 7, cost: 3 })
+state().addRefund({ billId: cola.billId, number: 3 })
+const originalRefundId = state().refunds[0].refundId
+assert.equal(state().bills.length, 1)
+assert.equal(state().bills[0].cost, 3)
+assert.equal(state().bills[0].refundNum, 3)
+assert.equal(billNetAmount(state().bills[0], state().refunds), 0)
+
+assert.equal(balance(41), 10)
+assert.equal(balance(42), 20)
+state().updateBill(cola.billId, { cost: 2 })
+assert.equal(state().bills[0].cost, 3)
+state().deleteRefund(state().refunds[0].refundId)
+assert.equal(billNetAmount(state().bills[0], state().refunds), 3)
+assert.equal(balance(41), 7)
+state().addRefund({ billId: cola.billId, number: 2, assetId: 42 })
+assert.notEqual(state().refunds[0].refundId, originalRefundId)
+assert.equal(balance(41), 7)
+assert.equal(balance(42), 22)
+assert.equal(billNetAmount(state().bills[0], state().refunds), 1)
+assert.equal(billNetAmount(state().bills[0], [{ ...state().refunds[0], baseAmount: undefined }]), 3)
+
+// A foreign-currency refund snapshots both the account amount and base amount.
+state().reset()
+state().addAsset({ assetId: 51, assetName: '人民币', assetNumber: 100, currency: 'CNY' })
+state().addAsset({ assetId: 52, assetName: '美元', assetNumber: 0, currency: 'USD' })
+state().setCurrencyRate('USD', 7.2)
+const fxBill = state().addBill({ assetId: 51, parentCategoryId: 7, cost: 72 })
+state().addRefund({ billId: fxBill.billId, assetId: 52, number: 10, baseAmount: 72 })
+assert.equal(balance(51), 28)
+assert.equal(balance(52), 10)
+assert.equal(billNetAmount(state().bills[0], state().refunds), 0)
+state().setCurrencyRate('USD', 8)
+assert.equal(balance(52), 10)
+assert.equal(billNetAmount(state().bills[0], state().refunds), 0)
+// Income/expense and budget exclusions are independent, and neither skips account movements.
+state().reset()
+state().addAsset({ assetId: 61, assetName: '汇总测试', assetNumber: 1000 })
+const normalExpense = state().addBill({ assetId: 61, parentCategoryId: 7, cost: 10 })
+const noTotal = state().addBill({ assetId: 61, parentCategoryId: 7, cost: 20, notIntoTotal: true })
+state().addBill({ assetId: 61, parentCategoryId: 7, cost: 30, notIntoBudget: true })
+state().addBill({ assetId: 61, parentCategoryId: 7, cost: 40, notIntoTotal: true, notIntoBudget: true })
+state().addBill({ assetId: 61, parentCategoryId: 903, cost: 60, notIntoTotal: true })
+state().addBill({ assetId: 61, parentCategoryId: 903, cost: 70 })
+state().addRefund({ billId: normalExpense.billId, number: 5 })
+let summary = summarizeBills(state().bills, state().parentCategories, state().refunds)
+assert.equal(summary.income, 70)
+assert.equal(summary.expense, 35)
+assert.equal(summary.budget, 25)
+assert.equal(summary.expenseByCategory.get(7), 35)
+assert.equal(summary.budgetByCategory.get(7), 25)
+assert.equal(balance(61), 1035)
+state().updateBill(noTotal.billId, { notIntoTotal: false, notIntoBudget: true })
+summary = summarizeBills(state().bills, state().parentCategories, state().refunds)
+assert.equal(summary.expense, 55)
+assert.equal(summary.budget, 5)
+assert.equal(balance(61), 1035)
 console.log('balance and synthetic CSV tests passed')

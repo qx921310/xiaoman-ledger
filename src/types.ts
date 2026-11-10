@@ -43,6 +43,10 @@ export interface Bill {
   currencyInfo?: string
   /** 外币原金额（cost 存折合本币后的金额） */
   currencyAssetNumber?: number
+  /** Actual amount posted to the selected account, in that account's currency. */
+  accountAmount?: number
+  /** Currency of accountAmount at the time of posting. */
+  accountCurrency?: string
   /** 外币优惠金额 */
   currencyDiscountNumber?: number
   /** 地点名（POI） */
@@ -162,6 +166,11 @@ export const LEND_TYPE: Record<number, string> = {
 export interface Refund {
   refundId: number
   billId: string | number
+  /** Account and currency receiving the refund at registration time. */
+  assetId?: number
+  currency?: string
+  /** Refunded amount in the ledger's base currency, captured when recorded. */
+  baseAmount?: number
   number: number
   userId: number
   updateTime: number

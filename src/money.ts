@@ -23,3 +23,13 @@ export const currencySymbol = (list: Currency[], code?: string, defaultCode = 'C
   const c = findCurrency(list, code ?? defaultCode)
   return c?.symbol ?? '¥'
 }
+
+export function accountMoney(amount: number, code: string | undefined, list: Currency[], defaultCode = 'CNY') {
+  return `${currencySymbol(list, code, defaultCode)}${amount.toFixed(2)} ${code ?? defaultCode}`
+}
+
+export function hasCurrencyRate(code: string | undefined, list: Currency[], defaultCode = 'CNY') {
+  if (!code || code === defaultCode) return true
+  const rate = list.find((currency) => currency.code === code)?.rate
+  return Number.isFinite(rate) && rate! > 0
+}
