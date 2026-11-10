@@ -68,6 +68,12 @@ npm run api     # 后端 http://127.0.0.1:8787
 - 反向代理：Caddy 自动 HTTPS，`ledger.yele.win → 127.0.0.1:8090`
 - 数据落在服务器 `server/data/ledger.db`（SQLite），不进仓库
 
+## 服务端只读策略
+
+公开部署时，**写接口默认关闭**：所有 `POST /api/*` 都要求 `x-write-token`，且必须与服务端环境变量 `LEDGER_WRITE_TOKEN` 一致；未配置该变量时服务端保持完全只读，`/api/health` 会返回 `writable: false`。
+
+这样即使域名公开，也不存在匿名的写入入口——记账数据始终留在浏览器本地。
+
 ## 隐私
 
 - 记账数据只存在**浏览器 localStorage**；只有手动点"测试同步"才会推到服务器。

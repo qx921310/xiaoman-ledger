@@ -16,6 +16,9 @@ db.exec(`
 `)
 
 const PORT = Number(process.env.PORT || 8787)
+// 写接口默认关闭：只有设置了 LEDGER_WRITE_TOKEN 且请求带 x-write-token 才允许写入。
+// 记账数据本来只存浏览器本地，服务端只是可选同步点，公开部署不该留匿名写入口。
+const WRITE_TOKEN = process.env.LEDGER_WRITE_TOKEN || ''
 const DIST = join(here, '..', 'dist')
 
 const MIME = {
@@ -83,7 +86,14 @@ const server = createServer(async (req, res) => {
   const userId = Number(req.headers['user-id'] || 1)
 
   try {
-    if (path === '/api/health') return ok(res, { ok: true, service: 'ledger-api', time: Date.now() })
+    if (path === '/api/health') return ok(res, { ok: true, service: 'ledger-api', time: Date.now(), writable: Boolean(WRITE_TOKEN) })
+
+    // 任何写请求都要过令牌；未配置令牌时服务端保持只读
+    if (req.method === 'POST' && path.startsWith('/api/')) {
+      if (!WRITE_TOKEN || req.headers['x-write-token'] !== WRITE_TOKEN) {
+        return send(res, 403, { code: 1, msg: '服务端只读：写接口需要 x-write-token，且必须与 LEDGER_WRITE_TOKEN 一致' })
+      }
+    }
 
     if (path === '/api/sync/push' && req.method === 'POST') {
       const body = await readBody(req)
