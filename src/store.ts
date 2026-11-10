@@ -260,15 +260,35 @@ export const useLedger = create<LedgerState>()(
         }
       },
 
-      // 合并式导入：新增分类/账户先落地，再并入账单，重复行由计划阶段剔除
-      applyImport: (plan) => set((s) => ({
-        parentCategories: [...s.parentCategories, ...plan.newParents],
-        childCategories: [...s.childCategories, ...plan.newChildren],
-        assets: [...s.assets, ...plan.newAssets],
-        bills: [...plan.bills, ...s.bills],
-        transfers: [...plan.transfers, ...s.transfers],
-        seeded: true
-      })),
+      // 合并式导入：新增分类/账户先落地，账单像正常记账一样冲账户余额
+      applyImport: (plan) => set((s) => {
+        const parents = [...s.parentCategories, ...plan.newParents]
+        let assets = [...s.assets, ...plan.newAssets]
+
+        const delta = (assetId: number, value: number) => {
+          assets = assets.map((a) => a.assetId === assetId
+            ? { ...a, assetNumber: +(a.assetNumber + value).toFixed(2), updateTime: NOW() }
+            : a)
+        }
+
+        for (const b of plan.bills) {
+          const kind = parents.find((p) => p.id === b.parentCategoryId)?.kind
+          delta(b.assetId, (kind === 'income' ? 1 : -1) * b.cost)
+        }
+        for (const t of plan.transfers) {
+          delta(t.fromAssetId, -(t.cost + t.serviceCharge))
+          delta(t.toAssetId, t.cost)
+        }
+
+        return {
+          parentCategories: parents,
+          childCategories: [...s.childCategories, ...plan.newChildren],
+          assets,
+          bills: [...plan.bills, ...s.bills],
+          transfers: [...plan.transfers, ...s.transfers],
+          seeded: true
+        }
+      }),
 
       importAll: (data) => set((s) => ({
         accountBooks: data.accountBooks ?? s.accountBooks,

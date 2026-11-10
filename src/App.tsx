@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLedger, useTotalAssets } from './store'
 import { ASSET_TYPE, BILL_TYPE } from './types'
-import type { Bill } from './types'
+import type { Asset, Bill } from './types'
 import { api } from './api'
 import type { ImportPlan } from './importer'
 
@@ -435,6 +435,8 @@ function Assets({ notify }: { notify: (m: string) => void }) {
   const assets = useLedger((s) => s.assets)
   const total = useTotalAssets()
   const addAsset = useLedger((s) => s.addAsset)
+  const updateAsset = useLedger((s) => s.updateAsset)
+  const [editingAsset, setEditingAsset] = useState<Asset | null>(null)
 
   const [name, setName] = useState('')
   const [type, setType] = useState(1)
@@ -457,6 +459,8 @@ function Assets({ notify }: { notify: (m: string) => void }) {
         <span>负资产 {money(debts)}</span>
       </div>
 
+      <p className="hint">余额会随记账自动变动；点右侧「改」可填入实际余额（迁移后建议先对一次账）。</p>
+
       {assets.map((a) => (
         <div key={a.assetId} className="row">
           <div className="grow">
@@ -464,8 +468,17 @@ function Assets({ notify }: { notify: (m: string) => void }) {
             <small>{ASSET_TYPE[a.assetType]}{a.groupName ? ' · ' + a.groupName : ''}</small>
           </div>
           <b className={a.assetNumber < 0 ? 'out' : ''}>{money(a.assetNumber)}</b>
+          <button className="link" onClick={() => setEditingAsset(a)}>改</button>
         </div>
       ))}
+
+      {editingAsset && (
+        <AssetEditor
+          asset={editingAsset}
+          onClose={() => setEditingAsset(null)}
+          onSave={(next) => { updateAsset(next); setEditingAsset(null); notify('账户已更新') }}
+        />
+      )}
 
       <div className="label">新增账户</div>
       <div className="row2">
@@ -479,6 +492,43 @@ function Assets({ notify }: { notify: (m: string) => void }) {
         <button onClick={create}>添加</button>
       </div>
     </section>
+  )
+}
+
+function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => void; onSave: (a: Asset) => void }) {
+  const [name, setName] = useState(asset.assetName)
+  const [type, setType] = useState(asset.assetType)
+  const [num, setNum] = useState(String(asset.assetNumber))
+
+  return (
+    <div className="modal-mask" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h3>编辑账户</h3>
+        <div className="label">名称</div>
+        <input value={name} onChange={(e) => setName(e.target.value)} />
+        <div className="label">类型</div>
+        <select value={type} onChange={(e) => setType(Number(e.target.value))}>
+          {Object.entries(ASSET_TYPE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+        <div className="label">当前余额（信用卡填负数）</div>
+        <input
+          value={num}
+          autoFocus
+          onClick={(e) => e.currentTarget.select()}
+          onChange={(e) => setNum(e.target.value.replace(/[^\d.-]/g, ''))}
+          inputMode="decimal"
+        />
+        <div className="modal-btns">
+          <button className="ghost" onClick={onClose}>取消</button>
+          <button className="primary" onClick={() => onSave({
+            ...asset,
+            assetName: name.trim() || asset.assetName,
+            assetType: type,
+            assetNumber: Number(num) || 0
+          })}>保存</button>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -560,12 +610,31 @@ function Settings({ notify }: { notify: (m: string) => void }) {
     }
   }
 
+  const loadDemo = async () => {
+    setErr('')
+    try {
+      const res = await fetch('/demo-yimu.xlsx')
+      if (!res.ok) throw new Error('示例文件不可用')
+      const buf = await res.arrayBuffer()
+      const { parseLedgerFile, buildImportPlan } = await import('./importer')
+      const table = parseLedgerFile(buf, 'demo-yimu.xlsx')
+      const p = buildImportPlan({
+        table, existingBills: bills, existingAssets: assets,
+        parentCategories: parents, childCategories: children, userId: 1, bookId: 1
+      })
+      setFileName('内置示例 demo-yimu.xlsx')
+      setPlan(p)
+    } catch (e: any) {
+      setErr('载入示例失败：' + (e?.message || e))
+    }
+  }
+
   const confirmImport = () => {
     if (!plan) return
     const n = plan.bills.length + plan.transfers.length
     applyImport(plan)
     setPlan(null)
-    notify(`已导入 ${n} 条` + (plan.duplicates ? `，跳过重复 ${plan.duplicates} 条` : ''))
+    notify(`已导入 ${n} 条` + (plan.duplicates ? `，跳过重复 ${plan.duplicates} 条` : '') + '；账户余额已按流水推算，可在资产页调整')
   }
 
   const doExportJson = () => {
@@ -617,6 +686,8 @@ function Settings({ notify }: { notify: (m: string) => void }) {
         选择文件（.xlsx / .xls / .csv）
         <input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => e.target.files?.[0] && pickFile(e.target.files[0])} />
       </label>
+
+      <button className="ghost wide" onClick={loadDemo}>没有数据？载入内置示例（471 条，走同一套导入流程）</button>
 
       {err && <p className="warn">{err}</p>}
 

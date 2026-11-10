@@ -193,3 +193,4 @@ button[disabled] { opacity: .5; cursor: not-allowed; }
   .filters { grid-template-columns: 1fr 1fr; }
   .filters .kw { grid-column: 1 / -1; }
 }
+.ghost.wide { display: block; width: 100%; margin-top: 8px; }
