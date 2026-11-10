@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { AccountBook, Asset, Bill, Category, Refund, Reimbursement, Transfer } from './types'
+import type { AccountBook, Asset, Bill, Category, Lend, Refund, Reimbursement, Transfer } from './types'
 import type { ImportPlan } from './importer'
 import { TAXONOMY_CHILDREN, TAXONOMY_INCOME, TAXONOMY_PARENTS } from './taxonomy'
 
@@ -27,6 +27,7 @@ interface LedgerState {
   budgets: Budget[]
   reimbursements: Reimbursement[]
   refunds: Refund[]
+  lends: Lend[]
   /** 上次使用的分类/账户，用于快速记账 */
   lastParentId: number
   lastChildId: number
@@ -38,6 +39,8 @@ interface LedgerState {
   addReimbursement: (patch: { billId: number; assetId: number; number: number; detail?: string }) => void
   settleReimbursement: (reimbursementId: number) => void
   deleteReimbursement: (reimbursementId: number) => void
+  addLend: (patch: { type: 1 | 2 | 3 | 4; assetId: number; counterparty: string; number: number; time?: number; remark?: string }) => void
+  deleteLend: (lendId: number) => void
   addRefund: (patch: { billId: number; number: number }) => void
   deleteRefund: (refundId: number) => void
   setBudget: (budget: Budget) => void
@@ -71,6 +74,7 @@ export const useLedger = create<LedgerState>()(
       budgets: [],
       reimbursements: [],
       refunds: [],
+      lends: [],
       lastParentId: 7,
       lastChildId: 0,
       lastAssetId: 0,
@@ -287,6 +291,34 @@ export const useLedger = create<LedgerState>()(
         }
       }),
 
+      // 借出 -、借入 +、收回 +、还款 -；删除则反向冲正
+      addLend: ({ type, assetId, counterparty, number, time, remark }) => set((s) => {
+        const amt = Number(number) || 0
+        if (amt <= 0 || !assetId) return {}
+        const sign = type === 1 || type === 4 ? -1 : 1
+        const rec: Lend = {
+          lendId: Date.now(), type, assetId, counterparty: counterparty ?? '',
+          number: amt, time: time ?? NOW(), remark: remark ?? '',
+          userId: s.userId, updateTime: NOW()
+        }
+        return {
+          lends: [rec, ...s.lends],
+          assets: s.assets.map((a) => a.assetId === assetId
+            ? { ...a, assetNumber: +(a.assetNumber + sign * amt).toFixed(2), updateTime: NOW() } : a)
+        }
+      }),
+
+      deleteLend: (lendId) => set((s) => {
+        const rec = s.lends.find((x) => x.lendId === lendId)
+        if (!rec) return {}
+        const sign = rec.type === 1 || rec.type === 4 ? 1 : -1
+        return {
+          lends: s.lends.filter((x) => x.lendId !== lendId),
+          assets: s.assets.map((a) => a.assetId === rec.assetId
+            ? { ...a, assetNumber: +(a.assetNumber + sign * rec.number).toFixed(2), updateTime: NOW() } : a)
+        }
+      }),
+
       // 退款：钱退回原支付账户，直接冲减这笔支出
       addRefund: ({ billId, number }) => set((s) => {
         const bill = s.bills.find((b) => b.billId === billId)
@@ -354,7 +386,7 @@ export const useLedger = create<LedgerState>()(
 
       reset: () => set({
         assets: [], bills: [], transfers: [], budgets: [],
-        reimbursements: [], refunds: [], seeded: false,
+        reimbursements: [], refunds: [], lends: [], seeded: false,
         parentCategories: [...TAXONOMY_PARENTS, ...TAXONOMY_INCOME],
         childCategories: TAXONOMY_CHILDREN
       }),
@@ -371,6 +403,7 @@ export const useLedger = create<LedgerState>()(
           budgets: s.budgets,
           reimbursements: s.reimbursements,
           refunds: s.refunds,
+          lends: s.lends,
           parentCategories: s.parentCategories,
           childCategories: s.childCategories
         }
@@ -431,6 +464,7 @@ export const useLedger = create<LedgerState>()(
         budgets: data.budgets ?? [],
         reimbursements: data.reimbursements ?? [],
         refunds: data.refunds ?? [],
+        lends: data.lends ?? [],
         parentCategories: data.parentCategories ?? s.parentCategories,
         childCategories: data.childCategories ?? s.childCategories,
         seeded: true

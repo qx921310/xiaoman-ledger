@@ -2980,6 +2980,7 @@ var useLedger = create()(
       budgets: [],
       reimbursements: [],
       refunds: [],
+      lends: [],
       lastParentId: 7,
       lastChildId: 0,
       lastAssetId: 0,
@@ -3166,6 +3167,36 @@ var useLedger = create()(
           bills: s.bills.map((b) => b.billId === rec.billId ? { ...b, isReimbursement: 0, reimbursementNum: 0, updateTime: NOW() } : b)
         };
       }),
+      // 借出 -、借入 +、收回 +、还款 -；删除则反向冲正
+      addLend: ({ type, assetId, counterparty, number, time, remark }) => set((s) => {
+        const amt = Number(number) || 0;
+        if (amt <= 0 || !assetId) return {};
+        const sign = type === 1 || type === 4 ? -1 : 1;
+        const rec = {
+          lendId: Date.now(),
+          type,
+          assetId,
+          counterparty: counterparty ?? "",
+          number: amt,
+          time: time ?? NOW(),
+          remark: remark ?? "",
+          userId: s.userId,
+          updateTime: NOW()
+        };
+        return {
+          lends: [rec, ...s.lends],
+          assets: s.assets.map((a) => a.assetId === assetId ? { ...a, assetNumber: +(a.assetNumber + sign * amt).toFixed(2), updateTime: NOW() } : a)
+        };
+      }),
+      deleteLend: (lendId) => set((s) => {
+        const rec = s.lends.find((x) => x.lendId === lendId);
+        if (!rec) return {};
+        const sign = rec.type === 1 || rec.type === 4 ? 1 : -1;
+        return {
+          lends: s.lends.filter((x) => x.lendId !== lendId),
+          assets: s.assets.map((a) => a.assetId === rec.assetId ? { ...a, assetNumber: +(a.assetNumber + sign * rec.number).toFixed(2), updateTime: NOW() } : a)
+        };
+      }),
       // 退款：钱退回原支付账户，直接冲减这笔支出
       addRefund: ({ billId, number }) => set((s) => {
         const bill = s.bills.find((b) => b.billId === billId);
@@ -3237,6 +3268,7 @@ var useLedger = create()(
         budgets: [],
         reimbursements: [],
         refunds: [],
+        lends: [],
         seeded: false,
         parentCategories: [...TAXONOMY_PARENTS, ...TAXONOMY_INCOME],
         childCategories: TAXONOMY_CHILDREN
@@ -3253,6 +3285,7 @@ var useLedger = create()(
           budgets: s.budgets,
           reimbursements: s.reimbursements,
           refunds: s.refunds,
+          lends: s.lends,
           parentCategories: s.parentCategories,
           childCategories: s.childCategories
         };
@@ -3305,6 +3338,7 @@ var useLedger = create()(
         budgets: data.budgets ?? [],
         reimbursements: data.reimbursements ?? [],
         refunds: data.refunds ?? [],
+        lends: data.lends ?? [],
         parentCategories: data.parentCategories ?? s.parentCategories,
         childCategories: data.childCategories ?? s.childCategories,
         seeded: true

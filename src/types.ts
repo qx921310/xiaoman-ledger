@@ -54,6 +54,26 @@ export interface Reimbursement {
   updateTime: number
 }
 
+/** 借入借出：独立资金动作，有自己的流水 */
+export interface Lend {
+  lendId: number
+  /** 1 借出 / 2 借出收回 / 3 借入 / 4 借入还款 */
+  type: 1 | 2 | 3 | 4
+  /** 资金所在账户 */
+  assetId: number
+  /** 对方（人名/机构） */
+  counterparty: string
+  number: number
+  time: number
+  remark: string
+  userId: number
+  updateTime: number
+}
+
+export const LEND_TYPE: Record<number, string> = {
+  1: '借出', 2: '收回借款', 3: '借入', 4: '归还借款'
+}
+
 /** 退款：同样挂在账单上 */
 export interface Refund {
   refundId: number

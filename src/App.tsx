@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLedger, useTotalAssets } from './store'
-import { ASSET_TYPE, BILL_TYPE } from './types'
+import { ASSET_TYPE, BILL_TYPE, LEND_TYPE } from './types'
 import type { Asset, Bill } from './types'
 import { api } from './api'
 import type { ImportPlan } from './importer'
@@ -525,7 +525,15 @@ function Assets({ notify }: { notify: (m: string) => void }) {
   const total = useTotalAssets()
   const addAsset = useLedger((s) => s.addAsset)
   const updateAsset = useLedger((s) => s.updateAsset)
+  const lends = useLedger((s) => s.lends)
+  const addLend = useLedger((s) => s.addLend)
+  const deleteLend = useLedger((s) => s.deleteLend)
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null)
+  const [lendForm, setLendForm] = useState<{ type: 1 | 2 | 3 | 4; assetId: number; counterparty: string; number: string; remark: string } | null>(null)
+  const receivable = lends.filter((l) => l.type === 1).reduce((s, l) => s + l.number, 0)
+    - lends.filter((l) => l.type === 2).reduce((s, l) => s + l.number, 0)
+  const payable = lends.filter((l) => l.type === 3).reduce((s, l) => s + l.number, 0)
+    - lends.filter((l) => l.type === 4).reduce((s, l) => s + l.number, 0)
 
   const [name, setName] = useState('')
   const [type, setType] = useState(1)
@@ -567,6 +575,63 @@ function Assets({ notify }: { notify: (m: string) => void }) {
           onClose={() => setEditingAsset(null)}
           onSave={(next) => { updateAsset(next); setEditingAsset(null); notify('账户已更新') }}
         />
+      )}
+
+      <h3>借入借出</h3>
+      {(receivable !== 0 || payable !== 0) && (
+        <p className="hint">待收回 {money(receivable)} · 待归还 {money(payable)}</p>
+      )}
+      {lends.length === 0 && <p className="hint">还没有借贷记录。</p>}
+      {lends.slice(0, 8).map((l) => (
+        <div key={l.lendId} className="row">
+          <div className="grow">
+            <div>{LEND_TYPE[l.type]} · {l.counterparty || '未填对方'}</div>
+            <small>
+              {assets.find((a) => a.assetId === l.assetId)?.assetName ?? '账户'} · {dayOf(l.time)}
+              {l.remark ? ' · ' + l.remark : ''}
+            </small>
+          </div>
+          <b className={l.type === 2 || l.type === 4 ? 'neutral' : ''}>{money(l.number)}</b>
+          <button className="del" onClick={() => deleteLend(l.lendId)}>删</button>
+        </div>
+      ))}
+      <button className="ghost wide" onClick={() => setLendForm({
+        type: 1, assetId: assets[0]?.assetId ?? 0, counterparty: '', number: '', remark: ''
+      })}>记一笔借贷</button>
+
+      {lendForm && (
+        <div className="modal-mask" onClick={() => setLendForm(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>借入借出</h3>
+            <div className="label">类型</div>
+            <select value={lendForm.type} onChange={(e) => setLendForm({ ...lendForm, type: Number(e.target.value) as any })}>
+              {Object.entries(LEND_TYPE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+            <div className="label">对方</div>
+            <input value={lendForm.counterparty} onChange={(e) => setLendForm({ ...lendForm, counterparty: e.target.value })} placeholder="借给谁 / 向谁借" />
+            <div className="label">金额</div>
+            <input value={lendForm.number} autoFocus inputMode="decimal"
+              onChange={(e) => setLendForm({ ...lendForm, number: e.target.value.replace(/[^\d.]/g, '') })} />
+            <div className="label">资金账户</div>
+            <select value={lendForm.assetId} onChange={(e) => setLendForm({ ...lendForm, assetId: Number(e.target.value) })}>
+              {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
+            </select>
+            <div className="label">备注</div>
+            <input value={lendForm.remark} onChange={(e) => setLendForm({ ...lendForm, remark: e.target.value })} />
+            <p className="hint">借出减少账户余额，收回与借入增加，归还减少；不计入收支。</p>
+            <div className="modal-btns">
+              <button className="ghost" onClick={() => setLendForm(null)}>取消</button>
+              <button className="primary" onClick={() => {
+                addLend({
+                  type: lendForm.type, assetId: lendForm.assetId,
+                  counterparty: lendForm.counterparty, number: Number(lendForm.number) || 0,
+                  remark: lendForm.remark
+                })
+                setLendForm(null)
+              }}>保存</button>
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="label">新增账户</div>
