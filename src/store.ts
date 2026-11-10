@@ -8,11 +8,16 @@ import { userStorage } from './auth'
 const NOW = () => Date.now()
 
 export interface Budget {
-  /** 'YYYY-MM'，或 'all' 表示默认每月生效 */
+  /** 'YYYY-MM'，或 'all' 表示默认生效 */
   month: string
   /** 0 = 总预算 */
   categoryId: number
+  /** 基础额度 */
   amount: number
+  /** 追加额度（叠加在基础额度上） */
+  addNum?: number
+  /** 预算周期：month 按月 / year 按年 */
+  type?: 'month' | 'year'
 }
 
 interface LedgerState {

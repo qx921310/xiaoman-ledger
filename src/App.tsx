@@ -1055,7 +1055,7 @@ function Stats() {
   const setBudget = useLedger((s) => s.setBudget)
   const removeBudget = useLedger((s) => s.removeBudget)
   const [month, setMonth] = useState(monthOf(Date.now()))
-  const [editing, setEditing] = useState<{ categoryId: number; amount: string } | null>(null)
+  const [editing, setEditing] = useState<{ categoryId: number; amount: string; addNum?: string; type?: 'month' | 'year' } | null>(null)
 
   const monthBills = useMemo(
     () => bills.filter((b) => monthOf(b.time) === month && parents.find((p) => p.id === b.parentCategoryId)?.kind !== 'income'),
@@ -1073,8 +1073,20 @@ function Stats() {
   const max = rows[0]?.v ?? 1
   const total = rows.reduce((s, r) => s + r.v, 0)
   const spentOf = (cid: number) => cid === 0 ? total : (rows.find((r) => r.p.id === cid)?.v ?? 0)
-  const totalBudget = budgets.find((b) => b.month === 'all' && b.categoryId === 0)?.amount ?? 0
-  const catBudgets = budgets.filter((b) => b.month === 'all' && b.categoryId !== 0)
+  const limitOf = (b: { amount: number; addNum?: number }) => (b.amount ?? 0) + (b.addNum ?? 0)
+  const monthBudgets = budgets.filter((b) => b.month === 'all' && (b.type ?? 'month') === 'month')
+  const yearBudgets = budgets.filter((b) => b.month === 'all' && b.type === 'year')
+  const totalBudget = limitOf(monthBudgets.find((b) => b.categoryId === 0) ?? { amount: 0 })
+  const catBudgets = monthBudgets.filter((b) => b.categoryId !== 0)
+
+  // 年度支出（当年）
+  const yearSpend = useMemo(() => {
+    const y = month.slice(0, 4)
+    return bills.filter((b) => String(monthOf(b.time)).slice(0, 4) === y
+      && parents.find((p) => p.id === b.parentCategoryId)?.kind !== 'income')
+      .reduce((s, b) => s + b.cost, 0)
+  }, [bills, parents, month])
+  const totalYearBudget = limitOf(yearBudgets.find((b) => b.categoryId === 0) ?? { amount: 0 })
 
   return (
     <section className="card">
@@ -1103,6 +1115,24 @@ function Stats() {
         <button className="ghost wide" onClick={() => setEditing({ categoryId: 0, amount: '' })}>设置本月总预算</button>
       )}
 
+      {totalYearBudget > 0 && (
+        <div className="budget-box">
+          <div className="budget-line">
+            <span>本年总预算</span>
+            <b>{money(yearSpend)} / {money(totalYearBudget)}</b>
+          </div>
+          <div className="bar-track">
+            <div className="bar" style={{
+              width: `${Math.min(100, (yearSpend / totalYearBudget) * 100)}%`,
+              background: yearSpend > totalYearBudget ? 'var(--out)' : 'var(--accent)'
+            }} />
+          </div>
+          <div className="budget-foot">
+            <span>剩余 {money(totalYearBudget - yearSpend)}</span>
+          </div>
+        </div>
+      )}
+
       {catBudgets.map((b) => {
         const p = parents.find((x) => x.id === b.categoryId)
         const used = spentOf(b.categoryId)
@@ -1110,18 +1140,19 @@ function Stats() {
           <div key={b.categoryId} className="budget-box small">
             <div className="budget-line">
               <span><CatIcon k={p?.icon} size={14} /> {p?.name ?? '分类'}预算</span>
-              <b>{money(used)} / {money(b.amount)}</b>
+              <b>{money(used)} / {money(limitOf(b))}</b>
             </div>
             <div className="bar-track">
               <div className="bar" style={{
-                width: `${Math.min(100, (used / b.amount) * 100)}%`,
-                background: used > b.amount ? 'var(--out)' : (p?.color === '#94a3b8' ? 'var(--accent)' : p?.color)
+                width: `${Math.min(100, (used / Math.max(1, limitOf(b))) * 100)}%`,
+                background: used > limitOf(b) ? 'var(--out)' : (p?.color === '#94a3b8' ? 'var(--accent)' : p?.color)
               }} />
             </div>
             <div className="budget-foot">
-              <span>剩余 {money(b.amount - used)}</span>
+              <span>剩余 {money(limitOf(b) - used)}</span>
               <span>
                 <button className="link" onClick={() => setEditing({ categoryId: b.categoryId, amount: String(b.amount) })}>调整</button>
+                <button className="link" onClick={() => setEditing({ categoryId: b.categoryId, amount: String(b.amount), addNum: String(b.addNum ?? ''), type: b.type ?? 'month' })}>追加</button>
                 <button className="del" onClick={() => removeBudget('all', b.categoryId)}>删</button>
               </span>
             </div>
@@ -1157,7 +1188,16 @@ function Stats() {
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
-            <div className="label">每月预算金额</div>
+            <div className="label">周期</div>
+            <select value={editing.type ?? 'month'}
+              onChange={(e) => setEditing({ ...editing, type: e.target.value as 'month' | 'year' })}>
+              <option value="month">按月</option>
+              <option value="year">按年</option>
+            </select>
+            <div className="label">追加额度（可选）</div>
+            <input value={editing.addNum ?? ''} inputMode="decimal" placeholder="在原额度上叠加"
+              onChange={(e) => setEditing({ ...editing, addNum: e.target.value.replace(/[^\d.]/g, '') })} />
+            <div className="label">基础额度</div>
             <input
               value={editing.amount}
               autoFocus
@@ -1169,7 +1209,12 @@ function Stats() {
             <div className="modal-btns">
               <button className="ghost" onClick={() => setEditing(null)}>取消</button>
               <button className="primary" onClick={() => {
-                setBudget({ month: 'all', categoryId: editing.categoryId, amount: Number(editing.amount) || 0 })
+                setBudget({
+                  month: 'all', categoryId: editing.categoryId,
+                  amount: Number(editing.amount) || 0,
+                  addNum: Number(editing.addNum) || 0,
+                  type: editing.type ?? 'month'
+                })
                 setEditing(null)
               }}>保存</button>
             </div>
