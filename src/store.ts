@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
-import type { AccountBook, Asset, Bill, Category, Currency, Cycle, Lend, Refund, Reimbursement, Transfer } from './types'
+import type { AccountBook, Asset, Bill, Category, Currency, Cycle, Lend, Refund, Reimbursement, Tag, Transfer } from './types'
 import type { ImportPlan } from './importer'
 import { TAXONOMY_CHILDREN, TAXONOMY_INCOME, TAXONOMY_PARENTS } from './taxonomy'
 import { userStorage } from './auth'
@@ -31,6 +31,7 @@ interface LedgerState {
   lends: Lend[]
   cycles: Cycle[]
   /** 币种表；默认币种固定为 CNY，其余按 rate 折算 */
+  tags: Tag[]
   currencies: Currency[]
   defaultCurrency: string
   /** 删除墓碑：同步时要把删除动作也推上去，否则别的设备会把数据拉回来 */
@@ -70,6 +71,10 @@ interface LedgerState {
   importAll: (data: any) => void
   applyImport: (plan: ImportPlan) => void
   mergeTaxonomy: () => void
+  addTag: (patch: Omit<Tag, 'tagId' | 'positionWeight'> & { positionWeight?: number }) => Tag
+  updateTag: (tagId: number, patch: Partial<Tag>) => void
+  deleteTag: (tagId: number) => void
+  ensureTags: (names: string[]) => number
   setCurrencyRate: (code: string, rate: number) => void
   addCurrency: (c: Currency) => void
   removeCurrency: (code: string) => void
@@ -95,6 +100,7 @@ export const useLedger = create<LedgerState>()(
       refunds: [],
       lends: [],
       cycles: [],
+      tags: [],
       currencies: [
         { code: 'CNY', name: '人民币', symbol: '¥', rate: 1, positionWeight: 100 },
         { code: 'USD', name: '美元', symbol: '$', rate: 7.2, positionWeight: 90 },
@@ -608,6 +614,43 @@ export const useLedger = create<LedgerState>()(
       },
 
       setLastSync: (t) => set({ lastSync: t }),
+
+      addTag: (patch) => {
+        const tag: Tag = {
+          tagId: NOW() + Math.floor(Math.random() * 1000),
+          name: patch.name,
+          color: patch.color || '#FED778',
+          parentName: patch.parentName || undefined,
+          positionWeight: patch.positionWeight ?? 0
+        }
+        set((s) => ({ tags: [...s.tags, tag] }))
+        return tag
+      },
+
+      updateTag: (tagId, patch) => set((s) => ({
+        tags: s.tags.map((t) => t.tagId === tagId ? { ...t, ...patch } : t)
+      })),
+
+      deleteTag: (tagId) => set((s) => ({ tags: s.tags.filter((t) => t.tagId !== tagId) })),
+
+      // 导入/输入时按名字补齐标签实体，返回补齐数量
+      ensureTags: (names) => {
+        const s = get()
+        const have = new Set(s.tags.map((t) => t.name))
+        const missing = [...new Set(names.map((n) => n.trim()).filter(Boolean))].filter((n) => !have.has(n))
+        if (!missing.length) return 0
+        const palette = ['#FED778', '#F8C8B0', '#CFE3F7', '#D9F0C8', '#E6D9F7', '#F7D9E6']
+        let i = s.tags.length
+        set((st) => ({
+          tags: [...st.tags, ...missing.map((n) => ({
+            tagId: NOW() + (i++),
+            name: n,
+            color: palette[i % palette.length],
+            positionWeight: i
+          } as Tag))]
+        }))
+        return missing.length
+      },
 
       setCurrencyRate: (code, rate) => set((s) => {
         const r = Number(rate)

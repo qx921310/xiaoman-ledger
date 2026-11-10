@@ -252,3 +252,6 @@ input.rate { width: 96px; flex: none; text-align: right; }
 .chip.small { padding: 2px 9px; font-size: 12px; }
 label.inline { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-top: 8px; color: var(--muted); }
 label.inline input { width: auto; }
+
+.tag-dot { width: 12px; height: 12px; border-radius: 4px; flex: none; }
+input.color { width: 34px; height: 30px; padding: 2px; flex: none; border-radius: 8px; cursor: pointer; }

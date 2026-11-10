@@ -431,6 +431,8 @@ function Bills() {
   const reimbursements = useLedger((s) => s.reimbursements)
   const refunds = useLedger((s) => s.refunds)
   const currentBookId = useLedger((s) => s.currentBookId)
+  const tags = useLedger((s) => s.tags)
+  const tagsByName = useMemo(() => new Map(tags.map((t) => [t.name, t])), [tags])
   const updateTransfer = useLedger((s) => s.updateTransfer)
   const [editingTransfer, setEditingTransfer] = useState<Transfer | null>(null)
 
@@ -568,6 +570,10 @@ function Bills() {
                         </span>
                       ))}
                       {(b.refundNum ?? 0) > 0 && <span className="tag">已退 {money(b.refundNum!)}</span>}
+                      {(b.tags || []).map((name) => {
+                        const t = tagsByName.get(name)
+                        return <span key={name} className="tag" style={t ? { background: t.color, color: '#4a2f16' } : undefined}>{name}</span>
+                      })}
                     </div>
                   )}
                 </div>
@@ -605,6 +611,8 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
   const reimbursements = useLedger((s) => s.reimbursements)
   const refunds = useLedger((s) => s.refunds)
   const currentBookId = useLedger((s) => s.currentBookId)
+  const tags = useLedger((s) => s.tags)
+  const tagsByName = useMemo(() => new Map(tags.map((t) => [t.name, t])), [tags])
   const updateTransfer = useLedger((s) => s.updateTransfer)
   const [editingTransfer, setEditingTransfer] = useState<Transfer | null>(null)
   const addReimbursement = useLedger((s) => s.addReimbursement)
@@ -1197,6 +1205,11 @@ function Settings({ notify }: { notify: (m: string) => void }) {
   const currencies = useLedger((s) => s.currencies)
   const defaultCurrency = useLedger((s) => s.defaultCurrency)
   const setCurrencyRate = useLedger((s) => s.setCurrencyRate)
+  const tags = useLedger((s) => s.tags)
+  const addTag = useLedger((s) => s.addTag)
+  const updateTag = useLedger((s) => s.updateTag)
+  const deleteTag = useLedger((s) => s.deleteTag)
+  const [newTag, setNewTag] = useState('')
   const lastSync = useLedger((s) => s.lastSync)
   const runSync = async () => {
     setSyncing(true)
@@ -1510,6 +1523,34 @@ function Settings({ notify }: { notify: (m: string) => void }) {
       <div className="btns">
         <button onClick={() => { seed(); notify('已填充演示数据') }}>填充演示数据</button>
         <button className="danger" onClick={() => { reset(); notify('已清空') }}>清空数据</button>
+      </div>
+
+      <h3>标签</h3>
+      <p className="hint">标签可着色、可嵌套；记账时按名字自动关联。</p>
+      {tags.length === 0 && <p className="hint">还没有标签。下面可以新建，或在记账备注里写 #标签。</p>}
+      {tags.map((t) => (
+        <div key={t.tagId} className="row">
+          <span className="tag-dot" style={{ background: t.color }} />
+          <div className="grow">
+            <div>{t.name}{t.parentName ? <span className="tag">属于 {t.parentName}</span> : null}</div>
+          </div>
+          <input
+            className="color"
+            type="color"
+            value={t.color}
+            onChange={(e) => updateTag(t.tagId, { color: e.target.value })}
+          />
+          <button className="del" onClick={() => deleteTag(t.tagId)}>删</button>
+        </div>
+      ))}
+      <div className="row2">
+        <input value={newTag} placeholder="新标签名" onChange={(e) => setNewTag(e.target.value)} />
+        <button className="ghost" onClick={() => {
+          if (!newTag.trim()) return
+          addTag({ name: newTag.trim(), color: '#FED778' })
+          setNewTag('')
+          notify('标签已添加')
+        }}>添加标签</button>
       </div>
 
       <h3>币种与汇率</h3>

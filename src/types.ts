@@ -71,6 +71,16 @@ export interface Reimbursement {
   updateTime: number
 }
 
+/** 标签：独立实体，可着色、可嵌套 */
+export interface Tag {
+  tagId: number
+  name: string
+  color: string
+  /** 父标签名（空表示顶层） */
+  parentName?: string
+  positionWeight: number
+}
+
 /** 币种。rate 语义：1 单位该币种 = rate 个默认币种 */
 export interface Currency {
   code: string       // USD

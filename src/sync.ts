@@ -15,6 +15,7 @@ export const KIND_MAP: Record<string, [string, string]> = {
   transfer: ['transfers', 'transferId'],
   lend: ['lends', 'lendId'],
   cycle: ['cycles', 'cycleId'],
+  tag: ['tags', 'tagId'],
   parent: ['parentCategories', 'id'],
   child: ['childCategories', 'id'],
   book: ['accountBooks', 'accountBookId'],
