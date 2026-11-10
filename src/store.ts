@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { AccountBook, Asset, Bill, Category, Transfer } from './types'
+import type { ImportPlan } from './importer'
 
 const NOW = () => Date.now()
 
@@ -50,6 +51,7 @@ interface LedgerState {
 
   addBill: (patch: Partial<Bill>) => Bill
   deleteBill: (billId: number) => void
+  updateBill: (billId: number, patch: Partial<Bill>) => void
   addTransfer: (patch: { fromAssetId: number; toAssetId: number; cost: number; serviceCharge?: number; time?: number; remark?: string }) => Transfer
   addAsset: (patch: Partial<Asset>) => void
   updateAsset: (asset: Asset) => void
@@ -58,6 +60,7 @@ interface LedgerState {
   reset: () => void
   exportAll: () => object
   importAll: (data: any) => void
+  applyImport: (plan: ImportPlan) => void
 }
 
 export const useLedger = create<LedgerState>()(
@@ -115,6 +118,34 @@ export const useLedger = create<LedgerState>()(
       },
 
       deleteBill: (billId) => set((s) => ({ bills: s.bills.filter((b) => b.billId !== billId) })),
+
+      // 改单：先把旧账单对账户的影响撤回，再按新值重新记一次
+      updateBill: (billId, patch) => {
+        const s = get()
+        const old = s.bills.find((b) => b.billId === billId)
+        if (!old) return
+        const deltaOf = (b: Bill) =>
+          (s.parentCategories.find((p) => p.id === b.parentCategoryId)?.kind === 'income' ? 1 : -1) * b.cost
+
+        let assets = s.assets.map((a) => a.assetId === old.assetId
+          ? { ...a, assetNumber: +(a.assetNumber - deltaOf(old)).toFixed(2) }
+          : a)
+
+        const next: Bill = { ...old, ...patch, updateTime: NOW() }
+        const parent = s.parentCategories.find((p) => p.id === next.parentCategoryId)
+        const asset = s.assets.find((a) => a.assetId === next.assetId)
+        next.billShareInfo = {
+          parentCategoryName: parent?.name ?? '',
+          childCategoryName: s.childCategories.find((c) => c.id === next.childCategoryId)?.name ?? '',
+          assetName: asset?.assetName ?? ''
+        }
+
+        assets = assets.map((a) => a.assetId === next.assetId
+          ? { ...a, assetNumber: +(a.assetNumber + deltaOf(next)).toFixed(2), updateTime: NOW() }
+          : a)
+
+        set({ bills: s.bills.map((b) => (b.billId === billId ? next : b)), assets })
+      },
 
       // 转账：本金不计收支；手续费若 >0 则单独生成一条支出账单（与原产品一致）
       addTransfer: (patch) => {
@@ -228,6 +259,16 @@ export const useLedger = create<LedgerState>()(
           childCategories: s.childCategories
         }
       },
+
+      // 合并式导入：新增分类/账户先落地，再并入账单，重复行由计划阶段剔除
+      applyImport: (plan) => set((s) => ({
+        parentCategories: [...s.parentCategories, ...plan.newParents],
+        childCategories: [...s.childCategories, ...plan.newChildren],
+        assets: [...s.assets, ...plan.newAssets],
+        bills: [...plan.bills, ...s.bills],
+        transfers: [...plan.transfers, ...s.transfers],
+        seeded: true
+      })),
 
       importAll: (data) => set((s) => ({
         accountBooks: data.accountBooks ?? s.accountBooks,

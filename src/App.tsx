@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLedger, useTotalAssets } from './store'
 import { ASSET_TYPE, BILL_TYPE } from './types'
+import type { Bill } from './types'
 import { api } from './api'
+import type { ImportPlan } from './importer'
 
 const money = (n: number) => '¥' + (n < 0 ? '-' : '') + Math.abs(n).toFixed(2)
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -231,32 +233,58 @@ function Bills() {
   const parents = useLedger((s) => s.parentCategories)
   const assets = useLedger((s) => s.assets)
   const del = useLedger((s) => s.deleteBill)
+  const updateBill = useLedger((s) => s.updateBill)
+
   const [month, setMonth] = useState(monthOf(Date.now()))
+  const [kw, setKw] = useState('')
+  const [fPid, setFPid] = useState(0)
+  const [fAid, setFAid] = useState(0)
+  const [editing, setEditing] = useState<Bill | null>(null)
 
-  type Item =
-    | { kind: 'bill'; id: number; time: number; data: typeof bills[number] }
-    | { kind: 'transfer'; id: number; time: number; data: typeof transfers[number] }
-
-  const items = useMemo<Item[]>(() => {
-    const inMonth = (t: number) => monthOf(t) === month
-    const a = bills.filter((b) => inMonth(b.time)).map((b) => ({ kind: 'bill' as const, id: b.billId, time: b.time, data: b }))
-    const t = transfers.filter((x) => inMonth(x.time)).map((x) => ({ kind: 'transfer' as const, id: x.transferId, time: x.time, data: x }))
-    return [...a, ...t].sort((x, y) => y.time - x.time)
-  }, [bills, transfers, month])
-
+  const nameOf = (pid: number) => parents.find((p) => p.id === pid)?.name ?? ''
   const isIncome = (pid: number) => parents.find((p) => p.id === pid)?.kind === 'income'
-  const income = bills.filter((b) => monthOf(b.time) === month && isIncome(b.parentCategoryId)).reduce((s, b) => s + b.cost, 0)
-  const expense = bills.filter((b) => monthOf(b.time) === month && !isIncome(b.parentCategoryId)).reduce((s, b) => s + b.cost, 0)
 
+  const match = (b: Bill) => {
+    if (monthOf(b.time) !== month) return false
+    if (fPid && b.parentCategoryId !== fPid) return false
+    if (fAid && b.assetId !== fAid) return false
+    if (kw) {
+      const hay = (b.remark || '') + ' ' + nameOf(b.parentCategoryId) + ' ' + (b.tags || []).join(' ')
+      if (!hay.toLowerCase().includes(kw.toLowerCase())) return false
+    }
+    return true
+  }
+
+  const list = useMemo(() => bills.filter(match).sort((a, b) => b.time - a.time), [bills, month, kw, fPid, fAid, parents])
+
+  const tList = useMemo(() => transfers.filter((t) => {
+    if (monthOf(t.time) !== month) return false
+    if (fAid && t.fromAssetId !== fAid && t.toAssetId !== fAid) return false
+    if (fPid) return false
+    if (kw) {
+      const hay = (t.remark || '') + ' 转账'
+      if (!hay.toLowerCase().includes(kw.toLowerCase())) return false
+    }
+    return true
+  }), [transfers, month, kw, fPid, fAid])
+
+  const income = list.filter((b) => isIncome(b.parentCategoryId)).reduce((s, b) => s + b.cost, 0)
+  const expense = list.filter((b) => !isIncome(b.parentCategoryId)).reduce((s, b) => s + b.cost, 0)
+
+  type Item = { kind: 'bill'; time: number; b: Bill } | { kind: 'transfer'; time: number; t: typeof transfers[number] }
   const groups = useMemo(() => {
+    const all: Item[] = [
+      ...list.map((b) => ({ kind: 'bill' as const, time: b.time, b })),
+      ...tList.map((t) => ({ kind: 'transfer' as const, time: t.time, t }))
+    ].sort((x, y) => y.time - x.time)
     const m = new Map<string, Item[]>()
-    items.forEach((b) => {
-      const k = dayOf(b.time)
+    all.forEach((it) => {
+      const k = dayOf(it.time)
       if (!m.has(k)) m.set(k, [])
-      m.get(k)!.push(b)
+      m.get(k)!.push(it)
     })
     return [...m.entries()]
-  }, [items])
+  }, [list, tList])
 
   return (
     <section className="card">
@@ -272,14 +300,27 @@ function Bills() {
         </div>
       </div>
 
-      {groups.length === 0 && <p className="empty">这个月还没有账单</p>}
+      <div className="filters">
+        <input className="kw" value={kw} onChange={(e) => setKw(e.target.value)} placeholder="搜索备注 / 分类 / 标签" />
+        <select value={fPid} onChange={(e) => setFPid(Number(e.target.value))}>
+          <option value={0}>全部分类</option>
+          {parents.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+        <select value={fAid} onChange={(e) => setFAid(Number(e.target.value))}>
+          <option value={0}>全部账户</option>
+          {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
+        </select>
+        {(kw || fPid || fAid) && <button className="ghost" onClick={() => { setKw(''); setFPid(0); setFAid(0) }}>重置</button>}
+      </div>
+
+      {groups.length === 0 && <p className="empty">没有符合条件的账单</p>}
 
       {groups.map(([day, rows]) => (
         <div key={day} className="group">
           <div className="day">{day}</div>
           {rows.map((it) => {
             if (it.kind === 'transfer') {
-              const t = it.data
+              const t = it.t
               const from = assets.find((a) => a.assetId === t.fromAssetId)
               const to = assets.find((a) => a.assetId === t.toAssetId)
               return (
@@ -297,7 +338,7 @@ function Bills() {
                 </div>
               )
             }
-            const b = it.data
+            const b = it.b
             const p = parents.find((x) => x.id === b.parentCategoryId)
             const a = assets.find((x) => x.assetId === b.assetId)
             const inc = p?.kind === 'income'
@@ -309,13 +350,84 @@ function Bills() {
                   <small>{a?.assetName ?? '无账户'} · {hhmm(b.time)} · {BILL_TYPE[b.billType]}</small>
                 </div>
                 <b className={inc ? 'in' : 'out'}>{inc ? '+' : '-'}{money(b.cost)}</b>
+                <button className="link" onClick={() => setEditing(b)}>改</button>
                 <button className="del" onClick={() => del(b.billId)}>删</button>
               </div>
             )
           })}
         </div>
       ))}
+
+      {editing && (
+        <EditBill bill={editing} onClose={() => setEditing(null)} onSave={(patch) => {
+          updateBill(editing.billId, patch)
+          setEditing(null)
+        }} />
+      )}
     </section>
+  )
+}
+
+function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; onSave: (p: Partial<Bill>) => void }) {
+  const parents = useLedger((s) => s.parentCategories)
+  const children = useLedger((s) => s.childCategories)
+  const assets = useLedger((s) => s.assets)
+
+  const [cost, setCost] = useState(String(bill.cost))
+  const [pid, setPid] = useState(bill.parentCategoryId)
+  const [cid, setCid] = useState(bill.childCategoryId)
+  const [aid, setAid] = useState(bill.assetId)
+  const [remark, setRemark] = useState(bill.remark)
+  const [time, setTime] = useState(toLocalInput(bill.time))
+
+  const subs = children.filter((c) => c.parentId === pid)
+
+  return (
+    <div className="modal-mask" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h3>修改账单</h3>
+        <div className="label">金额</div>
+        <input
+          value={cost}
+          autoFocus
+
+          onChange={(e) => setCost(e.target.value.replace(/[^\d.]/g, ''))}
+          inputMode="decimal"
+        />
+        <div className="label">分类</div>
+        <select value={pid} onChange={(e) => { setPid(Number(e.target.value)); setCid(0) }}>
+          {parents.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+        {subs.length > 0 && (
+          <>
+            <div className="label">子分类</div>
+            <select value={cid} onChange={(e) => setCid(Number(e.target.value))}>
+              <option value={0}>不选</option>
+              {subs.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </>
+        )}
+        <div className="label">账户</div>
+        <select value={aid} onChange={(e) => setAid(Number(e.target.value))}>
+          {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
+        </select>
+        <div className="label">时间</div>
+        <input type="datetime-local" value={time} onChange={(e) => setTime(e.target.value)} />
+        <div className="label">备注</div>
+        <input value={remark} onChange={(e) => setRemark(e.target.value)} />
+        <div className="modal-btns">
+          <button className="ghost" onClick={onClose}>取消</button>
+          <button className="primary" onClick={() => onSave({
+            cost: Number(cost) || bill.cost,
+            parentCategoryId: pid,
+            childCategoryId: cid,
+            assetId: aid,
+            remark,
+            time: new Date(time).getTime()
+          })}>保存</button>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -415,23 +527,69 @@ function Settings({ notify }: { notify: (m: string) => void }) {
   const reset = useLedger((s) => s.reset)
   const exportAll = useLedger((s) => s.exportAll)
   const importAll = useLedger((s) => s.importAll)
+  const applyImport = useLedger((s) => s.applyImport)
+  const bills = useLedger((s) => s.bills)
+  const assets = useLedger((s) => s.assets)
+  const parents = useLedger((s) => s.parentCategories)
+  const children = useLedger((s) => s.childCategories)
+
+  const [plan, setPlan] = useState<ImportPlan | null>(null)
+  const [fileName, setFileName] = useState('')
+  const [err, setErr] = useState('')
   const [syncMsg, setSyncMsg] = useState('')
 
-  const doExport = () => {
+  const fmtLabel = (f: string) =>
+    f === 'yimu' ? '一木记账导出' : f === 'transfer' ? '转账流水' : f === 'generic' ? '通用账单表' : '未识别的表头'
+
+  const pickFile = async (f: File) => {
+    setErr('')
+    setPlan(null)
+    try {
+      const { parseLedgerFile, buildImportPlan } = await import('./importer')
+      const table = parseLedgerFile(await f.arrayBuffer(), f.name)
+      const p = buildImportPlan({
+        table, existingBills: bills, existingAssets: assets,
+        parentCategories: parents, childCategories: children, userId: 1, bookId: 1
+      })
+      setFileName(f.name)
+      setPlan(p)
+      if (p.total === 0) setErr('文件里没有数据行')
+    } catch (e: any) {
+      setErr('解析失败：' + (e?.message || e))
+      setFileName(f.name)
+    }
+  }
+
+  const confirmImport = () => {
+    if (!plan) return
+    const n = plan.bills.length + plan.transfers.length
+    applyImport(plan)
+    setPlan(null)
+    notify(`已导入 ${n} 条` + (plan.duplicates ? `，跳过重复 ${plan.duplicates} 条` : ''))
+  }
+
+  const doExportJson = () => {
     const blob = new Blob([JSON.stringify(exportAll(), null, 2)], { type: 'application/json' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
-    a.download = `ledger-${new Date().toISOString().slice(0, 10)}.json`
+    a.download = `qingzhang-${new Date().toISOString().slice(0, 10)}.json`
     a.click()
-    notify('已导出')
+    notify('已导出 JSON')
   }
 
-  const doImport = (f: File) => {
+  const doExportXlsx = async () => {
+    if (bills.length === 0) return notify('还没有账单可导出')
+    const { exportXlsx } = await import('./importer')
+    exportXlsx(bills, parents, children, assets)
+    notify(`已导出 ${bills.length} 条为 Excel`)
+  }
+
+  const doImportJson = (f: File) => {
     const r = new FileReader()
     r.onload = () => {
       try {
         importAll(JSON.parse(String(r.result)))
-        notify('已导入')
+        notify('已导入 JSON 备份')
       } catch { notify('文件格式不对') }
     }
     r.readAsText(f)
@@ -440,37 +598,78 @@ function Settings({ notify }: { notify: (m: string) => void }) {
   const doSync = async () => {
     setSyncMsg('连接中…')
     try {
-      await api.health()
-      const data = exportAll()
-      await api.syncPush({ bills: (data as any).bills, assets: (data as any).assets })
-      setSyncMsg('已推送到服务端')
+      const h = await api.health()
+      setSyncMsg(h?.result?.writable ? '服务端在线，可写' : '服务端在线，但只读（未配置写令牌）')
     } catch (e: any) {
-      setSyncMsg('服务端未启动：' + e.message)
+      setSyncMsg('连接失败：' + e.message)
     }
   }
 
   return (
     <section className="card">
+      <h3>从其他记账软件迁移</h3>
+      <p className="hint">
+        支持 <b>一木记账导出的 Excel/CSV</b>（表头含 日期/收支类型/金额/类别/二级分类/账户）、
+        转账流水表，以及含时间与金额的通用表格。重复账单会自动跳过。
+      </p>
+
+      <label className="filebtn big">
+        选择文件（.xlsx / .xls / .csv）
+        <input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => e.target.files?.[0] && pickFile(e.target.files[0])} />
+      </label>
+
+      {err && <p className="warn">{err}</p>}
+
+      {plan && (
+        <div className="preview">
+          <div className="preview-head">
+            <b>{fileName || '未选择'}</b>
+            <span className="badge">{fmtLabel(plan.format)}</span>
+          </div>
+          <div className="preview-stats">
+            <div><small>总行数</small><b>{plan.total}</b></div>
+            <div><small>可导入</small><b className="in">{plan.bills.length + plan.transfers.length}</b></div>
+            <div><small>重复跳过</small><b>{plan.duplicates}</b></div>
+            <div><small>无法解析</small><b>{plan.skipped.length}</b></div>
+          </div>
+          <div className="preview-stats">
+            <div><small>收入合计</small><b className="in">{money(plan.income)}</b></div>
+            <div><small>支出合计</small><b className="out">{money(plan.expense)}</b></div>
+            <div><small>新增分类</small><b>{plan.newParents.length}</b></div>
+            <div><small>新增账户</small><b>{plan.newAssets.length}</b></div>
+          </div>
+          {plan.skipped.length > 0 && (
+            <p className="hint">跳过示例：第 {plan.skipped.slice(0, 3).map((x) => x.row).join('、')} 行 —— {plan.skipped[0].reason}</p>
+          )}
+          <button className="primary" onClick={confirmImport} disabled={plan.bills.length + plan.transfers.length === 0}>
+            确认导入 {plan.bills.length + plan.transfers.length} 条
+          </button>
+        </div>
+      )}
+
+      <h3>导出</h3>
+      <div className="btns">
+        <button onClick={doExportXlsx}>导出 Excel</button>
+        <button onClick={doExportJson}>导出 JSON</button>
+        <label className="filebtn">
+          导入 JSON 备份
+          <input type="file" accept=".json" onChange={(e) => e.target.files?.[0] && doImportJson(e.target.files[0])} />
+        </label>
+      </div>
+
       <h3>数据</h3>
       <div className="btns">
         <button onClick={() => { seed(); notify('已填充演示数据') }}>填充演示数据</button>
-        <button onClick={doExport}>导出 JSON</button>
-        <label className="filebtn">
-          导入 JSON
-          <input type="file" accept=".json" onChange={(e) => e.target.files?.[0] && doImport(e.target.files[0])} />
-        </label>
         <button className="danger" onClick={() => { reset(); notify('已清空') }}>清空数据</button>
       </div>
 
       <h3>服务端</h3>
-      <p className="hint">本地优先存储，服务端仅做同步演示（需先启动 <code>pnpm api</code>）。</p>
-      <button onClick={doSync}>测试同步</button>
+      <button onClick={doSync}>测试连接</button>
       {syncMsg && <p className="hint">{syncMsg}</p>}
 
       <h3>关于</h3>
       <p className="hint">
-        自建记账应用，功能对齐常见个人记账产品：两级分类、多账户、账单流水、资产统计。
-        数据只存在本机浏览器，不采集任何信息。
+        数据只存在本机浏览器（localStorage），不登录、不上传。导出 Excel 后可再导回或导入其他工具。
       </p>
     </section>
   )
