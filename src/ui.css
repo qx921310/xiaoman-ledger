@@ -271,3 +271,7 @@ input.color { width: 34px; height: 30px; padding: 2px; flex: none; border-radius
 .switch.on { background: var(--accent); }
 .switch.on i { left: 21px; }
 .modal.detail .modal-btns { padding: 14px 20px 18px; margin: 0; }
+
+.invite { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--accent-soft); border-radius: 10px; padding: 10px 14px; margin-top: 8px; }
+.invite .code { font-size: 20px; font-weight: 700; letter-spacing: 3px; color: #7a5230; }
+.invite small { display: block; color: var(--muted); font-size: 11px; }

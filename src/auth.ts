@@ -38,7 +38,9 @@ export const books = {
     call('/books/role', { method: 'POST', body: JSON.stringify({ bookId, userId, role }) }),
   removeMember: (bookId: string, userId: number) =>
     call('/books/remove-member', { method: 'POST', body: JSON.stringify({ bookId, userId }) }),
-  leave: (bookId: string) => call('/books/leave', { method: 'POST', body: JSON.stringify({ bookId }) })
+  leave: (bookId: string) => call('/books/leave', { method: 'POST', body: JSON.stringify({ bookId }) }),
+  remove: (bookId: string) => call('/books/delete', { method: 'POST', body: JSON.stringify({ bookId }) }),
+  clear: (bookId: string) => call('/books/clear', { method: 'POST', body: JSON.stringify({ bookId }) })
 }
 
 export const auth = {

@@ -363,6 +363,29 @@ const server = createServer(async (req, res) => {
       return ok(res, { members: bookMembers(bookId) })
     }
 
+    if (path === '/api/books/delete' && req.method === 'POST') {
+      const user = currentUser(req)
+      if (!user) return fail(res, '请先登录')
+      const { bookId } = await readBody(req)
+      const book = db.prepare('SELECT owner_id FROM books WHERE book_id = ?').get(bookId)
+      if (!book) return fail(res, '账本不存在')
+      if (book.owner_id !== user.id) return fail(res, '只有创建者可以删除账本')
+      db.prepare('DELETE FROM records WHERE book_id = ?').run(bookId)
+      db.prepare('DELETE FROM invites WHERE book_id = ?').run(bookId)
+      db.prepare('DELETE FROM book_members WHERE book_id = ?').run(bookId)
+      db.prepare('DELETE FROM books WHERE book_id = ?').run(bookId)
+      return ok(res, { books: myBooks(user.id) })
+    }
+
+    if (path === '/api/books/clear' && req.method === 'POST') {
+      const user = currentUser(req)
+      if (!user) return fail(res, '请先登录')
+      const { bookId } = await readBody(req)
+      if (!isAdmin(roleOf(bookId, user.id))) return fail(res, '只有「管理」可以清空账本数据')
+      const info = db.prepare('DELETE FROM records WHERE book_id = ?').run(bookId)
+      return ok(res, { removed: info.changes })
+    }
+
     if (path === '/api/books/leave' && req.method === 'POST') {
       const user = currentUser(req)
       if (!user) return fail(res, '请先登录')

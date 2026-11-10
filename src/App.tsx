@@ -284,6 +284,10 @@ function BookSwitch() {
 }
 
 function AddBill({ notify }: { notify: (m: string) => void }) {
+  const accountBooks = useLedger((s) => s.accountBooks)
+  const curBookId = useLedger((s) => s.currentBookId)
+  const myRole = accountBooks.find((b) => b.bookId && String(b.bookId) === String(curBookId))?.role
+  const readOnly = myRole === 'silent'
   const parents = useLedger((s) => s.parentCategories)
   const children = useLedger((s) => s.childCategories)
   const assets = useLedger((s) => s.assets)
@@ -482,6 +486,9 @@ function Bills({ me }: { me?: { id: number; email: string } }) {
   const currentBookId = useLedger((s) => s.currentBookId)
   const tags = useLedger((s) => s.tags)
   const tagsByName = useMemo(() => new Map(tags.map((t) => [t.name, t])), [tags])
+  const accountBooks = useLedger((s) => s.accountBooks)
+  const myRole = accountBooks.find((b) => b.bookId && String(b.bookId) === String(currentBookId))?.role
+  const readOnly = myRole === 'silent'
   const updateTransfer = useLedger((s) => s.updateTransfer)
   const [editingTransfer, setEditingTransfer] = useState<Transfer | null>(null)
 
@@ -629,8 +636,8 @@ function Bills({ me }: { me?: { id: number; email: string } }) {
                 </div>
                 <b className={inc ? 'in' : 'out'}>{inc ? '+' : '-'}{money(b.cost)}</b>
                 <button className="link" onClick={() => setDetail(b)}>明细</button>
-                <button className="link" onClick={() => setEditing(b)}>改</button>
-                <button className="del" onClick={() => del(b.billId)}>删</button>
+                {!readOnly && <button className="link" onClick={() => setEditing(b)}>改</button>}
+                {!readOnly && <button className="del" onClick={() => del(b.billId)}>删</button>}
               </div>
             )
           })}
@@ -763,6 +770,9 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
   const currentBookId = useLedger((s) => s.currentBookId)
   const tags = useLedger((s) => s.tags)
   const tagsByName = useMemo(() => new Map(tags.map((t) => [t.name, t])), [tags])
+  const accountBooks = useLedger((s) => s.accountBooks)
+  const myRole = accountBooks.find((b) => b.bookId && String(b.bookId) === String(currentBookId))?.role
+  const readOnly = myRole === 'silent'
   const updateTransfer = useLedger((s) => s.updateTransfer)
   const [editingTransfer, setEditingTransfer] = useState<Transfer | null>(null)
   const addReimbursement = useLedger((s) => s.addReimbursement)
@@ -1407,6 +1417,7 @@ function Settings({ notify, me }: { notify: (m: string) => void; me?: { id: numb
   const [newTag, setNewTag] = useState('')
   const setBook = useLedger((s) => s.setBook)
   const [members, setMembers] = useState<{ userId: number; role: string; email: string }[]>([])
+  const [invite, setInvite] = useState<{ code: string; expiresAt: number } | null>(null)
   const currentBook = accountBooks.find((b) => b.bookId && String(b.bookId) === String(currentBookId))
   const reloadBooks = async () => {
     const r = await bookApi.list()
@@ -1785,12 +1796,51 @@ function Settings({ notify, me }: { notify: (m: string) => void; me?: { id: numb
             <button className="ghost tiny" onClick={async () => {
               try {
                 const r = await bookApi.invite(String(currentBook.bookId))
-                notify(`邀请码 ${r.code}（24 小时有效）`)
+                setInvite({ code: r.code, expiresAt: r.expiresAt })
+                notify(`邀请码 ${r.code}`)
               } catch (e: any) { notify(e?.message || '生成失败') }
             }}>生成邀请码</button>
           )}
         </div>
       )}
+      {currentBook && currentBook.role === 'admin' && (
+        <div className="btns">
+          <button onClick={async () => {
+            const name = prompt('账本名称', currentBook.accountBookName)
+            if (!name) return
+            await bookApi.rename(String(currentBook.bookId), name)
+            await reloadBooks()
+            notify('已重命名')
+          }}>重命名</button>
+          <button onClick={async () => {
+            if (!confirm('清空这个账本里的所有账单？操作不可撤销')) return
+            try {
+              const r = await bookApi.clear(String(currentBook.bookId))
+              notify(`已清空 ${r.removed} 条服务端记录（本地请点「清空数据」）`)
+            } catch (e: any) { notify(e?.message || '失败') }
+          }}>清空账本</button>
+          {me?.id === currentBook.ownerId && (
+            <button className="danger" onClick={async () => {
+              if (!confirm('删除这个账本？所有成员都会失去它')) return
+              try {
+                await bookApi.remove(String(currentBook.bookId))
+                await reloadBooks()
+                notify('账本已删除')
+              } catch (e: any) { notify(e?.message || '失败') }
+            }}>删除账本</button>
+          )}
+        </div>
+      )}
+
+      {currentBook && currentBook.role !== 'admin' && currentBook.role && (
+        <button className="ghost wide" onClick={async () => {
+          if (!confirm('退出这个账本？你的历史账单会保留在账本里')) return
+          await bookApi.leave(String(currentBook.bookId))
+          await reloadBooks()
+          notify('已退出账本')
+        }}>退出账本</button>
+      )}
+
       {members.length > 0 && (
         <>
           <div className="label">成员（{members.length}/6）</div>
@@ -1813,6 +1863,16 @@ function Settings({ notify, me }: { notify: (m: string) => void; me?: { id: numb
             </div>
           ))}
         </>
+      )}
+
+      {invite && (
+        <div className="invite">
+          <div>
+            <span className="code">{invite.code}</span>
+            <small>有效期至 {new Date(invite.expiresAt).toLocaleString('zh-CN')}</small>
+          </div>
+          <button className="link" onClick={() => setInvite(null)}>收起</button>
+        </div>
       )}
 
       <h3>标签</h3>
