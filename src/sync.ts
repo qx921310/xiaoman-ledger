@@ -25,7 +25,7 @@ export const KIND_MAP: Record<string, [string, string]> = {
 }
 
 const idOf = (kind: string, item: any) =>
-  kind === 'budget' ? `${item.month}:${item.categoryId}` : String(item[KIND_MAP[kind][1]])
+  kind === 'budget' ? `${item.month}:${item.categoryId}` : kind === 'bill' ? String(item.syncId ?? item.billId) : String(item[KIND_MAP[kind][1]])
 
 export function collectRecords(): SyncRecord[] {
   const s: any = useLedger.getState()

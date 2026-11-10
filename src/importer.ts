@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx'
 import type { AccountBook, Asset, Bill, Category, Refund, Reimbursement, Transfer } from './types'
+import { newBillIdentity } from './identity'
 
 export interface ParsedTable {
   headers: string[]
@@ -306,11 +307,11 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
   const used = new Set(existingBills.map((b) => b.billId))
   bills.sort((a, b) => a.time - b.time)
   bills.forEach((b) => {
-    // 与 store 一致：秒 * 1000 + 用户后缀，避免多人同秒撞 ID
-    let id = Math.floor(b.time / 1000) * 1000 + (Math.abs(userId) % 1000)
-    while (used.has(id)) id++
-    b.billId = id
-    used.add(id)
+    let identity = newBillIdentity()
+    while (used.has(identity.billId)) identity = newBillIdentity()
+    b.billId = identity.billId
+    b.syncId = identity.syncId
+    used.add(identity.billId)
   })
 
   // 报销 / 退款挂到最终 billId 上

@@ -53,13 +53,13 @@ assert.equal(state().assets[0].openingBalance, 0)
 
 // A second offline transaction arrives after an unrelated local transaction.
 const s = state()
-const remoteBill = { ...s.bills[0], billId: 987654321, cost: 10, updateTime: Date.now() + 1 }
+const remoteBill = { ...s.bills[0], billId: 987654321, syncId: crypto.randomUUID(), cost: 10, updateTime: Date.now() + 1 }
 const before = s.assets[0].assetNumber
-state().applyRemote([{ kind: 'bill', id: String(remoteBill.billId), payload: remoteBill, updatedAt: remoteBill.updateTime }])
+state().applyRemote([{ kind: 'bill', id: remoteBill.syncId, payload: remoteBill, updatedAt: remoteBill.updateTime }])
 const kind = state().parentCategories.find(c => c.id === remoteBill.parentCategoryId)?.kind
 assert.equal(state().assets[0].assetNumber, before + (kind === 'income' ? 10 : -10))
 const afterRemote = state().assets[0].assetNumber
-state().applyRemote([{ kind: 'bill', id: String(remoteBill.billId), payload: null, deleted: true, updatedAt: remoteBill.updateTime + 10 }])
+state().applyRemote([{ kind: 'bill', id: remoteBill.syncId, payload: null, deleted: true, updatedAt: remoteBill.updateTime + 10 }])
 assert.equal(state().assets[0].assetNumber, before)
 assert.notEqual(afterRemote, before)
 

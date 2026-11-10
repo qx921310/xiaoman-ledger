@@ -5,6 +5,7 @@ import type { ImportPlan } from './importer'
 import { TAXONOMY_CHILDREN, TAXONOMY_INCOME, TAXONOMY_PARENTS } from './taxonomy'
 import { userStorage } from './auth'
 import { deriveAssets } from './balances'
+import { newBillIdentity } from './identity'
 
 const NOW = () => Date.now()
 
@@ -144,15 +145,15 @@ export const useLedger = create<LedgerState>()(
 
       addBill: (patch) => {
         const s = get()
-        // billId = 秒级时间戳 * 1000 + 用户后缀：多人同秒记账也不会撞 ID
-        const uidSuffix = Math.abs(s.userId || 0) % 1000
-        let billId = patch.billId ?? Math.floor(NOW() / 1000) * 1000 + uidSuffix
-        while (s.bills.some((b) => b.billId === billId)) billId++
+        let identity = newBillIdentity()
+        while (s.bills.some((b) => b.billId === identity.billId)) identity = newBillIdentity()
+        const billId = patch.billId ?? identity.billId
         const parent = s.parentCategories.find((c) => c.id === patch.parentCategoryId)
         const child = s.childCategories.find((c) => c.id === patch.childCategoryId)
         const asset = s.assets.find((a) => a.assetId === patch.assetId)
         const bill: Bill = {
           billId,
+          syncId: patch.syncId ?? identity.syncId,
           time: patch.time ?? NOW(),
           cost: Number(patch.cost ?? 0),
           parentCategoryId: patch.parentCategoryId ?? 199,
@@ -207,9 +208,9 @@ export const useLedger = create<LedgerState>()(
 
       // 删除同样要冲正：把该账单对账户的影响退回
       deleteBill: (billId) => set((s) => {
-        const tomb = { kind: 'bill', id: String(billId), updatedAt: NOW() }
         const old = s.bills.find((b) => b.billId === billId)
         if (!old) return {}
+        const tomb = { kind: 'bill', id: old.syncId ?? String(billId), updatedAt: NOW() }
         const sign = s.parentCategories.find((p) => p.id === old.parentCategoryId)?.kind === 'income' ? 1 : -1
         return {
           bills: s.bills.filter((b) => b.billId !== billId),
@@ -312,8 +313,8 @@ export const useLedger = create<LedgerState>()(
           transfers: st.transfers.filter((t) => t.transferId !== transferId),
           bills: old.billId ? st.bills.filter((b) => b.billId !== old.billId) : st.bills,
           tombstones: old.billId
-            ? [...st.tombstones.filter((x) => !(x.kind === 'bill' && x.id === String(old.billId))),
-               { kind: 'bill', id: String(old.billId), updatedAt: NOW() }]
+            ? [...st.tombstones.filter((x) => !(x.kind === 'bill' && x.id === (feeBill?.syncId ?? String(old.billId)))),
+               { kind: 'bill', id: feeBill?.syncId ?? String(old.billId), updatedAt: NOW() }]
             : st.tombstones,
           assets: st.assets.map((a) => {
             let v = a.assetNumber
@@ -357,6 +358,7 @@ export const useLedger = create<LedgerState>()(
       deleteTransfer: (transferId) => set((s) => {
         const t = s.transfers.find((x) => x.transferId === transferId)
         if (!t) return {}
+        const feeIdentity = s.bills.find(b => b.billId === t.billId)?.syncId ?? String(t.billId)
         // 撤销：转出方退回本金+手续费，转入方扣回到账金额；连带删掉手续费账单
         const back = t.cost + t.serviceCharge
         const toBack = t.toCost ?? t.cost
@@ -365,10 +367,10 @@ export const useLedger = create<LedgerState>()(
           bills: t.billId ? s.bills.filter((b) => b.billId !== t.billId) : s.bills,
           // 转账本身和它的手续费账单都要写墓碑，否则下次拉取会被同步回来
           tombstones: [
-            ...s.tombstones.filter((x) => !(t.billId && x.kind === 'bill' && x.id === String(t.billId))
+            ...s.tombstones.filter((x) => !(t.billId && x.kind === 'bill' && x.id === feeIdentity)
               && !(x.kind === 'transfer' && x.id === String(transferId))),
             { kind: 'transfer', id: String(transferId), updatedAt: NOW() },
-            ...(t.billId ? [{ kind: 'bill', id: String(t.billId), updatedAt: NOW() }] : [])
+            ...(t.billId ? [{ kind: 'bill', id: feeIdentity, updatedAt: NOW() }] : [])
           ],
           assets: s.assets.map((a) => {
             if (a.assetId === t.fromAssetId) return { ...a, assetNumber: +(a.assetNumber + back).toFixed(2), updateTime: NOW() }
@@ -488,13 +490,13 @@ export const useLedger = create<LedgerState>()(
           for (const d of fresh) {
             const time = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 9, 0, 0).getTime()
             const t = get()
-            const uidSuffix = Math.abs(t.userId || 0) % 1000
-            let billId = Math.floor(time / 1000) * 1000 + uidSuffix
-            while (t.bills.some((b) => b.billId === billId)) billId++
+            let identity = newBillIdentity()
+            while (t.bills.some((b) => b.billId === identity.billId)) identity = newBillIdentity()
+            const { billId, syncId } = identity
             const parent = t.parentCategories.find((p) => p.id === c.parentCategoryId)
             const asset = t.assets.find((a) => a.assetId === c.assetId)
             const bill: Bill = {
-              billId, time, cost: c.cost,
+              billId, syncId, time, cost: c.cost,
               parentCategoryId: c.parentCategoryId, childCategoryId: c.childCategoryId,
               assetId: c.assetId, bookId: t.currentBookId || 1,
               remark: c.remark || c.name, billType: 4,
@@ -749,7 +751,7 @@ export const useLedger = create<LedgerState>()(
           budget: ['budgets', 'month']
         }
         const idOf = (kind: string, item: any) =>
-          kind === 'budget' ? `${item.month}:${item.categoryId}` : String(item[spec[kind][1]])
+          kind === 'budget' ? `${item.month}:${item.categoryId}` : kind === 'bill' ? String(item.syncId ?? item.billId) : String(item[spec[kind][1]])
 
         for (const r of records || []) {
           const k = spec[r.kind]
@@ -766,10 +768,12 @@ export const useLedger = create<LedgerState>()(
             continue
           }
           if (!r.payload) continue
+          const deleted = tombstones.find((t) => t.kind === r.kind && t.id === String(r.id))
+          if (deleted && deleted.updatedAt >= (r.updatedAt ?? 0)) continue
           if (r.ownerId != null && r.payload.ownerId == null) r.payload = { ...r.payload, ownerId: r.ownerId }
           const idx = arr.findIndex((x) => idOf(r.kind, x) === String(r.id))
           const ownerOf = (x: any) => (x?.ownerId ?? x?.userId ?? 0)
-          if (idx >= 0 && ownerOf(arr[idx]) !== ownerOf(r.payload)) {
+          if (idx >= 0 && r.kind !== 'bill' && ownerOf(arr[idx]) !== ownerOf(r.payload)) {
             // 同 ID 但身份不同：不覆盖，顺位给一个新 ID，两条并存
             const idField = k[1]
             const taken = new Set(arr.map((x) => String(x[idField])))
@@ -780,6 +784,10 @@ export const useLedger = create<LedgerState>()(
             continue
           }
           const localTime = idx >= 0 ? (arr[idx].updateTime ?? 0) : -1
+          if (r.kind === 'bill' && idx >= 0 && r.payload.displayId) {
+            arr[idx] = { ...arr[idx], memberNo: r.payload.memberNo, sequenceNo: r.payload.sequenceNo, displayId: r.payload.displayId, ownerId: r.ownerId }
+            next[k[0]] = arr
+          }
           if (idx < 0 || (r.updatedAt ?? 0) > localTime) {
             if (idx >= 0) arr[idx] = r.payload
             else arr.push(r.payload)

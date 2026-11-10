@@ -13,6 +13,12 @@ export const CREDIT_CARD = 2
 
 export interface Bill {
   billId: number
+  /** Stable creation identity; old records may have only the numeric billId. */
+  syncId?: string
+  /** Assigned by the server within this book. */
+  memberNo?: number
+  sequenceNo?: number
+  displayId?: string
   time: number
   cost: number
   parentCategoryId: number

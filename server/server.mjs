@@ -37,6 +37,22 @@ db.exec(`
     joined_at INTEGER NOT NULL,
     PRIMARY KEY (book_id, user_id)
   );
+  CREATE TABLE IF NOT EXISTS book_member_numbers (
+    book_id TEXT NOT NULL,
+    user_id INTEGER NOT NULL,
+    member_no INTEGER NOT NULL,
+    PRIMARY KEY (book_id, user_id),
+    UNIQUE (book_id, member_no)
+  );
+  CREATE TABLE IF NOT EXISTS book_bill_numbers (
+    book_id TEXT NOT NULL,
+    record_id TEXT NOT NULL,
+    creator_id INTEGER NOT NULL,
+    member_no INTEGER NOT NULL,
+    sequence_no INTEGER NOT NULL,
+    PRIMARY KEY (book_id, record_id),
+    UNIQUE (book_id, member_no, sequence_no)
+  );
   CREATE TABLE IF NOT EXISTS invites (
     code TEXT PRIMARY KEY,
     book_id TEXT NOT NULL,
@@ -138,6 +154,26 @@ const roleOf = (bookId, userId) => {
 }
 const canWrite = (role) => role === 'peer' || role === 'admin'
 const isAdmin = (role) => role === 'admin'
+function memberNumber(bookId, userId) {
+  const existing = db.prepare('SELECT member_no FROM book_member_numbers WHERE book_id = ? AND user_id = ?').get(bookId, userId)
+  if (existing) return existing.member_no
+  const n = db.prepare('SELECT COALESCE(MAX(member_no),0)+1 AS n FROM book_member_numbers WHERE book_id = ?').get(bookId).n
+  db.prepare('INSERT INTO book_member_numbers (book_id,user_id,member_no) VALUES (?,?,?)').run(bookId, userId, n)
+  return n
+}
+// Existing members have no number yet. Preserve owner first, then known join order.
+for (const book of db.prepare('SELECT book_id, owner_id FROM books').all()) {
+  const members = db.prepare('SELECT user_id FROM book_members WHERE book_id = ? ORDER BY CASE WHEN user_id = ? THEN 0 ELSE 1 END, joined_at, user_id').all(book.book_id, book.owner_id)
+  for (const m of members) memberNumber(book.book_id, m.user_id)
+}
+function billNumber(bookId, recordId, userId) {
+  const row = db.prepare('SELECT creator_id,member_no,sequence_no FROM book_bill_numbers WHERE book_id = ? AND record_id = ?').get(bookId, recordId)
+  if (row) return row
+  const memberNo = memberNumber(bookId, userId)
+  const sequenceNo = db.prepare('SELECT COALESCE(MAX(sequence_no),0)+1 AS n FROM book_bill_numbers WHERE book_id = ? AND member_no = ?').get(bookId, memberNo).n
+  db.prepare('INSERT INTO book_bill_numbers VALUES (?,?,?,?,?)').run(bookId, recordId, userId, memberNo, sequenceNo)
+  return { creator_id: userId, member_no: memberNo, sequence_no: sequenceNo }
+}
 const myBooks = (userId) =>
   db.prepare('SELECT b.book_id AS bookId, b.name, b.owner_id AS ownerId, m.role FROM books b JOIN book_members m ON m.book_id = b.book_id WHERE m.user_id = ?').all(userId)
 const bookMembers = (bookId) =>
@@ -280,6 +316,7 @@ const server = createServer(async (req, res) => {
           .run(bookId, '我的账本', user.id, Date.now())
         db.prepare('INSERT INTO book_members (book_id, user_id, role, joined_at) VALUES (?,?,?,?)')
           .run(bookId, user.id, 'admin', Date.now())
+        memberNumber(bookId, user.id)
         return ok(res, { books: myBooks(user.id) })
       }
       return ok(res, { books })
@@ -295,6 +332,7 @@ const server = createServer(async (req, res) => {
         .run(bookId, name, user.id, Date.now())
       db.prepare('INSERT INTO book_members (book_id, user_id, role, joined_at) VALUES (?,?,?,?)')
         .run(bookId, user.id, 'admin', Date.now())
+      memberNumber(bookId, user.id)
       return ok(res, { bookId, books: myBooks(user.id) })
     }
 
@@ -335,6 +373,7 @@ const server = createServer(async (req, res) => {
       if (count >= 6) return fail(res, '这个账本已经满 6 人')
       db.prepare('INSERT INTO book_members (book_id, user_id, role, joined_at) VALUES (?,?,?,?)')
         .run(inv.book_id, user.id, 'silent', Date.now())
+      memberNumber(inv.book_id, user.id)
       return ok(res, { bookId: inv.book_id, books: myBooks(user.id) })
     }
 
@@ -409,7 +448,8 @@ const server = createServer(async (req, res) => {
       const body = await readBody(req)
       const list = Array.isArray(body.records) ? body.records : []
       let accepted = 0, skipped = 0, denied = 0
-      for (const r of list) {
+      db.exec('BEGIN IMMEDIATE')
+      try { for (const r of list) {
         if (!r || typeof r.kind !== 'string' || r.id == null) { skipped++; continue }
         const rid = String(r.id)
         const updatedAt = Number(r.updatedAt) || 0
@@ -437,14 +477,23 @@ const server = createServer(async (req, res) => {
         const mine = existing.find((e) => (e.book_id || null) === bookId)
         if (mine && mine.updated_at > updatedAt) { skipped++; continue }
 
+        let payload = r.payload ?? null
+        if (r.kind === 'bill' && !r.deleted && bookId && payload) {
+          if (payload.syncId && payload.syncId !== rid) { denied++; continue }
+          const number = billNumber(bookId, rid, mine?.user_id ?? user.id)
+          payload = { ...payload, ownerId: number.creator_id, memberNo: number.member_no,
+            sequenceNo: number.sequence_no, displayId: number.member_no + '-' + String(number.sequence_no).padStart(4, '0') }
+        }
         db.prepare(`INSERT INTO records (user_id, kind, rid, payload, updated_at, deleted, book_id)
           VALUES (?,?,?,?,?,?,?)
           ON CONFLICT(user_id, kind, rid) DO UPDATE SET payload=excluded.payload, updated_at=excluded.updated_at,
             deleted=excluded.deleted, book_id=excluded.book_id`)
-          .run(user.id, r.kind, rid, JSON.stringify(r.payload ?? null), updatedAt, r.deleted ? 1 : 0, bookId)
+          .run(mine?.user_id ?? user.id, r.kind, rid, JSON.stringify(payload), updatedAt, r.deleted ? 1 : 0, bookId)
         accepted++
       }
       upsertKv(`lastSync:${user.id}`, Date.now())
+      db.exec('COMMIT')
+      } catch (e) { db.exec('ROLLBACK'); throw e }
       return ok(res, { accepted, skipped, denied, at: Date.now() })
     }
 
