@@ -9,24 +9,7 @@ import { adoptAnonymousData, auth, books as bookApi, hasUserData, setCurrentUid,
 import { syncNow } from './sync'
 import { currencySymbol, findCurrency, toBase } from './money'
 
-const money = (n: number) => '¥' + (n < 0 ? '-' : '') + Math.abs(n).toFixed(2)
-const pad = (n: number) => String(n).padStart(2, '0')
-const monthOf = (t: number) => {
-  const d = new Date(t)
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`
-}
-const dayOf = (t: number) => {
-  const d = new Date(t)
-  return `${d.getMonth() + 1}月${d.getDate()}日`
-}
-const hhmm = (t: number) => {
-  const d = new Date(t)
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-const toLocalInput = (t: number) => {
-  const d = new Date(t - new Date().getTimezoneOffset() * 60000)
-  return d.toISOString().slice(0, 16)
-}
+import { money, dayOf, hhmm, monthOf, toLocalInput } from './ui-format'
 
 type Tab = 'add' | 'bills' | 'assets' | 'stats' | 'settings'
 
