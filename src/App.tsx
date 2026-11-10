@@ -310,7 +310,7 @@ function Bills() {
           <option value={0}>全部账户</option>
           {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
         </select>
-        {(kw || fPid || fAid) && <button className="ghost" onClick={() => { setKw(''); setFPid(0); setFAid(0) }}>重置</button>}
+        {Boolean(kw || fPid || fAid) && <button className="ghost" onClick={() => { setKw(''); setFPid(0); setFAid(0) }}>重置</button>}
       </div>
 
       {groups.length === 0 && <p className="empty">没有符合条件的账单</p>}
