@@ -26,6 +26,38 @@ export interface Bill {
   userId: number
   updateTime: number
   billShareInfo?: { parentCategoryName: string; childCategoryName: string; assetName: string }
+  /** 一木导出里的「其他」列：不计入收支 / 不计入预算 */
+  notIntoTotal?: boolean
+  notIntoBudget?: boolean
+  /** 优惠金额 */
+  discountNumber?: number
+  /** 退款金额 */
+  refundNum?: number
+  /** 多币种信息，如 "USD 12.5" */
+  currencyInfo?: string
+  poiAddress?: string
+  fromUserId?: number
+}
+
+/** 报销：挂在账单上的附属记录（不改变账单本身） */
+export interface Reimbursement {
+  reimbursementId: number
+  billId: number
+  /** 报销账户（资产） */
+  assetId: number
+  number: number
+  detail: string
+  userId: number
+  updateTime: number
+}
+
+/** 退款：同样挂在账单上 */
+export interface Refund {
+  refundId: number
+  billId: number
+  number: number
+  userId: number
+  updateTime: number
 }
 
 export interface Asset {

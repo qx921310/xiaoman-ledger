@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx'
-import type { Asset, Bill, Category, Transfer } from './types'
+import type { AccountBook, Asset, Bill, Category, Refund, Reimbursement, Transfer } from './types'
 
 export interface ParsedTable {
   headers: string[]
@@ -50,7 +50,6 @@ function isUtf8(b: Uint8Array) {
   }
 }
 
-/** 识别来源：一木导出 / 转账导出 / 通用 */
 export function detectFormat(headers: string[]): SourceFormat {
   const has = (k: string) => headers.includes(k)
   if (has('日期') && has('收支类型') && has('金额') && (has('类别') || has('分类'))) return 'yimu'
@@ -68,16 +67,22 @@ export interface ImportPlan {
   newParents: Category[]
   newChildren: Category[]
   newAssets: Asset[]
+  newBooks: AccountBook[]
+  reimbursements: Reimbursement[]
+  refunds: Refund[]
   duplicates: number
   skipped: { row: number; reason: string }[]
   income: number
   expense: number
+  /** 各列的填充情况，用于告诉用户哪些字段真的带过来了 */
+  columnCoverage: { column: string; filled: number }[]
 }
 
 interface BuildArgs {
   table: ParsedTable
   existingBills: Bill[]
   existingAssets: Asset[]
+  existingBooks: AccountBook[]
   parentCategories: Category[]
   childCategories: Category[]
   userId: number
@@ -85,17 +90,15 @@ interface BuildArgs {
 }
 
 const num = (v: any) => {
-  const n = Number(String(v).replace(/[¥,\s]/g, ''))
+  const n = Number(String(v).replace(/[¥$€,，\s]/g, ''))
   return Number.isFinite(n) ? n : 0
 }
-
 const str = (v: any) => String(v ?? '').trim()
 
-/** 把表头映射成列索引；缺失返回 -1 */
 function buildIndex(headers: string[]) {
   const idx: Record<string, number> = {}
   headers.forEach((h, i) => {
-    if (idx[h] === undefined) idx[h] = i
+    if (h && idx[h] === undefined) idx[h] = i
   })
   return (name: string) => (idx[name] !== undefined ? idx[name] : -1)
 }
@@ -103,7 +106,6 @@ function buildIndex(headers: string[]) {
 function parseTime(v: any): number {
   const s = str(v)
   if (!s) return NaN
-  // YYYY-MM-DD HH:mm / YYYY/MM/DD HH:mm / 时间戳
   if (/^\d{10,13}$/.test(s)) return Number(s.length === 10 ? s + '000' : s)
   const m = s.match(/^(\d{4})[-/年](\d{1,2})[-/月](\d{1,2})[日]?(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/)
   if (m) {
@@ -116,18 +118,21 @@ function parseTime(v: any): number {
   return Number.isNaN(t) ? NaN : t
 }
 
-/** 生成导入计划（不落库，先给用户看） */
 export function buildImportPlan(args: BuildArgs): ImportPlan {
-  const { table, existingBills, existingAssets, parentCategories, childCategories, userId, bookId } = args
+  const { table, existingBills, existingAssets, existingBooks, parentCategories, childCategories, userId, bookId } = args
   const format = detectFormat(table.headers)
   const col = buildIndex(table.headers)
 
   const parents = [...parentCategories]
   const children = [...childCategories]
   const assets = [...existingAssets]
+  const books = [...existingBooks]
   const newParents: Category[] = []
   const newChildren: Category[] = []
   const newAssets: Asset[] = []
+  const newBooks: AccountBook[] = []
+  const reimbursements: Reimbursement[] = []
+  const refunds: Refund[] = []
 
   const seen = new Set(existingBills.map((b) => `${b.time}|${b.cost.toFixed(2)}|${b.assetId}|${b.remark}`))
   const bills: Bill[] = []
@@ -137,7 +142,6 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
   let income = 0
   let expense = 0
   let seq = 0
-
   const idFor = (base: number) => base + (seq++)
 
   const ensureParent = (name: string, kind: 'expense' | 'income'): number => {
@@ -145,8 +149,7 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
     const hit = parents.find((p) => p.name === n && p.kind === kind)
     if (hit) return hit.id
     const cat: Category = { id: idFor(900000), name: n, parentId: 0, kind, color: '#94a3b8', positionWeight: parents.length }
-    parents.push(cat)
-    newParents.push(cat)
+    parents.push(cat); newParents.push(cat)
     return cat.id
   }
 
@@ -156,8 +159,7 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
     const hit = children.find((c) => c.name === n && c.parentId === parentId)
     if (hit) return hit.id
     const cat: Category = { id: idFor(950000), name: n, parentId, kind: 'expense', color: '#cbd5e1', positionWeight: children.length }
-    children.push(cat)
-    newChildren.push(cat)
+    children.push(cat); newChildren.push(cat)
     return cat.id
   }
 
@@ -167,22 +169,30 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
     if (hit) return hit.assetId
     const isCredit = /信用卡|花呗|白条/.test(n)
     const asset: Asset = {
-      assetId: idFor(800000),
-      assetName: n,
-      assetType: isCredit ? 2 : 1,
-      assetNumber: 0,
-      groupName: isCredit ? '信用卡' : '导入',
-      hide: false,
-      intoTotalAsset: true,
-      positionWeight: assets.length,
-      remark: '',
-      userId,
-      updateTime: Date.now()
+      assetId: idFor(800000), assetName: n, assetType: isCredit ? 2 : 1, assetNumber: 0,
+      groupName: isCredit ? '信用卡' : '导入', hide: false, intoTotalAsset: true,
+      positionWeight: assets.length, remark: '', userId, updateTime: Date.now()
     }
-    assets.push(asset)
-    newAssets.push(asset)
+    assets.push(asset); newAssets.push(asset)
     return asset.assetId
   }
+
+  const ensureBook = (name: string): number => {
+    const n = str(name) || '日常账本'
+    const hit = books.find((b) => b.accountBookName === n)
+    if (hit) return hit.accountBookId
+    const book: AccountBook = { accountBookId: idFor(700000), accountBookName: n, userId, createTime: Date.now() }
+    books.push(book); newBooks.push(book)
+    return book.accountBookId
+  }
+
+  // 列填充率：让用户看到哪些字段真的带过来了
+  const coverageCols = ['日期', '收支类型', '金额', '类别', '二级分类', '账户', '账本', '退款', '优惠',
+    '备注', '标签', '报销账户', '报销金额', '报销明细', '多币种', '地址', '创建用户', '其他', '附件1']
+  const columnCoverage = coverageCols
+    .filter((c) => col(c) >= 0)
+    .map((c) => ({ column: c, filled: table.rows.filter((r) => str(r[col(c)]) !== '').length }))
+    .filter((x) => x.filled > 0)
 
   if (format === 'transfer') {
     table.rows.forEach((r, i) => {
@@ -206,8 +216,15 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
         updateTime: Date.now()
       })
     })
-    return { format, headers: table.headers, total: table.rows.length, bills, transfers, newParents, newChildren, newAssets, duplicates, skipped, income, expense }
+    return {
+      format, headers: table.headers, total: table.rows.length, bills, transfers,
+      newParents, newChildren, newAssets, newBooks, reimbursements, refunds,
+      duplicates, skipped, income, expense, columnCoverage
+    }
   }
+
+  // 记录「行号 → 账单」用于回填报销/退款的 billId
+  const pendings: { bill: Bill; reimb?: { assetName: string; amount: number; detail: string }; refund?: number }[] = []
 
   table.rows.forEach((r, i) => {
     const dateRaw = r[col('日期')] ?? r[col('时间')] ?? r[col('日期时间')]
@@ -223,47 +240,63 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
       skipped.push({ row: i + 2, reason: '金额为空或为 0' })
       return
     }
-    // 收入正、支出负；也兼容"支出为正"的通用表格
-    const isIncome = /收入|收/.test(typeText) && !/支出/.test(typeText)
-      ? true
-      : /支出|支/.test(typeText)
-        ? false
-        : amountRaw > 0
-
+    const isIncome = /收入/.test(typeText) ? true : /支出/.test(typeText) ? false : amountRaw > 0
     const cost = Math.abs(amountRaw)
+
     const parentName = str(r[col('类别')] ?? r[col('分类')] ?? r[col('一级分类')] ?? r[col('大类')]) || (isIncome ? '其他收入' : '其他')
     const childName = str(r[col('二级分类')] ?? r[col('子分类')])
-    const assetName = str(r[col('账户')] ?? r[col('支付账户')])
-    const remark = str(r[col('备注')])
-    const assetId = ensureAsset(assetName)
+    const assetId = ensureAsset(str(r[col('账户')] ?? r[col('支付账户')]))
     const parentCategoryId = ensureParent(parentName, isIncome ? 'income' : 'expense')
     const childCategoryId = ensureChild(childName, parentCategoryId)
+    const remark = str(r[col('备注')])
+    const bookIdOfRow = col('账本') >= 0 ? ensureBook(str(r[col('账本')])) : bookId
 
     const key = `${time}|${cost.toFixed(2)}|${assetId}|${remark}`
-    if (seen.has(key)) {
-      duplicates++
-      return
-    }
+    if (seen.has(key)) { duplicates++; return }
     seen.add(key)
 
     if (isIncome) income += cost
     else expense += cost
 
-    bills.push({
-      billId: time, // 秒级时间戳，下面统一校正冲突
+    // 「其他」列写成 "不计入收支、不计入预算" 这类文本
+    const otherText = str(r[col('其他')])
+    const attachmentUrls = [1, 2, 3, 4, 5]
+      .map((n) => str(r[col(`附件${n}`)]))
+      .filter(Boolean)
+
+    const bill: Bill = {
+      billId: time,
       time,
       cost,
       parentCategoryId,
       childCategoryId,
       assetId,
-      bookId,
+      bookId: bookIdOfRow,
       remark,
-      billType: 3, // 导入记账
+      billType: 3,
       tags: str(r[col('标签')]).split(/[,，;；\s]+/).filter(Boolean),
-      files: [],
+      files: attachmentUrls.map((u, idx) => ({ name: `附件${idx + 1}`, remotePath: u })),
       userId,
       updateTime: Date.now(),
-      billShareInfo: { parentCategoryName: parentName, childCategoryName: childName, assetName }
+      billShareInfo: { parentCategoryName: parentName, childCategoryName: childName, assetName: assets.find((a) => a.assetId === assetId)?.assetName ?? '' },
+      notIntoTotal: /不计入收支/.test(otherText),
+      notIntoBudget: /不计入预算/.test(otherText),
+      discountNumber: Math.abs(num(r[col('优惠')])),
+      refundNum: Math.abs(num(r[col('退款')])),
+      currencyInfo: str(r[col('多币种')]),
+      poiAddress: str(r[col('地址')]),
+      fromUserId: num(r[col('创建用户')]) || 0
+    }
+    bills.push(bill)
+
+    const reimbAcc = str(r[col('报销账户')])
+    const reimbAmt = Math.abs(num(r[col('报销金额')]))
+    const reimbDetail = str(r[col('报销明细')])
+    const refundAmt = Math.abs(num(r[col('退款')]))
+    pendings.push({
+      bill,
+      reimb: (reimbAcc || reimbAmt > 0) ? { assetName: reimbAcc, amount: reimbAmt, detail: reimbDetail } : undefined,
+      refund: refundAmt > 0 ? refundAmt : undefined
     })
   })
 
@@ -277,17 +310,56 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
     used.add(id)
   })
 
-  return { format, headers: table.headers, total: table.rows.length, bills, transfers, newParents, newChildren, newAssets, duplicates, skipped, income, expense }
+  // 报销 / 退款挂到最终 billId 上
+  let rseq = 0
+  pendings.forEach((p) => {
+    if (p.reimb) {
+      reimbursements.push({
+        reimbursementId: Date.now() + (rseq++),
+        billId: p.bill.billId,
+        assetId: p.reimb.assetName ? ensureAsset(p.reimb.assetName) : 0,
+        number: p.reimb.amount,
+        detail: p.reimb.detail,
+        userId,
+        updateTime: Date.now()
+      })
+    }
+    if (p.refund) {
+      refunds.push({
+        refundId: Date.now() + (rseq++),
+        billId: p.bill.billId,
+        number: p.refund,
+        userId,
+        updateTime: Date.now()
+      })
+    }
+  })
+
+  return {
+    format, headers: table.headers, total: table.rows.length, bills, transfers,
+    newParents, newChildren, newAssets, newBooks, reimbursements, refunds,
+    duplicates, skipped, income, expense, columnCoverage
+  }
 }
 
-/** 导出成与原产品同构的 xlsx（可再被打回） */
-export function exportXlsx(bills: Bill[], parents: Category[], children: Category[], assets: Asset[]) {
-  const header = ['日期', '收支类型', '金额', '类别', '二级分类', '账户', '账本', '备注', '标签', '不计入收支']
+/** 导出：列与一木一致，便于再导回或换工具 */
+export function exportXlsx(
+  bills: Bill[], parents: Category[], children: Category[], assets: Asset[],
+  books: AccountBook[] = [], reimbursements: Reimbursement[] = [], refunds: Refund[] = []
+) {
+  const header = ['日期', '收支类型', '金额', '类别', '二级分类', '账户', '账本', '退款', '优惠', '备注', '标签',
+    '报销账户', '报销金额', '报销明细', '多币种', '地址', '创建用户', '其他', '附件1', '附件2', '附件3', '附件4', '附件5']
   const rows = bills.map((b) => {
     const p = parents.find((x) => x.id === b.parentCategoryId)
     const c = children.find((x) => x.id === b.childCategoryId)
     const a = assets.find((x) => x.assetId === b.assetId)
+    const bk = books.find((x) => x.accountBookId === b.bookId)
+    const reimb = reimbursements.find((x) => x.billId === b.billId)
+    const refund = refunds.find((x) => x.billId === b.billId)
     const isIncome = p?.kind === 'income'
+    const flags = [b.notIntoTotal ? '不计入收支' : '', b.notIntoBudget ? '不计入预算' : ''].filter(Boolean).join('、')
+    const files = (b.files || []).slice(0, 5).map((f: any) => f?.remotePath ?? '')
+    while (files.length < 5) files.push('')
     return [
       fmtTime(b.time),
       isIncome ? '收入' : '支出',
@@ -295,10 +367,19 @@ export function exportXlsx(bills: Bill[], parents: Category[], children: Categor
       p?.name ?? '',
       c?.name ?? '',
       a?.assetName ?? '',
-      '日常账本',
+      bk?.accountBookName ?? '日常账本',
+      b.refundNum ?? 0,
+      b.discountNumber ?? 0,
       b.remark,
       (b.tags || []).join(','),
-      ''
+      reimb ? (assets.find((x) => x.assetId === reimb.assetId)?.assetName ?? '') : '',
+      reimb ? reimb.number : '',
+      reimb ? reimb.detail : '',
+      b.currencyInfo ?? '',
+      b.poiAddress ?? '',
+      b.fromUserId || '',
+      flags,
+      ...files
     ]
   })
   const ws = XLSX.utils.aoa_to_sheet([header, ...rows])

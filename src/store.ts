@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { AccountBook, Asset, Bill, Category, Transfer } from './types'
+import type { AccountBook, Asset, Bill, Category, Refund, Reimbursement, Transfer } from './types'
 import type { ImportPlan } from './importer'
 import { TAXONOMY_CHILDREN, TAXONOMY_INCOME, TAXONOMY_PARENTS } from './taxonomy'
 
@@ -25,6 +25,8 @@ interface LedgerState {
   childCategories: Category[]
   transfers: Transfer[]
   budgets: Budget[]
+  reimbursements: Reimbursement[]
+  refunds: Refund[]
   /** 上次使用的分类/账户，用于快速记账 */
   lastParentId: number
   lastChildId: number
@@ -62,6 +64,8 @@ export const useLedger = create<LedgerState>()(
       childCategories: TAXONOMY_CHILDREN,
       transfers: [],
       budgets: [],
+      reimbursements: [],
+      refunds: [],
       lastParentId: 7,
       lastChildId: 0,
       lastAssetId: 0,
@@ -276,7 +280,8 @@ export const useLedger = create<LedgerState>()(
       },
 
       reset: () => set({
-        assets: [], bills: [], transfers: [], budgets: [], seeded: false,
+        assets: [], bills: [], transfers: [], budgets: [],
+        reimbursements: [], refunds: [], seeded: false,
         parentCategories: [...TAXONOMY_PARENTS, ...TAXONOMY_INCOME],
         childCategories: TAXONOMY_CHILDREN
       }),
@@ -291,6 +296,8 @@ export const useLedger = create<LedgerState>()(
           bills: s.bills,
           transfers: s.transfers,
           budgets: s.budgets,
+          reimbursements: s.reimbursements,
+          refunds: s.refunds,
           parentCategories: s.parentCategories,
           childCategories: s.childCategories
         }
@@ -333,9 +340,12 @@ export const useLedger = create<LedgerState>()(
         return {
           parentCategories: parents,
           childCategories: [...s.childCategories, ...plan.newChildren],
+          accountBooks: [...s.accountBooks, ...plan.newBooks],
           assets,
           bills: [...plan.bills, ...s.bills],
           transfers: [...plan.transfers, ...s.transfers],
+          reimbursements: [...plan.reimbursements, ...s.reimbursements],
+          refunds: [...plan.refunds, ...s.refunds],
           seeded: true
         }
       }),
@@ -346,6 +356,8 @@ export const useLedger = create<LedgerState>()(
         bills: data.bills ?? [],
         transfers: data.transfers ?? [],
         budgets: data.budgets ?? [],
+        reimbursements: data.reimbursements ?? [],
+        refunds: data.refunds ?? [],
         parentCategories: data.parentCategories ?? s.parentCategories,
         childCategories: data.childCategories ?? s.childCategories,
         seeded: true

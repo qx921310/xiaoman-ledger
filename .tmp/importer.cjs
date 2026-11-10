@@ -32690,14 +32690,14 @@ function detectFormat(headers) {
   return "unknown";
 }
 var num = (v) => {
-  const n = Number(String(v).replace(/[¥,\s]/g, ""));
+  const n = Number(String(v).replace(/[¥$€,，\s]/g, ""));
   return Number.isFinite(n) ? n : 0;
 };
 var str = (v) => String(v ?? "").trim();
 function buildIndex(headers) {
   const idx = {};
   headers.forEach((h, i) => {
-    if (idx[h] === void 0) idx[h] = i;
+    if (h && idx[h] === void 0) idx[h] = i;
   });
   return (name) => idx[name] !== void 0 ? idx[name] : -1;
 }
@@ -32720,15 +32720,19 @@ function parseTime(v) {
   return Number.isNaN(t) ? NaN : t;
 }
 function buildImportPlan(args) {
-  const { table, existingBills, existingAssets, parentCategories, childCategories, userId, bookId } = args;
+  const { table, existingBills, existingAssets, existingBooks, parentCategories, childCategories, userId, bookId } = args;
   const format = detectFormat(table.headers);
   const col = buildIndex(table.headers);
   const parents = [...parentCategories];
   const children = [...childCategories];
   const assets = [...existingAssets];
+  const books = [...existingBooks];
   const newParents = [];
   const newChildren = [];
   const newAssets = [];
+  const newBooks = [];
+  const reimbursements = [];
+  const refunds = [];
   const seen = new Set(existingBills.map((b) => `${b.time}|${b.cost.toFixed(2)}|${b.assetId}|${b.remark}`));
   const bills = [];
   const transfers = [];
@@ -32779,6 +32783,37 @@ function buildImportPlan(args) {
     newAssets.push(asset);
     return asset.assetId;
   };
+  const ensureBook = (name) => {
+    const n = str(name) || "\u65E5\u5E38\u8D26\u672C";
+    const hit = books.find((b) => b.accountBookName === n);
+    if (hit) return hit.accountBookId;
+    const book = { accountBookId: idFor(7e5), accountBookName: n, userId, createTime: Date.now() };
+    books.push(book);
+    newBooks.push(book);
+    return book.accountBookId;
+  };
+  const coverageCols = [
+    "\u65E5\u671F",
+    "\u6536\u652F\u7C7B\u578B",
+    "\u91D1\u989D",
+    "\u7C7B\u522B",
+    "\u4E8C\u7EA7\u5206\u7C7B",
+    "\u8D26\u6237",
+    "\u8D26\u672C",
+    "\u9000\u6B3E",
+    "\u4F18\u60E0",
+    "\u5907\u6CE8",
+    "\u6807\u7B7E",
+    "\u62A5\u9500\u8D26\u6237",
+    "\u62A5\u9500\u91D1\u989D",
+    "\u62A5\u9500\u660E\u7EC6",
+    "\u591A\u5E01\u79CD",
+    "\u5730\u5740",
+    "\u521B\u5EFA\u7528\u6237",
+    "\u5176\u4ED6",
+    "\u9644\u4EF61"
+  ];
+  const columnCoverage = coverageCols.filter((c) => col(c) >= 0).map((c) => ({ column: c, filled: table.rows.filter((r) => str(r[col(c)]) !== "").length })).filter((x) => x.filled > 0);
   if (format === "transfer") {
     table.rows.forEach((r, i) => {
       const time = parseTime(r[col("\u65E5\u671F")] ?? r[col("\u65F6\u95F4")]);
@@ -32801,8 +32836,26 @@ function buildImportPlan(args) {
         updateTime: Date.now()
       });
     });
-    return { format, headers: table.headers, total: table.rows.length, bills, transfers, newParents, newChildren, newAssets, duplicates, skipped, income, expense };
+    return {
+      format,
+      headers: table.headers,
+      total: table.rows.length,
+      bills,
+      transfers,
+      newParents,
+      newChildren,
+      newAssets,
+      newBooks,
+      reimbursements,
+      refunds,
+      duplicates,
+      skipped,
+      income,
+      expense,
+      columnCoverage
+    };
   }
+  const pendings = [];
   table.rows.forEach((r, i) => {
     const dateRaw = r[col("\u65E5\u671F")] ?? r[col("\u65F6\u95F4")] ?? r[col("\u65E5\u671F\u65F6\u95F4")];
     const time = parseTime(dateRaw);
@@ -32816,15 +32869,15 @@ function buildImportPlan(args) {
       skipped.push({ row: i + 2, reason: "\u91D1\u989D\u4E3A\u7A7A\u6216\u4E3A 0" });
       return;
     }
-    const isIncome = /收入|收/.test(typeText) && !/支出/.test(typeText) ? true : /支出|支/.test(typeText) ? false : amountRaw > 0;
+    const isIncome = /收入/.test(typeText) ? true : /支出/.test(typeText) ? false : amountRaw > 0;
     const cost = Math.abs(amountRaw);
     const parentName = str(r[col("\u7C7B\u522B")] ?? r[col("\u5206\u7C7B")] ?? r[col("\u4E00\u7EA7\u5206\u7C7B")] ?? r[col("\u5927\u7C7B")]) || (isIncome ? "\u5176\u4ED6\u6536\u5165" : "\u5176\u4ED6");
     const childName = str(r[col("\u4E8C\u7EA7\u5206\u7C7B")] ?? r[col("\u5B50\u5206\u7C7B")]);
-    const assetName = str(r[col("\u8D26\u6237")] ?? r[col("\u652F\u4ED8\u8D26\u6237")]);
-    const remark = str(r[col("\u5907\u6CE8")]);
-    const assetId = ensureAsset(assetName);
+    const assetId = ensureAsset(str(r[col("\u8D26\u6237")] ?? r[col("\u652F\u4ED8\u8D26\u6237")]));
     const parentCategoryId = ensureParent(parentName, isIncome ? "income" : "expense");
     const childCategoryId = ensureChild(childName, parentCategoryId);
+    const remark = str(r[col("\u5907\u6CE8")]);
+    const bookIdOfRow = col("\u8D26\u672C") >= 0 ? ensureBook(str(r[col("\u8D26\u672C")])) : bookId;
     const key = `${time}|${cost.toFixed(2)}|${assetId}|${remark}`;
     if (seen.has(key)) {
       duplicates++;
@@ -32833,23 +32886,40 @@ function buildImportPlan(args) {
     seen.add(key);
     if (isIncome) income += cost;
     else expense += cost;
-    bills.push({
+    const otherText = str(r[col("\u5176\u4ED6")]);
+    const attachmentUrls = [1, 2, 3, 4, 5].map((n) => str(r[col(`\u9644\u4EF6${n}`)])).filter(Boolean);
+    const bill = {
       billId: time,
-      // 秒级时间戳，下面统一校正冲突
       time,
       cost,
       parentCategoryId,
       childCategoryId,
       assetId,
-      bookId,
+      bookId: bookIdOfRow,
       remark,
       billType: 3,
-      // 导入记账
       tags: str(r[col("\u6807\u7B7E")]).split(/[,，;；\s]+/).filter(Boolean),
-      files: [],
+      files: attachmentUrls.map((u, idx) => ({ name: `\u9644\u4EF6${idx + 1}`, remotePath: u })),
       userId,
       updateTime: Date.now(),
-      billShareInfo: { parentCategoryName: parentName, childCategoryName: childName, assetName }
+      billShareInfo: { parentCategoryName: parentName, childCategoryName: childName, assetName: assets.find((a) => a.assetId === assetId)?.assetName ?? "" },
+      notIntoTotal: /不计入收支/.test(otherText),
+      notIntoBudget: /不计入预算/.test(otherText),
+      discountNumber: Math.abs(num(r[col("\u4F18\u60E0")])),
+      refundNum: Math.abs(num(r[col("\u9000\u6B3E")])),
+      currencyInfo: str(r[col("\u591A\u5E01\u79CD")]),
+      poiAddress: str(r[col("\u5730\u5740")]),
+      fromUserId: num(r[col("\u521B\u5EFA\u7528\u6237")]) || 0
+    };
+    bills.push(bill);
+    const reimbAcc = str(r[col("\u62A5\u9500\u8D26\u6237")]);
+    const reimbAmt = Math.abs(num(r[col("\u62A5\u9500\u91D1\u989D")]));
+    const reimbDetail = str(r[col("\u62A5\u9500\u660E\u7EC6")]);
+    const refundAmt = Math.abs(num(r[col("\u9000\u6B3E")]));
+    pendings.push({
+      bill,
+      reimb: reimbAcc || reimbAmt > 0 ? { assetName: reimbAcc, amount: reimbAmt, detail: reimbDetail } : void 0,
+      refund: refundAmt > 0 ? refundAmt : void 0
     });
   });
   const used = new Set(existingBills.map((b) => b.billId));
@@ -32860,15 +32930,85 @@ function buildImportPlan(args) {
     b.billId = id;
     used.add(id);
   });
-  return { format, headers: table.headers, total: table.rows.length, bills, transfers, newParents, newChildren, newAssets, duplicates, skipped, income, expense };
+  let rseq = 0;
+  pendings.forEach((p) => {
+    if (p.reimb) {
+      reimbursements.push({
+        reimbursementId: Date.now() + rseq++,
+        billId: p.bill.billId,
+        assetId: p.reimb.assetName ? ensureAsset(p.reimb.assetName) : 0,
+        number: p.reimb.amount,
+        detail: p.reimb.detail,
+        userId,
+        updateTime: Date.now()
+      });
+    }
+    if (p.refund) {
+      refunds.push({
+        refundId: Date.now() + rseq++,
+        billId: p.bill.billId,
+        number: p.refund,
+        userId,
+        updateTime: Date.now()
+      });
+    }
+  });
+  return {
+    format,
+    headers: table.headers,
+    total: table.rows.length,
+    bills,
+    transfers,
+    newParents,
+    newChildren,
+    newAssets,
+    newBooks,
+    reimbursements,
+    refunds,
+    duplicates,
+    skipped,
+    income,
+    expense,
+    columnCoverage
+  };
 }
-function exportXlsx(bills, parents, children, assets) {
-  const header = ["\u65E5\u671F", "\u6536\u652F\u7C7B\u578B", "\u91D1\u989D", "\u7C7B\u522B", "\u4E8C\u7EA7\u5206\u7C7B", "\u8D26\u6237", "\u8D26\u672C", "\u5907\u6CE8", "\u6807\u7B7E", "\u4E0D\u8BA1\u5165\u6536\u652F"];
+function exportXlsx(bills, parents, children, assets, books = [], reimbursements = [], refunds = []) {
+  const header = [
+    "\u65E5\u671F",
+    "\u6536\u652F\u7C7B\u578B",
+    "\u91D1\u989D",
+    "\u7C7B\u522B",
+    "\u4E8C\u7EA7\u5206\u7C7B",
+    "\u8D26\u6237",
+    "\u8D26\u672C",
+    "\u9000\u6B3E",
+    "\u4F18\u60E0",
+    "\u5907\u6CE8",
+    "\u6807\u7B7E",
+    "\u62A5\u9500\u8D26\u6237",
+    "\u62A5\u9500\u91D1\u989D",
+    "\u62A5\u9500\u660E\u7EC6",
+    "\u591A\u5E01\u79CD",
+    "\u5730\u5740",
+    "\u521B\u5EFA\u7528\u6237",
+    "\u5176\u4ED6",
+    "\u9644\u4EF61",
+    "\u9644\u4EF62",
+    "\u9644\u4EF63",
+    "\u9644\u4EF64",
+    "\u9644\u4EF65"
+  ];
   const rows = bills.map((b) => {
     const p = parents.find((x) => x.id === b.parentCategoryId);
     const c = children.find((x) => x.id === b.childCategoryId);
     const a = assets.find((x) => x.assetId === b.assetId);
+    const bk = books.find((x) => x.accountBookId === b.bookId);
+    const reimb = reimbursements.find((x) => x.billId === b.billId);
+    const refund = refunds.find((x) => x.billId === b.billId);
     const isIncome = p?.kind === "income";
+    const flags = [b.notIntoTotal ? "\u4E0D\u8BA1\u5165\u6536\u652F" : "", b.notIntoBudget ? "\u4E0D\u8BA1\u5165\u9884\u7B97" : ""].filter(Boolean).join("\u3001");
+    const files = (b.files || []).slice(0, 5).map((f) => f?.remotePath ?? "");
+    while (files.length < 5) files.push("");
     return [
       fmtTime(b.time),
       isIncome ? "\u6536\u5165" : "\u652F\u51FA",
@@ -32876,10 +33016,19 @@ function exportXlsx(bills, parents, children, assets) {
       p?.name ?? "",
       c?.name ?? "",
       a?.assetName ?? "",
-      "\u65E5\u5E38\u8D26\u672C",
+      bk?.accountBookName ?? "\u65E5\u5E38\u8D26\u672C",
+      b.refundNum ?? 0,
+      b.discountNumber ?? 0,
       b.remark,
       (b.tags || []).join(","),
-      ""
+      reimb ? assets.find((x) => x.assetId === reimb.assetId)?.assetName ?? "" : "",
+      reimb ? reimb.number : "",
+      reimb ? reimb.detail : "",
+      b.currencyInfo ?? "",
+      b.poiAddress ?? "",
+      b.fromUserId || "",
+      flags,
+      ...files
     ];
   });
   const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);

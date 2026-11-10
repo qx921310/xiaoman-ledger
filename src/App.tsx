@@ -685,6 +685,9 @@ function Settings({ notify }: { notify: (m: string) => void }) {
   const assets = useLedger((s) => s.assets)
   const parents = useLedger((s) => s.parentCategories)
   const children = useLedger((s) => s.childCategories)
+  const accountBooks = useLedger((s) => s.accountBooks)
+  const reimbursements = useLedger((s) => s.reimbursements)
+  const refunds = useLedger((s) => s.refunds)
 
   const [plan, setPlan] = useState<ImportPlan | null>(null)
   const [fileName, setFileName] = useState('')
@@ -701,7 +704,7 @@ function Settings({ notify }: { notify: (m: string) => void }) {
       const { parseLedgerFile, buildImportPlan } = await import('./importer')
       const table = parseLedgerFile(await f.arrayBuffer(), f.name)
       const p = buildImportPlan({
-        table, existingBills: bills, existingAssets: assets,
+        table, existingBills: bills, existingAssets: assets, existingBooks: accountBooks,
         parentCategories: parents, childCategories: children, userId: 1, bookId: 1
       })
       setFileName(f.name)
@@ -722,7 +725,7 @@ function Settings({ notify }: { notify: (m: string) => void }) {
       const { parseLedgerFile, buildImportPlan } = await import('./importer')
       const table = parseLedgerFile(buf, 'demo-yimu.xlsx')
       const p = buildImportPlan({
-        table, existingBills: bills, existingAssets: assets,
+        table, existingBills: bills, existingAssets: assets, existingBooks: accountBooks,
         parentCategories: parents, childCategories: children, userId: 1, bookId: 1
       })
       setFileName('内置示例 demo-yimu.xlsx')
@@ -752,7 +755,7 @@ function Settings({ notify }: { notify: (m: string) => void }) {
   const doExportXlsx = async () => {
     if (bills.length === 0) return notify('还没有账单可导出')
     const { exportXlsx } = await import('./importer')
-    exportXlsx(bills, parents, children, assets)
+    exportXlsx(bills, parents, children, assets, accountBooks, reimbursements, refunds)
     notify(`已导出 ${bills.length} 条为 Excel`)
   }
 
@@ -810,8 +813,16 @@ function Settings({ notify }: { notify: (m: string) => void }) {
             <div><small>收入合计</small><b className="in">{money(plan.income)}</b></div>
             <div><small>支出合计</small><b className="out">{money(plan.expense)}</b></div>
             <div><small>新增分类</small><b>{plan.newParents.length}</b></div>
-            <div><small>新增账户</small><b>{plan.newAssets.length}</b></div>
+            <div><small>新增账户/账本</small><b>{plan.newAssets.length}/{plan.newBooks.length}</b></div>
           </div>
+          {(plan.reimbursements.length > 0 || plan.refunds.length > 0) && (
+            <p className="hint">带过来的附属记录：报销 {plan.reimbursements.length} 条、退款 {plan.refunds.length} 条。</p>
+          )}
+          {plan.columnCoverage.length > 0 && (
+            <p className="hint">
+              识别到的列：{plan.columnCoverage.map((c) => c.column).join('、')}
+            </p>
+          )}
           {plan.skipped.length > 0 && (
             <p className="hint">跳过示例：第 {plan.skipped.slice(0, 3).map((x) => x.row).join('、')} 行 —— {plan.skipped[0].reason}</p>
           )}
