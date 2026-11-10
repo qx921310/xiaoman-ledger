@@ -299,4 +299,43 @@ const importedColaRefund = state().refunds.find(r => r.billId === importedCola.b
 assert.equal(importedColaRefund.number, 3)
 assert.equal(importedColaRefund.baseAmount, 3)
 assert.equal(importedColaRefund.assetId, importedCola.assetId)
+
+// Identical rows may be two real purchases; keep both, even after synchronization.
+state().reset()
+const identicalCsv = [
+  '日期,收支类型,金额,类别,账户,备注',
+  '2026-04-01 12:00:00,支出,-3,食品餐饮,导入钱包,可乐',
+  '2026-04-01 12:00:00,支出,-3,食品餐饮,导入钱包,可乐'
+].join('\n')
+const identicalBytes = new TextEncoder().encode(identicalCsv)
+const identicalTable = parseLedgerFile(identicalBytes.buffer, 'identical.csv')
+const planIdentical = (table: typeof identicalTable) => buildImportPlan({ table, existingBills: state().bills,
+  existingAssets: state().assets, existingBooks: state().accountBooks, parentCategories: state().parentCategories,
+  childCategories: state().childCategories, userId: 1, bookId: 1 })
+const identicalPlan = planIdentical(identicalTable)
+assert.equal(identicalPlan.bills.length, 2)
+assert.equal(identicalPlan.duplicates, 1)
+assert.notEqual(identicalPlan.bills[0].billId, identicalPlan.bills[1].billId)
+state().applyImport(identicalPlan)
+const importedWallet = state().assets.find(a => a.assetName === '导入钱包')!
+assert.equal(importedWallet.assetNumber, -6)
+const syncedBills = collectRecords().filter(r => r.kind === 'bill' && !r.deleted)
+assert.equal(syncedBills.length, 2)
+assert.notEqual(syncedBills[0].id, syncedBills[1].id)
+state().applyRemote(syncedBills)
+assert.equal(state().bills.length, 2)
+assert.equal(balance(importedWallet.assetId), -6)
+const repeatedPlan = planIdentical(identicalTable)
+assert.equal(repeatedPlan.bills.length, 2)
+assert.equal(repeatedPlan.duplicates, 2)
+assert.ok(repeatedPlan.bills.every(b => !state().bills.some(existing => existing.billId === b.billId)))
+
+// New accounts created by a later import must not reuse an existing account ID.
+const anotherBytes = new TextEncoder().encode('日期,收支类型,金额,类别,账户,备注\n2026-04-02,支出,-1,食品餐饮,另一张卡,测试')
+const anotherPlan = planIdentical(parseLedgerFile(anotherBytes.buffer, 'second.csv'))
+assert.equal(anotherPlan.newAssets.length, 1)
+assert.notEqual(anotherPlan.newAssets[0].assetId, importedWallet.assetId)
+state().applyImport(anotherPlan)
+assert.equal(state().assets.find(a => a.assetName === '导入钱包')!.assetNumber, -6)
+assert.equal(state().assets.find(a => a.assetName === '另一张卡')!.assetNumber, -1)
 console.log('balance and synthetic CSV tests passed')

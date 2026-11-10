@@ -71,6 +71,7 @@ export interface ImportPlan {
   newBooks: AccountBook[]
   reimbursements: Reimbursement[]
   refunds: Refund[]
+  /** Rows matching an earlier or existing bill; they are retained for review. */
   duplicates: number
   skipped: { row: number; reason: string }[]
   warnings: { row: number; reason: string }[]
@@ -145,7 +146,16 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
   let income = 0
   let expense = 0
   let seq = 0
-  const idFor = (base: number) => base + (seq++)
+  const allocatedIds = new Set<number>([
+    ...parents.map((p) => p.id), ...children.map((c) => c.id),
+    ...assets.map((a) => a.assetId), ...books.map((b) => b.accountBookId)
+  ])
+  const idFor = (base: number) => {
+    let id = base + (seq++)
+    while (allocatedIds.has(id)) id = base + (seq++)
+    allocatedIds.add(id)
+    return id
+  }
 
   const ensureParent = (name: string, kind: 'expense' | 'income'): number => {
     const n = str(name) || '未分类'
@@ -300,7 +310,7 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
     const bookIdOfRow = col('账本') >= 0 ? ensureBook(str(r[col('账本')])) : bookId
 
     const key = `${time}|${cost.toFixed(2)}|${assetId}|${remark}`
-    if (seen.has(key)) { duplicates++; return }
+    if (seen.has(key)) duplicates++
     seen.add(key)
 
     if (isIncome) income += cost

@@ -165,7 +165,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
     const n = plan.bills.length + plan.transfers.length
     applyImport(plan)
     setPlan(null)
-    notify(`已导入 ${n} 条` + (plan.duplicates ? `，跳过重复 ${plan.duplicates} 条` : '') + '；账户余额已按流水推算，可在资产页调整')
+    notify(`已导入 ${n} 条` + (plan.duplicates ? `，其中 ${plan.duplicates} 条疑似重复，请核对` : '') + '；账户余额已按流水推算，可在资产页调整')
   }
 
   const doExportJson = () => {
@@ -214,7 +214,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
       <h3>从其他记账软件迁移</h3>
       <p className="hint">
         支持 <b>一木记账导出的 Excel/CSV</b>（表头含 日期/收支类型/金额/类别/二级分类/账户）、
-        转账流水表，以及含时间与金额的通用表格。重复账单会自动跳过。
+        转账流水表，以及含时间与金额的通用表格。疑似重复的账单会提示核对，并全部保留。
       </p>
 
       <label className="filebtn big">
@@ -235,7 +235,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
           <div className="preview-stats">
             <div><small>总行数</small><b>{plan.total}</b></div>
             <div><small>可导入</small><b className="in">{plan.bills.length + plan.transfers.length}</b></div>
-            <div><small>重复跳过</small><b>{plan.duplicates}</b></div>
+            <div><small>疑似重复</small><b>{plan.duplicates}</b></div>
             <div><small>无法解析</small><b>{plan.skipped.length}</b></div>
           </div>
           <div className="preview-stats">
@@ -258,6 +258,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
           {plan.warnings.length > 0 && (
             <p className="hint">需要核对 {plan.warnings.length} 条：例如第 {plan.warnings[0].row} 行，{plan.warnings[0].reason}。</p>
           )}
+          {plan.duplicates > 0 && <p className="hint">疑似重复记录也会全部导入。若重复导入同一文件，请先核对，避免多记。</p>}
           <button className="primary" onClick={confirmImport} disabled={plan.bills.length + plan.transfers.length === 0}>
             确认导入 {plan.bills.length + plan.transfers.length} 条
           </button>
