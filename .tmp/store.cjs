@@ -3615,20 +3615,20 @@ var useLedger = create()(
           if (!r.payload) continue;
           if (r.ownerId != null && r.payload.ownerId == null) r.payload = { ...r.payload, ownerId: r.ownerId };
           const idx = arr.findIndex((x) => idOf(r.kind, x) === String(r.id));
+          const ownerOf = (x) => x?.ownerId ?? x?.userId ?? 0;
+          if (idx >= 0 && ownerOf(arr[idx]) !== ownerOf(r.payload)) {
+            const idField = k[1];
+            const taken = new Set(arr.map((x) => String(x[idField])));
+            let nextId = (Number(r.id) || 0) + 1;
+            while (taken.has(String(nextId))) nextId++;
+            arr.push({ ...r.payload, [idField]: nextId });
+            next[k[0]] = arr;
+            continue;
+          }
           const localTime = idx >= 0 ? arr[idx].updateTime ?? 0 : -1;
           if (idx < 0 || (r.updatedAt ?? 0) > localTime) {
-            if (idx >= 0) {
-              const prev = arr[idx];
-              const clash = prev.ownerId != null && r.ownerId != null && prev.ownerId !== r.ownerId || prev.ownerId == null && r.ownerId != null && prev.userId !== r.ownerId;
-              arr[idx] = clash ? { ...r.payload, conflict: true, conflictOwnerId: prev.ownerId ?? prev.userId } : r.payload;
-            } else {
-              const dup = arr.filter((x) => idOf(r.kind, x) === String(r.id));
-              arr.push(r.payload);
-              if (dup.length) {
-                const i2 = arr.findIndex((x) => idOf(r.kind, x) === String(r.id) && x !== r.payload);
-                if (i2 >= 0) arr[i2] = { ...arr[i2], conflict: true };
-              }
-            }
+            if (idx >= 0) arr[idx] = r.payload;
+            else arr.push(r.payload);
           }
           next[k[0]] = arr;
         }
