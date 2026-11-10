@@ -47,6 +47,9 @@ export interface Reimbursement {
   assetId: number
   number: number
   detail: string
+  /** pending=登记待报销，done=已到账（钱已进报销账户） */
+  status: 'pending' | 'done'
+  settledAt?: number
   userId: number
   updateTime: number
 }

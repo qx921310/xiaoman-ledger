@@ -35,6 +35,11 @@ interface LedgerState {
 
   addBill: (patch: Partial<Bill>) => Bill
   deleteTransfer: (transferId: number) => void
+  addReimbursement: (patch: { billId: number; assetId: number; number: number; detail?: string }) => void
+  settleReimbursement: (reimbursementId: number) => void
+  deleteReimbursement: (reimbursementId: number) => void
+  addRefund: (patch: { billId: number; number: number }) => void
+  deleteRefund: (refundId: number) => void
   setBudget: (budget: Budget) => void
   removeBudget: (month: string, categoryId: number) => void
   deleteBill: (billId: number) => void
@@ -240,6 +245,74 @@ export const useLedger = create<LedgerState>()(
             if (a.assetId === t.toAssetId) return { ...a, assetNumber: +(a.assetNumber - t.cost).toFixed(2), updateTime: NOW() }
             return a
           })
+        }
+      }),
+
+      // 登记报销：只落记录，钱还没到；确认到账时才进报销账户
+      addReimbursement: ({ billId, assetId, number, detail }) => set((s) => {
+        const rid = Date.now()
+        const rec: Reimbursement = {
+          reimbursementId: rid, billId, assetId, number: Number(number) || 0,
+          detail: detail ?? '', status: 'pending', userId: s.userId, updateTime: NOW()
+        }
+        const bill = s.bills.find((b) => b.billId === billId)
+        return {
+          reimbursements: [rec, ...s.reimbursements],
+          bills: bill ? s.bills.map((b) => b.billId === billId
+            ? { ...b, isReimbursement: 1, reimbursementNum: rec.number, updateTime: NOW() } : b) : s.bills
+        }
+      }),
+
+      settleReimbursement: (reimbursementId) => set((s) => {
+        const rec = s.reimbursements.find((r) => r.reimbursementId === reimbursementId)
+        if (!rec || rec.status === 'done') return {}
+        return {
+          reimbursements: s.reimbursements.map((r) => r.reimbursementId === reimbursementId
+            ? { ...r, status: 'done' as const, settledAt: NOW(), updateTime: NOW() } : r),
+          assets: s.assets.map((a) => a.assetId === rec.assetId
+            ? { ...a, assetNumber: +(a.assetNumber + rec.number).toFixed(2), updateTime: NOW() } : a)
+        }
+      }),
+
+      deleteReimbursement: (reimbursementId) => set((s) => {
+        const rec = s.reimbursements.find((r) => r.reimbursementId === reimbursementId)
+        if (!rec) return {}
+        const refundBack = rec.status === 'done' ? rec.number : 0
+        return {
+          reimbursements: s.reimbursements.filter((r) => r.reimbursementId !== reimbursementId),
+          assets: refundBack ? s.assets.map((a) => a.assetId === rec.assetId
+            ? { ...a, assetNumber: +(a.assetNumber - refundBack).toFixed(2), updateTime: NOW() } : a) : s.assets,
+          bills: s.bills.map((b) => b.billId === rec.billId
+            ? { ...b, isReimbursement: 0, reimbursementNum: 0, updateTime: NOW() } : b)
+        }
+      }),
+
+      // 退款：钱退回原支付账户，直接冲减这笔支出
+      addRefund: ({ billId, number }) => set((s) => {
+        const bill = s.bills.find((b) => b.billId === billId)
+        if (!bill) return {}
+        const amt = Number(number) || 0
+        if (amt <= 0) return {}
+        const rec: Refund = {
+          refundId: Date.now(), billId, number: amt, userId: s.userId, updateTime: NOW()
+        }
+        return {
+          refunds: [rec, ...s.refunds],
+          bills: s.bills.map((b) => b.billId === billId ? { ...b, refundNum: amt, updateTime: NOW() } : b),
+          assets: s.assets.map((a) => a.assetId === bill.assetId
+            ? { ...a, assetNumber: +(a.assetNumber + amt).toFixed(2), updateTime: NOW() } : a)
+        }
+      }),
+
+      deleteRefund: (refundId) => set((s) => {
+        const rec = s.refunds.find((r) => r.refundId === refundId)
+        if (!rec) return {}
+        const bill = s.bills.find((b) => b.billId === rec.billId)
+        return {
+          refunds: s.refunds.filter((r) => r.refundId !== refundId),
+          bills: s.bills.map((b) => b.billId === rec.billId ? { ...b, refundNum: 0, updateTime: NOW() } : b),
+          assets: bill ? s.assets.map((a) => a.assetId === bill.assetId
+            ? { ...a, assetNumber: +(a.assetNumber - rec.number).toFixed(2), updateTime: NOW() } : a) : s.assets
         }
       }),
 

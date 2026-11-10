@@ -320,6 +320,8 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
         assetId: p.reimb.assetName ? ensureAsset(p.reimb.assetName) : 0,
         number: p.reimb.amount,
         detail: p.reimb.detail,
+        // 导入的报销视为「已登记待确认」，用户核对后可点到账
+        status: 'pending',
         userId,
         updateTime: Date.now()
       })

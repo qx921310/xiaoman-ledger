@@ -2977,6 +2977,12 @@ var useLedger = create()(
       parentCategories: [...TAXONOMY_PARENTS, ...TAXONOMY_INCOME],
       childCategories: TAXONOMY_CHILDREN,
       transfers: [],
+      budgets: [],
+      reimbursements: [],
+      refunds: [],
+      lastParentId: 7,
+      lastChildId: 0,
+      lastAssetId: 0,
       seeded: false,
       addBill: (patch) => {
         const s = get();
@@ -3012,7 +3018,13 @@ var useLedger = create()(
           const delta = isIncome ? bill.cost : -bill.cost;
           return { ...a, assetNumber: +(a.assetNumber + delta).toFixed(2), updateTime: NOW() };
         });
-        set({ bills: [bill, ...s.bills], assets });
+        set({
+          bills: [bill, ...s.bills],
+          assets,
+          lastParentId: bill.parentCategoryId,
+          lastChildId: bill.childCategoryId,
+          lastAssetId: bill.assetId
+        });
         return bill;
       },
       // 删除同样要冲正：把该账单对账户的影响退回
@@ -3103,6 +3115,93 @@ var useLedger = create()(
         };
         return { assets: [...s.assets, asset] };
       }),
+      // 删转账：转出方退回本金+手续费，转入方扣回本金
+      deleteTransfer: (transferId) => set((s) => {
+        const t = s.transfers.find((x) => x.transferId === transferId);
+        if (!t) return {};
+        const back = t.cost + t.serviceCharge;
+        return {
+          transfers: s.transfers.filter((x) => x.transferId !== transferId),
+          assets: s.assets.map((a) => {
+            if (a.assetId === t.fromAssetId) return { ...a, assetNumber: +(a.assetNumber + back).toFixed(2), updateTime: NOW() };
+            if (a.assetId === t.toAssetId) return { ...a, assetNumber: +(a.assetNumber - t.cost).toFixed(2), updateTime: NOW() };
+            return a;
+          })
+        };
+      }),
+      // 登记报销：只落记录，钱还没到；确认到账时才进报销账户
+      addReimbursement: ({ billId, assetId, number, detail }) => set((s) => {
+        const rid = Date.now();
+        const rec = {
+          reimbursementId: rid,
+          billId,
+          assetId,
+          number: Number(number) || 0,
+          detail: detail ?? "",
+          status: "pending",
+          userId: s.userId,
+          updateTime: NOW()
+        };
+        const bill = s.bills.find((b) => b.billId === billId);
+        return {
+          reimbursements: [rec, ...s.reimbursements],
+          bills: bill ? s.bills.map((b) => b.billId === billId ? { ...b, isReimbursement: 1, reimbursementNum: rec.number, updateTime: NOW() } : b) : s.bills
+        };
+      }),
+      settleReimbursement: (reimbursementId) => set((s) => {
+        const rec = s.reimbursements.find((r) => r.reimbursementId === reimbursementId);
+        if (!rec || rec.status === "done") return {};
+        return {
+          reimbursements: s.reimbursements.map((r) => r.reimbursementId === reimbursementId ? { ...r, status: "done", settledAt: NOW(), updateTime: NOW() } : r),
+          assets: s.assets.map((a) => a.assetId === rec.assetId ? { ...a, assetNumber: +(a.assetNumber + rec.number).toFixed(2), updateTime: NOW() } : a)
+        };
+      }),
+      deleteReimbursement: (reimbursementId) => set((s) => {
+        const rec = s.reimbursements.find((r) => r.reimbursementId === reimbursementId);
+        if (!rec) return {};
+        const refundBack = rec.status === "done" ? rec.number : 0;
+        return {
+          reimbursements: s.reimbursements.filter((r) => r.reimbursementId !== reimbursementId),
+          assets: refundBack ? s.assets.map((a) => a.assetId === rec.assetId ? { ...a, assetNumber: +(a.assetNumber - refundBack).toFixed(2), updateTime: NOW() } : a) : s.assets,
+          bills: s.bills.map((b) => b.billId === rec.billId ? { ...b, isReimbursement: 0, reimbursementNum: 0, updateTime: NOW() } : b)
+        };
+      }),
+      // 退款：钱退回原支付账户，直接冲减这笔支出
+      addRefund: ({ billId, number }) => set((s) => {
+        const bill = s.bills.find((b) => b.billId === billId);
+        if (!bill) return {};
+        const amt = Number(number) || 0;
+        if (amt <= 0) return {};
+        const rec = {
+          refundId: Date.now(),
+          billId,
+          number: amt,
+          userId: s.userId,
+          updateTime: NOW()
+        };
+        return {
+          refunds: [rec, ...s.refunds],
+          bills: s.bills.map((b) => b.billId === billId ? { ...b, refundNum: amt, updateTime: NOW() } : b),
+          assets: s.assets.map((a) => a.assetId === bill.assetId ? { ...a, assetNumber: +(a.assetNumber + amt).toFixed(2), updateTime: NOW() } : a)
+        };
+      }),
+      deleteRefund: (refundId) => set((s) => {
+        const rec = s.refunds.find((r) => r.refundId === refundId);
+        if (!rec) return {};
+        const bill = s.bills.find((b) => b.billId === rec.billId);
+        return {
+          refunds: s.refunds.filter((r) => r.refundId !== refundId),
+          bills: s.bills.map((b) => b.billId === rec.billId ? { ...b, refundNum: 0, updateTime: NOW() } : b),
+          assets: bill ? s.assets.map((a) => a.assetId === bill.assetId ? { ...a, assetNumber: +(a.assetNumber - rec.number).toFixed(2), updateTime: NOW() } : a) : s.assets
+        };
+      }),
+      setBudget: (budget) => set((s) => {
+        const rest = s.budgets.filter((b) => !(b.month === budget.month && b.categoryId === budget.categoryId));
+        return { budgets: budget.amount > 0 ? [...rest, budget] : rest };
+      }),
+      removeBudget: (month, categoryId) => set((s) => ({
+        budgets: s.budgets.filter((b) => !(b.month === month && b.categoryId === categoryId))
+      })),
       updateAsset: (asset) => set((s) => ({
         assets: s.assets.map((a) => a.assetId === asset.assetId ? { ...asset, updateTime: NOW() } : a)
       })),
@@ -3135,6 +3234,9 @@ var useLedger = create()(
         assets: [],
         bills: [],
         transfers: [],
+        budgets: [],
+        reimbursements: [],
+        refunds: [],
         seeded: false,
         parentCategories: [...TAXONOMY_PARENTS, ...TAXONOMY_INCOME],
         childCategories: TAXONOMY_CHILDREN
@@ -3148,6 +3250,9 @@ var useLedger = create()(
           assets: s.assets,
           bills: s.bills,
           transfers: s.transfers,
+          budgets: s.budgets,
+          reimbursements: s.reimbursements,
+          refunds: s.refunds,
           parentCategories: s.parentCategories,
           childCategories: s.childCategories
         };
@@ -3183,9 +3288,12 @@ var useLedger = create()(
         return {
           parentCategories: parents,
           childCategories: [...s.childCategories, ...plan.newChildren],
+          accountBooks: [...s.accountBooks, ...plan.newBooks],
           assets,
           bills: [...plan.bills, ...s.bills],
           transfers: [...plan.transfers, ...s.transfers],
+          reimbursements: [...plan.reimbursements, ...s.reimbursements],
+          refunds: [...plan.refunds, ...s.refunds],
           seeded: true
         };
       }),
@@ -3194,6 +3302,9 @@ var useLedger = create()(
         assets: data.assets ?? [],
         bills: data.bills ?? [],
         transfers: data.transfers ?? [],
+        budgets: data.budgets ?? [],
+        reimbursements: data.reimbursements ?? [],
+        refunds: data.refunds ?? [],
         parentCategories: data.parentCategories ?? s.parentCategories,
         childCategories: data.childCategories ?? s.childCategories,
         seeded: true
