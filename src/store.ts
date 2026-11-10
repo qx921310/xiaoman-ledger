@@ -30,6 +30,9 @@ interface LedgerState {
   refunds: Refund[]
   lends: Lend[]
   cycles: Cycle[]
+  /** 删除墓碑：同步时要把删除动作也推上去，否则别的设备会把数据拉回来 */
+  tombstones: { kind: string; id: string; updatedAt: number }[]
+  lastSync: number
   /** 上次使用的分类/账户，用于快速记账 */
   lastParentId: number
   lastChildId: number
@@ -64,6 +67,9 @@ interface LedgerState {
   importAll: (data: any) => void
   applyImport: (plan: ImportPlan) => void
   mergeTaxonomy: () => void
+  applyRemote: (records: any[]) => void
+  setLastSync: (t: number) => void
+  tombstone: (kind: string, id: string | number) => void
 }
 
 export const useLedger = create<LedgerState>()(
@@ -83,6 +89,8 @@ export const useLedger = create<LedgerState>()(
       refunds: [],
       lends: [],
       cycles: [],
+      tombstones: [],
+      lastSync: 0,
       lastParentId: 7,
       lastChildId: 0,
       lastAssetId: 0,
@@ -136,6 +144,7 @@ export const useLedger = create<LedgerState>()(
 
       // 删除同样要冲正：把该账单对账户的影响退回
       deleteBill: (billId) => set((s) => {
+        const tomb = { kind: 'bill', id: String(billId), updatedAt: NOW() }
         const old = s.bills.find((b) => b.billId === billId)
         if (!old) return {}
         const sign = s.parentCategories.find((p) => p.id === old.parentCategoryId)?.kind === 'income' ? 1 : -1
@@ -143,7 +152,8 @@ export const useLedger = create<LedgerState>()(
           bills: s.bills.filter((b) => b.billId !== billId),
           assets: s.assets.map((a) => a.assetId === old.assetId
             ? { ...a, assetNumber: +(a.assetNumber - sign * old.cost).toFixed(2), updateTime: NOW() }
-            : a)
+            : a),
+          tombstones: [...s.tombstones, tomb]
         }
       }),
 
@@ -283,7 +293,8 @@ export const useLedger = create<LedgerState>()(
             if (a.assetId === t.fromAssetId) return { ...a, assetNumber: +(a.assetNumber + back).toFixed(2), updateTime: NOW() }
             if (a.assetId === t.toAssetId) return { ...a, assetNumber: +(a.assetNumber - t.cost).toFixed(2), updateTime: NOW() }
             return a
-          })
+          }),
+          tombstones: [...s.tombstones, { kind: 'transfer', id: String(transferId), updatedAt: NOW() }]
         }
       }),
 
@@ -322,7 +333,8 @@ export const useLedger = create<LedgerState>()(
           assets: refundBack ? s.assets.map((a) => a.assetId === rec.assetId
             ? { ...a, assetNumber: +(a.assetNumber - refundBack).toFixed(2), updateTime: NOW() } : a) : s.assets,
           bills: s.bills.map((b) => b.billId === rec.billId
-            ? { ...b, isReimbursement: 0, reimbursementNum: 0, updateTime: NOW() } : b)
+            ? { ...b, isReimbursement: 0, reimbursementNum: 0, updateTime: NOW() } : b),
+          tombstones: [...s.tombstones, { kind: 'reimbursement', id: String(reimbursementId), updatedAt: NOW() }]
         }
       }),
 
@@ -337,7 +349,10 @@ export const useLedger = create<LedgerState>()(
         } as Cycle]
       })),
 
-      deleteCycle: (cycleId) => set((s) => ({ cycles: s.cycles.filter((c) => c.cycleId !== cycleId) })),
+      deleteCycle: (cycleId) => set((s) => ({
+        cycles: s.cycles.filter((c) => c.cycleId !== cycleId),
+        tombstones: [...s.tombstones, { kind: 'cycle', id: String(cycleId), updatedAt: NOW() }]
+      })),
 
       toggleCycle: (cycleId) => set((s) => ({
         cycles: s.cycles.map((c) => c.cycleId === cycleId ? { ...c, enabled: !c.enabled, updateTime: NOW() } : c)
@@ -428,7 +443,8 @@ export const useLedger = create<LedgerState>()(
         return {
           lends: s.lends.filter((x) => x.lendId !== lendId),
           assets: s.assets.map((a) => a.assetId === rec.assetId
-            ? { ...a, assetNumber: +(a.assetNumber + sign * rec.number).toFixed(2), updateTime: NOW() } : a)
+            ? { ...a, assetNumber: +(a.assetNumber + sign * rec.number).toFixed(2), updateTime: NOW() } : a),
+          tombstones: [...s.tombstones, { kind: 'lend', id: String(lendId), updatedAt: NOW() }]
         }
       }),
 
@@ -455,6 +471,7 @@ export const useLedger = create<LedgerState>()(
         const bill = s.bills.find((b) => b.billId === rec.billId)
         return {
           refunds: s.refunds.filter((r) => r.refundId !== refundId),
+          tombstones: [...s.tombstones, { kind: 'refund', id: String(refundId), updatedAt: NOW() }],
           bills: s.bills.map((b) => b.billId === rec.billId ? { ...b, refundNum: 0, updateTime: NOW() } : b),
           assets: bill ? s.assets.map((a) => a.assetId === bill.assetId
             ? { ...a, assetNumber: +(a.assetNumber - rec.number).toFixed(2), updateTime: NOW() } : a) : s.assets
@@ -467,7 +484,8 @@ export const useLedger = create<LedgerState>()(
       }),
 
       removeBudget: (month, categoryId) => set((s) => ({
-        budgets: s.budgets.filter((b) => !(b.month === month && b.categoryId === categoryId))
+        budgets: s.budgets.filter((b) => !(b.month === month && b.categoryId === categoryId)),
+        tombstones: [...s.tombstones, { kind: 'budget', id: `${month}:${categoryId}`, updatedAt: NOW() }]
       })),
 
       updateAsset: (asset) => set((s) => ({
@@ -522,6 +540,53 @@ export const useLedger = create<LedgerState>()(
           childCategories: s.childCategories
         }
       },
+
+      setLastSync: (t) => set({ lastSync: t }),
+
+      tombstone: (kind, id) => set((s) => ({
+        tombstones: [
+          ...s.tombstones.filter((t) => !(t.kind === kind && t.id === String(id))),
+          { kind, id: String(id), updatedAt: NOW() }
+        ]
+      })),
+
+      // 合并云端记录：逐条 last-write-wins，删除墓碑生效
+      applyRemote: (records) => set((s: any) => {
+        const next: any = {}
+        const tombstones = [...s.tombstones]
+        const spec: Record<string, [string, string]> = {
+          bill: ['bills', 'billId'], asset: ['assets', 'assetId'], transfer: ['transfers', 'transferId'],
+          lend: ['lends', 'lendId'], cycle: ['cycles', 'cycleId'],
+          parent: ['parentCategories', 'id'], child: ['childCategories', 'id'],
+          book: ['accountBooks', 'accountBookId'],
+          reimbursement: ['reimbursements', 'reimbursementId'], refund: ['refunds', 'refundId'],
+          budget: ['budgets', 'month']
+        }
+        const idOf = (kind: string, item: any) =>
+          kind === 'budget' ? `${item.month}:${item.categoryId}` : String(item[spec[kind][1]])
+
+        for (const r of records || []) {
+          const k = spec[r.kind]
+          if (!k) continue
+          const arr: any[] = next[k[0]] ?? [...(s[k[0]] || [])]
+          if (r.deleted) {
+            next[k[0]] = arr.filter((x) => idOf(r.kind, x) !== String(r.id))
+            if (!tombstones.some((t) => t.kind === r.kind && t.id === String(r.id))) {
+              tombstones.push({ kind: r.kind, id: String(r.id), updatedAt: r.updatedAt || NOW() })
+            }
+            continue
+          }
+          if (!r.payload) continue
+          const idx = arr.findIndex((x) => idOf(r.kind, x) === String(r.id))
+          const localTime = idx >= 0 ? (arr[idx].updateTime ?? 0) : -1
+          if (idx < 0 || (r.updatedAt ?? 0) > localTime) {
+            if (idx >= 0) arr[idx] = r.payload
+            else arr.push(r.payload)
+          }
+          next[k[0]] = arr
+        }
+        return { ...next, tombstones }
+      }),
 
       // 补齐内置分类（缺失的加上），并把老数据里的 emoji 图标迁移成图标键
       mergeTaxonomy: () => set((s) => {

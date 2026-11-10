@@ -24,6 +24,15 @@ db.exec(`
     created_at INTEGER NOT NULL,
     expires_at INTEGER NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS records (
+    user_id INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    rid TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    updated_at INTEGER NOT NULL,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, kind, rid)
+  );
   CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT NOT NULL, updated_at INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS bills (bill_id INTEGER PRIMARY KEY, payload TEXT NOT NULL, user_id INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS assets (asset_id INTEGER PRIMARY KEY, payload TEXT NOT NULL, user_id INTEGER NOT NULL);
@@ -171,8 +180,9 @@ const server = createServer(async (req, res) => {
 
     // 任何写请求都要过令牌；未配置令牌时服务端保持只读
     // 账号相关接口例外：注册/登录本身就是写操作，且必须对公网开放
-    const isAuthPath = path.startsWith('/api/auth/')
-    if (req.method === 'POST' && path.startsWith('/api/') && !isAuthPath) {
+    // 账号与数据接口走会话鉴权，不再需要写令牌
+    const isSessionPath = path.startsWith('/api/auth/') || path.startsWith('/api/data/')
+    if (req.method === 'POST' && path.startsWith('/api/') && !isSessionPath) {
       if (!WRITE_TOKEN || req.headers['x-write-token'] !== WRITE_TOKEN) {
         return send(res, 403, { code: 1, msg: '服务端只读：写接口需要 x-write-token，且必须与 LEDGER_WRITE_TOKEN 一致' })
       }
@@ -215,6 +225,44 @@ const server = createServer(async (req, res) => {
     if (path === '/api/auth/me' && req.method === 'GET') {
       const user = currentUser(req)
       return ok(res, { user })
+    }
+
+    // ---------- 数据同步（需要登录） ----------
+    if (path === '/api/data/push' && req.method === 'POST') {
+      const user = currentUser(req)
+      if (!user) return fail(res, '请先登录')
+      const body = await readBody(req)
+      const list = Array.isArray(body.records) ? body.records : []
+      const get = db.prepare('SELECT updated_at FROM records WHERE user_id = ? AND kind = ? AND rid = ?')
+      const put = db.prepare(`INSERT INTO records (user_id, kind, rid, payload, updated_at, deleted)
+        VALUES (?,?,?,?,?,?)
+        ON CONFLICT(user_id, kind, rid) DO UPDATE SET payload=excluded.payload, updated_at=excluded.updated_at, deleted=excluded.deleted`)
+      let accepted = 0, skipped = 0
+      for (const r of list) {
+        if (!r || typeof r.kind !== 'string' || r.id == null) { skipped++; continue }
+        const rid = String(r.id)
+        const updatedAt = Number(r.updatedAt) || 0
+        const cur = get.get(user.id, r.kind, rid)
+        if (cur && cur.updated_at > updatedAt) { skipped++; continue }
+        put.run(user.id, r.kind, rid, JSON.stringify(r.payload ?? null), updatedAt, r.deleted ? 1 : 0)
+        accepted++
+      }
+      upsertKv(`lastSync:${user.id}`, Date.now())
+      return ok(res, { accepted, skipped, at: Date.now() })
+    }
+
+    if (path === '/api/data/pull' && req.method === 'GET') {
+      const user = currentUser(req)
+      if (!user) return fail(res, '请先登录')
+      const rows = db.prepare('SELECT kind, rid, payload, updated_at, deleted FROM records WHERE user_id = ?').all(user.id)
+      const records = rows.map((r) => ({
+        kind: r.kind,
+        id: r.rid,
+        payload: r.payload ? JSON.parse(r.payload) : null,
+        updatedAt: r.updated_at,
+        deleted: r.deleted === 1
+      }))
+      return ok(res, { records, lastSync: getKv(`lastSync:${user.id}`) })
     }
 
     if (path === '/api/sync/push' && req.method === 'POST') {

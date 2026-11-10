@@ -5,6 +5,7 @@ import type { Asset, Bill, Transfer } from './types'
 import { api } from './api'
 import type { ImportPlan } from './importer'
 import { adoptAnonymousData, auth, setCurrentUid, type User } from './auth'
+import { syncNow } from './sync'
 
 const money = (n: number) => '¥' + (n < 0 ? '-' : '') + Math.abs(n).toFixed(2)
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -1054,6 +1055,20 @@ function Settings({ notify }: { notify: (m: string) => void }) {
   const [fileName, setFileName] = useState('')
   const [err, setErr] = useState('')
   const [syncMsg, setSyncMsg] = useState('')
+  const [syncing, setSyncing] = useState(false)
+  const lastSync = useLedger((s) => s.lastSync)
+  const runSync = async () => {
+    setSyncing(true)
+    setSyncMsg('')
+    try {
+      const r = await syncNow()
+      setSyncMsg(`已推送 ${r.pushed} 条（跳过 ${r.skipped} 条较旧记录），拉回 ${r.pulled} 条`)
+    } catch (e: any) {
+      setSyncMsg('同步失败：' + (e?.message || '未知错误'))
+    } finally {
+      setSyncing(false)
+    }
+  }
   const cycles = useLedger((s) => s.cycles)
   const addCycle = useLedger((s) => s.addCycle)
   const deleteCycle = useLedger((s) => s.deleteCycle)
@@ -1302,13 +1317,19 @@ function Settings({ notify }: { notify: (m: string) => void }) {
         <button className="danger" onClick={() => { reset(); notify('已清空') }}>清空数据</button>
       </div>
 
-      <h3>服务端</h3>
-      <button onClick={doSync}>测试连接</button>
+      <h3>云端同步</h3>
+      <p className="hint">
+        数据存在你自己的账号下。同步是<b>先推后拉</b>：本地改动推到服务器，再把别的设备改过的记录合并回来（逐条取更新时间晚的）。
+      </p>
+      <div className="btns">
+        <button onClick={runSync} disabled={syncing}>{syncing ? '同步中…' : '立即同步'}</button>
+      </div>
+      {lastSync > 0 && <p className="hint">上次同步：{new Date(lastSync).toLocaleString('zh-CN')}</p>}
       {syncMsg && <p className="hint">{syncMsg}</p>}
 
       <h3>关于</h3>
       <p className="hint">
-        数据只存在本机浏览器（localStorage），不登录、不上传。导出 Excel 后可再导回或导入其他工具。
+        数据默认只存本机浏览器；登录后可手动同步到你自己账号下，不传给第三方。导出 Excel 后可再导回或换工具。
       </p>
     </section>
   )
