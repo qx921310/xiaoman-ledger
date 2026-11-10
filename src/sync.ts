@@ -33,7 +33,10 @@ export function collectRecords(): SyncRecord[] {
   for (const kind of Object.keys(KIND_MAP)) {
     const arr = s[KIND_MAP[kind][0]] as any[]
     for (const item of arr || []) {
-      out.push({ kind, id: idOf(kind, item), payload: item, updatedAt: item.updateTime ?? 0 })
+      const payload = kind === 'asset'
+        ? (({ assetNumber, ...rest }) => rest)(item)
+        : item
+      out.push({ kind, id: idOf(kind, item), payload, updatedAt: item.updateTime ?? 0 })
     }
   }
   for (const t of s.tombstones || []) {

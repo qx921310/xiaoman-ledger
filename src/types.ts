@@ -166,6 +166,8 @@ export interface Asset {
   assetName: string
   assetType: number
   assetNumber: number
+  /** Starting balance; assetNumber is a derived local display cache. */
+  openingBalance?: number
   groupName: string
   hide: boolean
   intoTotalAsset: boolean

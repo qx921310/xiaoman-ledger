@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "api": "node server/server.mjs",
     "icons": "node scripts/icon-manifest.mjs --write",
-    "icons:check": "node scripts/icon-manifest.mjs"
+    "icons:check": "node scripts/icon-manifest.mjs",
+    "test:balances": "node tests/run-balances.cjs"
   },
   "dependencies": {
     "react": "^18.3.1",

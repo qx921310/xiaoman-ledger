@@ -4,6 +4,7 @@ import type { AccountBook, Asset, Bill, Category, Currency, Cycle, Lend, Refund,
 import type { ImportPlan } from './importer'
 import { TAXONOMY_CHILDREN, TAXONOMY_INCOME, TAXONOMY_PARENTS } from './taxonomy'
 import { userStorage } from './auth'
+import { deriveAssets } from './balances'
 
 const NOW = () => Date.now()
 
@@ -92,7 +93,25 @@ interface LedgerState {
 
 export const useLedger = create<LedgerState>()(
   persist(
-    (set, get) => ({
+    (persistSet, get) => {
+      // Keep assetNumber as a local display cache, never as a source of truth.
+      const set: typeof persistSet = (update: any, replace?: any) => persistSet((state) => {
+        const changes = typeof update === 'function' ? update(state) : update
+        if (!changes) return changes
+        const combined = { ...state, ...changes }
+        if (!combined.assets || !combined.bills || !combined.parentCategories) return changes
+        const assets = deriveAssets(combined).map(asset => {
+          const previous = state.assets.find(a => a.assetId === asset.assetId)
+          if (!previous) return asset
+          const { assetNumber: _balance, updateTime: _time, ...metadata } = asset
+          const { assetNumber: _oldBalance, updateTime: _oldTime, ...oldMetadata } = previous
+          // A transaction changes the derived cache, not the version of opening balance.
+          return JSON.stringify(metadata) === JSON.stringify(oldMetadata)
+            ? { ...asset, updateTime: previous.updateTime } : asset
+        })
+        return { ...changes, assets }
+      }, replace)
+      return ({
       userId: 1,
       token: null,
       currentBookId: 1,
@@ -322,6 +341,7 @@ export const useLedger = create<LedgerState>()(
           assetName: patch.assetName ?? '未命名账户',
           assetType: patch.assetType ?? 1,
           assetNumber: Number(patch.assetNumber ?? 0),
+          openingBalance: Number(patch.openingBalance ?? patch.assetNumber ?? 0),
           groupName: patch.groupName ?? '',
           hide: false,
           intoTotalAsset: true,
@@ -580,7 +600,9 @@ export const useLedger = create<LedgerState>()(
       })),
 
       updateAsset: (asset) => set((s) => ({
-        assets: s.assets.map((a) => a.assetId === asset.assetId ? { ...asset, updateTime: NOW() } : a)
+        assets: s.assets.map((a) => a.assetId === asset.assetId
+          ? { ...asset, openingBalance: (a.openingBalance ?? a.assetNumber) + (asset.assetNumber - a.assetNumber), updateTime: NOW() }
+          : a)
       })),
 
       setBook: (id) => set({ currentBookId: id }),
@@ -876,7 +898,7 @@ export const useLedger = create<LedgerState>()(
       // 合并式导入：新增分类/账户先落地，账单像正常记账一样冲账户余额
       applyImport: (plan) => set((s) => {
         const parents = [...s.parentCategories, ...plan.newParents]
-        let assets = [...s.assets, ...plan.newAssets]
+        let assets = [...s.assets, ...plan.newAssets.map(a => ({ ...a, openingBalance: 0 }))]
 
         const delta = (assetId: number, value: number) => {
           assets = assets.map((a) => a.assetId === assetId
@@ -920,8 +942,15 @@ export const useLedger = create<LedgerState>()(
         childCategories: data.childCategories ?? s.childCategories,
         seeded: true
       }))
-    }),
-    { name: 'xiaoman-data', storage: createJSONStorage(() => userStorage) }
+    }) },
+    {
+      name: 'xiaoman-data',
+      storage: createJSONStorage(() => userStorage),
+      merge: (persisted: any, current) => {
+        const snapshot = { ...current, ...persisted }
+        return { ...snapshot, assets: deriveAssets(snapshot) }
+      }
+    }
   )
 )
 
