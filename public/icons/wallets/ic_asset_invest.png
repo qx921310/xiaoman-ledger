@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="https://cdn.yimubill.com/assets/app-logo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>一木记账</title>
+    <script type="module" src="https://cdn.yimubill.com/assets/index-C6JQXa0P.js"></script>
+    <link rel="modulepreload" href="https://cdn.yimubill.com/assets/vendor-antd-core-BGhm3nX-.js">
+    <link rel="modulepreload" href="https://cdn.yimubill.com/assets/vendor-utils-C4Y0i8CG.js">
+    <link rel="modulepreload" href="https://cdn.yimubill.com/assets/vendor-antd-icons-D0j0w0H9.js">
+    <link rel="stylesheet" href="https://cdn.yimubill.com/assets/index-DnQmWjo6.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- 阿里云 OSS SDK - 通过官方 CDN 加载 -->
+    <script src="https://gosspublic.alicdn.com/aliyun-oss-sdk-6.20.0.min.js"></script>
+    <!-- SheetJS xlsx - 从自有服务器加载（避免境外 CDN 慢） -->
+    <script src="https://cdn.yimubill.com/assets/xlsx.full.min.js"></script>
+  </body>
+</html>
