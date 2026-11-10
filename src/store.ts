@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { AccountBook, Asset, Bill, Category, Lend, Refund, Reimbursement, Transfer } from './types'
+import type { AccountBook, Asset, Bill, Category, Cycle, Lend, Refund, Reimbursement, Transfer } from './types'
 import type { ImportPlan } from './importer'
 import { TAXONOMY_CHILDREN, TAXONOMY_INCOME, TAXONOMY_PARENTS } from './taxonomy'
 
@@ -28,6 +28,7 @@ interface LedgerState {
   reimbursements: Reimbursement[]
   refunds: Refund[]
   lends: Lend[]
+  cycles: Cycle[]
   /** 上次使用的分类/账户，用于快速记账 */
   lastParentId: number
   lastChildId: number
@@ -39,6 +40,10 @@ interface LedgerState {
   addReimbursement: (patch: { billId: number; assetId: number; number: number; detail?: string }) => void
   settleReimbursement: (reimbursementId: number) => void
   deleteReimbursement: (reimbursementId: number) => void
+  addCycle: (patch: Omit<Cycle, 'cycleId' | 'generated' | 'userId' | 'updateTime' | 'enabled'> & { enabled?: boolean }) => void
+  deleteCycle: (cycleId: number) => void
+  toggleCycle: (cycleId: number) => void
+  runCycles: () => number
   addLend: (patch: { type: 1 | 2 | 3 | 4; assetId: number; counterparty: string; number: number; time?: number; remark?: string }) => void
   deleteLend: (lendId: number) => void
   addRefund: (patch: { billId: number; number: number }) => void
@@ -48,6 +53,7 @@ interface LedgerState {
   deleteBill: (billId: number) => void
   updateBill: (billId: number, patch: Partial<Bill>) => void
   addTransfer: (patch: { fromAssetId: number; toAssetId: number; cost: number; serviceCharge?: number; time?: number; remark?: string }) => Transfer
+  updateTransfer: (transferId: number, patch: Partial<Pick<Transfer, 'fromAssetId' | 'toAssetId' | 'cost' | 'serviceCharge' | 'time' | 'remark'>>) => void
   addAsset: (patch: Partial<Asset>) => void
   updateAsset: (asset: Asset) => void
   setBook: (id: number) => void
@@ -75,6 +81,7 @@ export const useLedger = create<LedgerState>()(
       reimbursements: [],
       refunds: [],
       lends: [],
+      cycles: [],
       lastParentId: 7,
       lastChildId: 0,
       lastAssetId: 0,
@@ -168,14 +175,25 @@ export const useLedger = create<LedgerState>()(
       },
 
       // 转账：本金不计收支；手续费若 >0 则单独生成一条支出账单（与原产品一致）
+      // 注意：本金必须从转出方扣、给转入方加；手续费是额外的一笔支出账单。
       addTransfer: (patch) => {
         const s = get()
         let transferId = Math.floor(NOW() / 1000)
         while (s.transfers.some((t) => t.transferId === transferId)) transferId++
         const fee = Number(patch.serviceCharge ?? 0)
         const time = patch.time ?? NOW()
-        let billId = 0
 
+        // 1) 本金：转出方 -，转入方 +
+        set((st) => ({
+          assets: st.assets.map((a) => {
+            if (a.assetId === patch.fromAssetId) return { ...a, assetNumber: +(a.assetNumber - patch.cost).toFixed(2), updateTime: NOW() }
+            if (a.assetId === patch.toAssetId) return { ...a, assetNumber: +(a.assetNumber + patch.cost).toFixed(2), updateTime: NOW() }
+            return a
+          })
+        }))
+
+        // 2) 手续费：单独一条支出账单（内部会给转出方再扣一次）
+        let billId = 0
         if (fee > 0) {
           const bill = get().addBill({
             cost: fee,
@@ -187,20 +205,7 @@ export const useLedger = create<LedgerState>()(
             time
           })
           billId = bill.billId
-        } else {
-          // 无手续费也要扣转出方的本金
-          set((st) => ({
-            assets: st.assets.map((a) => a.assetId === patch.fromAssetId
-              ? { ...a, assetNumber: +(a.assetNumber - patch.cost).toFixed(2), updateTime: NOW() }
-              : a)
-          }))
         }
-
-        set((st) => ({
-          assets: st.assets.map((a) => a.assetId === patch.toAssetId
-            ? { ...a, assetNumber: +(a.assetNumber + patch.cost).toFixed(2), updateTime: NOW() }
-            : a)
-        }))
 
         const t: Transfer = {
           transferId,
@@ -217,6 +222,35 @@ export const useLedger = create<LedgerState>()(
         }
         set((st) => ({ transfers: [t, ...st.transfers] }))
         return t
+      },
+
+      // 改转账：先完整撤销旧记录（含手续费账单），再按新值重记
+      updateTransfer: (transferId, patch) => {
+        const s = get()
+        const old = s.transfers.find((t) => t.transferId === transferId)
+        if (!old) return
+        const feeBill = old.billId ? s.bills.find((b) => b.billId === old.billId) : undefined
+        const feeBack = feeBill ? feeBill.cost : 0
+
+        set((st) => ({
+          transfers: st.transfers.filter((t) => t.transferId !== transferId),
+          bills: old.billId ? st.bills.filter((b) => b.billId !== old.billId) : st.bills,
+          assets: st.assets.map((a) => {
+            let v = a.assetNumber
+            if (a.assetId === old.fromAssetId) v += old.cost + feeBack
+            if (a.assetId === old.toAssetId) v -= old.cost
+            return v === a.assetNumber ? a : { ...a, assetNumber: +v.toFixed(2), updateTime: NOW() }
+          })
+        }))
+
+        get().addTransfer({
+          fromAssetId: patch.fromAssetId ?? old.fromAssetId,
+          toAssetId: patch.toAssetId ?? old.toAssetId,
+          cost: patch.cost ?? old.cost,
+          serviceCharge: patch.serviceCharge ?? old.serviceCharge,
+          time: patch.time ?? old.time,
+          remark: patch.remark ?? old.remark
+        })
       },
 
       addAsset: (patch) => set((s) => {
@@ -290,6 +324,84 @@ export const useLedger = create<LedgerState>()(
             ? { ...b, isReimbursement: 0, reimbursementNum: 0, updateTime: NOW() } : b)
         }
       }),
+
+      addCycle: (patch) => set((s) => ({
+        cycles: [...s.cycles, {
+          ...patch,
+          cycleId: NOW(),
+          enabled: patch.enabled ?? true,
+          generated: [],
+          userId: s.userId,
+          updateTime: NOW()
+        } as Cycle]
+      })),
+
+      deleteCycle: (cycleId) => set((s) => ({ cycles: s.cycles.filter((c) => c.cycleId !== cycleId) })),
+
+      toggleCycle: (cycleId) => set((s) => ({
+        cycles: s.cycles.map((c) => c.cycleId === cycleId ? { ...c, enabled: !c.enabled, updateTime: NOW() } : c)
+      })),
+
+      // 补生成所有到期未生成的周期账单；返回本次生成条数
+      runCycles: () => {
+        const s = get()
+        const now = new Date()
+        const todayDay = now.getDate()
+        const cy = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+        let count = 0
+
+        const pending = s.cycles.filter((c) => c.enabled).map((c) => {
+          const start = new Date(c.startTime)
+          const gen: string[] = []
+          for (let d = new Date(start.getFullYear(), start.getMonth(), 1); ; d.setMonth(d.getMonth() + 1)) {
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+            const isCurrent = key === cy
+            const due = isCurrent ? todayDay >= c.dayOfMonth : key < cy
+            if (due && !c.generated.includes(key) && !gen.includes(key)) gen.push(key)
+            if (key >= cy) break
+          }
+          return { c, gen }
+        })
+
+        const updated: Cycle[] = []
+        for (const { c, gen } of pending) {
+          for (const key of gen) {
+            const [y, m] = key.split('-').map(Number)
+            const time = new Date(y, m - 1, Math.min(c.dayOfMonth, 28), 9, 0, 0).getTime()
+            // 直接落一条正常账单（周期记账 billType=4）
+            const t = get()
+            let billId = Math.floor(time / 1000)
+            while (t.bills.some((b) => b.billId === billId)) billId++
+            const parent = t.parentCategories.find((p) => p.id === c.parentCategoryId)
+            const asset = t.assets.find((a) => a.assetId === c.assetId)
+            const bill: Bill = {
+              billId, time, cost: c.cost,
+              parentCategoryId: c.parentCategoryId, childCategoryId: c.childCategoryId,
+              assetId: c.assetId, bookId: t.currentBookId || 1,
+              remark: c.remark || c.name, billType: 4,
+              tags: [], files: [], userId: t.userId, updateTime: NOW(),
+              billShareInfo: {
+                parentCategoryName: parent?.name ?? '',
+                childCategoryName: t.childCategories.find((x) => x.id === c.childCategoryId)?.name ?? '',
+                assetName: asset?.assetName ?? ''
+              }
+            }
+            const sign = parent?.kind === 'income' ? 1 : -1
+            set((st) => ({
+              bills: [bill, ...st.bills],
+              assets: st.assets.map((a) => a.assetId === c.assetId
+                ? { ...a, assetNumber: +(a.assetNumber + sign * c.cost).toFixed(2), updateTime: NOW() } : a)
+            }))
+            count++
+          }
+          if (gen.length) updated.push({ ...c, generated: [...c.generated, ...gen], updateTime: NOW() })
+        }
+        if (updated.length) {
+          const map = new Map(updated.map((u) => [u.cycleId, u]))
+          set((st) => ({ cycles: st.cycles.map((c) => map.get(c.cycleId) ?? c) }))
+        }
+        return count
+      },
 
       // 借出 -、借入 +、收回 +、还款 -；删除则反向冲正
       addLend: ({ type, assetId, counterparty, number, time, remark }) => set((s) => {
@@ -386,7 +498,7 @@ export const useLedger = create<LedgerState>()(
 
       reset: () => set({
         assets: [], bills: [], transfers: [], budgets: [],
-        reimbursements: [], refunds: [], lends: [], seeded: false,
+        reimbursements: [], refunds: [], lends: [], cycles: [], seeded: false,
         parentCategories: [...TAXONOMY_PARENTS, ...TAXONOMY_INCOME],
         childCategories: TAXONOMY_CHILDREN
       }),
@@ -404,6 +516,7 @@ export const useLedger = create<LedgerState>()(
           reimbursements: s.reimbursements,
           refunds: s.refunds,
           lends: s.lends,
+          cycles: s.cycles,
           parentCategories: s.parentCategories,
           childCategories: s.childCategories
         }
@@ -465,6 +578,7 @@ export const useLedger = create<LedgerState>()(
         reimbursements: data.reimbursements ?? [],
         refunds: data.refunds ?? [],
         lends: data.lends ?? [],
+        cycles: data.cycles ?? [],
         parentCategories: data.parentCategories ?? s.parentCategories,
         childCategories: data.childCategories ?? s.childCategories,
         seeded: true

@@ -54,6 +54,27 @@ export interface Reimbursement {
   updateTime: number
 }
 
+/** 周期记账规则：每月固定日期自动生成账单 */
+export interface Cycle {
+  cycleId: number
+  name: string
+  kind: 'expense' | 'income'
+  parentCategoryId: number
+  childCategoryId: number
+  assetId: number
+  cost: number
+  /** 每月第几天（1–28） */
+  dayOfMonth: number
+  remark: string
+  enabled: boolean
+  /** 生效起始月（时间戳，取当月即可） */
+  startTime: number
+  /** 已生成过的月份，格式 YYYY-MM，保证不重复 */
+  generated: string[]
+  userId: number
+  updateTime: number
+}
+
 /** 借入借出：独立资金动作，有自己的流水 */
 export interface Lend {
   lendId: number

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLedger, useTotalAssets } from './store'
 import { ASSET_TYPE, BILL_TYPE, LEND_TYPE } from './types'
-import type { Asset, Bill } from './types'
+import type { Asset, Bill, Transfer } from './types'
 import { api } from './api'
 import type { ImportPlan } from './importer'
 
@@ -30,8 +30,12 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('add')
   const mergeTaxonomy = useLedger((s) => s.mergeTaxonomy)
 
+  const runCycles = useLedger((s) => s.runCycles)
+
   // 启动时补齐内置分类（幂等，不动用户已有分类）
   useEffect(() => { mergeTaxonomy() }, [mergeTaxonomy])
+  // 启动时补生成到期的周期账单（幂等：同一月份只生成一次）
+  useEffect(() => { runCycles() }, [runCycles])
   const [toast, setToast] = useState('')
   const notify = (m: string) => {
     setToast(m)
@@ -246,6 +250,8 @@ function Bills() {
   const reimbursements = useLedger((s) => s.reimbursements)
   const refunds = useLedger((s) => s.refunds)
   const currentBookId = useLedger((s) => s.currentBookId)
+  const updateTransfer = useLedger((s) => s.updateTransfer)
+  const [editingTransfer, setEditingTransfer] = useState<Transfer | null>(null)
 
   const [month, setMonth] = useState(monthOf(Date.now()))
   const [kw, setKw] = useState('')
@@ -348,6 +354,7 @@ function Bills() {
                     </small>
                   </div>
                   <b className="neutral">{money(t.cost)}</b>
+                  <button className="link" onClick={() => setEditingTransfer(t)}>改</button>
                   <button className="del" onClick={() => delTransfer(t.transferId)}>删</button>
                 </div>
               )
@@ -388,6 +395,14 @@ function Bills() {
         </div>
       ))}
 
+      {editingTransfer && (
+        <TransferEditor
+          transfer={editingTransfer}
+          onClose={() => setEditingTransfer(null)}
+          onSave={(patch) => { updateTransfer(editingTransfer.transferId, patch); setEditingTransfer(null) }}
+        />
+      )}
+
       {editing && (
         <EditBill bill={editing} onClose={() => setEditing(null)} onSave={(patch) => {
           updateBill(editing.billId, patch)
@@ -405,6 +420,8 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
   const reimbursements = useLedger((s) => s.reimbursements)
   const refunds = useLedger((s) => s.refunds)
   const currentBookId = useLedger((s) => s.currentBookId)
+  const updateTransfer = useLedger((s) => s.updateTransfer)
+  const [editingTransfer, setEditingTransfer] = useState<Transfer | null>(null)
   const addReimbursement = useLedger((s) => s.addReimbursement)
   const settleReimbursement = useLedger((s) => s.settleReimbursement)
   const deleteReimbursement = useLedger((s) => s.deleteReimbursement)
@@ -649,6 +666,66 @@ function Assets({ notify }: { notify: (m: string) => void }) {
   )
 }
 
+function TransferEditor({ transfer, onClose, onSave }: {
+  transfer: Transfer; onClose: () => void
+  onSave: (p: { fromAssetId: number; toAssetId: number; cost: number; serviceCharge: number; remark: string; time: number }) => void
+}) {
+  const assets = useLedger((s) => s.assets)
+  const [from, setFrom] = useState(transfer.fromAssetId)
+  const [to, setTo] = useState(transfer.toAssetId)
+  const [cost, setCost] = useState(String(transfer.cost))
+  const [fee, setFee] = useState(String(transfer.serviceCharge))
+  const [remark, setRemark] = useState(transfer.remark)
+  const [time, setTime] = useState(toLocalInput(transfer.time))
+
+  return (
+    <div className="modal-mask" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h3>修改转账</h3>
+        <div className="row2">
+          <div>
+            <div className="label">转出账户</div>
+            <select value={from} onChange={(e) => setFrom(Number(e.target.value))}>
+              {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
+            </select>
+          </div>
+          <div>
+            <div className="label">转入账户</div>
+            <select value={to} onChange={(e) => setTo(Number(e.target.value))}>
+              {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="row2">
+          <div>
+            <div className="label">金额</div>
+            <input value={cost} autoFocus inputMode="decimal"
+              onChange={(e) => setCost(e.target.value.replace(/[^\d.]/g, ''))} />
+          </div>
+          <div>
+            <div className="label">手续费</div>
+            <input value={fee} inputMode="decimal"
+              onChange={(e) => setFee(e.target.value.replace(/[^\d.]/g, ''))} />
+          </div>
+        </div>
+        <div className="label">时间</div>
+        <input type="datetime-local" value={time} onChange={(e) => setTime(e.target.value)} />
+        <div className="label">备注</div>
+        <input value={remark} onChange={(e) => setRemark(e.target.value)} />
+        <p className="hint">保存会先撤销原转账（含手续费账单），再按新值重记。</p>
+        <div className="modal-btns">
+          <button className="ghost" onClick={onClose}>取消</button>
+          <button className="primary" onClick={() => onSave({
+            fromAssetId: from, toAssetId: to,
+            cost: Number(cost) || 0, serviceCharge: Number(fee) || 0,
+            remark, time: new Date(time).getTime()
+          })}>保存</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => void; onSave: (a: Asset) => void }) {
   const [name, setName] = useState(asset.assetName)
   const [type, setType] = useState(asset.assetType)
@@ -833,11 +910,22 @@ function Settings({ notify }: { notify: (m: string) => void }) {
   const reimbursements = useLedger((s) => s.reimbursements)
   const refunds = useLedger((s) => s.refunds)
   const currentBookId = useLedger((s) => s.currentBookId)
+  const updateTransfer = useLedger((s) => s.updateTransfer)
+  const [editingTransfer, setEditingTransfer] = useState<Transfer | null>(null)
 
   const [plan, setPlan] = useState<ImportPlan | null>(null)
   const [fileName, setFileName] = useState('')
   const [err, setErr] = useState('')
   const [syncMsg, setSyncMsg] = useState('')
+  const cycles = useLedger((s) => s.cycles)
+  const addCycle = useLedger((s) => s.addCycle)
+  const deleteCycle = useLedger((s) => s.deleteCycle)
+  const toggleCycle = useLedger((s) => s.toggleCycle)
+  const runCycles = useLedger((s) => s.runCycles)
+  const [cycleForm, setCycleForm] = useState<{
+    name: string; kind: 'expense' | 'income'; parentCategoryId: number; childCategoryId: number
+    assetId: number; cost: string; dayOfMonth: number; remark: string
+  } | null>(null)
 
   const fmtLabel = (f: string) =>
     f === 'yimu' ? '一木记账导出' : f === 'transfer' ? '转账流水' : f === 'generic' ? '通用账单表' : '未识别的表头'
@@ -986,6 +1074,90 @@ function Settings({ notify }: { notify: (m: string) => void }) {
           <input type="file" accept=".json" onChange={(e) => e.target.files?.[0] && doImportJson(e.target.files[0])} />
         </label>
       </div>
+
+      <h3>周期记账</h3>
+      <p className="hint">每月固定日期自动生成账单；打开应用时补生成，不会重复。</p>
+      {cycles.length === 0 && <p className="hint">还没有周期规则（比如房租、工资）。</p>}
+      {cycles.map((c) => {
+        const p = parents.find((x) => x.id === c.parentCategoryId)
+        const a = assets.find((x) => x.assetId === c.assetId)
+        return (
+          <div key={c.cycleId} className="row">
+            <div className="grow">
+              <div>{c.name} <span className="tag">每月 {c.dayOfMonth} 日</span></div>
+              <small>{p?.name ?? '分类'} · {a?.assetName ?? '账户'} · {money(c.cost)} · {c.enabled ? '启用中' : '已暂停'}</small>
+            </div>
+            <button className="link" onClick={() => toggleCycle(c.cycleId)}>{c.enabled ? '暂停' : '启用'}</button>
+            <button className="del" onClick={() => deleteCycle(c.cycleId)}>删</button>
+          </div>
+        )
+      })}
+      <button className="ghost wide" onClick={() => setCycleForm({
+        name: '', kind: 'expense', parentCategoryId: 4, childCategoryId: 0,
+        assetId: assets[0]?.assetId ?? 0, cost: '', dayOfMonth: 1, remark: ''
+      })}>新增周期规则</button>
+
+      {cycleForm && (
+        <div className="modal-mask" onClick={() => setCycleForm(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>周期记账</h3>
+            <div className="label">名称</div>
+            <input value={cycleForm.name} onChange={(e) => setCycleForm({ ...cycleForm, name: e.target.value })} placeholder="如：房租、工资" />
+            <div className="label">类型</div>
+            <select value={cycleForm.kind} onChange={(e) => setCycleForm({ ...cycleForm, kind: e.target.value as any, parentCategoryId: e.target.value === 'income' ? 903 : 4 })}>
+              <option value="expense">支出</option>
+              <option value="income">收入</option>
+            </select>
+            <div className="label">分类</div>
+            <select value={cycleForm.parentCategoryId} onChange={(e) => setCycleForm({ ...cycleForm, parentCategoryId: Number(e.target.value) })}>
+              {parents.filter((p) => p.kind === cycleForm.kind).map((p) => (
+                <option key={p.id} value={p.id}>{p.icon} {p.name}</option>
+              ))}
+            </select>
+            <div className="row2">
+              <div>
+                <div className="label">金额</div>
+                <input value={cycleForm.cost} inputMode="decimal" autoFocus
+                  onChange={(e) => setCycleForm({ ...cycleForm, cost: e.target.value.replace(/[^\d.]/g, '') })} />
+              </div>
+              <div>
+                <div className="label">每月几号</div>
+                <input value={String(cycleForm.dayOfMonth)} inputMode="numeric"
+                  onChange={(e) => {
+                    const n = Math.min(28, Math.max(1, Number(e.target.value.replace(/\D/g, '')) || 1))
+                    setCycleForm({ ...cycleForm, dayOfMonth: n })
+                  }} />
+              </div>
+            </div>
+            <div className="label">账户</div>
+            <select value={cycleForm.assetId} onChange={(e) => setCycleForm({ ...cycleForm, assetId: Number(e.target.value) })}>
+              {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
+            </select>
+            <div className="label">备注</div>
+            <input value={cycleForm.remark} onChange={(e) => setCycleForm({ ...cycleForm, remark: e.target.value })} />
+            <p className="hint">保存后立即补生成当月已到期的账单。</p>
+            <div className="modal-btns">
+              <button className="ghost" onClick={() => setCycleForm(null)}>取消</button>
+              <button className="primary" onClick={() => {
+                addCycle({
+                  name: cycleForm.name || '周期账单',
+                  kind: cycleForm.kind,
+                  parentCategoryId: cycleForm.parentCategoryId,
+                  childCategoryId: cycleForm.childCategoryId,
+                  assetId: cycleForm.assetId,
+                  cost: Number(cycleForm.cost) || 0,
+                  dayOfMonth: cycleForm.dayOfMonth,
+                  remark: cycleForm.remark,
+                  startTime: Date.now()
+                })
+                setCycleForm(null)
+                setTimeout(() => runCycles(), 0)
+                notify('周期规则已保存')
+              }}>保存</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <h3>数据</h3>
       <div className="btns">
