@@ -1,6 +1,7 @@
 import { createServer } from 'node:http'
 import { DatabaseSync } from 'node:sqlite'
 import { mkdirSync, createReadStream, existsSync, statSync } from 'node:fs'
+import { scryptSync, randomBytes, timingSafeEqual, createHash } from 'node:crypto'
 import { dirname, join, extname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -10,12 +11,90 @@ mkdirSync(dataDir, { recursive: true })
 
 const db = new DatabaseSync(join(dataDir, 'ledger.db'))
 db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE,
+    salt TEXT NOT NULL,
+    hash TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS sessions (
+    token_hash TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT NOT NULL, updated_at INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS bills (bill_id INTEGER PRIMARY KEY, payload TEXT NOT NULL, user_id INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS assets (asset_id INTEGER PRIMARY KEY, payload TEXT NOT NULL, user_id INTEGER NOT NULL);
 `)
 
 const PORT = Number(process.env.PORT || 8787)
+
+// ---------- 账号与会话 ----------
+const SESSION_DAYS = 30
+const COOKIE = 'xm_session'
+
+const sha = (v) => createHash('sha256').update(v).digest('hex')
+
+function makePassword(password) {
+  const salt = randomBytes(16).toString('hex')
+  const hash = scryptSync(password, salt, 64).toString('hex')
+  return { salt, hash }
+}
+
+function checkPassword(password, salt, hash) {
+  const a = scryptSync(password, salt, 64)
+  const b = Buffer.from(hash, 'hex')
+  return a.length === b.length && timingSafeEqual(a, b)
+}
+
+function parseCookies(req) {
+  const raw = req.headers.cookie || ''
+  const out = {}
+  for (const part of raw.split(';')) {
+    const i = part.indexOf('=')
+    if (i > 0) out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim())
+  }
+  return out
+}
+
+function setSessionCookie(res, token, req) {
+  const secure = (req.headers['x-forwarded-proto'] || '').includes('https') || req.socket.encrypted
+  const bits = [
+    `${COOKIE}=${encodeURIComponent(token)}`,
+    'Path=/', 'HttpOnly', 'SameSite=Lax', `Max-Age=${SESSION_DAYS * 86400}`
+  ]
+  if (secure) bits.push('Secure')
+  res.setHeader('Set-Cookie', bits.join('; '))
+}
+
+function clearSessionCookie(res) {
+  res.setHeader('Set-Cookie', `${COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`)
+}
+
+function createSession(userId) {
+  const token = randomBytes(32).toString('hex')
+  const now = Date.now()
+  db.prepare('INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?,?,?,?)')
+    .run(sha(token), userId, now, now + SESSION_DAYS * 86400 * 1000)
+  return token
+}
+
+function currentUser(req) {
+  const token = parseCookies(req)[COOKIE]
+  if (!token) return null
+  const row = db.prepare('SELECT s.user_id, s.expires_at, u.email FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?')
+    .get(sha(token))
+  if (!row) return null
+  if (row.expires_at < Date.now()) {
+    db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(sha(token))
+    return null
+  }
+  return { id: row.user_id, email: row.email }
+}
+
+const emailOk = (v) => typeof v === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
 // 写接口默认关闭：只有设置了 LEDGER_WRITE_TOKEN 且请求带 x-write-token 才允许写入。
 // 记账数据本来只存浏览器本地，服务端只是可选同步点，公开部署不该留匿名写入口。
 const WRITE_TOKEN = process.env.LEDGER_WRITE_TOKEN || ''
@@ -53,6 +132,8 @@ function serveStatic(url, res) {
 const send = (res, code, body) => {
   res.writeHead(code, {
     'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'Vary': 'Cookie',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, token',
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS'
@@ -89,10 +170,51 @@ const server = createServer(async (req, res) => {
     if (path === '/api/health') return ok(res, { ok: true, service: 'ledger-api', time: Date.now(), writable: Boolean(WRITE_TOKEN) })
 
     // 任何写请求都要过令牌；未配置令牌时服务端保持只读
-    if (req.method === 'POST' && path.startsWith('/api/')) {
+    // 账号相关接口例外：注册/登录本身就是写操作，且必须对公网开放
+    const isAuthPath = path.startsWith('/api/auth/')
+    if (req.method === 'POST' && path.startsWith('/api/') && !isAuthPath) {
       if (!WRITE_TOKEN || req.headers['x-write-token'] !== WRITE_TOKEN) {
         return send(res, 403, { code: 1, msg: '服务端只读：写接口需要 x-write-token，且必须与 LEDGER_WRITE_TOKEN 一致' })
       }
+    }
+
+    // ---------- 账号 ----------
+    if (path === '/api/auth/register' && req.method === 'POST') {
+      const body = await readBody(req)
+      const email = String(body.email || '').trim().toLowerCase()
+      const password = String(body.password || '')
+      if (!emailOk(email)) return fail(res, '邮箱格式不对')
+      if (password.length < 8) return fail(res, '密码至少 8 位')
+      if (db.prepare('SELECT id FROM users WHERE email = ?').get(email)) return fail(res, '这个邮箱已经注册过了')
+      const { salt, hash } = makePassword(password)
+      const info = db.prepare('INSERT INTO users (email, salt, hash, created_at) VALUES (?,?,?,?)')
+        .run(email, salt, hash, Date.now())
+      const token = createSession(Number(info.lastInsertRowid))
+      setSessionCookie(res, token, req)
+      return ok(res, { user: { id: Number(info.lastInsertRowid), email } })
+    }
+
+    if (path === '/api/auth/login' && req.method === 'POST') {
+      const body = await readBody(req)
+      const email = String(body.email || '').trim().toLowerCase()
+      const password = String(body.password || '')
+      const row = db.prepare('SELECT * FROM users WHERE email = ?').get(email)
+      if (!row || !checkPassword(password, row.salt, row.hash)) return fail(res, '邮箱或密码不对')
+      const token = createSession(row.id)
+      setSessionCookie(res, token, req)
+      return ok(res, { user: { id: row.id, email: row.email } })
+    }
+
+    if (path === '/api/auth/logout' && req.method === 'POST') {
+      const token = parseCookies(req)[COOKIE]
+      if (token) db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(sha(token))
+      clearSessionCookie(res)
+      return ok(res, { ok: true })
+    }
+
+    if (path === '/api/auth/me' && req.method === 'GET') {
+      const user = currentUser(req)
+      return ok(res, { user })
     }
 
     if (path === '/api/sync/push' && req.method === 'POST') {

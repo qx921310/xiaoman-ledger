@@ -224,3 +224,19 @@ button[disabled] { opacity: .5; cursor: not-allowed; }
 .asset-badge { width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; flex: none; background: var(--accent-soft); color: var(--accent); }
 .chip .cat-ico { color: currentColor; }
 .bar-name .cat-ico { color: var(--muted); }
+
+/* 登录/注册 */
+.boot { display: grid; place-items: center; height: 100vh; color: var(--muted); }
+.auth-wrap { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+.auth-card {
+  width: min(400px, 100%); background: var(--card); border: 1px solid var(--line);
+  border-radius: 16px; padding: 22px; box-shadow: 0 10px 30px rgba(120, 80, 30, .08);
+}
+.auth-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.auth-brand img { width: 46px; height: 46px; }
+.auth-brand strong { display: block; font-size: 17px; }
+.auth-brand small { color: var(--muted); font-size: 12px; }
+.userbox { display: flex; align-items: center; gap: 8px; }
+.uemail { font-size: 12px; color: var(--muted); max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ghost.tiny { padding: 5px 10px; font-size: 12px; }
+@media (max-width: 820px) { .uemail { display: none; } }

@@ -1,8 +1,9 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { createJSONStorage, persist } from 'zustand/middleware'
 import type { AccountBook, Asset, Bill, Category, Cycle, Lend, Refund, Reimbursement, Transfer } from './types'
 import type { ImportPlan } from './importer'
 import { TAXONOMY_CHILDREN, TAXONOMY_INCOME, TAXONOMY_PARENTS } from './taxonomy'
+import { userStorage } from './auth'
 
 const NOW = () => Date.now()
 
@@ -602,7 +603,7 @@ export const useLedger = create<LedgerState>()(
         seeded: true
       }))
     }),
-    { name: 'ledger-data-store' }
+    { name: 'xiaoman-data', storage: createJSONStorage(() => userStorage) }
   )
 )
 

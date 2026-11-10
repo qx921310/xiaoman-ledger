@@ -1,5 +1,5 @@
 {
-  "name": "ledger-app",
+  "name": "xiaoman-ledger",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -26,5 +26,6 @@
     "onlyBuiltDependencies": [
       "esbuild"
     ]
-  }
+  },
+  "description": "小满记账 · 个人记账 Web 应用（React + SQLite，本地优先）"
 }

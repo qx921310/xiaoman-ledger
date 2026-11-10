@@ -11,7 +11,7 @@ npm run build
 
 echo "==> 打包"
 mkdir -p .deploy
-tar czf .deploy/ledger-app.tar.gz dist server package.json
+tar czf .deploy/ledger-app.tar.gz --exclude="server/data" dist server package.json
 
 echo "==> 上传到 $HOST"
 scp -q .deploy/ledger-app.tar.gz "$HOST:/tmp/ledger-app.tar.gz"

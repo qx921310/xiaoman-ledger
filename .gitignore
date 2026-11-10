@@ -5,3 +5,5 @@ server/data/
 *.log
 
 .deploy/
+
+server/data/
