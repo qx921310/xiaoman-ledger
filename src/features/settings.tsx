@@ -7,6 +7,7 @@ import { books as bookApi, type BookInfo } from '../auth'
 import { syncNow } from '../sync'
 import { money } from '../ui-format'
 import { ROLE_LABEL } from '../ui/roles'
+import { validateBackup } from '../backup'
 
 function RateInput({ value, onCommit }: { value: number; onCommit: (v: number) => void }) {
   const [draft, setDraft] = useState<string | null>(null)
@@ -65,6 +66,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
   const [editingTransfer, setEditingTransfer] = useState<Transfer | null>(null)
 
   const [plan, setPlan] = useState<ImportPlan | null>(null)
+  const [restorePreview, setRestorePreview] = useState<{ name: string; data: any } | null>(null)
   const [fileName, setFileName] = useState('')
   const [err, setErr] = useState('')
   const [syncMsg, setSyncMsg] = useState('')
@@ -192,10 +194,10 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
     const r = new FileReader()
     r.onload = () => {
       try {
-        importAll(JSON.parse(String(r.result)))
-        notify('已导入 JSON 备份')
-      } catch { notify('文件格式不对') }
+        setRestorePreview({ name: f.name, data: validateBackup(JSON.parse(String(r.result))) })
+      } catch (e: any) { notify('备份无法读取：' + (e?.message || '文件格式不对')) }
     }
+    r.onerror = () => notify('备份文件读取失败')
     r.readAsText(f)
   }
 
@@ -272,9 +274,27 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
         <button onClick={doExportJson}>导出 JSON</button>
         <label className="filebtn">
           导入 JSON 备份
-          <input type="file" accept=".json" onChange={(e) => e.target.files?.[0] && doImportJson(e.target.files[0])} />
+          <input type="file" accept=".json" onChange={(e) => { const file = e.target.files?.[0]; if (file) doImportJson(file); e.target.value = '' }} />
         </label>
       </div>
+      {restorePreview && (
+        <div className="modal-mask" onClick={() => setRestorePreview(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>恢复 JSON 备份</h3>
+            <p>{restorePreview.name}</p>
+            <p>备份包含 {restorePreview.data.bills.length} 条账单、{restorePreview.data.assets.length} 个账户和 {restorePreview.data.refunds.length} 条退款。</p>
+            <p className="hint">恢复会替换当前设备上的本地数据。建议先导出当前 JSON 备份；云端及其他设备的数据不会随此操作回滚，同步后可能重新出现。</p>
+            {restorePreview.data.version === 1 && <p className="hint">旧版备份不含币种、汇率、标签和删除记录，将保留当前设备上的这些设置。</p>}
+            <div className="modal-btns">
+              <button className="ghost" onClick={() => setRestorePreview(null)}>取消</button>
+              <button className="primary" onClick={() => {
+                try { importAll(restorePreview.data); setRestorePreview(null); notify('已恢复本地 JSON 备份') }
+                catch (e: any) { notify('恢复失败：' + (e?.message || '备份格式不正确')) }
+              }}>确认恢复</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <h3>周期记账</h3>
       <p className="hint">每月固定日期自动生成账单；打开应用时补生成，不会重复。</p>

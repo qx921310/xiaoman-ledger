@@ -338,4 +338,45 @@ assert.notEqual(anotherPlan.newAssets[0].assetId, importedWallet.assetId)
 state().applyImport(anotherPlan)
 assert.equal(state().assets.find(a => a.assetName === '导入钱包')!.assetNumber, -6)
 assert.equal(state().assets.find(a => a.assetName === '另一张卡')!.assetNumber, -1)
+
+// JSON backup preserves account movements, settings and deletion markers.
+state().reset()
+state().addAsset({ assetId: 81, assetName: '备份账户', assetNumber: 100 })
+const backupBill = state().addBill({ assetId: 81, parentCategoryId: 7, cost: 10 })
+state().addRefund({ billId: backupBill.billId, number: 3 })
+state().setCurrencyRate('USD', 9.5)
+const backupTag = state().addTag({ name: '备份测试', color: '#123456' })
+state().tombstone('bill', 'deleted-backup-test')
+const backup = JSON.parse(JSON.stringify(state().exportAll()))
+assert.equal(backup.version, 2)
+assert.equal('token' in backup, false)
+state().deleteTag(backupTag.tagId)
+state().setCurrencyRate('USD', 7.2)
+state().reset()
+state().importAll(backup)
+assert.equal(balance(81), 93)
+assert.equal(state().refunds[0].baseAmount, 3)
+assert.equal(state().currencies.find(c => c.code === 'USD')!.rate, 9.5)
+assert.ok(state().tags.some(t => t.tagId === backupTag.tagId))
+assert.ok(state().tombstones.some(t => t.id === 'deleted-backup-test'))
+const unmigratedBackup = JSON.parse(JSON.stringify(backup))
+delete unmigratedBackup.assets[0].openingBalance
+state().importAll(unmigratedBackup)
+assert.equal(balance(81), 93)
+assert.equal(state().assets[0].openingBalance, 100)
+
+// Invalid or incomplete backups must leave existing state untouched.
+const beforeInvalid = JSON.stringify({ assets: state().assets, bills: state().bills, refunds: state().refunds, currencies: state().currencies })
+for (const invalid of [{}, { ...backup, assets: null }, { ...backup, bills: [{ billId: 'bad' }] }, { ...backup, version: 999 }]) {
+  assert.throws(() => state().importAll(invalid))
+  assert.equal(JSON.stringify({ assets: state().assets, bills: state().bills, refunds: state().refunds, currencies: state().currencies }), beforeInvalid)
+}
+
+// V1 did not contain these settings; restoring it retains current settings.
+const { tags: _tags, currencies: _currencies, defaultCurrency: _defaultCurrency, tombstones: _tombstones, currentBookId: _currentBookId, ...v1 } = backup
+state().setCurrencyRate('USD', 8)
+state().importAll({ ...v1, version: 1 })
+assert.equal(balance(81), 93)
+assert.equal(state().currencies.find(c => c.code === 'USD')!.rate, 8)
+assert.ok(state().tags.some(t => t.tagId === backupTag.tagId))
 console.log('balance and synthetic CSV tests passed')

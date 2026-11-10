@@ -7,6 +7,7 @@ import { getCurrentUid, userStorage } from './auth'
 import { deriveAssets } from './balances'
 import { newBillIdentity } from './identity'
 import { fromBase, hasCurrencyRate, toBase } from './money'
+import { validateBackup } from './backup'
 
 const NOW = () => Date.now()
 
@@ -695,7 +696,7 @@ export const useLedger = create<LedgerState>()(
       exportAll: () => {
         const s = get()
         return {
-          version: 1,
+          version: 2,
           exportedAt: new Date().toISOString(),
           accountBooks: s.accountBooks,
           assets: s.assets,
@@ -707,7 +708,12 @@ export const useLedger = create<LedgerState>()(
           lends: s.lends,
           cycles: s.cycles,
           parentCategories: s.parentCategories,
-          childCategories: s.childCategories
+          childCategories: s.childCategories,
+          tags: s.tags,
+          currencies: s.currencies,
+          defaultCurrency: s.defaultCurrency,
+          tombstones: s.tombstones,
+          currentBookId: s.currentBookId
         }
       },
 
@@ -972,20 +978,30 @@ export const useLedger = create<LedgerState>()(
         }
       }),
 
-      importAll: (data) => set((s) => ({
-        accountBooks: data.accountBooks ?? s.accountBooks,
-        assets: data.assets ?? [],
-        bills: data.bills ?? [],
-        transfers: data.transfers ?? [],
-        budgets: data.budgets ?? [],
-        reimbursements: data.reimbursements ?? [],
-        refunds: data.refunds ?? [],
-        lends: data.lends ?? [],
-        cycles: data.cycles ?? [],
-        parentCategories: data.parentCategories ?? s.parentCategories,
-        childCategories: data.childCategories ?? s.childCategories,
-        seeded: true
-      }))
+      importAll: (input) => {
+        const data = validateBackup(input)
+        set((s) => ({
+          accountBooks: data.accountBooks,
+          assets: data.assets,
+          bills: data.bills,
+          transfers: data.transfers,
+          budgets: data.budgets,
+          reimbursements: data.reimbursements,
+          refunds: data.refunds,
+          lends: data.lends,
+          cycles: data.cycles,
+          parentCategories: data.parentCategories,
+          childCategories: data.childCategories,
+          ...(data.version === 2 ? {
+            tags: data.tags,
+            currencies: data.currencies,
+            defaultCurrency: data.defaultCurrency,
+            tombstones: data.tombstones,
+            currentBookId: data.currentBookId ?? s.currentBookId
+          } : {}),
+          seeded: true
+        }))
+      }
     }) },
     {
       name: 'xiaoman-data',
