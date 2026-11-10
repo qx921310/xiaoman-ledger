@@ -601,13 +601,27 @@ export const useLedger = create<LedgerState>()(
         for (const c of [...TAXONOMY_PARENTS, ...TAXONOMY_INCOME, ...TAXONOMY_CHILDREN]) {
           byName.set(`${c.name}|${c.kind}`, c)
         }
+        // 老名字 → 新名字（同一分类改名时避免被当成两个）
+        const RENAMED: Record<string, string> = { '房租还贷': '房贷' }
         const fix = (c: Category): Category => {
+          const renamed = RENAMED[c.name]
+          if (renamed) c = { ...c, name: renamed }
           if (c.icon?.startsWith('ic_')) return c
           const t = byName.get(`${c.name}|${c.kind}`)
           return t ? { ...c, icon: t.icon, color: t.color, bg: t.bg } : c
         }
-        const parents = s.parentCategories.map(fix)
-        const children = s.childCategories.map(fix)
+        let parents = s.parentCategories.map(fix)
+        let children = s.childCategories.map(fix)
+
+        // 一次性清理：早期测试造出来的分类，若没有任何账单引用就删掉
+        const JUNK = new Set(['通讯', '人情', '外卖', '三餐', '零食饮料', '药品'])
+        const used = new Set<number>()
+        for (const b of s.bills) {
+          used.add(b.parentCategoryId)
+          if (b.childCategoryId) used.add(b.childCategoryId)
+        }
+        children = children.filter((c) => !JUNK.has(c.name) || used.has(c.id))
+        parents = parents.filter((c) => !JUNK.has(c.name) || used.has(c.id))
 
         if (!addP.length && !addC.length) {
           const changed = parents.some((c, i) => c !== s.parentCategories[i])
