@@ -5,7 +5,7 @@ import type { Cycle } from './types'
 import type { Asset, Bill, Transfer } from './types'
 import { api } from './api'
 import type { ImportPlan } from './importer'
-import { adoptAnonymousData, auth, setCurrentUid, type User } from './auth'
+import { adoptAnonymousData, auth, books as bookApi, setCurrentUid, type BookInfo, type User } from './auth'
 import { syncNow } from './sync'
 import { currencySymbol, findCurrency, toBase } from './money'
 
@@ -73,6 +73,7 @@ export default function App() {
         adoptAnonymousData(u.id)
         await useLedger.persist.rehydrate()
         setUser(u)
+        await loadBooks()
         autoSyncOnce()
       } else {
         setUser(null)
@@ -90,11 +91,36 @@ export default function App() {
     }
   }
 
+  const loadBooks = async () => {
+    try {
+      const r = await bookApi.list()
+      const list: BookInfo[] = r?.books ?? []
+      const setBooks = useLedger.getState().setAccountBooks
+      setBooks(list.map((b) => ({
+        accountBookId: 0,
+        accountBookName: b.name,
+        userId: 0,
+        createTime: 0,
+        bookId: b.bookId,
+        ownerId: b.ownerId,
+        role: b.role
+      })))
+      const cur = useLedger.getState().currentBookId
+      const match = list.find((b) => b.bookId === localStorage.getItem('xm-current-book'))
+      if (match) useLedger.getState().setBook(match.bookId as any)
+      else if (list[0]) useLedger.getState().setBook(list[0].bookId as any)
+      else if (!cur) useLedger.getState().setBook(0)
+    } catch (e) {
+      console.warn('[books] 加载失败', e)
+    }
+  }
+
   const afterAuth = async (u: User) => {
     setCurrentUid(u.id)
     adoptAnonymousData(u.id)
     await useLedger.persist.rehydrate()
     setUser(u)
+    await loadBooks()
     autoSyncOnce()
   }
 
@@ -223,13 +249,32 @@ function Shell({ user, onLogout }: { user: User; onLogout: () => void }) {
   )
 }
 
+const ROLE_LABEL: Record<string, string> = { silent: '静默', peer: '同伴', admin: '管理' }
+
 function BookSwitch() {
   const books = useLedger((s) => s.accountBooks)
   const current = useLedger((s) => s.currentBookId)
   const setBook = useLedger((s) => s.setBook)
+  const keyOf = (b: any) => String(b.bookId ?? b.accountBookId)
   return (
-    <select value={current} onChange={(e) => setBook(Number(e.target.value))} className="book">
-      {books.map((b) => <option key={b.accountBookId} value={b.accountBookId}>{b.accountBookName}</option>)}
+    <select
+      value={String(current)}
+      onChange={(e) => {
+        const v = e.target.value
+        localStorage.setItem('xm-current-book', v)
+        setBook(/^\d+$/.test(v) ? Number(v) : v)
+      }}
+      className="book">
+      <option value="0">全部账本</option>
+      {books.map((b) => {
+        const k = keyOf(b)
+        const shared = b.role && b.role !== 'admin' || (b.ownerId && b.ownerId !== 0 && b.role)
+        return (
+          <option key={k} value={k}>
+            {b.accountBookName}{b.role ? ` · ${ROLE_LABEL[b.role] ?? b.role}` : ''}
+          </option>
+        )
+      })}
     </select>
   )
 }
@@ -1225,7 +1270,7 @@ function Stats() {
   )
 }
 
-function Settings({ notify }: { notify: (m: string) => void }) {
+function Settings({ notify, me }: { notify: (m: string) => void; me?: { id: number; email: string } }) {
   const seed = useLedger((s) => s.seed)
   const reset = useLedger((s) => s.reset)
   const exportAll = useLedger((s) => s.exportAll)
@@ -1255,6 +1300,22 @@ function Settings({ notify }: { notify: (m: string) => void }) {
   const updateTag = useLedger((s) => s.updateTag)
   const deleteTag = useLedger((s) => s.deleteTag)
   const [newTag, setNewTag] = useState('')
+  const setBook = useLedger((s) => s.setBook)
+  const [members, setMembers] = useState<{ userId: number; role: string; email: string }[]>([])
+  const currentBook = accountBooks.find((b) => b.bookId && String(b.bookId) === String(currentBookId))
+  const reloadBooks = async () => {
+    const r = await bookApi.list()
+    useLedger.getState().setAccountBooks((r?.books ?? []).map((b: BookInfo) => ({
+      accountBookId: 0, accountBookName: b.name, userId: 0, createTime: 0,
+      bookId: b.bookId, ownerId: b.ownerId, role: b.role
+    })))
+  }
+  useEffect(() => {
+    if (!currentBook?.bookId) return
+    bookApi.members(String(currentBook.bookId))
+      .then((r) => setMembers(r.members))
+      .catch(() => setMembers([]))
+  }, [currentBook?.bookId])
   const lastSync = useLedger((s) => s.lastSync)
   const runSync = async () => {
     setSyncing(true)
@@ -1569,6 +1630,85 @@ function Settings({ notify }: { notify: (m: string) => void }) {
         <button onClick={() => { seed(); notify('已填充演示数据') }}>填充演示数据</button>
         <button className="danger" onClick={() => { reset(); notify('已清空') }}>清空数据</button>
       </div>
+
+      <h3>账本与成员</h3>
+      <p className="hint">
+        共享账本支持 2–6 人共记共看。角色：<b>静默</b>只读、<b>同伴</b>可增删改账单、<b>管理</b>可改名/邀请/清空/删账本。
+      </p>
+      {accountBooks.filter((b) => b.bookId).map((b) => {
+        const active = String(b.bookId) === String(currentBookId)
+        return (
+          <div key={String(b.bookId)} className="row">
+            <div className="grow">
+              <div>
+                {b.accountBookName}
+                <span className="tag">{ROLE_LABEL[b.role ?? ''] ?? b.role}</span>
+                {active && <span className="tag ok">当前</span>}
+              </div>
+              <small>{b.ownerId === me?.id ? '我创建的' : `创建者 #${b.ownerId}`}</small>
+            </div>
+            <button className="link" onClick={() => { setBook(String(b.bookId)); localStorage.setItem('xm-current-book', String(b.bookId)) }}>进入</button>
+          </div>
+        )
+      })}
+      <div className="btns">
+        <button onClick={async () => {
+          const name = prompt('新账本名称', '家庭账本')
+          if (!name) return
+          await bookApi.create(name)
+          await reloadBooks()
+          notify('账本已创建')
+        }}>新建账本</button>
+        <button onClick={async () => {
+          const code = prompt('输入邀请码')
+          if (!code) return
+          try {
+            await bookApi.join(code.trim().toUpperCase())
+            await reloadBooks()
+            notify('已加入账本')
+          } catch (e: any) { notify(e?.message || '加入失败') }
+        }}>加入账本</button>
+      </div>
+
+      {currentBook && (
+        <div className="row">
+          <div className="grow">
+            <div>当前：{currentBook.accountBookName}</div>
+            <small>我的角色：{ROLE_LABEL[currentBook.role ?? ''] ?? currentBook.role}</small>
+          </div>
+          {currentBook.role === 'admin' && (
+            <button className="ghost tiny" onClick={async () => {
+              try {
+                const r = await bookApi.invite(String(currentBook.bookId))
+                notify(`邀请码 ${r.code}（24 小时有效）`)
+              } catch (e: any) { notify(e?.message || '生成失败') }
+            }}>生成邀请码</button>
+          )}
+        </div>
+      )}
+      {members.length > 0 && (
+        <>
+          <div className="label">成员（{members.length}/6）</div>
+          {members.map((m) => (
+            <div key={m.userId} className="row">
+              <div className="grow">
+                <div>{m.email}{m.userId === me?.id ? '（我）' : ''}</div>
+                <small>{ROLE_LABEL[m.role] ?? m.role}</small>
+              </div>
+              {currentBook?.role === 'admin' && m.userId !== currentBook.ownerId && (
+                <select value={m.role} onChange={async (e) => {
+                  await bookApi.setRole(String(currentBook.bookId), m.userId, e.target.value)
+                  setMembers((await bookApi.members(String(currentBook.bookId))).members)
+                }}>
+                  <option value="silent">静默</option>
+                  <option value="peer">同伴</option>
+                  <option value="admin">管理</option>
+                </select>
+              )}
+            </div>
+          ))}
+        </>
+      )}
 
       <h3>标签</h3>
       <p className="hint">标签可着色、可嵌套；记账时按名字自动关联。</p>

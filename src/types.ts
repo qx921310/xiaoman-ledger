@@ -18,7 +18,7 @@ export interface Bill {
   parentCategoryId: number
   childCategoryId: number
   assetId: number
-  bookId: number
+  bookId: string | number
   remark: string
   billType: number
   tags: string[]
@@ -210,6 +210,12 @@ export interface Transfer {
 }
 
 export interface AccountBook {
+  /** 服务端账本 id（共享账本用），本地账本可为数字 id */
+  bookId?: string
+  /** 创建者 userId */
+  ownerId?: number
+  /** 我在这个账本里的角色 */
+  role?: 'silent' | 'peer' | 'admin'
   accountBookId: number
   accountBookName: string
   userId: number

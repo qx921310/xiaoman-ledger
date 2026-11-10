@@ -23,7 +23,7 @@ export interface Budget {
 interface LedgerState {
   userId: number
   token: string | null
-  currentBookId: number
+  currentBookId: string | number
   accountBooks: AccountBook[]
   assets: Asset[]
   bills: Bill[]
@@ -69,7 +69,8 @@ interface LedgerState {
   updateTransfer: (transferId: number, patch: Partial<Pick<Transfer, 'fromAssetId' | 'toAssetId' | 'cost' | 'toCost' | 'serviceCharge' | 'time' | 'remark'>>) => void
   addAsset: (patch: Partial<Asset>) => void
   updateAsset: (asset: Asset) => void
-  setBook: (id: number) => void
+  setBook: (id: string | number) => void
+  setAccountBooks: (list: AccountBook[]) => void
   seed: () => void
   reset: () => void
   exportAll: () => object
@@ -570,6 +571,12 @@ export const useLedger = create<LedgerState>()(
       })),
 
       setBook: (id) => set({ currentBookId: id }),
+
+      setAccountBooks: (list) => set((s) => {
+        // 保留本地账本（数字 id），替换服务端账本
+        const local = s.accountBooks.filter((b) => !b.bookId)
+        return { accountBooks: [...local, ...list] }
+      }),
 
       seed: () => {
         const assets: Asset[] = [

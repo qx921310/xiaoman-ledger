@@ -20,6 +20,27 @@ async function call(path: string, init?: RequestInit) {
   return data.result
 }
 
+export interface BookInfo {
+  bookId: string
+  name: string
+  ownerId: number
+  role: 'silent' | 'peer' | 'admin'
+}
+
+export const books = {
+  list: () => call('/books'),
+  create: (name: string) => call('/books/create', { method: 'POST', body: JSON.stringify({ name }) }),
+  rename: (bookId: string, name: string) => call('/books/rename', { method: 'POST', body: JSON.stringify({ bookId, name }) }),
+  invite: (bookId: string) => call('/books/invite', { method: 'POST', body: JSON.stringify({ bookId }) }),
+  join: (code: string) => call('/books/join', { method: 'POST', body: JSON.stringify({ code }) }),
+  members: (bookId: string) => call(`/books/members?bookId=${encodeURIComponent(bookId)}`),
+  setRole: (bookId: string, userId: number, role: string) =>
+    call('/books/role', { method: 'POST', body: JSON.stringify({ bookId, userId, role }) }),
+  removeMember: (bookId: string, userId: number) =>
+    call('/books/remove-member', { method: 'POST', body: JSON.stringify({ bookId, userId }) }),
+  leave: (bookId: string) => call('/books/leave', { method: 'POST', body: JSON.stringify({ bookId }) })
+}
+
 export const auth = {
   me: async (): Promise<User | null> => {
     try {
