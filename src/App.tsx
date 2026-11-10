@@ -752,10 +752,10 @@ function Assets({ notify }: { notify: (m: string) => void }) {
   const addLend = useLedger((s) => s.addLend)
   const deleteLend = useLedger((s) => s.deleteLend)
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null)
-  const [lendForm, setLendForm] = useState<{ type: 1 | 2 | 3 | 4; assetId: number; counterparty: string; number: string; remark: string } | null>(null)
-  const receivable = lends.filter((l) => l.type === 1).reduce((s, l) => s + l.number, 0)
+  const [lendForm, setLendForm] = useState<{ type: 1 | 2 | 3 | 4; assetId: number; counterparty: string; number: string; interest: string; repaymentAssetId: number; remark: string } | null>(null)
+  const receivable = lends.filter((l) => l.type === 1).reduce((s, l) => s + l.number + (l.interest ?? 0), 0)
     - lends.filter((l) => l.type === 2).reduce((s, l) => s + l.number, 0)
-  const payable = lends.filter((l) => l.type === 3).reduce((s, l) => s + l.number, 0)
+  const payable = lends.filter((l) => l.type === 3).reduce((s, l) => s + l.number + (l.interest ?? 0), 0)
     - lends.filter((l) => l.type === 4).reduce((s, l) => s + l.number, 0)
 
   const [name, setName] = useState('')
@@ -812,6 +812,7 @@ function Assets({ notify }: { notify: (m: string) => void }) {
             <div>{LEND_TYPE[l.type]} · {l.counterparty || '未填对方'}</div>
             <small>
               {assets.find((a) => a.assetId === l.assetId)?.assetName ?? '账户'} · {dayOf(l.time)}
+              {l.interest ? ` · 利息 ${money(l.interest)}` : ''}
               {l.remark ? ' · ' + l.remark : ''}
             </small>
           </div>
@@ -820,7 +821,8 @@ function Assets({ notify }: { notify: (m: string) => void }) {
         </div>
       ))}
       <button className="ghost wide" onClick={() => setLendForm({
-        type: 1, assetId: assets[0]?.assetId ?? 0, counterparty: '', number: '', remark: ''
+        type: 1, assetId: assets[0]?.assetId ?? 0, counterparty: '', number: '',
+        interest: '', repaymentAssetId: 0, remark: ''
       })}>记一笔借贷</button>
 
       {lendForm && (
@@ -836,10 +838,28 @@ function Assets({ notify }: { notify: (m: string) => void }) {
             <div className="label">金额</div>
             <input value={lendForm.number} autoFocus inputMode="decimal"
               onChange={(e) => setLendForm({ ...lendForm, number: e.target.value.replace(/[^\d.]/g, '') })} />
-            <div className="label">资金账户</div>
-            <select value={lendForm.assetId} onChange={(e) => setLendForm({ ...lendForm, assetId: Number(e.target.value) })}>
-              {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
-            </select>
+            <div className="row2">
+              <div>
+                <div className="label">利息（可选）</div>
+                <input value={lendForm.interest} inputMode="decimal"
+                  onChange={(e) => setLendForm({ ...lendForm, interest: e.target.value.replace(/[^\d.]/g, '') })} />
+              </div>
+              <div>
+                <div className="label">
+                  {lendForm.type === 2 || lendForm.type === 4 ? '收款账户' : '资金账户'}
+                </div>
+                <select
+                  value={lendForm.repaymentAssetId || lendForm.assetId}
+                  onChange={(e) => setLendForm({
+                    ...lendForm,
+                    ...(lendForm.type === 2 || lendForm.type === 4
+                      ? { repaymentAssetId: Number(e.target.value) }
+                      : { assetId: Number(e.target.value) })
+                  })}>
+                  {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
+                </select>
+              </div>
+            </div>
             <div className="label">备注</div>
             <input value={lendForm.remark} onChange={(e) => setLendForm({ ...lendForm, remark: e.target.value })} />
             <p className="hint">借出减少账户余额，收回与借入增加，归还减少；不计入收支。</p>
@@ -849,6 +869,8 @@ function Assets({ notify }: { notify: (m: string) => void }) {
                 addLend({
                   type: lendForm.type, assetId: lendForm.assetId,
                   counterparty: lendForm.counterparty, number: Number(lendForm.number) || 0,
+                  interest: Number(lendForm.interest) || 0,
+                  repaymentAssetId: lendForm.repaymentAssetId || undefined,
                   remark: lendForm.remark
                 })
                 setLendForm(null)

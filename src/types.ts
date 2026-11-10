@@ -101,7 +101,12 @@ export interface Lend {
   assetId: number
   /** 对方（人名/机构） */
   counterparty: string
+  /** 本金 */
   number: number
+  /** 利息（应收/应付，不计入本金流水） */
+  interest?: number
+  /** 还款/收款账户；缺省沿用 assetId */
+  repaymentAssetId?: number
   time: number
   remark: string
   userId: number

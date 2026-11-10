@@ -51,7 +51,7 @@ interface LedgerState {
   deleteCycle: (cycleId: number) => void
   toggleCycle: (cycleId: number) => void
   runCycles: () => number
-  addLend: (patch: { type: 1 | 2 | 3 | 4; assetId: number; counterparty: string; number: number; time?: number; remark?: string }) => void
+  addLend: (patch: { type: 1 | 2 | 3 | 4; assetId: number; counterparty: string; number: number; interest?: number; repaymentAssetId?: number; time?: number; remark?: string }) => void
   deleteLend: (lendId: number) => void
   addRefund: (patch: { billId: number; number: number }) => void
   deleteRefund: (refundId: number) => void
@@ -452,18 +452,23 @@ export const useLedger = create<LedgerState>()(
       },
 
       // 借出 -、借入 +、收回 +、还款 -；删除则反向冲正
-      addLend: ({ type, assetId, counterparty, number, time, remark }) => set((s) => {
+      addLend: ({ type, assetId, counterparty, number, interest, repaymentAssetId, time, remark }) => set((s) => {
         const amt = Number(number) || 0
         if (amt <= 0 || !assetId) return {}
+        // 借出/借入走 assetId；收回/还款优先走 repaymentAssetId
+        const cashAsset = (type === 2 || type === 4) && repaymentAssetId ? repaymentAssetId : assetId
         const sign = type === 1 || type === 4 ? -1 : 1
         const rec: Lend = {
           lendId: Date.now(), type, assetId, counterparty: counterparty ?? '',
-          number: amt, time: time ?? NOW(), remark: remark ?? '',
+          number: amt,
+          interest: Number(interest) || 0,
+          repaymentAssetId: repaymentAssetId || undefined,
+          time: time ?? NOW(), remark: remark ?? '',
           userId: s.userId, updateTime: NOW()
         }
         return {
           lends: [rec, ...s.lends],
-          assets: s.assets.map((a) => a.assetId === assetId
+          assets: s.assets.map((a) => a.assetId === cashAsset
             ? { ...a, assetNumber: +(a.assetNumber + sign * amt).toFixed(2), updateTime: NOW() } : a)
         }
       }),
@@ -472,9 +477,10 @@ export const useLedger = create<LedgerState>()(
         const rec = s.lends.find((x) => x.lendId === lendId)
         if (!rec) return {}
         const sign = rec.type === 1 || rec.type === 4 ? 1 : -1
+        const cashAsset = (rec.type === 2 || rec.type === 4) && rec.repaymentAssetId ? rec.repaymentAssetId : rec.assetId
         return {
           lends: s.lends.filter((x) => x.lendId !== lendId),
-          assets: s.assets.map((a) => a.assetId === rec.assetId
+          assets: s.assets.map((a) => a.assetId === cashAsset
             ? { ...a, assetNumber: +(a.assetNumber + sign * rec.number).toFixed(2), updateTime: NOW() } : a),
           tombstones: [...s.tombstones, { kind: 'lend', id: String(lendId), updatedAt: NOW() }]
         }

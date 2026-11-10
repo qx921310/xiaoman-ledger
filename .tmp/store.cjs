@@ -3358,9 +3358,10 @@ var useLedger = create()(
         return count;
       },
       // 借出 -、借入 +、收回 +、还款 -；删除则反向冲正
-      addLend: ({ type, assetId, counterparty, number, time, remark }) => set((s) => {
+      addLend: ({ type, assetId, counterparty, number, interest, repaymentAssetId, time, remark }) => set((s) => {
         const amt = Number(number) || 0;
         if (amt <= 0 || !assetId) return {};
+        const cashAsset = (type === 2 || type === 4) && repaymentAssetId ? repaymentAssetId : assetId;
         const sign = type === 1 || type === 4 ? -1 : 1;
         const rec = {
           lendId: Date.now(),
@@ -3368,6 +3369,8 @@ var useLedger = create()(
           assetId,
           counterparty: counterparty ?? "",
           number: amt,
+          interest: Number(interest) || 0,
+          repaymentAssetId: repaymentAssetId || void 0,
           time: time ?? NOW(),
           remark: remark ?? "",
           userId: s.userId,
@@ -3375,16 +3378,17 @@ var useLedger = create()(
         };
         return {
           lends: [rec, ...s.lends],
-          assets: s.assets.map((a) => a.assetId === assetId ? { ...a, assetNumber: +(a.assetNumber + sign * amt).toFixed(2), updateTime: NOW() } : a)
+          assets: s.assets.map((a) => a.assetId === cashAsset ? { ...a, assetNumber: +(a.assetNumber + sign * amt).toFixed(2), updateTime: NOW() } : a)
         };
       }),
       deleteLend: (lendId) => set((s) => {
         const rec = s.lends.find((x) => x.lendId === lendId);
         if (!rec) return {};
         const sign = rec.type === 1 || rec.type === 4 ? 1 : -1;
+        const cashAsset = (rec.type === 2 || rec.type === 4) && rec.repaymentAssetId ? rec.repaymentAssetId : rec.assetId;
         return {
           lends: s.lends.filter((x) => x.lendId !== lendId),
-          assets: s.assets.map((a) => a.assetId === rec.assetId ? { ...a, assetNumber: +(a.assetNumber + sign * rec.number).toFixed(2), updateTime: NOW() } : a),
+          assets: s.assets.map((a) => a.assetId === cashAsset ? { ...a, assetNumber: +(a.assetNumber + sign * rec.number).toFixed(2), updateTime: NOW() } : a),
           tombstones: [...s.tombstones, { kind: "lend", id: String(lendId), updatedAt: NOW() }]
         };
       }),
