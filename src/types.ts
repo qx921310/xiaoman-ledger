@@ -49,6 +49,8 @@ export interface Category {
   kind: 'expense' | 'income'
   color: string
   positionWeight: number
+  /** 语义图标（当前用 emoji 占位，图标规范见设计稿） */
+  icon?: string
 }
 
 export interface Transfer {

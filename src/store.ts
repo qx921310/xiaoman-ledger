@@ -2,40 +2,9 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { AccountBook, Asset, Bill, Category, Transfer } from './types'
 import type { ImportPlan } from './importer'
+import { TAXONOMY_CHILDREN, TAXONOMY_INCOME, TAXONOMY_PARENTS } from './taxonomy'
 
 const NOW = () => Date.now()
-
-function makeParents(): Category[] {
-  const src: [number, string, 'expense' | 'income', string][] = [
-    [100, '食品餐饮', 'expense', '#f97316'],
-    [101, '出行交通', 'expense', '#3b82f6'],
-    [102, '购物消费', 'expense', '#ec4899'],
-    [103, '健康医疗', 'expense', '#10b981'],
-    [104, '文化教育', 'expense', '#8b5cf6'],
-    [105, '居家生活', 'expense', '#f59e0b'],
-    [199, '其他', 'expense', '#94a3b8'],
-    [200, '工资', 'income', '#22c55e'],
-    [201, '收款', 'income', '#14b8a6'],
-    [202, '理财收益', 'income', '#0ea5e9']
-  ]
-  return src.map(([id, name, kind, color], i) => ({
-    id, name, parentId: 0, kind, color, positionWeight: i
-  }))
-}
-
-function makeChildren(): Category[] {
-  const src: [number, number, string][] = [
-    [1001, 100, '三餐'], [1002, 100, '零食饮料'], [1003, 100, '外卖'],
-    [1011, 101, '公交地铁'], [1012, 101, '打车'], [1013, 101, '加油'],
-    [1021, 102, '日用品'], [1022, 102, '数码'],
-    [1031, 103, '药品'], [1032, 103, '门诊'],
-    [1041, 104, '书籍'], [1042, 104, '课程'],
-    [1051, 105, '房租'], [1052, 105, '水电']
-  ]
-  return src.map(([id, parentId, name], i) => ({
-    id, name, parentId, kind: 'expense' as const, color: '#cbd5e1', positionWeight: i
-  }))
-}
 
 interface LedgerState {
   userId: number
@@ -61,6 +30,7 @@ interface LedgerState {
   exportAll: () => object
   importAll: (data: any) => void
   applyImport: (plan: ImportPlan) => void
+  mergeTaxonomy: () => void
 }
 
 export const useLedger = create<LedgerState>()(
@@ -72,8 +42,8 @@ export const useLedger = create<LedgerState>()(
       accountBooks: [{ accountBookId: 1, accountBookName: '日常账本', userId: 1, createTime: NOW() }],
       assets: [],
       bills: [],
-      parentCategories: makeParents(),
-      childCategories: makeChildren(),
+      parentCategories: [...TAXONOMY_PARENTS, ...TAXONOMY_INCOME],
+      childCategories: TAXONOMY_CHILDREN,
       transfers: [],
       seeded: false,
 
@@ -117,7 +87,18 @@ export const useLedger = create<LedgerState>()(
         return bill
       },
 
-      deleteBill: (billId) => set((s) => ({ bills: s.bills.filter((b) => b.billId !== billId) })),
+      // 删除同样要冲正：把该账单对账户的影响退回
+      deleteBill: (billId) => set((s) => {
+        const old = s.bills.find((b) => b.billId === billId)
+        if (!old) return {}
+        const sign = s.parentCategories.find((p) => p.id === old.parentCategoryId)?.kind === 'income' ? 1 : -1
+        return {
+          bills: s.bills.filter((b) => b.billId !== billId),
+          assets: s.assets.map((a) => a.assetId === old.assetId
+            ? { ...a, assetNumber: +(a.assetNumber - sign * old.cost).toFixed(2), updateTime: NOW() }
+            : a)
+        }
+      }),
 
       // 改单：先把旧账单对账户的影响撤回，再按新值重新记一次
       updateBill: (billId, patch) => {
@@ -236,15 +217,19 @@ export const useLedger = create<LedgerState>()(
             time: NOW() - daysAgo * day, cost, parentCategoryId: pid,
             childCategoryId: cid, assetId: aid, remark, billType: 2
           })
-        mk(0, 32.5, 100, 1001, 3, '午饭')
-        mk(0, 128, 102, 1021, 1, '洗衣液和纸巾')
-        mk(1, 6, 101, 1011, 3, '地铁')
-        mk(2, 45, 104, 1041, 1, '一本书')
-        mk(3, 3200, 105, 1051, 1, '房租')
-        mk(4, 12000, 200, 0, 1, '月薪')
+        mk(0, 32.5, 7, 706, 3, '午饭')      // 食品餐饮 / 午餐
+        mk(0, 128, 8, 811, 1, '洗衣液和纸巾') // 购物消费 / 日常家居
+        mk(1, 6, 6, 605, 3, '地铁')          // 出行交通 / 公共交通
+        mk(2, 45, 3, 301, 1, '一本书')       // 文化教育 / 书报杂志
+        mk(3, 3200, 4, 402, 1, '房租')       // 居家生活 / 房租还贷
+        mk(4, 12000, 903, 0, 1, '月薪')      // 工资
       },
 
-      reset: () => set({ assets: [], bills: [], transfers: [], seeded: false }),
+      reset: () => set({
+        assets: [], bills: [], transfers: [], seeded: false,
+        parentCategories: [...TAXONOMY_PARENTS, ...TAXONOMY_INCOME],
+        childCategories: TAXONOMY_CHILDREN
+      }),
 
       exportAll: () => {
         const s = get()
@@ -259,6 +244,20 @@ export const useLedger = create<LedgerState>()(
           childCategories: s.childCategories
         }
       },
+
+      // 把内置分类体系缺失的部分补进来（老数据不会被覆盖，只是补齐）
+      mergeTaxonomy: () => set((s) => {
+        const key = (c: Category) => `${c.parentId}|${c.name}|${c.kind}`
+        const haveP = new Set(s.parentCategories.map(key))
+        const haveC = new Set(s.childCategories.map(key))
+        const addP = [...TAXONOMY_PARENTS, ...TAXONOMY_INCOME].filter((c) => !haveP.has(key(c)))
+        const addC = TAXONOMY_CHILDREN.filter((c) => !haveC.has(key(c)))
+        if (addP.length === 0 && addC.length === 0) return {}
+        return {
+          parentCategories: [...s.parentCategories, ...addP],
+          childCategories: [...s.childCategories, ...addC]
+        }
+      }),
 
       // 合并式导入：新增分类/账户先落地，账单像正常记账一样冲账户余额
       applyImport: (plan) => set((s) => {

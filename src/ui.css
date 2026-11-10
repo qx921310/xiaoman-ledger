@@ -194,3 +194,4 @@ button[disabled] { opacity: .5; cursor: not-allowed; }
   .filters .kw { grid-column: 1 / -1; }
 }
 .ghost.wide { display: block; width: 100%; margin-top: 8px; }
+.chip .ico { font-size: 14px; line-height: 1; }

@@ -28,6 +28,10 @@ type Tab = 'add' | 'bills' | 'assets' | 'stats' | 'settings'
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('add')
+  const mergeTaxonomy = useLedger((s) => s.mergeTaxonomy)
+
+  // 启动时补齐内置分类（幂等，不动用户已有分类）
+  useEffect(() => { mergeTaxonomy() }, [mergeTaxonomy])
   const [toast, setToast] = useState('')
   const notify = (m: string) => {
     setToast(m)
@@ -86,7 +90,7 @@ function AddBill({ notify }: { notify: (m: string) => void }) {
 
   const [mode, setMode] = useState<'expense' | 'income' | 'transfer'>('expense')
   const [cost, setCost] = useState('')
-  const [pid, setPid] = useState(100)
+  const [pid, setPid] = useState(7)
   const [cid, setCid] = useState(0)
   const [aid, setAid] = useState(0)
   const [toAid, setToAid] = useState(0)
@@ -102,14 +106,14 @@ function AddBill({ notify }: { notify: (m: string) => void }) {
 
   const catKind = mode === 'income' ? 'income' : 'expense'
   const list = parents.filter((p) => p.kind === catKind)
-  const cur = list.some((p) => p.id === pid) ? pid : (list[0]?.id ?? 199)
+  const cur = list.some((p) => p.id === pid) ? pid : (list[0]?.id ?? 7)
   const subs = children.filter((c) => c.parentId === cur)
 
   const switchMode = (m: 'expense' | 'income' | 'transfer') => {
     setMode(m)
     setCid(0)
-    if (m === 'expense') setPid(100)
-    if (m === 'income') setPid(200)
+    if (m === 'expense') setPid(7)
+    if (m === 'income') setPid(903)
   }
 
   const submit = () => {
@@ -186,7 +190,7 @@ function AddBill({ notify }: { notify: (m: string) => void }) {
           <div className="chips">
             {list.map((p) => (
               <button key={p.id} className={'chip' + (p.id === cur ? ' on' : '')} onClick={() => { setPid(p.id); setCid(0) }}>
-                <i style={{ background: p.color }} />{p.name}
+                <span className="ico">{p.icon ?? '•'}</span>{p.name}
               </button>
             ))}
           </div>
