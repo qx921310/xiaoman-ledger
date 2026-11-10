@@ -59,6 +59,8 @@ export async function syncNow() {
   const pushed = await call('/data/push', { method: 'POST', body: JSON.stringify({ records }) })
   const pulled = await call('/data/pull')
   useLedger.getState().applyRemote(pulled.records || [])
+  // 云端记录会带回旧分类，合并后再跑一次规范/去重
+  useLedger.getState().mergeTaxonomy()
   useLedger.getState().setLastSync(Date.now())
   return {
     pushed: pushed.accepted as number,

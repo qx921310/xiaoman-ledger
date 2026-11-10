@@ -774,6 +774,8 @@ export const useLedger = create<LedgerState>()(
         // 老名字 → 新名字（同一分类改名时避免被当成两个）
         const RENAMED: Record<string, string> = { '房租还贷': '房贷' }
         const fix = (c: Category): Category => {
+          // 旧数据/云端记录可能缺 kind，按 id 段推断，避免同名分类被当成两个
+          if (!c.kind) c = { ...c, kind: c.id >= 900 ? 'income' : 'expense' }
           const renamed = RENAMED[c.name]
           if (renamed) c = { ...c, name: renamed }
           if (c.icon?.startsWith('ic_')) return c
@@ -798,15 +800,62 @@ export const useLedger = create<LedgerState>()(
         parents = parents.filter((c) => !(c.kind === 'income' && INCOME_MISPLACED.has(c.name) && !used.has(c.id)))
 
         const ratesFixed = currencies.some((c, i) => c !== (s.currencies ?? [])[i])
+        // ---- 去重：同名分类只保留一个（优先保留内置 id，其次最小的）----
+        const canonical = new Map<string, number>()
+        for (const c of [...TAXONOMY_PARENTS, ...TAXONOMY_INCOME]) canonical.set(`${c.name}|${c.kind}`, c.id)
+        for (const c of TAXONOMY_CHILDREN) canonical.set(`${c.parentId}|${c.name}|child`, c.id)
+
+        const keepP = new Map<string, Category>()
+        for (const c of parents) {
+          const k = c.name
+          const prev = keepP.get(k)
+          if (!prev) { keepP.set(k, c); continue }
+          const want = canonical.get(`${c.name}|${c.kind}`)
+          // 若当前这个是内置 id 而已有的不是，则替换
+          if (want != null && c.id === want && prev.id !== want) keepP.set(k, c)
+        }
+        const parentNameOf = (id: number) => (keepP.get([...keepP.values()].find((p: any) => p.id === id)?.name ?? '')?.name ?? String(id))
+        const keepC = new Map<string, Category>()
+        for (const c of children) {
+          const k = `${parentNameOf(c.parentId)}|${c.name}`
+          const prev = keepC.get(k)
+          if (!prev) { keepC.set(k, c); continue }
+          const want = canonical.get(`${c.parentId}|${c.name}|child`)
+          if (want != null && c.id === want && prev.id !== want) keepC.set(k, c)
+        }
+        const remapP = new Map<number, number>()
+        for (const c of parents) {
+          const keep = keepP.get(c.name)
+          if (keep && keep.id !== c.id) remapP.set(c.id, keep.id)
+        }
+        const remapC = new Map<number, number>()
+        for (const c of children) {
+          const keep = keepC.get(`${parentNameOf(c.parentId)}|${c.name}`)
+          if (keep && keep.id !== c.id) remapC.set(c.id, keep.id)
+        }
+        parents = [...keepP.values()]
+        children = [...keepC.values()]
+        const bills = (remapP.size || remapC.size)
+          ? s.bills.map((b) => {
+            const p2 = remapP.get(b.parentCategoryId)
+            const c2 = remapC.get(b.childCategoryId)
+            return p2 == null && c2 == null ? b : { ...b, parentCategoryId: p2 ?? b.parentCategoryId, childCategoryId: c2 ?? b.childCategoryId }
+          })
+          : s.bills
+
         if (!addP.length && !addC.length) {
-          const changed = parents.some((c, i) => c !== s.parentCategories[i])
+          const changed =
+            parents.length !== s.parentCategories.length
+            || children.length !== s.childCategories.length
+            || parents.some((c, i) => c !== s.parentCategories[i])
             || children.some((c, i) => c !== s.childCategories[i])
           if (!changed && !ratesFixed) return {}
-          return { parentCategories: parents, childCategories: children, ...(ratesFixed ? { currencies } : {}) }
+          return { parentCategories: parents, childCategories: children, bills, ...(ratesFixed ? { currencies } : {}) }
         }
         return {
           parentCategories: [...parents, ...addP],
           childCategories: [...children, ...addC],
+          bills,
           ...(ratesFixed ? { currencies } : {})
         }
       }),
