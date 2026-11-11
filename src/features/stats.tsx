@@ -4,6 +4,7 @@ import { money, monthOf } from '../ui-format'
 import { CatIcon } from '../ui/icons'
 import { summarizeBills } from '../bill-summary'
 import { Modal } from '../ui/modal'
+import { IMPORTED_CATEGORY_COLOR } from '../default-colors'
 
 export function Stats() {
   const bills = useLedger((s) => s.bills)
@@ -103,7 +104,7 @@ export function Stats() {
             <div className="bar-track">
               <div className="bar" style={{
                 width: `${Math.min(100, (used / Math.max(1, limitOf(b))) * 100)}%`,
-                background: used > limitOf(b) ? 'var(--out)' : (p?.color === '#94a3b8' ? 'var(--accent)' : p?.color)
+                background: used > limitOf(b) ? 'var(--out)' : (p?.color === IMPORTED_CATEGORY_COLOR ? 'var(--accent)' : p?.color)
               }} />
             </div>
             <div className="budget-foot">

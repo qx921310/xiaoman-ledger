@@ -9,6 +9,7 @@ import { newBillIdentity } from './identity'
 import { fromBase, toBase } from './money'
 import { validateBackup } from './backup'
 import { addRefundChanges, deleteRefundChanges } from './refund-operations'
+import { DEFAULT_TAG_COLOR } from './default-colors'
 
 const NOW = () => Date.now()
 
@@ -694,7 +695,7 @@ export const useLedger = create<LedgerState>()(
         const tag: Tag = {
           tagId: NOW() + Math.floor(Math.random() * 1000),
           name: patch.name,
-          color: patch.color || '#FED778',
+          color: patch.color || DEFAULT_TAG_COLOR,
           parentName: patch.parentName || undefined,
           positionWeight: patch.positionWeight ?? 0
         }
@@ -714,7 +715,7 @@ export const useLedger = create<LedgerState>()(
         const have = new Set(s.tags.map((t) => t.name))
         const missing = [...new Set(names.map((n) => n.trim()).filter(Boolean))].filter((n) => !have.has(n))
         if (!missing.length) return 0
-        const palette = ['#FED778', '#F8C8B0', '#CFE3F7', '#D9F0C8', '#E6D9F7', '#F7D9E6']
+        const palette = [DEFAULT_TAG_COLOR, '#F8C8B0', '#CFE3F7', '#D9F0C8', '#E6D9F7', '#F7D9E6']
         let i = s.tags.length
         set((st) => ({
           tags: [...st.tags, ...missing.map((n) => ({

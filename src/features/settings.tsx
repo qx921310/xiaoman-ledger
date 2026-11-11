@@ -9,6 +9,7 @@ import { money } from '../ui-format'
 import { ROLE_LABEL } from '../ui/roles'
 import { validateBackup } from '../backup'
 import { Modal } from '../ui/modal'
+import { DEFAULT_TAG_COLOR } from '../default-colors'
 
 function RateInput({ value, onCommit, label }: { value: number; onCommit: (v: number) => void; label: string }) {
   const [draft, setDraft] = useState<string | null>(null)
@@ -588,7 +589,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
         <input aria-label="新标签名" value={newTag} placeholder="新标签名" onChange={(e) => setNewTag(e.target.value)} />
         <button className="ghost" onClick={() => {
           if (!newTag.trim()) return
-          addTag({ name: newTag.trim(), color: '#FED778' })
+          addTag({ name: newTag.trim(), color: DEFAULT_TAG_COLOR })
           setNewTag('')
           notify('标签已添加')
         }}>添加标签</button>

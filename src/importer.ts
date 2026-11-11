@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx'
 import type { AccountBook, Asset, Bill, Category, Refund, Reimbursement, Transfer } from './types'
 import { newBillIdentity } from './identity'
 import { childCategoryNeedsReview, resolveBillChild } from './taxonomy'
+import { IMPORTED_CATEGORY_COLOR } from './default-colors'
 
 export interface ParsedTable {
   headers: string[]
@@ -162,7 +163,7 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
     const n = str(name) || '未分类'
     const hit = parents.find((p) => p.name === n && p.kind === kind)
     if (hit) return hit.id
-    const cat: Category = { id: idFor(900000), name: n, parentId: 0, kind, color: '#94a3b8', positionWeight: parents.length }
+    const cat: Category = { id: idFor(900000), name: n, parentId: 0, kind, color: IMPORTED_CATEGORY_COLOR, positionWeight: parents.length }
     parents.push(cat); newParents.push(cat)
     return cat.id
   }

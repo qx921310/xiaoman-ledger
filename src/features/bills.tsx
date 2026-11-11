@@ -149,7 +149,7 @@ export function Bills({ me, onAdd }: { me?: { id: number; email: string }; onAdd
             const inc = p?.kind === 'income'
             return (
               <div key={b.billId} className="row">
-                <span className="dot-badge" style={{ background: p?.bg ?? '#F1EDE4', color: p?.color ?? '#7A5A3C' }}>
+                <span className="dot-badge" style={{ background: p?.bg ?? 'var(--accent-soft)', color: p?.color ?? 'var(--ink)' }}>
                   <CatIcon k={p?.icon} size={16} />
                 </span>
                 <div className="grow">
@@ -178,7 +178,7 @@ export function Bills({ me, onAdd }: { me?: { id: number; email: string }; onAdd
                       {(b.refundNum ?? 0) > 0 && <span className="tag">已退 {money(b.refundNum!)}</span>}
                       {(b.tags || []).map((name) => {
                         const t = tagsByName.get(name)
-                        return <span key={name} className="tag" style={t ? { background: t.color, color: '#4a2f16' } : undefined}>{name}</span>
+                        return <span key={name} className="tag" style={t ? { background: t.color, color: 'var(--ink)' } : undefined}>{name}</span>
                       })}
                     </div>
                   )}
@@ -286,7 +286,7 @@ function BillDetail({ bill, me, onClose, onEdit }: {
         <Row label="标签">
           {(bill.tags && bill.tags.length)
             ? bill.tags.map((t) => (
-              <span key={t} className="tag" style={{ background: tagColor(t) ?? undefined, color: '#4a2f16' }}>{t}</span>
+              <span key={t} className="tag" style={{ background: tagColor(t) ?? undefined, color: 'var(--ink)' }}>{t}</span>
             ))
             : '无'}
         </Row>
