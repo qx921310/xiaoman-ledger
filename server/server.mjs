@@ -573,6 +573,29 @@ const server = createServer(async (req, res) => {
     // 旧版 REST/sync 接口已移除：客户端只用 /api/data/*、/api/auth/*、/api/books/*
     // 这些接口曾用请求头 user-id 识别用户，无法安全鉴权，保留即是越权入口。
 
+    // 行情：转发腾讯行情接口（与满满 market 服务同一数据源），返回最新价
+    if (path === '/api/quote' && req.method === 'GET') {
+      const u = currentUser(req)
+      if (!u) return fail(res, '请先登录', 401)
+      const code = String(url.searchParams.get('code') || '').trim()
+      if (!/^[a-zA-Z0-9.]{2,20}$/.test(code)) return fail(res, '代码格式不对')
+      try {
+        const r = await fetch(`https://qt.gtimg.cn/q=${encodeURIComponent(code)}`, {
+          headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://finance.qq.com/' }
+        })
+        const text = await r.text()
+        // 形如 v_sh600519="1~贵州茅台~600519~1680.00~..."
+        const m = text.match(/="([^"]+)"/)
+        if (!m) return fail(res, '行情源没有返回该代码')
+        const parts = m[1].split('~')
+        const price = Number(parts[3])
+        if (!Number.isFinite(price) || price <= 0) return fail(res, '行情源没有有效价格')
+        return ok(res, { code, name: parts[1], price })
+      } catch (e) {
+        return fail(res, '行情获取失败：' + (e?.message || '网络错误'))
+      }
+    }
+
     // 截图识别：调用网关 vision 模型，返回结构化账单字段
     if (path === '/api/ocr' && req.method === 'POST') {
       const u = currentUser(req)

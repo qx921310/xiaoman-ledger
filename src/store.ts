@@ -13,7 +13,7 @@ import { dedupeCycleBills as dedupeBills } from './domain/cycle-dedupe'
 import { mergeTaxonomyState } from './domain/taxonomy-merge'
 import { serializeShares, splitAmounts } from './domain/split'
 import { planInstalment } from './domain/loan'
-import { applyBuy, applySell } from './domain/stock'
+import { applyBuyWithLot, applySellByMethod } from './domain/stock'
 import { fromBase, toBase } from './money'
 import { validateBackup } from './backup'
 import { addRefundChanges, deleteRefundChanges } from './refund-operations'
@@ -132,6 +132,7 @@ interface LedgerState {
   /** 买入/卖出：更新持仓成本与已实现盈亏，并记录一笔 StockInfo */
   tradeStock: (stockAssetId: number, type: 1 | 2, num: number, amount: number, fee?: number, time?: number) => boolean
   setStockPrice: (stockAssetId: number, price: number) => void
+  setStockCostMethod: (stockAssetId: number, method: 0 | 1 | 2) => void
   addTemplate: (patch: Omit<import('./types').Template, 'templateId' | 'updateTime'>) => import('./types').Template
   deleteTemplate: (templateId: number) => void
   /** 套用模板：直接记一笔 */
@@ -480,8 +481,9 @@ export const useLedger = create<LedgerState>()(
         const s = get()
         const rec = s.stockAssets.find((x) => x.stockAssetId === stockAssetId)
         if (!rec || !(num > 0)) return false
-        const h = { num: rec.primeNum, cost: rec.primeCost, realized: rec.historyIncome }
-        const next = type === 1 ? applyBuy(h, num, amount, fee) : applySell(h, num, amount, fee)
+        const h = { num: rec.primeNum, cost: rec.primeCost, realized: rec.historyIncome, lots: rec.lots }
+        const method = rec.costMethod ?? 0
+        const next = type === 1 ? applyBuyWithLot(h, num, amount, fee) : applySellByMethod(h, method, num, amount, fee)
         if (next === h) return false                     // 卖出超量或参数非法
         let stockInfoId = Date.now()
         while (s.stockInfos.some((x) => x.stockInfoId === stockInfoId)) stockInfoId++
@@ -497,7 +499,7 @@ export const useLedger = create<LedgerState>()(
         }
         set((st) => ({
           stockAssets: st.stockAssets.map((x) => x.stockAssetId === stockAssetId
-            ? { ...x, primeNum: next.num, primeCost: next.cost, historyIncome: next.realized, updateTime: NOW() }
+            ? { ...x, primeNum: next.num, primeCost: next.cost, historyIncome: next.realized, lots: next.lots, updateTime: NOW() }
             : x),
           stockInfos: [...st.stockInfos, {
             stockInfoId, stockAssetId, type, num, cost: amount,
@@ -506,6 +508,11 @@ export const useLedger = create<LedgerState>()(
         }))
         return true
       },
+
+      setStockCostMethod: (stockAssetId, method) => set((s) => ({
+        stockAssets: s.stockAssets.map((x) => x.stockAssetId === stockAssetId
+          ? { ...x, costMethod: method, updateTime: NOW() } : x)
+      })),
 
       setStockPrice: (stockAssetId, price) => set((s) => ({
         stockAssets: s.stockAssets.map((x) => x.stockAssetId === stockAssetId

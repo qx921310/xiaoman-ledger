@@ -69,6 +69,10 @@ export interface StockAsset {
   monetary?: boolean
   /** 一木 addBill：交易时是否生成账单 */
   addBill?: boolean
+  /** 一木 StockCostMethod.method：0 移动加权 / 1 先进先出 / 2 后进先出 */
+  costMethod?: 0 | 1 | 2
+  /** 持仓批次 */
+  lots?: Array<{ num: number; cost: number }>
   hide?: boolean
   intoTotalAsset?: boolean
   remark?: string

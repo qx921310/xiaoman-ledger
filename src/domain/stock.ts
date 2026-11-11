@@ -3,6 +3,16 @@
  * 统一按「移动加权平均成本」计算，卖出时的已实现盈亏累加到 historyIncome。
  */
 
+/** 成本计量方式：0 移动加权平均 / 1 先进先出 / 2 后进先出 */
+export type CostMethod = 0 | 1 | 2
+
+/** 一批持仓（FIFO/LIFO 需要按批次结转成本） */
+export interface StockLot {
+  num: number
+  /** 该批次的单位成本 */
+  cost: number
+}
+
 export interface StockHolding {
   /** 持仓数量 */
   num: number
@@ -10,6 +20,8 @@ export interface StockHolding {
   cost: number
   /** 累计已实现盈亏 */
   realized: number
+  /** 持仓批次（仅 FIFO/LIFO 使用；移动加权可忽略） */
+  lots?: StockLot[]
 }
 
 /**
@@ -52,4 +64,44 @@ export function holdingValue(num: number, cost: number, price: number) {
 /** 总盈亏 = 已实现 + 浮动 */
 export function totalProfit(realized: number, floating: number) {
   return +(realized + floating).toFixed(2)
+}
+
+/**
+ * 按成本法卖出：返回新的持仓。
+ * - 移动加权平均：按平均成本结转
+ * - 先进先出：从最早批次扣
+ * - 后进先出：从最新批次扣
+ * 已实现盈亏 = 卖出到账额 − 结转成本（与一木公式一致）。
+ */
+export function applySellByMethod(
+  h: StockHolding, method: CostMethod, num: number, amount: number, fee = 0
+): StockHolding {
+  if (!(num > 0) || num > h.num + 1e-9 || !(amount > 0)) return h
+  if (method === 0 || !h.lots?.length) return applySell(h, num, amount, fee)
+
+  const lots = h.lots.map((x) => ({ ...x }))
+  const order = method === 1 ? [...lots] : [...lots].reverse()
+  let left = num
+  let costPart = 0
+  for (const lot of order) {
+    if (left <= 0) break
+    const take = Math.min(lot.num, left)
+    costPart += take * lot.cost
+    lot.num = +(lot.num - take).toFixed(6)
+    left = +(left - take).toFixed(6)
+  }
+  if (left > 1e-9) return h          // 批次不足（数据不一致时不动作）
+  const realized = +((amount - fee) - costPart).toFixed(2)
+  const kept = (method === 1 ? lots : lots.reverse()).filter((x) => x.num > 1e-6)
+  const totalNum = +kept.reduce((s, x) => s + x.num, 0).toFixed(6)
+  const totalCost = totalNum ? +(kept.reduce((s, x) => s + x.num * x.cost, 0) / totalNum).toFixed(6) : 0
+  return { num: totalNum, cost: totalCost, realized: +(h.realized + realized).toFixed(2), lots: kept }
+}
+
+/** 买入时把新批次追加进去，并重算平均成本 */
+export function applyBuyWithLot(h: StockHolding, num: number, amount: number, fee = 0): StockHolding {
+  const next = applyBuy(h, num, amount, fee)
+  const unit = num > 0 ? +((amount + fee) / num).toFixed(6) : 0
+  const lots = [...(h.lots ?? []), { num, cost: unit }]
+  return { ...next, lots }
 }

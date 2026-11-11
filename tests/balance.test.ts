@@ -13,7 +13,7 @@ import { accountHistory } from '../src/domain/account-history'
 import { parseShares, splitAmounts } from '../src/domain/split'
 import { buildAssetSankey, sankeyGroupOf } from '../src/domain/asset-sankey'
 import { planInstalment, planLoan } from '../src/domain/loan'
-import { applyBuy, applySell, holdingValue, totalProfit } from '../src/domain/stock'
+import { applyBuy, applyBuyWithLot, applySell, applySellByMethod, holdingValue, totalProfit } from '../src/domain/stock'
 import { byAsset, byTag, dailyTrend } from '../src/domain/stats-breakdown'
 import { dateKey, pendingDates } from '../src/cycle-dates'
 import { createElement } from 'react'
@@ -1194,3 +1194,17 @@ const val = holdingValue(100, 12, 15)
 assert.equal(val.market, 1500)
 assert.equal(val.floating, 300)
 assert.equal(totalProfit(300, 300), 600)
+
+// 多成本法：先进先出 / 后进先出 结转成本不同，盈亏也不同
+let fifo = { num: 0, cost: 0, realized: 0, lots: [] as Array<{ num: number; cost: number }> }
+fifo = applyBuyWithLot(fifo, 100, 1000)   // 10 元
+fifo = applyBuyWithLot(fifo, 100, 2000)   // 20 元
+const fifoSell = applySellByMethod(fifo, 1, 100, 1800)
+assert.equal(fifoSell.realized, 800, 'FIFO 先卖 10 元的批次：1800-1000=800')
+assert.equal(fifoSell.num, 100)
+assert.equal(fifoSell.cost, 20, '剩余是 20 元那批')
+const lifoSell = applySellByMethod(fifo, 2, 100, 1800)
+assert.equal(lifoSell.realized, -200, 'LIFO 先卖 20 元的批次：1800-2000=-200')
+assert.equal(lifoSell.cost, 10, '剩余是 10 元那批')
+const avgSell = applySellByMethod(fifo, 0, 100, 1800)
+assert.equal(avgSell.realized, 300, '移动加权：均价 15，1800-1500=300')

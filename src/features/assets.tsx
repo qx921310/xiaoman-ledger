@@ -3,6 +3,7 @@ import { useLedger, useTotalAssets } from '../store'
 import { ASSET_TYPE, LEND_TYPE } from '../types'
 import type { Asset } from '../types'
 import { money, dayOf } from '../ui-format'
+import { errorMessage } from '../errors'
 import { AssetIcon } from '../ui/icons'
 import { ASSET_ICON_GROUPS } from '../ui/asset-icons'
 import { Modal } from '../ui/modal'
@@ -52,6 +53,7 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
   const deleteStockAsset = useLedger((s) => s.deleteStockAsset)
   const tradeStock = useLedger((s) => s.tradeStock)
   const setStockPrice = useLedger((s) => s.setStockPrice)
+  const setStockCostMethod = useLedger((s) => s.setStockCostMethod)
   const [stockForm, setStockForm] = useState({ name: '', code: '', num: '', amount: '' })
   const [stockSell, setStockSell] = useState<Record<number, string>>({})
   const [stockSellAmt, setStockSellAmt] = useState<Record<number, string>>({})
@@ -225,6 +227,24 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
               <button className="del" onClick={() => deleteStockAsset(h.stockAssetId)}>删</button>
             </div>
             <div className="cat-children">
+              <div className="row2">
+                <select aria-label={`${h.name} 成本法`} value={h.costMethod ?? 0}
+                  onChange={(e) => setStockCostMethod(h.stockAssetId, Number(e.target.value) as 0 | 1 | 2)}>
+                  <option value={0}>移动加权平均</option>
+                  <option value={1}>先进先出</option>
+                  <option value={2}>后进先出</option>
+                </select>
+                <button className="ghost" disabled={!h.code} onClick={async () => {
+                  if (!h.code) return notify('这个持仓没有代码，无法拉行情')
+                  try {
+                    const r = await fetch(`/api/quote?code=${encodeURIComponent(h.code)}`, { credentials: 'same-origin' })
+                    const j = await r.json()
+                    if (j.code !== 0) throw new Error(j.msg)
+                    setStockPrice(h.stockAssetId, j.result.price)
+                    notify(`已更新 ${h.name} 现价 ${j.result.price}`)
+                  } catch (e) { notify(errorMessage(e, '行情获取失败')) }
+                }}>刷新行情</button>
+              </div>
               <div className="row2">
                 <input aria-label={`${h.name} 现价`} placeholder="当前价" defaultValue={h.price ?? ''}
                   inputMode="decimal"
@@ -594,6 +614,24 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
               <button className="del" onClick={() => deleteStockAsset(h.stockAssetId)}>删</button>
             </div>
             <div className="cat-children">
+              <div className="row2">
+                <select aria-label={`${h.name} 成本法`} value={h.costMethod ?? 0}
+                  onChange={(e) => setStockCostMethod(h.stockAssetId, Number(e.target.value) as 0 | 1 | 2)}>
+                  <option value={0}>移动加权平均</option>
+                  <option value={1}>先进先出</option>
+                  <option value={2}>后进先出</option>
+                </select>
+                <button className="ghost" disabled={!h.code} onClick={async () => {
+                  if (!h.code) return notify('这个持仓没有代码，无法拉行情')
+                  try {
+                    const r = await fetch(`/api/quote?code=${encodeURIComponent(h.code)}`, { credentials: 'same-origin' })
+                    const j = await r.json()
+                    if (j.code !== 0) throw new Error(j.msg)
+                    setStockPrice(h.stockAssetId, j.result.price)
+                    notify(`已更新 ${h.name} 现价 ${j.result.price}`)
+                  } catch (e) { notify(errorMessage(e, '行情获取失败')) }
+                }}>刷新行情</button>
+              </div>
               <div className="row2">
                 <input aria-label={`${h.name} 现价`} placeholder="当前价" defaultValue={h.price ?? ''}
                   inputMode="decimal"
