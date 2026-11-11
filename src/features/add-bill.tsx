@@ -198,16 +198,6 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
             {mode !== 'transfer' && <div className="entry-account"><span>账户</span><MobilePicker className="entry-account-picker" label="选择账户" value={String(aid)} options={assetOptions} onChange={(value) => setAid(Number(value))} /></div>}
             {!keypadOpen && <button type="button" onClick={() => { setKeypadField('cost'); setKeypadOpen(true) }}>数字键盘</button>}
           </div>
-          <div className="entry-attrs">
-            <label>
-              <input type="checkbox" checked={notIntoTotal} onChange={(e) => setNotIntoTotal(e.target.checked)} />
-              不计收支
-            </label>
-            <label>
-              <input type="checkbox" checked={notIntoBudget} onChange={(e) => setNotIntoBudget(e.target.checked)} />
-              不计预算
-            </label>
-          </div>
           {privacyBlocked && (
             <p className="hint due-hint">
               「{pickedAsset?.assetName}」是私有账户，记到共享账本会让成员看到它的名字。
@@ -333,6 +323,18 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
       <div className="label">备注</div>
       <input aria-label="备注" value={remark} onChange={(e) => setRemark(e.target.value)} placeholder="写点什么（可留空）" />
 
+      {mode !== 'transfer' && (
+        <div className="entry-attrs">
+          <label>
+            <input type="checkbox" checked={notIntoTotal} onChange={(e) => setNotIntoTotal(e.target.checked)} />
+            不计收支
+          </label>
+          <label>
+            <input type="checkbox" checked={notIntoBudget} onChange={(e) => setNotIntoBudget(e.target.checked)} />
+            不计预算
+          </label>
+        </div>
+      )}
       <button className="primary" disabled={readOnly} onClick={() => { submit() }}>{mode === 'transfer' ? '确认转账' : '记一笔'}</button>
     </section>
   )
