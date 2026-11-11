@@ -1,5 +1,6 @@
 /** Apply one key to a decimal amount without allowing multiple decimal points. */
-export function editAmount(value: string, key: string): string {
+export function editAmount(raw: string, key: string): string {
+  const value = raw.replace(/,/g, '')
   if (key === '清空') return ''
   if (key === '退格') return value.slice(0, -1)
   if (['+', '-', '×', '÷'].includes(key)) {
@@ -18,7 +19,8 @@ export function editAmount(value: string, key: string): string {
 }
 
 /** Evaluate a small arithmetic expression without executing arbitrary code. */
-export function evaluateAmount(value: string): number | null {
+export function evaluateAmount(raw: string): number | null {
+  const value = raw.replace(/,/g, '')
   if (!/^(?:\d+(?:\.\d*)?|\.\d+)(?:[+\-×÷](?:\d+(?:\.\d*)?|\.\d+))*$/.test(value)) return null
   const tokens = value.match(/\d+(?:\.\d*)?|\.\d+|[+\-×÷]/g) ?? []
   const terms: number[] = []
@@ -39,4 +41,19 @@ export function evaluateAmount(value: string): number | null {
     }
   }
   return Number.isFinite(result) ? +result.toFixed(2) : null
+}
+
+/** 展示用千分位：给每段数字加逗号，保留运算符与末尾小数点 */
+export function formatAmount(raw: string): string {
+  const value = raw.replace(/,/g, '')
+  if (!value) return ''
+  return value
+    .split(/([+\-×÷])/)
+    .map((part) => {
+      if (!part || /^[+\-×÷]$/.test(part)) return part
+      const [intPart, decPart] = part.split('.')
+      const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+      return part.includes('.') ? `${grouped}.${decPart ?? ''}` : grouped
+    })
+    .join('')
 }

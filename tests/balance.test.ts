@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert'
 import { deriveAssets } from '../src/balances'
 import { buildExportTable, buildImportPlan, parseLedgerFile } from '../src/importer'
 import * as XLSX from 'xlsx'
-import { editAmount, evaluateAmount } from '../src/ui/keypad'
+import { editAmount, evaluateAmount, formatAmount } from '../src/ui/keypad'
 import { lendRemaining, lendTotals } from '../src/lend'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -496,6 +496,17 @@ assert.equal(editAmount('1+2', '.'), '1+2.')
 assert.equal(editAmount('0', '0'), '0')
 assert.equal(editAmount('0', '7'), '7')
 assert.equal(editAmount('1.0', '0'), '1.00')
+
+// 千分位显示：只影响展示，不影响求值
+assert.equal(formatAmount('12345.6'), '12,345.6')
+assert.equal(formatAmount('1234+5678'), '1,234+5,678')
+assert.equal(formatAmount('1234.'), '1,234.')
+assert.equal(formatAmount(''), '')
+assert.equal(formatAmount('12,345'), '12,345')
+// 带千分位的串先还原成无逗号原文再编辑，展示层负责重新加逗号
+assert.equal(editAmount('12,345', '退格'), '1234')
+assert.equal(formatAmount(editAmount('12,345', '退格')), '1,234')
+assert.equal(evaluateAmount('12,345'), 12345)
 assert.equal(evaluateAmount('3+2×4'), 11)
 assert.equal(evaluateAmount('10-6÷2'), 7)
 assert.equal(evaluateAmount('1÷0'), null)

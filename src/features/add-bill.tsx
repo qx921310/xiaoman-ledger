@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLedger } from '../store'
 import { accountMoney, currencySymbol, findCurrency, hasCurrencyRate, toBase } from '../money'
 import { money, toLocalInput } from '../ui-format'
 import { CatIcon } from '../ui/icons'
-import { editAmount, evaluateAmount } from '../ui/keypad'
+import { editAmount, evaluateAmount, formatAmount } from '../ui/keypad'
 import { MobilePicker } from '../ui/mobile-picker'
 
 export function AddBill({ notify, onClose }: { notify: (m: string) => void; onClose?: () => void }) {
@@ -109,11 +109,27 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
   if (mobileKeypad) {
     const displayCurrency = mode === 'transfer' ? (assets.find((a) => a.assetId === aid)?.currency ?? defaultCurrency) : currency
     const evaluatedCost = evaluateAmount(cost)
+    const holdRef = useRef<{ delay?: ReturnType<typeof setTimeout>; timer?: ReturnType<typeof setInterval> }>({})
+    const startHold = () => {
+      holdRef.current.delay = setTimeout(() => {
+        holdRef.current.timer = setInterval(() => setKey('退格'), 100)
+      }, 400)
+    }
+    const stopHold = () => {
+      if (holdRef.current.delay) clearTimeout(holdRef.current.delay)
+      if (holdRef.current.timer) clearInterval(holdRef.current.timer)
+      holdRef.current = {}
+    }
     const setKey = (key: string) => {
       const setter = keypadField === 'fee' ? setFee : keypadField === 'toCost' ? setToCost : setCost
       setter((value) => editAmount(value, key))
     }
-    const key = (label: string, extra = '') => <button type="button" aria-label={label} className={extra} onClick={() => setKey(label)}>{label === '退格' ? <svg className="entry-key-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9L3 12l6-7Z"/><path d="m12 9 4 6m0-6-4 6"/></svg> : label}</button>
+    const key = (label: string, extra = '') => label === '退格'
+      ? <button type="button" aria-label="退格" className={extra} onClick={() => setKey(label)}
+          onPointerDown={startHold} onPointerUp={stopHold} onPointerLeave={stopHold} onPointerCancel={stopHold}
+          onContextMenu={(e) => e.preventDefault()}
+        ><svg className="entry-key-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9L3 12l6-7Z"/><path d="m12 9 4 6m0-6-4 6"/></svg></button>
+      : <button type="button" aria-label={label} className={extra} onClick={() => setKey(label)}>{label === '退格' ? <svg className="entry-key-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9L3 12l6-7Z"/><path d="m12 9 4 6m0-6-4 6"/></svg> : label}</button>
     const assetOptions = [{ value: '0', label: '请选择账户' }, ...assets.map((a) => ({ value: String(a.assetId), label: a.assetName, detail: accountMoney(a.assetNumber, a.currency, currencies, defaultCurrency), assetType: a.assetType }))]
     return (
       <section className="mobile-entry" aria-label="记账">
@@ -156,7 +172,7 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
             <input className="entry-remark" aria-label="备注" value={remark} placeholder="写备注…" onFocus={() => setKeypadOpen(false)} onBlur={() => setKeypadOpen(true)} onChange={(e) => setRemark(e.target.value)} />
             {mode === 'transfer' ? <span className="entry-currency-code">{displayCurrency}</span> : <MobilePicker className="entry-currency" label="选择币种" value={currency} options={currencies.map((c) => ({ value: c.code, label: c.code, detail: c.name, icon: c.symbol }))} onChange={setCurrency} />}
             <span className="entry-symbol">{currencySymbol(currencies, displayCurrency, defaultCurrency)}</span>
-            <input className="entry-value" aria-label="记账金额" value={cost} placeholder="0.00" inputMode="none" onFocus={() => { setKeypadField('cost'); setKeypadOpen(true) }} onChange={(e) => setCost(e.target.value.replace(/[^\d.]/g, ''))} />
+            <input className="entry-value" aria-label="记账金额" value={formatAmount(cost)} placeholder="0.00" inputMode="none" onFocus={() => { setKeypadField('cost'); setKeypadOpen(true) }} onChange={(e) => setCost(e.target.value.replace(/[^\d.]/g, ''))} />
           </div>
           {mode !== 'transfer' && currency !== defaultCurrency && evaluatedCost != null && evaluatedCost > 0 && <div className="entry-fx">{hasCurrencyRate(currency, currencies, defaultCurrency) ? `折合 ${currencySymbol(currencies, defaultCurrency, defaultCurrency)}${toBase(evaluatedCost, currency, currencies, defaultCurrency).toFixed(2)}` : '请先设置汇率'}</div>}
           <div className="entry-options">
@@ -186,7 +202,7 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
 
       <div className="amount">
         <span>{currencySymbol(currencies, currency, defaultCurrency)}</span>
-        <input value={cost} onChange={(e) => setCost(e.target.value.replace(/[^\d.]/g, ''))} placeholder="0.00" aria-label="记账金额" inputMode="decimal" />
+        <input value={formatAmount(cost)} onChange={(e) => setCost(e.target.value.replace(/[^\d.]/g, ''))} placeholder="0.00" aria-label="记账金额" inputMode="decimal" />
         {currencies.length > 1 && (
           <select aria-label="记账币种" className="cur" value={currency} onChange={(e) => setCurrency(e.target.value)}>
             {currencies.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
