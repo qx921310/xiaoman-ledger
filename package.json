@@ -19,7 +19,8 @@
     "test:sync-identities": "node --test tests/sync-identities.test.mjs",
     "lint": "eslint src",
     "hooks:install": "node scripts/install-hooks.mjs",
-    "guard": "node scripts/guard-staged.mjs"
+    "guard": "node scripts/guard-staged.mjs",
+    "audit:migration": "node scripts/audit-migration.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

@@ -35,7 +35,7 @@ export interface Bill {
   remark: string
   billType: number
   /** 由哪条周期规则生成（跨设备去重用） */
-  cycleId?: number
+  cycleId?: number | string
   tags: string[]
   /** 附件引用 */
   files: BillFile[]
@@ -121,7 +121,8 @@ export interface Currency {
 
 /** 周期记账规则：每月固定日期自动生成账单 */
 export interface Cycle {
-  cycleId: number
+  /** 新规则用 UUID，保证多台设备对同一条规则得到同一个 id；历史规则可能是数字 */
+  cycleId: number | string
   /** 所属账本：周期规则固定在创建时的账本，避免切换账本后记错位置 */
   bookId?: string | number
   name: string

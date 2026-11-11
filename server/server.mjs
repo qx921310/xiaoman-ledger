@@ -53,6 +53,14 @@ db.exec(`
     PRIMARY KEY (book_id, record_id),
     UNIQUE (book_id, member_no, sequence_no)
   );
+  CREATE TABLE IF NOT EXISTS bill_periods (
+    book_id TEXT NOT NULL,
+    period_key TEXT NOT NULL,
+    record_id TEXT NOT NULL,
+    user_id INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (book_id, period_key)
+  );
   CREATE TABLE IF NOT EXISTS invites (
     code TEXT PRIMARY KEY,
     book_id TEXT NOT NULL,
@@ -446,7 +454,7 @@ const server = createServer(async (req, res) => {
       if (!user) return fail(res, '请先登录')
       const body = await readBody(req)
       const list = Array.isArray(body.records) ? body.records : []
-      let accepted = 0, skipped = 0, denied = 0
+      let accepted = 0, skipped = 0, denied = 0, duplicates = 0
       db.exec('BEGIN IMMEDIATE')
       try { for (const r of list) {
         if (!r || typeof r.kind !== 'string' || r.id == null) { skipped++; continue }
@@ -478,6 +486,12 @@ const server = createServer(async (req, res) => {
         if (mine && (mine.updated_at > updatedAt || (mine.updated_at === updatedAt && mine.deleted && !r.deleted))) { skipped++; continue }
 
         let payload = r.payload ?? null
+        // 周期账单：同一账本同一期只允许落地一条（服务端权威期号）
+        if (r.kind === 'bill' && !r.deleted && bookId && r.periodKey) {
+          const held = db.prepare('SELECT record_id FROM bill_periods WHERE book_id = ? AND period_key = ?')
+            .get(bookId, String(r.periodKey))
+          if (held && held.record_id !== rid) { duplicates++; continue }
+        }
         if (r.kind === 'bill' && !r.deleted && bookId && payload) {
           if (payload.syncId && payload.syncId !== rid) { denied++; continue }
           const number = billNumber(bookId, rid, mine?.user_id ?? user.id)
@@ -489,12 +503,17 @@ const server = createServer(async (req, res) => {
           ON CONFLICT(user_id, kind, rid) DO UPDATE SET payload=excluded.payload, updated_at=excluded.updated_at,
             deleted=excluded.deleted, book_id=excluded.book_id`)
           .run(mine?.user_id ?? user.id, r.kind, rid, JSON.stringify(payload), updatedAt, r.deleted ? 1 : 0, bookId)
+        if (r.kind === 'bill' && !r.deleted && bookId && r.periodKey) {
+          db.prepare(`INSERT INTO bill_periods (book_id, period_key, record_id, user_id, created_at)
+            VALUES (?,?,?,?,?) ON CONFLICT(book_id, period_key) DO NOTHING`)
+            .run(bookId, String(r.periodKey), rid, user.id, Date.now())
+        }
         accepted++
       }
       upsertKv(`lastSync:${user.id}`, Date.now())
       db.exec('COMMIT')
       } catch (e) { db.exec('ROLLBACK'); throw e }
-      return ok(res, { accepted, skipped, denied, at: Date.now() })
+      return ok(res, { accepted, skipped, denied, duplicates, at: Date.now() })
     }
 
     if (path === '/api/data/pull' && req.method === 'GET') {

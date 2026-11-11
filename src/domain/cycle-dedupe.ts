@@ -1,5 +1,10 @@
 import type { Bill } from '../types'
 
+/** 期号：账本 | 规则 | 到期日。服务端据此做唯一约束，客户端据此去重 */
+export function periodKeyOf(bill: Bill): string | null {
+  return cycleBillKey(bill)
+}
+
 /** 同一周期规则、同一天只应存在一条账单（多设备各自补生成会产生重复） */
 export function cycleBillKey(bill: Bill): string | null {
   if (bill.cycleId == null) return null

@@ -69,10 +69,10 @@ interface LedgerState {
   settleReimbursement: (reimbursementId: number) => void
   deleteReimbursement: (reimbursementId: number) => void
   addCycle: (patch: Omit<Cycle, 'cycleId' | 'generated' | 'userId' | 'updateTime' | 'enabled'> & { enabled?: boolean }) => void
-  deleteCycle: (cycleId: number) => void
-  toggleCycle: (cycleId: number) => void
-  skipCycleDate: (cycleId: number, key: string) => void
-  bindCycleBook: (cycleId: number, bookId: string | number) => void
+  deleteCycle: (cycleId: number | string) => void
+  toggleCycle: (cycleId: number | string) => void
+  skipCycleDate: (cycleId: number | string, key: string) => void
+  bindCycleBook: (cycleId: number | string, bookId: string | number) => void
   dedupeCycleBills: () => number
   runCycles: () => number
   addLend: (patch: { type: 1 | 2 | 3 | 4; assetId: number; counterparty: string; number: number; interest?: number; repaymentAssetId?: number; time?: number; remark?: string; parentLendId?: number }) => void
@@ -512,7 +512,8 @@ export const useLedger = create<LedgerState>()(
         cycles: [...s.cycles, {
           ...patch,
           bookId: s.currentBookId || 1,
-          cycleId: NOW(),
+          // 稳定 UUID：两台设备创建同一条规则时不会各用各的时间戳
+          cycleId: (globalThis.crypto?.randomUUID?.() ?? String(NOW())),
           enabled: patch.enabled ?? true,
           generated: [],
           userId: s.userId,

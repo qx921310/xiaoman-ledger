@@ -75,10 +75,10 @@ period_key = hash(bookId, cycleId, dueDate, timezone)
 | A1 | 客户端集中身份比较逻辑；无法确定作用域的旧数据保守处理（不删、不合并） | ✅ 已完成 |
 | A2 | 拉取协议返回作用域（`bookId`），墓碑一并携带 | ✅ 已完成（线上已验证） |
 | A2 | 拉取协议向后兼容扩展：墓碑与记录都返回 `bookId`/`ownerId` 作用域 | ✅ |
-| A3 | 服务端周期期号唯一约束（`period_key`） | ⏳ 待做 |
+| A3 | 服务端周期期号唯一约束（`period_key`） | ✅ 已完成 |
 | B | 服务端记录身份表 + 幂等写入 | ✅ |
 | C | 周期期号服务端唯一约束 | ✅ |
-| D | 历史数据扫描与迁移工具 | ✅ |
+| D | 历史数据扫描与迁移工具 | ✅ 已完成（`npm run audit:migration`） |
 
 ## 5.1 为什么 A 不能"完全不动服务端"
 
@@ -88,6 +88,21 @@ Codex 指出：拉取接口目前不返回墓碑的 `bookId`，而删除记录�
 - **A1 只能保守处理**：无法判定作用域的旧数据一律不删、不自动合并
 - **A2 已扩展协议**：`/api/data/pull` 每条记录返回 `ownerId` + `bookId`，墓碑同样携带
 - 线上实测：565 条记录中 10 条带 `bookId`（其余是 `bookId` 列存在之前的历史数据，按 A1 保守处理）
+
+## 5.2 已落地的实现
+
+| 能力 | 落点 |
+|---|---|
+| 稳定规则 ID | `addCycle` 用 `crypto.randomUUID()`，类型放宽为 `number \| string` |
+| 期号计算 | `domain/cycle-dedupe.ts` 的 `periodKeyOf`：`bookId\|cycleId\|日期` |
+| 推送携带期号 | `sync.ts` 的 `SyncRecord.periodKey` |
+| 服务端唯一约束 | `bill_periods(book_id, period_key)` 主键；重复期直接 skip 并计入 `duplicates` |
+| 历史审计 | `scripts/audit-migration.mjs`：只读报告 + 只修可证明项 |
+
+工具的安全边界：
+- 只继承「账单上已有的账本」给退款/报销
+- 周期规则仅当其生成账单**全部指向同一账本**时才回填
+- 重复期号、引用缺失**只报告不删除**
 
 ## 6. 验收标准
 

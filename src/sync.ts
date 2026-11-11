@@ -1,8 +1,12 @@
 import { useLedger } from './store'
+import type { Bill } from './types'
+import { periodKeyOf as cyclePeriodKey } from './domain/cycle-dedupe'
 
 export interface SyncRecord {
   kind: string
   id: string
+  /** 周期账单的期号：bookId|cycleId|日期，服务端据此保证同一期只落一条 */
+  periodKey?: string
   payload: Record<string, unknown> | null
   updatedAt: number
   deleted?: boolean
@@ -39,7 +43,12 @@ export function collectRecords(): SyncRecord[] {
       const payload: Entity = kind === 'asset'
         ? (({ assetNumber: _balance, ...rest }) => rest)(item)
         : item
-      out.push({ kind, id: idOf(kind, item), payload, updatedAt: Number(item.updateTime ?? 0) })
+      const record: SyncRecord = { kind, id: idOf(kind, item), payload, updatedAt: Number(item.updateTime ?? 0) }
+      if (kind === 'bill') {
+        const periodKey = cyclePeriodKey(item as unknown as Bill)
+        if (periodKey) record.periodKey = periodKey
+      }
+      out.push(record)
     }
   }
   for (const t of (s.tombstones ?? [])) {
