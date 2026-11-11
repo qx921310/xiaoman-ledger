@@ -10,11 +10,13 @@ import { Assets } from './features/assets'
 import { Stats } from './features/stats'
 import { Settings } from './features/settings'
 import { ROLE_LABEL } from './ui/roles'
+import type { AccountBook } from './types'
 
 type Tab = 'add' | 'bills' | 'assets' | 'stats' | 'settings'
 
 export default function App() {
   const [user, setUser] = useState<User | null | undefined>(undefined)
+  const [syncWarning, setSyncWarning] = useState('')
 
   useEffect(() => {
     auth.me().then(async (u) => {
@@ -37,6 +39,7 @@ export default function App() {
   const autoSyncOnce = async () => {
     try {
       const r = await syncNow()
+      setSyncWarning(r.denied ? `${r.denied} 条记录未能推送，请到设置页检查同步结果。` : '')
       console.log('[sync] 自动同步完成', r)
     } catch (e) {
       console.warn('[sync] 自动同步失败（可手动重试）', e)
@@ -63,8 +66,8 @@ export default function App() {
       }
       const cur = useLedger.getState().currentBookId
       const match = list.find((b) => b.bookId === localStorage.getItem('xm-current-book'))
-      if (match) useLedger.getState().setBook(match.bookId as any)
-      else if (list[0]) useLedger.getState().setBook(list[0].bookId as any)
+      if (match) useLedger.getState().setBook(match.bookId)
+      else if (list[0]) useLedger.getState().setBook(list[0].bookId)
       else if (!cur) useLedger.getState().setBook(0)
     } catch (e) {
       console.warn('[books] 加载失败', e)
@@ -84,17 +87,18 @@ export default function App() {
   const logout = async () => {
     try { await auth.logout() } catch { /* 忽略 */ }
     setCurrentUid(0)
+    setSyncWarning('')
     await useLedger.persist.rehydrate()
     setUser(null)
   }
 
   if (user === undefined) return <div className="boot">加载中…</div>
   if (user === null) return <AuthScreen onAuthed={afterAuth} />
-  return <Shell user={user} onLogout={logout} />
+  return <Shell user={user} onLogout={logout} syncWarning={syncWarning} dismissSyncWarning={() => setSyncWarning('')} />
 }
 
 
-function Shell({ user, onLogout }: { user: User; onLogout: () => void }) {
+function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User; onLogout: () => void; syncWarning: string; dismissSyncWarning: () => void }) {
   const [tab, setTab] = useState<Tab>('add')
   const mergeTaxonomy = useLedger((s) => s.mergeTaxonomy)
 
@@ -134,7 +138,8 @@ function Shell({ user, onLogout }: { user: User; onLogout: () => void }) {
       </nav>
 
       <main className="main">
-        {tab === 'add' && <AddBill notify={notify} />}
+        {syncWarning && <div className="warn" role="alert">{syncWarning} <button className="link" onClick={() => { setTab('settings'); dismissSyncWarning() }}>查看同步</button></div>}
+        {tab === 'add' && <AddBill notify={notify} onClose={() => setTab('bills')} />}
         {tab === 'bills' && <Bills me={user} />}
         {tab === 'assets' && <Assets notify={notify} />}
         {tab === 'stats' && <Stats />}
@@ -150,7 +155,7 @@ function BookSwitch() {
   const books = useLedger((s) => s.accountBooks)
   const current = useLedger((s) => s.currentBookId)
   const setBook = useLedger((s) => s.setBook)
-  const keyOf = (b: any) => String(b.bookId ?? b.accountBookId)
+  const keyOf = (b: AccountBook) => String(b.bookId ?? b.accountBookId)
   return (
     <select
       value={String(current)}

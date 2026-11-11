@@ -3,10 +3,12 @@ import { useLedger } from '../store'
 import { accountMoney, currencySymbol, findCurrency, hasCurrencyRate, toBase } from '../money'
 import { money, toLocalInput } from '../ui-format'
 import { CatIcon } from '../ui/icons'
+import { editAmount, evaluateAmount } from '../ui/keypad'
 
-export function AddBill({ notify }: { notify: (m: string) => void }) {
+export function AddBill({ notify, onClose }: { notify: (m: string) => void; onClose?: () => void }) {
   const accountBooks = useLedger((s) => s.accountBooks)
   const curBookId = useLedger((s) => s.currentBookId)
+  const setBook = useLedger((s) => s.setBook)
   const myRole = accountBooks.find((b) => b.bookId && String(b.bookId) === String(curBookId))?.role
   const readOnly = myRole === 'silent'
   const parents = useLedger((s) => s.parentCategories)
@@ -32,6 +34,16 @@ export function AddBill({ notify }: { notify: (m: string) => void }) {
   const [toCost, setToCost] = useState('')
   const [remark, setRemark] = useState('')
   const [time, setTime] = useState(toLocalInput(Date.now()))
+  const [keypadOpen, setKeypadOpen] = useState(true)
+  const [keypadField, setKeypadField] = useState<'cost' | 'fee' | 'toCost'>('cost')
+  const [mobileKeypad, setMobileKeypad] = useState(() => window.matchMedia('(max-width: 600px)').matches)
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 600px)')
+    const update = () => setMobileKeypad(media.matches)
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
 
   // 账户默认取上次使用的，没有就取第一个
   useEffect(() => {
@@ -46,36 +58,40 @@ export function AddBill({ notify }: { notify: (m: string) => void }) {
 
   const switchMode = (m: 'expense' | 'income' | 'transfer') => {
     setMode(m)
+    setKeypadField('cost')
     setCid(0)
     if (m === 'expense') setPid(7)
     if (m === 'income') setPid(903)
   }
 
-  const submit = () => {
-    const v = Number(cost)
-    if (!v || v <= 0) return notify('请输入金额')
-    if (String(curBookId) === '0') return notify('请先选择一个具体账本')
+  const submit = (): boolean => {
+    const fail = (message: string) => { notify(message); return false }
+    const v = evaluateAmount(cost)
+    if (v == null || v <= 0) return fail('请输入有效金额')
+    if (String(curBookId) === '0') return fail('请先选择一个具体账本')
 
     if (mode === 'transfer') {
-      if (!aid || !toAid) return notify('请选择转出和转入账户')
-      if (aid === toAid) return notify('转出和转入不能是同一个账户')
-      const f = Number(fee) || 0
+      if (!aid || !toAid) return fail('请选择转出和转入账户')
+      if (aid === toAid) return fail('转出和转入不能是同一个账户')
+      const f = fee ? evaluateAmount(fee) : 0
+      const tc = toCost ? evaluateAmount(toCost) : 0
+      if (f == null || f < 0 || tc == null || tc < 0) return fail('请输入有效的手续费和到账金额')
       const fromCurrency = assets.find((a) => a.assetId === aid)?.currency
-      if (f > 0 && !hasCurrencyRate(fromCurrency, currencies, defaultCurrency)) return notify(`请先设置 ${fromCurrency} 汇率`)
-      const tc = Number(toCost) || 0
+      if (f > 0 && !hasCurrencyRate(fromCurrency, currencies, defaultCurrency)) return fail(`请先设置 ${fromCurrency} 汇率`)
       addTransfer({
         toCost: tc > 0 ? tc : undefined,
         fromAssetId: aid, toAssetId: toAid, cost: v,
         serviceCharge: f, remark, time: new Date(time).getTime()
       })
       setCost(''); setFee(''); setRemark(''); setToCost('')
-      return notify(`已转账 ${money(v)}` + (tc > 0 && tc !== v ? `（到账 ${money(tc)}）` : '') + (f > 0 ? `，手续费 ${money(f)} 已单独记为支出` : ''))
+      notify(`已转账 ${money(v)}` + (tc > 0 && tc !== v ? `（到账 ${money(tc)}）` : '') + (f > 0 ? `，手续费 ${money(f)} 已单独记为支出` : ''))
+      return true
     }
 
-    if (!aid) return notify('请选择账户')
+    if (!aid) return fail('请选择账户')
     const accountCurrency = assets.find((a) => a.assetId === aid)?.currency
-    if (!hasCurrencyRate(currency, currencies, defaultCurrency)) return notify(`请先设置 ${currency} 汇率`)
-    if (!hasCurrencyRate(accountCurrency, currencies, defaultCurrency)) return notify(`请先设置 ${accountCurrency} 汇率`)
+    if (!hasCurrencyRate(currency, currencies, defaultCurrency)) return fail(`请先设置 ${currency} 汇率`)
+    if (!hasCurrencyRate(accountCurrency, currencies, defaultCurrency)) return fail(`请先设置 ${accountCurrency} 汇率`)
     const foreign = currency !== defaultCurrency
     addBill({
       cost: foreign ? toBase(v, currency, currencies, defaultCurrency) : v,
@@ -86,10 +102,85 @@ export function AddBill({ notify }: { notify: (m: string) => void }) {
     })
     setCost(''); setRemark(''); setCid(0); setCurrency(defaultCurrency)
     notify(`${mode === 'expense' ? '支出' : '收入'} ${money(v)} 已记录`)
+    return true
+  }
+
+  if (mobileKeypad) {
+    const displayCurrency = mode === 'transfer' ? (assets.find((a) => a.assetId === aid)?.currency ?? defaultCurrency) : currency
+    const evaluatedCost = evaluateAmount(cost)
+    const setKey = (key: string) => {
+      const setter = keypadField === 'fee' ? setFee : keypadField === 'toCost' ? setToCost : setCost
+      setter((value) => editAmount(value, key))
+    }
+    const key = (label: string, extra = '') => <button type="button" className={extra} onClick={() => setKey(label)}>{label}</button>
+    return (
+      <section className="mobile-entry" aria-label="记账">
+        <div className="entry-toolbar">
+          <button className="entry-back" type="button" aria-label="返回账单" onClick={onClose}>‹</button>
+          <div className="entry-tabs">
+            {(['expense', 'income', 'transfer'] as const).map((item, index) => <button key={item} type="button" className={mode === item ? 'on' : ''} onClick={() => switchMode(item)}>{['支出', '收入', '转账'][index]}</button>)}
+          </div>
+          <select className="entry-book" aria-label="选择账本" value={String(curBookId)} onChange={(e) => {
+            const value = e.target.value; localStorage.setItem('xm-current-book', value); setBook(/^\d+$/.test(value) ? Number(value) : value)
+          }}>
+            <option value="0">全部账本</option>
+            {accountBooks.map((b) => <option key={String(b.bookId ?? b.accountBookId)} value={String(b.bookId ?? b.accountBookId)}>{b.accountBookName}</option>)}
+          </select>
+        </div>
+
+        <div className="entry-scroll">
+          {mode === 'transfer' ? <div className="entry-transfer">
+            <label>转出账户<select value={aid} onChange={(e) => setAid(Number(e.target.value))}><option value={0}>请选择账户</option>{assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName} · {accountMoney(a.assetNumber, a.currency, currencies, defaultCurrency)}</option>)}</select></label>
+            <div className="entry-transfer-arrow">↓</div>
+            <label>转入账户<select value={toAid} onChange={(e) => setToAid(Number(e.target.value))}><option value={0}>请选择账户</option>{assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}</select></label>
+            <label>到账金额<input value={toCost} placeholder="留空与转出相同" inputMode="none" onFocus={() => { setKeypadField('toCost'); setKeypadOpen(true) }} onChange={(e) => setToCost(e.target.value.replace(/[^\d.]/g, ''))} /></label>
+            <label>手续费<input value={fee} placeholder="0.00" inputMode="none" onFocus={() => { setKeypadField('fee'); setKeypadOpen(true) }} onChange={(e) => setFee(e.target.value.replace(/[^\d.]/g, ''))} /></label>
+          </div> : <>
+            <div className="entry-categories" aria-label="大类">
+              {list.map((p) => <button key={p.id} type="button" className={'entry-category' + (p.id === cur ? ' on' : '')} onClick={() => { setPid(p.id); setCid(0) }}>
+                <span className="entry-category-icon" style={{ '--category-color': p.color, '--category-bg': p.bg ?? 'var(--accent-soft)' } as React.CSSProperties}><CatIcon k={p.icon} size={22} /></span><span>{p.name}</span>
+              </button>)}
+            </div>
+            {subs.length > 0 && <div className="entry-subsection"><div className="entry-subtitle">{parents.find((p) => p.id === cur)?.name}</div>
+              <div className="entry-categories" aria-label="子分类">
+                {subs.map((c) => <button key={c.id} type="button" className={'entry-category child' + (cid === c.id ? ' on' : '')} onClick={() => setCid(c.id)}>
+                  <span className="entry-category-icon"><CatIcon k={c.icon} size={19} /></span><span>{c.name}</span>
+                </button>)}
+              </div>
+            </div>}
+          </>}
+        </div>
+
+        <div className="entry-bottom">
+          <div className="entry-amount-row">
+            <input className="entry-remark" value={remark} placeholder="写备注…" onFocus={() => setKeypadOpen(false)} onBlur={() => setKeypadOpen(true)} onChange={(e) => setRemark(e.target.value)} />
+            {mode === 'transfer' ? <span className="entry-currency-code">{displayCurrency}</span> : <select aria-label="记账币种" className="entry-currency" value={currency} onChange={(e) => setCurrency(e.target.value)}>{currencies.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}</select>}
+            <span className="entry-symbol">{currencySymbol(currencies, displayCurrency, defaultCurrency)}</span>
+            <input className="entry-value" aria-label="记账金额" value={cost} placeholder="0.00" inputMode="none" onFocus={() => { setKeypadField('cost'); setKeypadOpen(true) }} onChange={(e) => setCost(e.target.value.replace(/[^\d.]/g, ''))} />
+          </div>
+          {mode !== 'transfer' && currency !== defaultCurrency && evaluatedCost != null && evaluatedCost > 0 && <div className="entry-fx">{hasCurrencyRate(currency, currencies, defaultCurrency) ? `折合 ${currencySymbol(currencies, defaultCurrency, defaultCurrency)}${toBase(evaluatedCost, currency, currencies, defaultCurrency).toFixed(2)}` : '请先设置汇率'}</div>}
+          <div className="entry-options">
+            <label>日期<input type="datetime-local" value={time} onChange={(e) => setTime(e.target.value)} /></label>
+            {mode !== 'transfer' && <label>账户<select value={aid} onChange={(e) => setAid(Number(e.target.value))}><option value={0}>请选择账户</option>{assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}</select></label>}
+            {!keypadOpen && <button type="button" onClick={() => { setKeypadField('cost'); setKeypadOpen(true) }}>数字键盘</button>}
+          </div>
+          {keypadOpen && <div className="entry-keypad" aria-label="数字键盘">
+            {key('1')}{key('2')}{key('3')}{key('退格', 'key-control')}
+            {key('4')}{key('5')}{key('6')}<div className="entry-operators">{key('+')}{key('-')}</div>
+            {key('7')}{key('8')}{key('9')}<div className="entry-operators">{key('×')}{key('÷')}</div>
+            <button type="button" className="key-control" disabled={readOnly} onClick={() => { submit() }}>再记</button>{key('0')}{key('.')}
+            <button type="button" className="key-finish" disabled={readOnly} onClick={() => { if (submit()) onClose?.() }}>完成</button>
+          </div>}
+        </div>
+      </section>
+    )
   }
 
   return (
-    <section className="card">
+    <section className={'card add-bill' + (keypadOpen ? ' keypad-open' : '')} onFocusCapture={(e) => {
+      const target = e.target
+      if ((target instanceof HTMLInputElement && !target.dataset.keypadField) || target instanceof HTMLSelectElement) setKeypadOpen(false)
+    }}>
       <div className="seg three">
         <button className={mode === 'expense' ? 'on' : ''} onClick={() => switchMode('expense')}>支出</button>
         <button className={mode === 'income' ? 'on' : ''} onClick={() => switchMode('income')}>收入</button>
@@ -98,7 +189,7 @@ export function AddBill({ notify }: { notify: (m: string) => void }) {
 
       <div className="amount">
         <span>{currencySymbol(currencies, currency, defaultCurrency)}</span>
-        <input value={cost} onChange={(e) => setCost(e.target.value.replace(/[^\d.]/g, ''))} placeholder="0.00" inputMode="decimal" />
+        <input value={cost} onChange={(e) => setCost(e.target.value.replace(/[^\d.]/g, ''))} placeholder="0.00" aria-label="记账金额" inputMode={mobileKeypad ? 'none' : 'decimal'} data-keypad-field="cost" onFocus={() => { setKeypadField('cost'); setKeypadOpen(true) }} />
         {currencies.length > 1 && (
           <select className="cur" value={currency} onChange={(e) => setCurrency(e.target.value)}>
             {currencies.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
@@ -137,7 +228,7 @@ export function AddBill({ notify }: { notify: (m: string) => void }) {
           <div className="row2">
             <div>
               <div className="label">手续费（可选）</div>
-              <input value={fee} onChange={(e) => setFee(e.target.value.replace(/[^\d.]/g, ''))} placeholder="0.00" inputMode="decimal" />
+              <input value={fee} onChange={(e) => setFee(e.target.value.replace(/[^\d.]/g, ''))} placeholder="0.00" inputMode={mobileKeypad ? 'none' : 'decimal'} data-keypad-field="fee" onFocus={() => { setKeypadField('fee'); setKeypadOpen(true) }} />
             </div>
             <div>
               <div className="label">时间</div>
@@ -145,7 +236,7 @@ export function AddBill({ notify }: { notify: (m: string) => void }) {
             </div>
           </div>
           <div className="label">到账金额（跨币种或对方扣费时填，留空＝与金额相同）</div>
-          <input value={toCost} onChange={(e) => setToCost(e.target.value.replace(/[^\d.]/g, ''))} placeholder="默认等于金额" inputMode="decimal" />
+          <input value={toCost} onChange={(e) => setToCost(e.target.value.replace(/[^\d.]/g, ''))} placeholder="默认等于金额" inputMode={mobileKeypad ? 'none' : 'decimal'} data-keypad-field="toCost" onFocus={() => { setKeypadField('toCost'); setKeypadOpen(true) }} />
           <p className="tip">
             转账本金不计入收支；手续费会单独生成一条支出账单。
             {toCost && Number(toCost) !== Number(cost) && Number(cost) > 0 && (
@@ -156,7 +247,7 @@ export function AddBill({ notify }: { notify: (m: string) => void }) {
       ) : (
         <>
           <div className="label">分类</div>
-          <div className="chips">
+          <div className="chips category-grid">
             {list.map((p) => (
               <button key={p.id} className={'chip' + (p.id === cur ? ' on' : '')} onClick={() => { setPid(p.id); setCid(0) }}>
                 <CatIcon k={p.icon} size={16} />{p.name}
@@ -167,10 +258,10 @@ export function AddBill({ notify }: { notify: (m: string) => void }) {
           {subs.length > 0 && (
             <>
               <div className="label">子分类</div>
-              <div className="chips small">
+              <div className="chips small category-grid">
                 <button className={'chip' + (cid === 0 ? ' on' : '')} onClick={() => setCid(0)}>不选</button>
                 {subs.map((c) => (
-                  <button key={c.id} className={'chip' + (cid === c.id ? ' on' : '')} onClick={() => setCid(c.id)}>{c.name}</button>
+                  <button key={c.id} className={'chip' + (cid === c.id ? ' on' : '')} onClick={() => setCid(c.id)}><CatIcon k={c.icon} size={16} />{c.name}</button>
                 ))}
               </div>
             </>
@@ -195,7 +286,18 @@ export function AddBill({ notify }: { notify: (m: string) => void }) {
       <div className="label">备注</div>
       <input value={remark} onChange={(e) => setRemark(e.target.value)} placeholder="写点什么（可留空）" />
 
-      <button className="primary" onClick={submit}>{mode === 'transfer' ? '确认转账' : '记一笔'}</button>
+      <button className="primary" disabled={readOnly} onClick={() => { submit() }}>{mode === 'transfer' ? '确认转账' : '记一笔'}</button>
+      {keypadOpen && <div className="mobile-keypad" aria-label="数字键盘">
+        {['7', '8', '9', '退格', '4', '5', '6', '清空', '1', '2', '3', '完成', '0', '00', '.'].map((key) => (
+          <button key={key} type="button" className={key === '完成' ? 'keypad-submit' : ''} disabled={key === '完成' && readOnly}
+            onClick={() => {
+              if (key === '完成') { submit(); return }
+              const setter = keypadField === 'fee' ? setFee : keypadField === 'toCost' ? setToCost : setCost
+              setter((value) => editAmount(value, key))
+            }}>{key}</button>
+        ))}
+        <button className="keypad-hide" type="button" onClick={() => setKeypadOpen(false)}>收起键盘</button>
+      </div>}
     </section>
   )
 }

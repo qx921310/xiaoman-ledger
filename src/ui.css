@@ -129,6 +129,7 @@ h3:first-child { margin-top: 0; }
 
 .toast {
   position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%);
+  z-index: 100;
   background: rgba(74, 47, 22, .92); color: #fff; padding: 9px 16px;
   border-radius: 999px; font-size: 13px; animation: pop .18s ease-out;
 }
@@ -285,3 +286,68 @@ input.color { width: 34px; height: 30px; padding: 2px; flex: none; border-radius
 }
 
 .asset-bank { object-fit: contain; border-radius: 6px; flex: none; }
+
+/* 手机记账：分类可滚动，输入与键盘保持在下方。 */
+.mobile-entry { display: none; }
+@media (max-width: 600px) {
+  html, body, .app * { scrollbar-width: none; -ms-overflow-style: none; }
+  html::-webkit-scrollbar, body::-webkit-scrollbar, .app *::-webkit-scrollbar { display: none; }
+  .mobile-entry { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; background: #f8f4ee; color: var(--ink); }
+  .entry-toolbar { height: 54px; flex: none; display: flex; align-items: center; gap: 7px; padding: 7px 9px; background: var(--card); }
+  .entry-back { width: 34px; height: 38px; border: 0; background: transparent; color: var(--ink); font-size: 28px; line-height: 1; }
+  .entry-tabs { flex: 1; display: flex; background: #f2ebe1; border-radius: 9px; padding: 3px; min-width: 0; }
+  .entry-tabs button { flex: 1; border: 0; border-radius: 7px; padding: 6px 2px; background: transparent; color: var(--muted); }
+  .entry-tabs button.on { background: var(--card); color: var(--ink); font-weight: 700; box-shadow: 0 1px 4px #00000010; }
+  .entry-book { width: 88px; flex: none; padding: 7px 4px; border: 0; background: #f2ebe1; font-size: 11px; text-overflow: ellipsis; }
+  .entry-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: 5px; border-radius: 12px; background: var(--card); padding: 12px 9px; }
+  .entry-categories { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px 2px; }
+  .entry-category { min-width: 0; border: 0; background: transparent; color: var(--ink); display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 3px 0; font-size: 11px; line-height: 1.25; }
+  .entry-category > span:last-child { width: 100%; overflow-wrap: anywhere; text-align: center; }
+  .entry-category-icon { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; color: var(--category-color, #9a7247); background: var(--category-bg, #f4ede4); }
+  .entry-category.on .entry-category-icon { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .entry-category.child .entry-category-icon { width: 36px; height: 36px; background: #f6f0e7; color: #8a694b; }
+  .entry-subsection { border-top: 1px solid var(--line); margin-top: 15px; padding-top: 10px; }
+  .entry-subtitle { color: var(--muted); font-size: 12px; margin: 0 3px 10px; }
+  .entry-transfer { display: grid; gap: 12px; padding: 8px; }
+  .entry-transfer label { display: grid; gap: 5px; color: var(--muted); font-size: 12px; }
+  .entry-transfer-arrow { text-align: center; color: var(--accent); font-size: 22px; line-height: 1; }
+  .entry-bottom { flex: none; background: var(--card); border-top: 1px solid var(--line); }
+  .entry-amount-row { height: 49px; display: flex; align-items: center; gap: 4px; padding: 4px 10px; }
+  .entry-remark { flex: 1; min-width: 0; border: 0; background: transparent; padding: 7px 3px; }
+  .entry-currency { width: 55px; padding: 4px 1px; border: 0; font-size: 11px; background: transparent; color: var(--muted); }
+  .entry-currency-code { color: var(--muted); font-size: 11px; }
+  .entry-fx { text-align: right; padding: 0 10px 4px; color: var(--muted); font-size: 11px; }
+  .entry-symbol { font-weight: 700; color: var(--accent); }
+  .entry-value { width: 90px; padding: 4px 0; border: 0; background: transparent; text-align: right; font-size: 20px; font-weight: 700; color: var(--ink); }
+  .entry-options { height: 42px; display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--line); padding: 3px 10px; }
+  .entry-options label { min-width: 0; flex: 1; display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 11px; white-space: nowrap; }
+  .entry-options input, .entry-options select { min-width: 0; padding: 4px; border: 0; background: transparent; color: var(--ink); font-size: 11px; }
+  .entry-options button { border: 0; background: transparent; color: var(--accent); font-size: 12px; }
+  .entry-keypad { height: calc(220px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(4, 1fr); gap: 4px; background: #f2ece3; padding: 5px 5px calc(5px + env(safe-area-inset-bottom)); }
+  .entry-keypad button { min-width: 0; border: 0; border-radius: 7px; background: var(--card); color: var(--ink); font-size: 19px; font-weight: 600; }
+  .entry-keypad .key-control, .entry-operators button { background: #e9e2d8; font-size: 14px; }
+  .entry-operators { display: flex; gap: 4px; min-width: 0; }
+  .entry-operators button { flex: 1; font-size: 19px; }
+  .entry-keypad .key-finish { background: var(--accent); color: #fff; font-size: 15px; }
+  .entry-keypad button:disabled { opacity: .45; }
+}
+
+.mobile-keypad { display: none; }
+@media (max-width: 600px) {
+  .add-bill.keypad-open { padding-bottom: calc(235px + env(safe-area-inset-bottom)); }
+  .category-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+  .category-grid .chip, .category-grid.small .chip {
+    min-width: 0; min-height: 55px; padding: 5px 2px; border-radius: 10px;
+    display: flex; flex-direction: column; justify-content: center; gap: 3px;
+    font-size: 11px; line-height: 1.2; overflow-wrap: anywhere;
+  }
+  .mobile-keypad {
+    position: fixed; z-index: 20; bottom: 0; left: 0; right: 0;
+    height: calc(220px + env(safe-area-inset-bottom)); padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(4, 1fr) 23px;
+    gap: 4px; background: var(--card); border-top: 1px solid var(--line); box-shadow: 0 -4px 18px #00000012;
+  }
+  .mobile-keypad button { border: 0; border-radius: 7px; background: var(--accent-soft); color: var(--ink); font-size: 18px; }
+  .mobile-keypad .keypad-submit { grid-row: span 2; background: var(--accent); color: white; font-size: 15px; }
+  .mobile-keypad .keypad-hide { grid-column: 1 / -1; background: transparent; color: var(--muted); font-size: 12px; }
+}
