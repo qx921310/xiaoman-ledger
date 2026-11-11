@@ -358,7 +358,9 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
   const addRefund = useLedger((s) => s.addRefund)
   const deleteRefund = useLedger((s) => s.deleteRefund)
 
-  const myReimb = reimbursements.find((r) => r.billId === bill.billId)
+  const myReimbs = reimbursements.filter((r) => r.billId === bill.billId)
+  const claimedTotal = +myReimbs.reduce((sum, r) => sum + (Number(r.number) || 0), 0).toFixed(2)
+  const claimRemaining = +Math.max(0, bill.cost - claimedTotal).toFixed(2)
   const myRefunds = refunds.filter((r) => r.billId === bill.billId)
   const hasLegacyRefund = myRefunds.some((r) => r.baseAmount == null)
   const refundedTotal = +myRefunds.reduce((sum, r) => sum + (Number(r.baseAmount) || 0), 0).toFixed(2)
@@ -427,30 +429,34 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
         {isExpense && (
           <>
             <div className="label">报销</div>
-            {myReimb ? (
-              <div className="attach-line">
+            {myReimbs.length > 0 && (
+              <p className="hint">已报 {money(claimedTotal)} · 还可报 {money(claimRemaining)}</p>
+            )}
+            {myReimbs.map((r) => (
+              <div key={r.reimbursementId} className="attach-line">
                 <span>
-                  {myReimb.status === 'done' ? '✅ 已到账' : '⏳ 待报销'} {accountMoney(myReimb.number, assets.find((a) => a.assetId === myReimb.assetId)?.currency, currencies, defaultCurrency)}
-                  {myReimb.assetId ? ' → ' + (assets.find((a) => a.assetId === myReimb.assetId)?.assetName ?? '报销账户') : ''}
+                  {r.status === 'done' ? '✅ 已到账' : '⏳ 待报销'} {accountMoney(r.number, assets.find((a) => a.assetId === r.assetId)?.currency, currencies, defaultCurrency)}
+                  {r.assetId ? ' → ' + (assets.find((a) => a.assetId === r.assetId)?.assetName ?? '报销账户') : ''}
                 </span>
-                {myReimb.status !== 'done' && (
-                  <button className="link" onClick={() => settleReimbursement(myReimb.reimbursementId)}>确认到账</button>
+                {r.status !== 'done' && (
+                  <button className="link" onClick={() => settleReimbursement(r.reimbursementId)}>确认到账</button>
                 )}
-                <button className="del" onClick={() => deleteReimbursement(myReimb.reimbursementId)}>撤销</button>
+                <button className="del" onClick={() => deleteReimbursement(r.reimbursementId)}>撤销</button>
               </div>
-            ) : (
+            ))}
+            {claimRemaining > 0 && (
               <div className="row2">
                 <select aria-label="报销账户" value={rAsset} onChange={(e) => { setRAsset(Number(e.target.value)); setRAmount('') }}>
                   <option value={0}>报销进哪个账户</option>
                   {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
                 </select>
-                <input value={rAmount} onChange={(e) => setRAmount(e.target.value.replace(/[^\d.]/g, ''))} placeholder={`报销金额（${reimbursementCurrency}）`} aria-label={`报销金额（${reimbursementCurrency}）`} inputMode="decimal" />
+                <input value={rAmount} onChange={(e) => setRAmount(e.target.value.replace(/[^\d.]/g, ''))} placeholder={`本次报销（${reimbursementCurrency}，最多 ${claimRemaining}）`} aria-label={`报销金额（${reimbursementCurrency}）`} inputMode="decimal" />
               </div>
             )}
-            {!myReimb && (
-              <button className="ghost wide" disabled={!rAsset || !Number.isFinite(Number(rAmount)) || Number(rAmount) <= 0} onClick={() => addReimbursement({
+            {claimRemaining > 0 && (
+              <button className="ghost wide" disabled={!rAsset || !Number.isFinite(Number(rAmount)) || Number(rAmount) <= 0 || Number(rAmount) > claimRemaining} onClick={() => { addReimbursement({
                 billId: bill.billId, assetId: rAsset, number: Number(rAmount) || 0, detail: remark
-              })}>登记报销（钱到账后再确认）</button>
+              }); setRAmount('') }}>登记报销（钱到账后再确认）</button>
             )}
 
             <div className="label">退款</div>

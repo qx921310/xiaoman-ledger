@@ -442,18 +442,23 @@ export const useLedger = create<LedgerState>()(
 
       // 登记报销：只落记录，钱还没到；确认到账时才进报销账户
       addReimbursement: ({ billId, assetId, number, detail }) => set((s) => {
-        if (!s.bills.some((b) => b.billId === billId) || !s.assets.some((a) => a.assetId === assetId) ||
-          !Number.isFinite(number) || number <= 0 || s.reimbursements.some((r) => r.billId === billId)) return {}
-        const rid = Date.now()
+        const bill = s.bills.find((b) => b.billId === billId)
+        if (!bill || !s.assets.some((a) => a.assetId === assetId) || !Number.isFinite(number) || number <= 0) return {}
+        // 多次报销：累计金额不得超过原账单
+        const claimed = s.reimbursements.filter((r) => r.billId === billId).reduce((sum, r) => sum + (Number(r.number) || 0), 0)
+        if (number > +(bill.cost - claimed).toFixed(2)) return {}
+        // 同一毫秒内连续登记会撞 id，这里顺延保证唯一
+        let rid = Date.now()
+        while (s.reimbursements.some((r) => r.reimbursementId === rid)) rid++
         const rec: Reimbursement = {
           reimbursementId: rid, billId, assetId, number: Number(number) || 0,
           detail: detail ?? '', status: 'pending', userId: s.userId, updateTime: NOW()
         }
-        const bill = s.bills.find((b) => b.billId === billId)
+        const total = claimed + rec.number
         return {
           reimbursements: [rec, ...s.reimbursements],
-          bills: bill ? s.bills.map((b) => b.billId === billId
-            ? { ...b, isReimbursement: 1, reimbursementNum: rec.number, updateTime: NOW() } : b) : s.bills
+          bills: s.bills.map((b) => b.billId === billId
+            ? { ...b, isReimbursement: 1, reimbursementNum: +total.toFixed(2), updateTime: NOW() } : b)
         }
       }),
 
@@ -472,12 +477,14 @@ export const useLedger = create<LedgerState>()(
         const rec = s.reimbursements.find((r) => r.reimbursementId === reimbursementId)
         if (!rec) return {}
         const refundBack = rec.status === 'done' ? rec.number : 0
+        const rest = s.reimbursements.filter((r) => r.reimbursementId !== reimbursementId && r.billId === rec.billId)
+        const remainTotal = +rest.reduce((sum, r) => sum + (Number(r.number) || 0), 0).toFixed(2)
         return {
           reimbursements: s.reimbursements.filter((r) => r.reimbursementId !== reimbursementId),
           assets: refundBack ? s.assets.map((a) => a.assetId === rec.assetId
             ? { ...a, assetNumber: +(a.assetNumber - refundBack).toFixed(2), updateTime: NOW() } : a) : s.assets,
           bills: s.bills.map((b) => b.billId === rec.billId
-            ? { ...b, isReimbursement: 0, reimbursementNum: 0, updateTime: NOW() } : b),
+            ? { ...b, isReimbursement: remainTotal > 0 ? 1 : 0, reimbursementNum: remainTotal, updateTime: NOW() } : b),
           tombstones: [...s.tombstones, { kind: 'reimbursement', id: String(reimbursementId), updatedAt: NOW() }]
         }
       }),

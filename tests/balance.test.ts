@@ -156,14 +156,21 @@ assert.equal(deriveAssets(oldRefundSnapshot).find(a => a.assetId === 32)!.assetN
 state().addReimbursement({ billId: refundedBill.billId, assetId: 0, number: 10 })
 state().addReimbursement({ billId: refundedBill.billId, assetId: 31, number: 0 })
 assert.equal(state().reimbursements.length, 0)
+// 允许分次报销，但累计不得超过原账单金额
 state().addReimbursement({ billId: refundedBill.billId, assetId: 31, number: 5 })
 state().addReimbursement({ billId: refundedBill.billId, assetId: 31, number: 5 })
-assert.equal(state().reimbursements.length, 1)
+assert.equal(state().reimbursements.length, 2)
+assert.equal(state().bills.find((b) => b.billId === refundedBill.billId)?.reimbursementNum, 10)
+// 超出剩余额度应被拒绝
+state().addReimbursement({ billId: refundedBill.billId, assetId: 31, number: refundedBill.cost })
+assert.equal(state().reimbursements.length, 2)
 assert.equal(balance(31), 100)
 state().settleReimbursement(state().reimbursements[0].reimbursementId)
 assert.equal(balance(31), 105)
+// 撤销单笔后累计值按剩余重算，而不是清零
 state().deleteReimbursement(state().reimbursements[0].reimbursementId)
 assert.equal(balance(31), 100)
+assert.equal(state().bills.find((b) => b.billId === refundedBill.billId)?.reimbursementNum, 5)
 
 // A refund reduces the existing bill rather than creating another bill.
 state().reset()
