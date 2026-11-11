@@ -291,6 +291,11 @@ function BillDetail({ bill, me, onClose, onEdit }: {
           <div className="damt">{isIncome ? '+' : '-'}{money(isIncome ? bill.cost : billNetAmount(bill, refunds))}</div>
         </div>
 
+        {bill.billShares?.length ? (
+          <Row label="AA 分摊">
+            {bill.billShares.map((x) => `${x.name} ${money(x.amount)}`).join(' · ')}
+          </Row>
+        ) : null}
         <Row label="账单分类">{p?.name}{bill.childCategoryId && !c ? ' - 子分类待核对' : c ? ` - ${c.name}` : ''}</Row>
         <Row label="账单日期">{dayOf(bill.time)} {hhmm(bill.time)}</Row>
         <Row label="收支账户">{a?.assetName ?? '无'}</Row>
@@ -376,6 +381,7 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
   const isExpense = parents.find((p) => p.id === bill.parentCategoryId)?.kind !== 'income'
 
   const [cost, setCost] = useState(String(bill.cost))
+  const [shareCount, setShareCount] = useState(String((bill.billShares?.length ?? 0) || ''))
   const [pid, setPid] = useState(bill.parentCategoryId)
   const [cid, setCid] = useState(() => resolveBillChild(bill, children)?.id ?? 0)
   const [categoryConfirmed, setCategoryConfirmed] = useState(() => !bill.childCategoryId || !!resolveBillChild(bill, children))
@@ -421,6 +427,14 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
         <input aria-label="账单时间" type="datetime-local" value={time} onChange={(e) => setTime(e.target.value)} />
         <div className="label">备注</div>
         <input aria-label="账单备注" value={remark} onChange={(e) => setRemark(e.target.value)} />
+        <div className="label">AA 分摊（几人均分，留空表示不分摊）</div>
+        <input aria-label="分摊人数" value={shareCount} inputMode="numeric" placeholder="例如 2"
+          onChange={(e) => setShareCount(e.target.value.replace(/\D/g, '').slice(0, 2))} />
+        {Number(shareCount) > 1 && (
+          <p className="hint">
+            合计 {money(Number(cost) || 0)}，每人 {money(+((Number(cost) || 0) / Number(shareCount)).toFixed(2))}
+          </p>
+        )}
         {isExpense && (
           <>
             <div className="label">报销</div>

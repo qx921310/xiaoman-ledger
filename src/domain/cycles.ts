@@ -67,7 +67,7 @@ export function planCycles(input: CyclePlanInput, now = new Date()): CyclePlan {
         cycleId: c.cycleId,
         remark: c.remark || c.name, billType: 4,
         tags: [], files: [], userId: input.uid || userId, updateTime: Date.now(),
-        billShareInfo: {
+        billSnapshot: {
           parentCategoryName: parent?.name ?? '',
           childCategoryName: resolveBillChild(c, childCategories)?.name ?? '',
           assetName: asset?.assetName ?? ''

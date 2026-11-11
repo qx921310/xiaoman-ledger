@@ -11,6 +11,15 @@ export const ASSET_TYPE: Record<number, string> = {
 /** 信用卡余额以负数表示 */
 export const CREDIT_CARD = 2
 
+export interface BillShare {
+  /** 参与人名称（对方不在本账本时只有名字） */
+  name: string
+  /** 本账本成员 id（可选） */
+  userId?: number
+  /** 该人应承担金额（本币） */
+  amount: number
+}
+
 export interface BillFile {
   name: string
   remotePath: string
@@ -41,7 +50,12 @@ export interface Bill {
   files: BillFile[]
   userId: number
   updateTime: number
+  /** 分类/账户名称快照（原 billShareInfo，语义正名） */
+  billSnapshot?: { parentCategoryName: string; childCategoryName: string; assetName: string }
+  /** @deprecated 旧字段名，仅用于读取历史数据 */
   billShareInfo?: { parentCategoryName: string; childCategoryName: string; assetName: string }
+  /** AA 分摊：谁一起承担这笔支出，金额之和应等于 cost */
+  billShares?: BillShare[]
   /** 一木导出里的「其他」列：不计入收支 / 不计入预算 */
   notIntoTotal?: boolean
   notIntoBudget?: boolean

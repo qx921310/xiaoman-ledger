@@ -85,6 +85,7 @@ interface LedgerState {
   deleteBill: (billId: string | number) => void
   restoreBill: (bill: Bill) => void
   duplicateBill: (billId: string | number) => void
+  setBillShares: (billId: string | number, shares: import('./types').BillShare[]) => void
   updateBill: (billId: string | number, patch: Partial<Bill>) => void
   addTransfer: (patch: { fromAssetId: number; toAssetId: number; cost: number; toCost?: number; serviceCharge?: number; time?: number; remark?: string }) => Transfer
   updateTransfer: (transferId: number, patch: Partial<Pick<Transfer, 'fromAssetId' | 'toAssetId' | 'cost' | 'toCost' | 'serviceCharge' | 'time' | 'remark'>>) => void
@@ -192,7 +193,7 @@ export const useLedger = create<LedgerState>()(
           userId: getCurrentUid() || s.userId,
           updateTime: NOW(),
           // 冗余快照：改名不影响历史账单
-          billShareInfo: {
+          billSnapshot: {
             parentCategoryName: parent?.name ?? '',
             childCategoryName: child?.name ?? '',
             assetName: asset?.assetName ?? ''
@@ -282,6 +283,13 @@ export const useLedger = create<LedgerState>()(
         return { bills: [...s.bills, copy] }
       }),
 
+      // AA 分摊：只改「谁承担多少」，不影响账户余额与统计总额
+      setBillShares: (billId, shares) => set((s) => ({
+        bills: s.bills.map((b) => b.billId === billId
+          ? { ...b, billShares: shares.length ? shares : undefined, updateTime: NOW() }
+          : b)
+      })),
+
       // 改单：先把旧账单对账户的影响撤回，再按新值重新记一次
       updateBill: (billId, patch) => {
         const s = get()
@@ -312,9 +320,9 @@ export const useLedger = create<LedgerState>()(
         }
         const parent = s.parentCategories.find((p) => p.id === next.parentCategoryId)
         const asset = s.assets.find((a) => a.assetId === next.assetId)
-        next.billShareInfo = {
+        next.billSnapshot = {
           parentCategoryName: parent?.name ?? '',
-          childCategoryName: next.childCategoryId ? (resolveBillChild(next, s.childCategories)?.name ?? old.billShareInfo?.childCategoryName ?? '') : '',
+          childCategoryName: next.childCategoryId ? (resolveBillChild(next, s.childCategories)?.name ?? (old.billSnapshot ?? old.billShareInfo)?.childCategoryName ?? '') : '',
           assetName: asset?.assetName ?? ''
         }
 
@@ -912,6 +920,12 @@ export const useLedger = create<LedgerState>()(
       merge: (persisted, current) => {
         const snapshot = { ...current, ...(persisted as Partial<LedgerState>) }
         snapshot.childCategories = snapshot.childCategories.map(normalizeBuiltInChild)
+        // 历史数据：billShareInfo 是快照，正名为 billSnapshot
+        snapshot.bills = (snapshot.bills ?? []).map((b) => {
+          if (b.billSnapshot || !b.billShareInfo) return b
+          const { billShareInfo, ...rest } = b
+          return { ...rest, billSnapshot: billShareInfo }
+        })
         return { ...snapshot, assets: deriveAssets(snapshot) }
       }
     }

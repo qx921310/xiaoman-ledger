@@ -372,7 +372,7 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
       files: attachmentUrls.map((u, idx) => ({ name: `附件${idx + 1}`, remotePath: u })),
       userId,
       updateTime: Date.now(),
-      billShareInfo: { parentCategoryName: parentName, childCategoryName: childName, assetName: assets.find((a) => a.assetId === assetId)?.assetName ?? '' },
+      billSnapshot: { parentCategoryName: parentName, childCategoryName: childName, assetName: assets.find((a) => a.assetId === assetId)?.assetName ?? '' },
       notIntoTotal: /不计入收支/.test(otherText),
       notIntoBudget: /不计入预算/.test(otherText),
       discountNumber: Math.abs(num(r[col('优惠')])),

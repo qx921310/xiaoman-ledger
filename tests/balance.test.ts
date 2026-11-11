@@ -608,6 +608,19 @@ const tagged = { ...mkCycleBill('g1', 'book-a'), tags: ['出差'], notIntoTotal:
 const plain = mkCycleBill('g2', 'book-a')
 const contentDiff = dedupeBills([tagged, plain])
 assert.equal(contentDiff.removed.length, 0, '标签/不计收支不同不能自动删')
+
+// AA 分摊：只改承担关系，不影响余额与统计总额
+state().reset()
+state().addAsset({ assetId: 91, assetName: 'AA 账户', assetNumber: 500 })
+const aaBill = state().addBill({ assetId: 91, parentCategoryId: 7, cost: 100 })
+assert.equal(balance(91), 400)
+state().setBillShares(aaBill.billId, [
+  { name: '我', amount: 50 },
+  { name: '张三', amount: 50 }
+])
+assert.equal(balance(91), 400, '分摊不改余额')
+assert.equal(state().bills.find((b) => b.billId === aaBill.billId)?.billShares?.length, 2)
+assert.equal(summarizeBills(state().bills, state().parentCategories, state().refunds).expense, 100, '统计仍按总额')
 const unmigratedBackup = JSON.parse(JSON.stringify(backup))
 delete unmigratedBackup.assets[0].openingBalance
 state().importAll(unmigratedBackup)
