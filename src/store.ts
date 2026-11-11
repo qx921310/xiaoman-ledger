@@ -72,6 +72,7 @@ interface LedgerState {
   deleteCycle: (cycleId: number) => void
   toggleCycle: (cycleId: number) => void
   skipCycleDate: (cycleId: number, key: string) => void
+  bindCycleBook: (cycleId: number, bookId: string | number) => void
   dedupeCycleBills: () => number
   runCycles: () => number
   addLend: (patch: { type: 1 | 2 | 3 | 4; assetId: number; counterparty: string; number: number; interest?: number; repaymentAssetId?: number; time?: number; remark?: string; parentLendId?: number }) => void
@@ -529,6 +530,11 @@ export const useLedger = create<LedgerState>()(
       })),
 
       // 补生成所有到期未生成的周期账单；返回本次生成条数
+      // 旧周期规则确认账本归属（用户显式操作，不做静默推断）
+      bindCycleBook: (cycleId, bookId) => set((s) => ({
+        cycles: s.cycles.map((c) => c.cycleId === cycleId ? { ...c, bookId, updateTime: NOW() } : c)
+      })),
+
       // 跳过某一期：记进 skipDates，这期不再生成，后续不受影响
       skipCycleDate: (cycleId, key) => set((s) => ({
         cycles: s.cycles.map((c) => c.cycleId === cycleId
@@ -571,10 +577,7 @@ export const useLedger = create<LedgerState>()(
           assets: st.assets.map((a) => plan.assetDelta.has(a.assetId)
             ? { ...a, assetNumber: +(a.assetNumber + (plan.assetDelta.get(a.assetId) ?? 0)).toFixed(2), updateTime: NOW() }
             : a),
-          cycles: st.cycles.map((c) => {
-            const next = cycleMap.get(c.cycleId) ?? c
-            return next.bookId == null ? { ...next, bookId: s.currentBookId || 1 } : next
-          })
+          cycles: st.cycles.map((c) => cycleMap.get(c.cycleId) ?? c)
         }))
         return plan.count
       },
@@ -715,6 +718,7 @@ export const useLedger = create<LedgerState>()(
       },
 
       reset: () => set({
+        sessionSyncAt: 0,
         assets: [], bills: [], transfers: [], budgets: [],
         reimbursements: [], refunds: [], lends: [], cycles: [], seeded: false,
         parentCategories: [...TAXONOMY_PARENTS, ...TAXONOMY_INCOME],

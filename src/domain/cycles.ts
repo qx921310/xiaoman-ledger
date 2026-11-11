@@ -38,7 +38,8 @@ export function planCycles(input: CyclePlanInput, now = new Date()): CyclePlan {
   const usedIds = new Set(existing.map((b) => String(b.billId)))
   const updatedCycles: Cycle[] = []
 
-  for (const c of input.cycles.filter((x) => x.enabled)) {
+  // 未确认所属账本的旧规则暂不自动生成，避免多设备各记到不同账本
+  for (const c of input.cycles.filter((x) => x.enabled && x.bookId != null)) {
     const done = handledDates(c)
     const fresh = cycleDueDates(c, now).filter((d) => !done.has(dateKey(d)))
     if (!fresh.length) continue

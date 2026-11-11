@@ -114,6 +114,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
   }
   const cycles = useLedger((s) => s.cycles)
   const skipCycleDate = useLedger((s) => s.skipCycleDate)
+  const bindCycleBook = useLedger((s) => s.bindCycleBook)
   const addCycle = useLedger((s) => s.addCycle)
   const deleteCycle = useLedger((s) => s.deleteCycle)
   const toggleCycle = useLedger((s) => s.toggleCycle)
@@ -317,7 +318,10 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
                 {c.name}
                 <span className="tag">{describeCycle(c)}</span>
               </div>
-              <small>{p?.name ?? '分类'} · {a?.assetName ?? '账户'} · {money(c.cost)} · {c.enabled ? '启用中' : '已暂停'}</small>
+              <small>
+                {p?.name ?? '分类'} · {a?.assetName ?? '账户'} · {money(c.cost)} · {c.enabled ? '启用中' : '已暂停'}
+                {c.bookId == null ? ' · ⚠️ 账本待确认' : ''}
+              </small>
             </div>
             {(() => {
               const next = pendingDates(c)[0]
@@ -326,6 +330,9 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
                   onClick={() => skipCycleDate(c.cycleId, dateKey(next))}>跳过{next.getMonth() + 1}/{next.getDate()}</button>
               ) : null
             })()}
+            {c.bookId == null && (
+              <button className="link" onClick={() => bindCycleBook(c.cycleId, currentBookId || 1)}>绑定当前账本</button>
+            )}
             <button className="link" onClick={() => toggleCycle(c.cycleId)}>{c.enabled ? '暂停' : '启用'}</button>
             <button className="del" onClick={() => deleteCycle(c.cycleId)}>删</button>
           </div>

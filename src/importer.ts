@@ -193,13 +193,12 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
     return asset.assetId
   }
 
-  const ensureBook = (name: string): number => {
+  const ensureBook = (name: string): string | number | null => {
     const n = str(name) || '日常账本'
     const hit = books.find((b) => b.accountBookName === n)
-    if (hit) return hit.accountBookId
-    const book: AccountBook = { accountBookId: idFor(700000), accountBookName: n, userId, createTime: Date.now() }
-    books.push(book); newBooks.push(book)
-    return book.accountBookId
+    // 服务端账本 accountBookId 是 0，真正的 id 在 bookId
+    if (hit) return hit.bookId ?? hit.accountBookId ?? null
+    return null   // 匹配不到就交给调用方处理，不自动造一个无法同步的本地账本
   }
 
   // 列填充率：让用户看到哪些字段真的带过来了
@@ -327,7 +326,8 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
     const parentCategoryId = ensureParent(parentName, isIncome ? 'income' : 'expense')
     const childCategoryId = ensureChild(childName, parentCategoryId)
     const remark = str(r[col('备注')])
-    const bookIdOfRow = col('账本') >= 0 ? ensureBook(str(r[col('账本')])) : bookId
+    // 账本列匹配不到时退回调用方传入的当前账本，绝不写入 null
+    const bookIdOfRow: string | number = (col('账本') >= 0 ? ensureBook(str(r[col('账本')])) : null) ?? bookId
 
     const key = `${time}|${cost.toFixed(2)}|${assetId}|${remark}`
     if (seen.has(key)) duplicates++

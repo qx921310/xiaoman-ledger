@@ -554,10 +554,29 @@ assert.deepEqual(rep.assets.map((a: any) => a.assetId), [7], '重复墓碑不能
 const keepRefund = mkCycleBill('r1', 'book-a')
 const protectedSet = new Set<string>(['r1'])
 const withProtected = dedupeBills([keepRefund, mkCycleBill('r2', 'book-a')], protectedSet)
-assert.ok(withProtected.bills.some((b: any) => b.billId === 'r2'), '没有关联的那条可以删')
+// 保留项带退款（内容一致的另一条可安全删除），有退款的记账不能被删
 assert.ok(withProtected.bills.some((b: any) => b.billId === 'r1'), '有退款的那条必须保留')
+assert.equal(withProtected.bills.length, 1, '内容一致的重复可收敛为一条')
 const allProtected = dedupeBills([mkCycleBill('r1', 'book-a'), mkCycleBill('r2', 'book-a')], new Set(['r1', 'r2']))
 assert.equal(allProtected.removed.length, 0, '全都有业务关联时不做去重')
+
+// 较旧墓碑不能删除较新的本地记录
+let stale: any = { ...emptyMergeState(), assets: [{ assetId: 9, assetName: '新记录', ownerId: 2, userId: 2, updateTime: 30 }] }
+stale = { ...stale, ...mergeRemote(stale, [{ kind: 'asset', id: '9', ownerId: 2, updatedAt: 20, deleted: true, payload: null }]) }
+assert.deepEqual(stale.assets.map((a: any) => a.assetId), [9], '本地更新时应保留')
+
+// 无属主类型（标签/预算）的墓碑必须能跨设备生效
+let ownerless: any = { ...emptyMergeState(), tags: [{ tagId: 12, name: '旧标签', color: '#fff', positionWeight: 0 }] }
+ownerless = { ...ownerless, ...mergeRemote(ownerless, [{ kind: 'tag', id: '12', ownerId: 3, updatedAt: 40, deleted: true, payload: null }]) }
+assert.deepEqual(ownerless.tags, [], '标签删除应在另一设备生效')
+
+// 内容被改过的周期账单不应被自动去重
+const edited = { ...mkCycleBill('e1', 'book-a'), cost: 99 }
+const identical = mkCycleBill('e2', 'book-a')
+const mixed = dedupeBills([edited, identical])
+assert.equal(mixed.removed.length, 0, '有内容差异时保留并待核对')
+const twins = dedupeBills([mkCycleBill('t1', 'book-a'), mkCycleBill('t2', 'book-a')])
+assert.equal(twins.removed.length, 1, '完全一致时才自动收敛')
 const unmigratedBackup = JSON.parse(JSON.stringify(backup))
 delete unmigratedBackup.assets[0].openingBalance
 state().importAll(unmigratedBackup)

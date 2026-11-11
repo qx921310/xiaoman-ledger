@@ -60,20 +60,23 @@ export function mergeRemote(s: MergeableState, records: SyncIncoming[], now = Da
     const ownerOf = (x: Record<string, unknown>) => (x?.ownerId ?? x?.userId ?? 0)
 
     if (r.deleted) {
-      // 墓碑带属主时只能删同属主的记录：服务端会反复返回同一墓碑，
-      // 若回退到「按编号删」，第二次就会误删另一属主的记录。
-      const sameOwner = r.ownerId == null ? null : Number(r.ownerId)
+      // 身份规则：无属主概念的类型只按业务 ID 匹配；其余要求属主一致
+      const sameOwner = OWNERLESS.has(r.kind) || r.ownerId == null ? null : Number(r.ownerId)
       const delIdx = arr.findIndex((x) => {
         if (sameOwner != null && Number(ownerOf(x)) !== sameOwner) return false
         if (x.__originId != null && String(x.__originId) === String(r.id)) return true
         return idOf(r.kind, x) === String(r.id)
       })
+      // 本地记录比墓碑新 → 墓碑已过期，保留本地记录
+      if (delIdx >= 0 && Number(arr[delIdx].updateTime ?? 0) > Number(r.updatedAt ?? 0)) continue
       if (delIdx >= 0) next[k[0]] = arr.filter((_, i) => i !== delIdx)
       // 墓碑时间必须取较新的一次，否则更早的记录会被误判为更新而复活
-      const existingTomb = tombstones.findIndex((t) => t.kind === r.kind && t.id === String(r.id) && Number(t.ownerId ?? 0) === Number(r.ownerId ?? 0))
+      const ownerKey = sameOwner
+      const existingTomb = tombstones.findIndex((t) => t.kind === r.kind && t.id === String(r.id)
+        && (ownerKey == null || Number(t.ownerId ?? 0) === ownerKey))
       const tombTime = r.updatedAt || now
       if (existingTomb < 0) {
-        tombstones.push({ kind: r.kind, id: String(r.id), ownerId: r.ownerId, updatedAt: tombTime })
+        tombstones.push({ kind: r.kind, id: String(r.id), ownerId: ownerKey ?? undefined, updatedAt: tombTime })
       } else if (tombTime > tombstones[existingTomb].updatedAt) {
         tombstones[existingTomb] = { ...tombstones[existingTomb], updatedAt: tombTime }
       }

@@ -24,8 +24,12 @@ export default function App() {
         setCurrentUid(u.id)
         adoptAnonymousData(u.id)
         // 新账号且本机没有它的数据 → 先清空内存状态，避免把上一个账号的数据带进来
+        // 切换账号一律重置会话状态，避免沿用上一个账号的同步标记
+        useLedger.setState({ sessionSyncAt: 0 })
         if (!hasUserData(u.id)) useLedger.getState().reset()
         await useLedger.persist.rehydrate()
+        // 账号身份同步进 store：导入、记账都依赖它，不能再依赖初始值 1
+        useLedger.setState({ userId: u.id, sessionSyncAt: 0 })
         setUser(u)
         await loadBooks()
         autoSyncOnce()
