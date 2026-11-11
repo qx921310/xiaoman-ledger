@@ -157,7 +157,7 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
       </div>
       <div className="row2">
         <input aria-label="新账户余额" value={num} onChange={(e) => setNum(e.target.value.replace(/[^\d.-]/g, ''))} placeholder="余额（信用卡填负数）" />
-        <button onClick={create}>添加</button>
+        <button className="ghost" onClick={create}>添加</button>
       </div>
     </section>
   )

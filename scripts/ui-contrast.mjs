@@ -3,9 +3,9 @@ import { readFileSync } from 'node:fs'
 const css = readFileSync('src/ui.css', 'utf8')
 const root = css.match(/:root\s*\{([^}]*)\}/)?.[1] ?? ''
 const token = (name) => {
-  const value = root.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})\\s*;`))?.[1]
+  const value = root.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6}|var\\(--[a-z-]+\\))\\s*;`))?.[1]
   if (!value) throw new Error(`缺少颜色令牌 --${name}`)
-  return value
+  return value.startsWith('var(') ? token(value.slice(6, -1)) : value
 }
 const luminance = (hex) => {
   const values = hex.slice(1).match(/../g).map((part) => parseInt(part, 16) / 255)
@@ -13,7 +13,7 @@ const luminance = (hex) => {
   return values[0] * 0.2126 + values[1] * 0.7152 + values[2] * 0.0722
 }
 const combinations = [
-  ['正文', 'ink', 'card', 4.5], ['次要文字', 'muted', 'card', 4.5],
+  ['选中状态', 'focus-ink', 'accent-soft', 4.5], ['正文', 'ink', 'card', 4.5], ['次要文字', 'muted', 'card', 4.5],
   ['主按钮', 'action-ink', 'accent', 4.5], ['危险操作', 'danger-ink', 'card', 4.5],
   ['键盘完成', 'key-finish-ink', 'key-finish-bg', 4.5], ['焦点轮廓', 'focus-ink', 'card', 3]
 ]
