@@ -13,6 +13,7 @@ import { dedupeCycleBills as dedupeBills } from './domain/cycle-dedupe'
 import { mergeTaxonomyState } from './domain/taxonomy-merge'
 import { serializeShares, splitAmounts } from './domain/split'
 import { planInstalment } from './domain/loan'
+import { applyBuy, applySell } from './domain/stock'
 import { fromBase, toBase } from './money'
 import { validateBackup } from './backup'
 import { addRefundChanges, deleteRefundChanges } from './refund-operations'
@@ -63,6 +64,8 @@ interface LedgerState {
   cycles: Cycle[]
   /** 币种表；默认币种固定为 CNY，其余按 rate 折算 */
   tags: Tag[]
+  stockAssets: import('./types').StockAsset[]
+  stockInfos: import('./types').StockInfo[]
   templates: import('./types').Template[]
   homeLoans: import('./types').HomeLoan[]
   instalments: import('./types').Instalment[]
@@ -124,6 +127,11 @@ interface LedgerState {
   dissolveBillGroup: (billGroupId: number) => void
   removeFromBillGroup: (billGroupId: number, billId: string | number) => void
   /** 账单关联：两两关联（一木 BillRelated） */
+  addStockAsset: (patch: { name: string; code?: string; price?: number; num?: number; cost?: number }) => import('./types').StockAsset
+  deleteStockAsset: (stockAssetId: number) => void
+  /** 买入/卖出：更新持仓成本与已实现盈亏，并记录一笔 StockInfo */
+  tradeStock: (stockAssetId: number, type: 1 | 2, num: number, amount: number, fee?: number, time?: number) => boolean
+  setStockPrice: (stockAssetId: number, price: number) => void
   addTemplate: (patch: Omit<import('./types').Template, 'templateId' | 'updateTime'>) => import('./types').Template
   deleteTemplate: (templateId: number) => void
   /** 套用模板：直接记一笔 */
@@ -209,6 +217,8 @@ export const useLedger = create<LedgerState>()(
       lends: [],
       cycles: [],
       tags: [],
+      stockAssets: [],
+      stockInfos: [],
       templates: [],
       homeLoans: [],
       instalments: [],
@@ -439,6 +449,56 @@ export const useLedger = create<LedgerState>()(
       settleSplit: (splitExpenseId, settlement) => set((s) => ({
         splitExpenses: s.splitExpenses.map((x) => x.splitExpenseId === splitExpenseId
           ? { ...x, settlement, updateTime: NOW() } : x)
+      })),
+
+      addStockAsset: (patch) => {
+        const s = get()
+        let stockAssetId = Date.now()
+        while (s.stockAssets.some((x) => x.stockAssetId === stockAssetId)) stockAssetId++
+        const rec: import('./types').StockAsset = {
+          stockAssetId,
+          name: patch.name.trim() || '未命名投资',
+          code: patch.code,
+          primeNum: Number(patch.num) || 0,
+          primeCost: Number(patch.cost) || 0,
+          historyIncome: 0,
+          price: patch.price,
+          intoTotalAsset: true,
+          updateTime: NOW()
+        }
+        set((st) => ({ stockAssets: [...st.stockAssets, rec] }))
+        return rec
+      },
+
+      deleteStockAsset: (stockAssetId) => set((s) => ({
+        stockAssets: s.stockAssets.filter((x) => x.stockAssetId !== stockAssetId),
+        stockInfos: s.stockInfos.filter((x) => x.stockAssetId !== stockAssetId)
+      })),
+
+      tradeStock: (stockAssetId, type, num, amount, fee = 0, time) => {
+        const s = get()
+        const rec = s.stockAssets.find((x) => x.stockAssetId === stockAssetId)
+        if (!rec || !(num > 0)) return false
+        const h = { num: rec.primeNum, cost: rec.primeCost, realized: rec.historyIncome }
+        const next = type === 1 ? applyBuy(h, num, amount, fee) : applySell(h, num, amount, fee)
+        if (next === h) return false                     // 卖出超量或参数非法
+        let stockInfoId = Date.now()
+        while (s.stockInfos.some((x) => x.stockInfoId === stockInfoId)) stockInfoId++
+        set((st) => ({
+          stockAssets: st.stockAssets.map((x) => x.stockAssetId === stockAssetId
+            ? { ...x, primeNum: next.num, primeCost: next.cost, historyIncome: next.realized, updateTime: NOW() }
+            : x),
+          stockInfos: [...st.stockInfos, {
+            stockInfoId, stockAssetId, type, num, cost: amount,
+            serviceCharge: fee || undefined, doTime: time ?? Date.now(), updateTime: NOW()
+          }]
+        }))
+        return true
+      },
+
+      setStockPrice: (stockAssetId, price) => set((s) => ({
+        stockAssets: s.stockAssets.map((x) => x.stockAssetId === stockAssetId
+          ? { ...x, price, updateTime: NOW() } : x)
       })),
 
       addTemplate: (patch) => {

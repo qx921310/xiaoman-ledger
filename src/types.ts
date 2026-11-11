@@ -50,6 +50,43 @@ export interface Instalment {
   updateTime?: number
 }
 
+/** 一木：投资持仓（StockAsset） */
+export interface StockAsset {
+  stockAssetId: number
+  name: string
+  code?: string
+  /** 一木 assetType：股票/基金/黄金等 */
+  assetType?: number
+  groupName?: string
+  /** 持仓数量 */
+  primeNum: number
+  /** 成本价 */
+  primeCost: number
+  /** 累计已实现盈亏 */
+  historyIncome: number
+  /** 当前价（手动维护，一木靠行情接口） */
+  price?: number
+  monetary?: boolean
+  hide?: boolean
+  intoTotalAsset?: boolean
+  remark?: string
+  updateTime?: number
+}
+
+/** 一木：一笔持仓交易（StockInfo） */
+export interface StockInfo {
+  stockInfoId: number
+  stockAssetId: number
+  /** 1 买入 / 2 卖出 */
+  type: 1 | 2
+  num: number
+  cost: number
+  serviceCharge?: number
+  doTime: number
+  remark?: string
+  updateTime?: number
+}
+
 /** 一木：模板（ModuleManagerActivity / AddModuleTransferActivity） */
 export interface Template {
   templateId: number

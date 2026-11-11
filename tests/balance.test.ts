@@ -13,6 +13,7 @@ import { accountHistory } from '../src/domain/account-history'
 import { parseShares, splitAmounts } from '../src/domain/split'
 import { buildAssetSankey, sankeyGroupOf } from '../src/domain/asset-sankey'
 import { planInstalment, planLoan } from '../src/domain/loan'
+import { applyBuy, applySell, holdingValue, totalProfit } from '../src/domain/stock'
 import { byAsset, byTag, dailyTrend } from '../src/domain/stats-breakdown'
 import { dateKey, pendingDates } from '../src/cycle-dates'
 import { createElement } from 'react'
@@ -1169,3 +1170,27 @@ const aliPlan = buildImportPlan({
 })
 assert.equal(aliPlan.bills.length, 1)
 assert.equal(aliPlan.bills[0].cost, 25)
+
+// 持仓：移动加权成本、卖出实现盈亏、清仓归零
+let hold = { num: 0, cost: 0, realized: 0 }
+hold = applyBuy(hold, 100, 1000)              // 10 元买 100
+assert.equal(hold.num, 100)
+assert.equal(hold.cost, 10)
+hold = applyBuy(hold, 100, 1400)              // 14 元再买 100 → 均价 12
+assert.equal(hold.cost, 12, '移动加权平均成本')
+assert.equal(hold.num, 200)
+hold = applySell(hold, 100, 1500)             // 15 元卖 100
+assert.equal(hold.realized, 300, '已实现盈亏 = 卖出额 - 结转成本')
+assert.equal(hold.num, 100)
+assert.equal(hold.cost, 12, '卖出不改变剩余成本')
+// 手续费从盈亏里扣
+const withFee = applySell({ num: 100, cost: 10, realized: 0 }, 100, 1200, 5)
+assert.equal(withFee.realized, 195)
+assert.equal(withFee.num, 0, '清仓后数量为 0')
+// 超量卖出被拒
+assert.equal(applySell({ num: 10, cost: 5, realized: 0 }, 20, 100).num, 10, '卖超不生效')
+// 市值与总盈亏
+const val = holdingValue(100, 12, 15)
+assert.equal(val.market, 1500)
+assert.equal(val.floating, 300)
+assert.equal(totalProfit(300, 300), 600)

@@ -10,6 +10,7 @@ import { accountMoney, toBase } from '../money'
 import { visibleAssets } from '../domain/asset-scope'
 import { accountHistory } from '../domain/account-history'
 import { planInstalment, planLoan } from '../domain/loan'
+import { holdingValue, totalProfit } from '../domain/stock'
 import { IconPicker } from '../ui/icon-picker'
 import { lendRemaining, lendTotals } from '../lend'
 
@@ -46,6 +47,14 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
   const addInstalment = useLedger((s) => s.addInstalment)
   const deleteInstalment = useLedger((s) => s.deleteInstalment)
   const postInstalmentBills = useLedger((s) => s.postInstalmentBills)
+  const stockAssets = useLedger((s) => s.stockAssets)
+  const addStockAsset = useLedger((s) => s.addStockAsset)
+  const deleteStockAsset = useLedger((s) => s.deleteStockAsset)
+  const tradeStock = useLedger((s) => s.tradeStock)
+  const setStockPrice = useLedger((s) => s.setStockPrice)
+  const [stockForm, setStockForm] = useState({ name: '', code: '', num: '', amount: '' })
+  const [stockSell, setStockSell] = useState<Record<number, string>>({})
+  const [stockSellAmt, setStockSellAmt] = useState<Record<number, string>>({})
   const [loanForm, setLoanForm] = useState({ name: '房贷', commercial: '', commercialRate: '4.3', provident: '', providentRate: '3.1', lprAdd: '', periods: '360', repayment: 'equal-payment' as 'equal-payment' | 'equal-principal' })
   const [insForm, setInsForm] = useState({ total: '', periods: '12', serviceRate: '7.2', serviceType: 0, month: new Date().toISOString().slice(0, 7), assetId: 0 })
   const bills = useLedger((s) => s.bills)
@@ -174,6 +183,69 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
           </Modal>
         )
       })()}
+
+      <h3>投资持仓</h3>
+      <p className="hint">按一木的持仓模型记录：买入/卖出自动算移动加权成本与已实现盈亏，填当前价看浮动盈亏。</p>
+      <div className="row2">
+        <input aria-label="持仓名称" value={stockForm.name} placeholder="名称，如 沪深300ETF"
+          onChange={(e) => setStockForm({ ...stockForm, name: e.target.value })} />
+        <input aria-label="持仓代码" value={stockForm.code} placeholder="代码（可选）"
+          onChange={(e) => setStockForm({ ...stockForm, code: e.target.value })} />
+      </div>
+      <div className="row2">
+        <input aria-label="买入数量" value={stockForm.num} placeholder="数量" inputMode="decimal"
+          onChange={(e) => setStockForm({ ...stockForm, num: e.target.value.replace(/[^\d.]/g, '') })} />
+        <input aria-label="买入金额" value={stockForm.amount} placeholder="买入金额"
+          onChange={(e) => setStockForm({ ...stockForm, amount: e.target.value.replace(/[^\d.]/g, '') })} />
+      </div>
+      <button className="ghost wide" onClick={() => {
+        if (!stockForm.name.trim()) return notify('请填名称')
+        const rec = addStockAsset({ name: stockForm.name, code: stockForm.code })
+        if (Number(stockForm.num) > 0 && Number(stockForm.amount) > 0) {
+          tradeStock(rec.stockAssetId, 1, Number(stockForm.num), Number(stockForm.amount))
+        }
+        setStockForm({ name: '', code: '', num: '', amount: '' })
+        notify('持仓已建立')
+      }}>建立持仓</button>
+
+      {stockAssets.map((h) => {
+        const price = h.price ?? h.primeCost
+        const v = holdingValue(h.primeNum, h.primeCost, price)
+        const profit = totalProfit(h.historyIncome, v.floating)
+        return (
+          <div key={h.stockAssetId} className="cat-block">
+            <div className="row">
+              <div className="grow">
+                <b>{h.name}{h.code ? ` · ${h.code}` : ''}</b>
+                <small>
+                  {h.primeNum} 份 · 成本 {money(h.primeCost)} · 现价 {money(price)} ·
+                  市值 {money(v.market)} · 盈亏 <span className={profit >= 0 ? 'in' : 'out'}>{money(profit)}</span>
+                </small>
+              </div>
+              <button className="del" onClick={() => deleteStockAsset(h.stockAssetId)}>删</button>
+            </div>
+            <div className="cat-children">
+              <div className="row2">
+                <input aria-label={`${h.name} 现价`} placeholder="当前价" defaultValue={h.price ?? ''}
+                  inputMode="decimal"
+                  onBlur={(e) => { const v2 = Number(e.target.value); if (v2 > 0) setStockPrice(h.stockAssetId, v2) }} />
+                <input aria-label={`${h.name} 卖出份额`} placeholder="卖出份额" value={stockSell[h.stockAssetId] ?? ''}
+                  onChange={(e) => setStockSell({ ...stockSell, [h.stockAssetId]: e.target.value.replace(/[^\d.]/g, '') })} />
+                <input aria-label={`${h.name} 卖出金额`} placeholder="卖出金额" value={stockSellAmt[h.stockAssetId] ?? ''}
+                  onChange={(e) => setStockSellAmt({ ...stockSellAmt, [h.stockAssetId]: e.target.value.replace(/[^\d.]/g, '') })} />
+                <button className="link" onClick={() => {
+                  const n = Number(stockSell[h.stockAssetId]); const amt = Number(stockSellAmt[h.stockAssetId])
+                  if (!(n > 0) || !(amt > 0)) return notify('填卖出份额与金额')
+                  if (!tradeStock(h.stockAssetId, 2, n, amt)) return notify('卖出份额超过持仓')
+                  setStockSell({ ...stockSell, [h.stockAssetId]: '' })
+                  setStockSellAmt({ ...stockSellAmt, [h.stockAssetId]: '' })
+                  notify('已记录卖出')
+                }}>卖出</button>
+              </div>
+            </div>
+          </div>
+        )
+      })}
 
       <h3>房贷计划</h3>
       <p className="hint">组合贷：商业贷款 + 公积金贷款，支持等额本息/等额本金与 LPR 加点。</p>
@@ -480,6 +552,69 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
           onChange={(icon) => setNewIcon(icon ?? '')}
           onClose={() => setPickerOpen(false)} />
       )}
+
+      <h3>投资持仓</h3>
+      <p className="hint">按一木的持仓模型记录：买入/卖出自动算移动加权成本与已实现盈亏，填当前价看浮动盈亏。</p>
+      <div className="row2">
+        <input aria-label="持仓名称" value={stockForm.name} placeholder="名称，如 沪深300ETF"
+          onChange={(e) => setStockForm({ ...stockForm, name: e.target.value })} />
+        <input aria-label="持仓代码" value={stockForm.code} placeholder="代码（可选）"
+          onChange={(e) => setStockForm({ ...stockForm, code: e.target.value })} />
+      </div>
+      <div className="row2">
+        <input aria-label="买入数量" value={stockForm.num} placeholder="数量" inputMode="decimal"
+          onChange={(e) => setStockForm({ ...stockForm, num: e.target.value.replace(/[^\d.]/g, '') })} />
+        <input aria-label="买入金额" value={stockForm.amount} placeholder="买入金额"
+          onChange={(e) => setStockForm({ ...stockForm, amount: e.target.value.replace(/[^\d.]/g, '') })} />
+      </div>
+      <button className="ghost wide" onClick={() => {
+        if (!stockForm.name.trim()) return notify('请填名称')
+        const rec = addStockAsset({ name: stockForm.name, code: stockForm.code })
+        if (Number(stockForm.num) > 0 && Number(stockForm.amount) > 0) {
+          tradeStock(rec.stockAssetId, 1, Number(stockForm.num), Number(stockForm.amount))
+        }
+        setStockForm({ name: '', code: '', num: '', amount: '' })
+        notify('持仓已建立')
+      }}>建立持仓</button>
+
+      {stockAssets.map((h) => {
+        const price = h.price ?? h.primeCost
+        const v = holdingValue(h.primeNum, h.primeCost, price)
+        const profit = totalProfit(h.historyIncome, v.floating)
+        return (
+          <div key={h.stockAssetId} className="cat-block">
+            <div className="row">
+              <div className="grow">
+                <b>{h.name}{h.code ? ` · ${h.code}` : ''}</b>
+                <small>
+                  {h.primeNum} 份 · 成本 {money(h.primeCost)} · 现价 {money(price)} ·
+                  市值 {money(v.market)} · 盈亏 <span className={profit >= 0 ? 'in' : 'out'}>{money(profit)}</span>
+                </small>
+              </div>
+              <button className="del" onClick={() => deleteStockAsset(h.stockAssetId)}>删</button>
+            </div>
+            <div className="cat-children">
+              <div className="row2">
+                <input aria-label={`${h.name} 现价`} placeholder="当前价" defaultValue={h.price ?? ''}
+                  inputMode="decimal"
+                  onBlur={(e) => { const v2 = Number(e.target.value); if (v2 > 0) setStockPrice(h.stockAssetId, v2) }} />
+                <input aria-label={`${h.name} 卖出份额`} placeholder="卖出份额" value={stockSell[h.stockAssetId] ?? ''}
+                  onChange={(e) => setStockSell({ ...stockSell, [h.stockAssetId]: e.target.value.replace(/[^\d.]/g, '') })} />
+                <input aria-label={`${h.name} 卖出金额`} placeholder="卖出金额" value={stockSellAmt[h.stockAssetId] ?? ''}
+                  onChange={(e) => setStockSellAmt({ ...stockSellAmt, [h.stockAssetId]: e.target.value.replace(/[^\d.]/g, '') })} />
+                <button className="link" onClick={() => {
+                  const n = Number(stockSell[h.stockAssetId]); const amt = Number(stockSellAmt[h.stockAssetId])
+                  if (!(n > 0) || !(amt > 0)) return notify('填卖出份额与金额')
+                  if (!tradeStock(h.stockAssetId, 2, n, amt)) return notify('卖出份额超过持仓')
+                  setStockSell({ ...stockSell, [h.stockAssetId]: '' })
+                  setStockSellAmt({ ...stockSellAmt, [h.stockAssetId]: '' })
+                  notify('已记录卖出')
+                }}>卖出</button>
+              </div>
+            </div>
+          </div>
+        )
+      })}
 
       <h3>房贷计划</h3>
       <p className="hint">组合贷：商业贷款 + 公积金贷款，支持等额本息/等额本金与 LPR 加点。</p>
