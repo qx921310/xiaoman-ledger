@@ -1,5 +1,4 @@
 import { useLedger } from './store'
-import { dedupeCycleBills } from './domain/cycle-dedupe'
 
 export interface SyncRecord {
   kind: string
@@ -67,17 +66,24 @@ async function call(path: string, init?: RequestInit) {
 /** 先推后拉：推送本地记录，再把云端记录合并回来（逐条 LWW） */
 export async function syncNow() {
   const records = collectRecords()
+  try {
+    return await runSync(records)
+  } catch (e) {
+    // 失败也要解除"等待首次同步"的阻塞，否则周期账单永远不生成
+    useLedger.getState().setSessionSyncAt(-1)
+    throw e
+  }
+}
+
+async function runSync(records: ReturnType<typeof collectRecords>) {
   const pushed = await call('/data/push', { method: 'POST', body: JSON.stringify({ records }) })
   const pulled = await call('/data/pull')
   useLedger.getState().applyRemote(pulled.records || [])
   // 云端记录会带回旧分类，合并后再跑一次规范/去重
   useLedger.getState().mergeTaxonomy()
-  // 多设备可能各自补生成了同一期周期账单：收敛到一条，其余写墓碑
-  const st = useLedger.getState()
-  const { bills: kept, removed } = dedupeCycleBills(st.bills)
-  if (removed.length) {
-    useLedger.setState({ bills: kept, tombstones: [...st.tombstones, ...removed.map((b) => ({ kind: 'bill', id: String(b.syncId ?? b.billId), bookId: b.bookId, updatedAt: Date.now() }))] })
-  }
+  // 多设备可能各自补生成了同一期周期账单：交回 store 去重（会重算余额并排墓碑）
+  useLedger.getState().dedupeCycleBills()
+  useLedger.getState().setSessionSyncAt(Date.now())
   if (!pushed.denied) useLedger.getState().setLastSync(Date.now())
   return {
     pushed: pushed.accepted as number,

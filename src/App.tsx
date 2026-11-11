@@ -107,7 +107,7 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User
   // 启动时补齐内置分类（幂等，不动用户已有分类）
   useEffect(() => { mergeTaxonomy() }, [mergeTaxonomy])
   // 补生成周期账单：必须等首次同步拉完，否则两台设备会各自生成同一期
-  const lastSync = useLedger((s) => s.lastSync)
+  const sessionSyncAt = useLedger((s) => s.sessionSyncAt)
   const cyclesRan = useRef(false)
   const [syncGrace, setSyncGrace] = useState(false)
   useEffect(() => {
@@ -117,11 +117,11 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User
   }, [])
   useEffect(() => {
     if (cyclesRan.current) return
-    if (lastSync > 0 || syncGrace) {
+    if (sessionSyncAt !== 0 || syncGrace) {
       cyclesRan.current = true
       runCycles()
     }
-  }, [lastSync, syncGrace, runCycles])
+  }, [sessionSyncAt, syncGrace, runCycles])
   const [toast, setToast] = useState('')
   const notify = (m: string) => {
     setToast(m)

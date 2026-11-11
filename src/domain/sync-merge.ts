@@ -19,6 +19,9 @@ export interface MergeableState {
   tombstones: TombstoneV1[]
 }
 
+// 这些类型没有「属主」语义：服务端回填 ownerId 时不应被当成他人记录而改号
+const OWNERLESS = new Set(['tag', 'budget', 'parent', 'child', 'book'])
+
 const KIND_SPEC: Record<string, [string, string]> = {
   bill: ['bills', 'billId'], asset: ['assets', 'assetId'], transfer: ['transfers', 'transferId'],
   lend: ['lends', 'lendId'], cycle: ['cycles', 'cycleId'],
@@ -56,10 +59,15 @@ export function mergeRemote(s: MergeableState, records: SyncIncoming[], now = Da
     const arr = (next[k[0]] ?? [...(stateView[k[0]] || [])]) as Record<string, unknown>[]
 
     if (r.deleted) {
-      const local = arr.find((x) => idOf(r.kind, x) === String(r.id))
+      // 改过号的记录必须按来源身份删除，否则会删掉别人的同编号记录
+      const originDeleted = arr.findIndex((x) => x.__originId != null
+        && String(x.__originId) === String(r.id)
+        && (r.ownerId == null || Number(x.__originOwner) === Number(r.ownerId)))
+      const delIdx = originDeleted >= 0 ? originDeleted : arr.findIndex((x) => idOf(r.kind, x) === String(r.id))
+      const local = delIdx >= 0 ? arr[delIdx] : undefined
       // 本地版本比墓碑新 → 墓碑已过期，保留本地记录
       if (local && Number(local.updateTime ?? 0) > Number(r.updatedAt ?? 0)) continue
-      next[k[0]] = arr.filter((x) => idOf(r.kind, x) !== String(r.id))
+      next[k[0]] = delIdx >= 0 ? arr.filter((_, i) => i !== delIdx) : arr
       // 墓碑时间必须取较新的一次，否则更早的记录会被误判为更新而复活
       const existingTomb = tombstones.findIndex((t) => t.kind === r.kind && t.id === String(r.id))
       const tombTime = r.updatedAt || now
@@ -88,7 +96,7 @@ export function mergeRemote(s: MergeableState, records: SyncIncoming[], now = Da
       TAXONOMY_CHILDREN.some((c) => c.id === r.payload!.id && c.parentId === r.payload!.parentId && c.name === r.payload!.name) &&
       !!localRow && localRow.parentId === r.payload!.parentId && localRow.name === r.payload!.name
 
-    if (idx >= 0 && !sameBuiltInChild && (r.kind !== 'bill' || (!arr[idx].syncId && !r.payload.syncId)) && ownerOf(arr[idx]) !== ownerOf(r.payload)) {
+    if (!OWNERLESS.has(r.kind) && idx >= 0 && !sameBuiltInChild && (r.kind !== 'bill' || (!arr[idx].syncId && !r.payload.syncId)) && ownerOf(arr[idx]) !== ownerOf(r.payload)) {
       // 同 ID 但属主不同：不覆盖，顺位换一个空闲 ID，两条并存
       const idField = k[1]
       const taken = new Set(arr.map((x) => String(x[idField])))
@@ -114,8 +122,16 @@ export function mergeRemote(s: MergeableState, records: SyncIncoming[], now = Da
       next[k[0]] = arr
     }
     if (idx < 0 || Number(r.updatedAt ?? 0) > localTime) {
-      if (idx >= 0) arr[idx] = r.payload
-      else arr.push(r.payload)
+      if (idx >= 0) {
+        // 改过号的记录：用新内容更新，但保留已分配的编号与来源身份
+        const prev = arr[idx]
+        const keepId = prev[k[1]]
+        const originMeta = prev.__originId != null
+          ? { __originId: prev.__originId, __originOwner: prev.__originOwner } : {}
+        arr[idx] = { ...r.payload, [k[1]]: keepId, ...originMeta }
+      } else {
+        arr.push(r.payload)
+      }
     }
     next[k[0]] = arr
   }

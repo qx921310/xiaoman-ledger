@@ -9,6 +9,7 @@ import { newBillIdentity } from './identity'
 import { lendRemaining } from './lend'
 import { mergeRemote, type MergeableState } from './domain/sync-merge'
 import { planCycles } from './domain/cycles'
+import { dedupeCycleBills as dedupeBills } from './domain/cycle-dedupe'
 import { mergeTaxonomyState } from './domain/taxonomy-merge'
 import { fromBase, toBase } from './money'
 import { validateBackup } from './backup'
@@ -54,6 +55,8 @@ interface LedgerState {
   /** 删除墓碑：同步时要把删除动作也推上去，否则别的设备会把数据拉回来 */
   tombstones: { kind: string; id: string; updatedAt: number; bookId?: string | number }[]
   lastSync: number
+  /** 本次会话是否已完成过一次同步（0=未跑，-1=尝试过但失败，>0=成功时间）。不持久化 */
+  sessionSyncAt: number
   /** 上次使用的分类/账户，用于快速记账 */
   lastParentId: number
   lastChildId: number
@@ -69,6 +72,7 @@ interface LedgerState {
   deleteCycle: (cycleId: number) => void
   toggleCycle: (cycleId: number) => void
   skipCycleDate: (cycleId: number, key: string) => void
+  dedupeCycleBills: () => number
   runCycles: () => number
   addLend: (patch: { type: 1 | 2 | 3 | 4; assetId: number; counterparty: string; number: number; interest?: number; repaymentAssetId?: number; time?: number; remark?: string; parentLendId?: number }) => void
   repayLend: (patch: { lendId: number; amount: number; repaymentAssetId?: number; time?: number }) => void
@@ -103,6 +107,7 @@ interface LedgerState {
   removeCurrency: (code: string) => void
   applyRemote: (records: SyncIncoming[]) => void
   setLastSync: (t: number) => void
+  setSessionSyncAt: (t: number) => void
   tombstone: (kind: string, id: string | number) => void
 }
 
@@ -154,6 +159,7 @@ export const useLedger = create<LedgerState>()(
       defaultCurrency: 'CNY',
       tombstones: [],
       lastSync: 0,
+      sessionSyncAt: 0,
       lastParentId: 7,
       lastChildId: 0,
       lastAssetId: 0,
@@ -179,6 +185,7 @@ export const useLedger = create<LedgerState>()(
           bookId: patch.bookId ?? s.currentBookId,
           remark: patch.remark ?? '',
           billType: patch.billType ?? 2,
+          cycleId: patch.cycleId,
           tags: patch.tags ?? [],
           userId: getCurrentUid() || s.userId,
           updateTime: NOW(),
@@ -527,6 +534,21 @@ export const useLedger = create<LedgerState>()(
           : c)
       })),
 
+      // 周期账单去重：必须走这层 set，才能触发余额重算并把墓碑写入待同步队列
+      dedupeCycleBills: () => {
+        const s = get()
+        const { bills, removed } = dedupeBills(s.bills)
+        if (!removed.length) return 0
+        set((st) => ({
+          bills,
+          tombstones: [
+            ...st.tombstones,
+            ...removed.map((b) => ({ kind: 'bill', id: String(b.syncId ?? b.billId), bookId: b.bookId, updatedAt: NOW() }))
+          ]
+        }))
+        return removed.length
+      },
+
       runCycles: () => {
         const s = get()
         const plan = planCycles({
@@ -709,6 +731,7 @@ export const useLedger = create<LedgerState>()(
       },
 
       setLastSync: (t) => set({ lastSync: t }),
+      setSessionSyncAt: (t) => set({ sessionSyncAt: t }),
 
       addTag: (patch) => {
         const tag: Tag = {
@@ -776,7 +799,14 @@ export const useLedger = create<LedgerState>()(
 
       // 补齐内置分类（缺失的加上），并把老数据里的 emoji 图标迁移成图标键
       // 分类规范化：算法在 domain/taxonomy-merge.ts
-      mergeTaxonomy: () => set((s) => mergeTaxonomyState(s)),
+      mergeTaxonomy: () => set((s) => {
+        const changes = mergeTaxonomyState(s)
+        // 历史周期规则没有账本归属：首次整理时固定到当前账本，避免之后随切换漂移
+        const stale = s.cycles.filter((c) => c.bookId == null)
+        return stale.length
+          ? { ...changes, cycles: s.cycles.map((c) => c.bookId == null ? { ...c, bookId: s.currentBookId || 1 } : c) }
+          : changes
+      }),
 
       // 合并式导入：新增分类/账户先落地，账单像正常记账一样冲账户余额
       applyImport: (plan) => set((s) => {
@@ -839,6 +869,11 @@ export const useLedger = create<LedgerState>()(
     {
       name: 'xiaoman-data',
       storage: createJSONStorage(() => userStorage),
+      // 会话级标记不落盘，否则"过去同步过"会被误当成"本次已同步"
+      partialize: (state) => {
+        const { sessionSyncAt: _session, ...rest } = state
+        return rest as LedgerState
+      },
       merge: (persisted, current) => {
         const snapshot = { ...current, ...(persisted as Partial<LedgerState>) }
         snapshot.childCategories = snapshot.childCategories.map(normalizeBuiltInChild)

@@ -249,7 +249,6 @@ const server = createServer(async (req, res) => {
   if (req.method === 'OPTIONS') return send(res, 204, {})
   const url = new URL(req.url, `http://${req.headers.host}`)
   const path = url.pathname
-  const userId = Number(req.headers['user-id'] || 1)
 
   try {
     if (path === '/api/health') return ok(res, { ok: true, service: 'ledger-api', time: Date.now(), writable: Boolean(WRITE_TOKEN) })
@@ -516,62 +515,8 @@ const server = createServer(async (req, res) => {
       return ok(res, { records, lastSync: getKv(`lastSync:${user.id}`) })
     }
 
-    if (path === '/api/sync/push' && req.method === 'POST') {
-      const body = await readBody(req)
-      const bills = Array.isArray(body.bills) ? body.bills : []
-      const assets = Array.isArray(body.assets) ? body.assets : []
-      const tx = db.transaction ? null : null
-      for (const b of bills) {
-        db.prepare('INSERT INTO bills (bill_id, payload, user_id) VALUES (?,?,?) ON CONFLICT(bill_id) DO UPDATE SET payload=excluded.payload')
-          .run(b.billId, JSON.stringify(b), userId)
-      }
-      for (const a of assets) {
-        db.prepare('INSERT INTO assets (asset_id, payload, user_id) VALUES (?,?,?) ON CONFLICT(asset_id) DO UPDATE SET payload=excluded.payload')
-          .run(a.assetId, JSON.stringify(a), userId)
-      }
-      upsertKv(`lastSync:${userId}`, Date.now())
-      return ok(res, { bills: bills.length, assets: assets.length, syncedAt: Date.now() })
-    }
-
-    if (path === '/api/sync/pull' && req.method === 'GET') {
-      if (!currentUser(req)) return fail(res, '请先登录')
-      const bills = db.prepare('SELECT payload FROM bills WHERE user_id = ?').all(userId).map((r) => JSON.parse(r.payload))
-      const assets = db.prepare('SELECT payload FROM assets WHERE user_id = ?').all(userId).map((r) => JSON.parse(r.payload))
-      return ok(res, { bills, assets, lastSync: getKv(`lastSync:${userId}`) })
-    }
-
-    // 与原产品同构的写接口（供后续对接）
-    // ---- 旧版 REST 接口（已由 /api/data/* 取代）：必须登录，且只能读写自己的数据 ----
-    if (path.startsWith('/api/bill/') || path.startsWith('/api/asset/') || path === '/api/sync/push') {
-      const u = currentUser(req)
-      if (!u) return fail(res, '请先登录', 401)
-      req.legacyUser = u
-    }
-    if (path === '/api/bill/addOrUpdateBill' && req.method === 'POST') {
-      const b = await readBody(req)
-      if (!b.billId || typeof b.cost !== 'number') return fail(res, 'bad bill')
-      db.prepare('INSERT INTO bills (bill_id, payload, user_id) VALUES (?,?,?) ON CONFLICT(bill_id) DO UPDATE SET payload=excluded.payload')
-        .run(b.billId, JSON.stringify(b), req.legacyUser.id)
-      return ok(res, b)
-    }
-    if (path === '/api/bill/deleteBill' && req.method === 'POST') {
-      const b = await readBody(req)
-      // 只能删自己的账单
-      db.prepare('DELETE FROM bills WHERE bill_id = ? AND user_id = ?').run(b.billId, req.legacyUser.id)
-      return ok(res, { billId: b.billId })
-    }
-    if (path.startsWith('/api/bill/getAccountBillPage/')) {
-      const offset = Number(path.split('/')[5] || 0)
-      const rows = db.prepare('SELECT payload FROM bills WHERE user_id = ? ORDER BY bill_id DESC LIMIT 200 OFFSET ?')
-        .all(req.legacyUser.id, offset).map((r) => JSON.parse(r.payload))
-      return ok(res, rows)
-    }
-    if (path === '/api/asset/addOrUpdateAsset' && req.method === 'POST') {
-      const a = await readBody(req)
-      db.prepare('INSERT INTO assets (asset_id, payload, user_id) VALUES (?,?,?) ON CONFLICT(asset_id) DO UPDATE SET payload=excluded.payload')
-        .run(a.assetId, JSON.stringify(a), req.legacyUser.id)
-      return ok(res, a)
-    }
+    // 旧版 REST/sync 接口已移除：客户端只用 /api/data/*、/api/auth/*、/api/books/*
+    // 这些接口曾用请求头 user-id 识别用户，无法安全鉴权，保留即是越权入口。
 
     if (path.startsWith('/api/')) return fail(res, 'not found: ' + path)
     if (serveStatic(url, res)) return

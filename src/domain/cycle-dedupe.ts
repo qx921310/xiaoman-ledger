@@ -5,7 +5,8 @@ export function cycleBillKey(bill: Bill): string | null {
   if (bill.cycleId == null) return null
   const d = new Date(bill.time)
   const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  return `${bill.cycleId}|${day}`
+  // 必须带上账本：不同账本里 cycleId 可能撞号，不能互相去重
+  return `${bill.bookId ?? ''}|${bill.cycleId}|${day}`
 }
 
 export interface CycleDedupeResult {

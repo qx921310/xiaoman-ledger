@@ -405,6 +405,7 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
       reimbursements.push({
         reimbursementId: Date.now() + (rseq++),
         billId: p.bill.billId,
+        bookId: p.bill.bookId,
         assetId: p.reimb.assetName ? ensureAsset(p.reimb.assetName) : 0,
         number: p.reimb.amount,
         detail: p.reimb.detail,
@@ -418,6 +419,7 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
       refunds.push({
         refundId: Date.now() + (rseq++),
         billId: p.bill.billId,
+        bookId: p.bill.bookId,
         number: refund.amount,
         assetId: refund.assetId,
         currency: refund.currency,

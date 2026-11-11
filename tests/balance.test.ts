@@ -4,6 +4,8 @@ import { buildExportTable, buildImportPlan, parseLedgerFile } from '../src/impor
 import * as XLSX from 'xlsx'
 import { editAmount, evaluateAmount, formatAmount } from '../src/ui/keypad'
 import { lendRemaining, lendTotals } from '../src/lend'
+import { mergeRemote } from '../src/domain/sync-merge'
+import { dedupeCycleBills as dedupeBills } from '../src/domain/cycle-dedupe'
 import { dateKey, pendingDates } from '../src/cycle-dates'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -488,6 +490,54 @@ assert.equal(state().lends.length, 2)
 state().deleteLend(parent.lendId)
 assert.equal(state().lends.length, 0)
 assert.equal(balance(71), baseBalance)
+
+// ---------- 同步身份、墓碑与周期去重（Codex 验收复现） ----------
+const emptyMergeState = () => ({
+  bills: [], assets: [], transfers: [], lends: [], cycles: [],
+  parentCategories: [], childCategories: [], accountBooks: [],
+  reimbursements: [], refunds: [], tags: [], tombstones: []
+})
+const assetRec = (updatedAt: number) => ({
+  kind: 'asset', id: '7', ownerId: 2, updatedAt,
+  payload: { assetId: 7, assetName: '对方卡', assetNumber: 50, ownerId: 2, userId: 2, updateTime: updatedAt }
+})
+
+// 改号后：更新应保留已分配编号，而不是回到原编号
+let ms: any = { ...emptyMergeState(), assets: [{ assetId: 7, assetName: '本地卡', assetNumber: 100, ownerId: 1, userId: 1, updateTime: 10 }] }
+ms = { ...ms, ...mergeRemote(ms, [assetRec(20)]) }
+assert.deepEqual(ms.assets.map((a: any) => a.assetId), [7, 7002])
+ms = { ...ms, ...mergeRemote(ms, [assetRec(25)]) }
+assert.deepEqual(ms.assets.map((a: any) => a.assetId), [7, 7002], '更新后应保留改号结果')
+assert.equal(ms.assets[1].assetName, '对方卡')
+
+// 删除应按来源身份删除，不能误删本地同编号记录
+ms = { ...ms, ...mergeRemote(ms, [{ ...assetRec(40), deleted: true, payload: null }]) }
+assert.deepEqual(ms.assets.map((a: any) => a.assetId), [7], '只应删掉属主 2 的记录')
+assert.equal(ms.assets[0].ownerId, 1)
+
+// 标签没有属主语义：拉回自己的标签不应产生副本
+let tagState: any = { ...emptyMergeState(), tags: [{ tagId: 5, name: '日常', color: '#fff', positionWeight: 0 }] }
+tagState = { ...tagState, ...mergeRemote(tagState, [{ kind: 'tag', id: '5', ownerId: 2, updatedAt: 20, payload: { tagId: 5, name: '日常', color: '#fff', positionWeight: 0 } }]) }
+assert.deepEqual(tagState.tags.map((t: any) => t.tagId), [5], '标签不应被改号')
+
+// 较新的墓碑要覆盖旧墓碑时间，否则更早的记录会复活
+let tomb: any = emptyMergeState()
+tomb = { ...tomb, ...mergeRemote(tomb, [{ kind: 'asset', id: '77', updatedAt: 10, deleted: true, payload: null }]) }
+tomb = { ...tomb, ...mergeRemote(tomb, [{ kind: 'asset', id: '77', updatedAt: 30, deleted: true, payload: null }]) }
+const revived = mergeRemote(tomb, [{ kind: 'asset', id: '77', updatedAt: 20, payload: { assetId: 77, assetName: '旧', assetNumber: 1, updateTime: 20 } }])
+assert.equal((revived.assets ?? []).length, 0, '时间 20 的旧记录不应复活')
+
+// 周期去重：同账本同日同规则收敛到一条；跨账本不受影响
+const mkCycleBill = (id: string, bookId: string, cycleId = 1) => ({
+  billId: id, syncId: id, cycleId, bookId, time: new Date(2026, 10, 1, 9).getTime(),
+  cost: 10, assetId: 1, parentCategoryId: 7, billType: 4, userId: 1, updateTime: 1,
+  remark: '', tags: [], files: []
+} as any)
+const dedupedA = dedupeBills([mkCycleBill('b', 'book-a'), mkCycleBill('a', 'book-a'), mkCycleBill('c', 'book-a')])
+assert.deepEqual(dedupedA.bills.map((b: any) => b.billId), ['a'])
+assert.equal(dedupedA.removed.length, 2)
+const crossBook = dedupeBills([mkCycleBill('x', 'book-a'), mkCycleBill('y', 'book-b')])
+assert.equal(crossBook.removed.length, 0, '不同账本不能互相去重')
 const unmigratedBackup = JSON.parse(JSON.stringify(backup))
 delete unmigratedBackup.assets[0].openingBalance
 state().importAll(unmigratedBackup)
