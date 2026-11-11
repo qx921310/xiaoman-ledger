@@ -428,7 +428,8 @@ export const useLedger = create<LedgerState>()(
         if (!bill || !members.length) return false
         const { shares, amounts } = splitAmounts(bill.cost, members, splitType, values ?? {})
         const sum = members.reduce((acc, m) => acc + (amounts[m.splitMemberId] ?? 0), 0)
-        if (!shares.length || Math.abs(sum - bill.cost) > 0.011) return false
+        // 精确到分：合计与账单金额必须完全一致
+        if (!shares.length || Math.round(sum * 100) !== Math.round(bill.cost * 100)) return false
         let splitExpenseId = Date.now()
         while (s.splitExpenses.some((x) => x.splitExpenseId === splitExpenseId)) splitExpenseId++
         const expense: import('./types').SplitExpense = {
@@ -1231,12 +1232,25 @@ export const useLedger = create<LedgerState>()(
       resolvePeriodConflicts: (entries) => {
         const s = get()
         const keyOf = (b: Bill) => String(b.syncId ?? b.billId)
+        // 内容比对要覆盖账户、币种快照、标签与标记——只比金额会误删真正不同的记录
         const sameContent = (a: Bill, b: Bill) => a.cost === b.cost && a.time === b.time
           && a.parentCategoryId === b.parentCategoryId
           && (a.childCategoryId ?? 0) === (b.childCategoryId ?? 0)
+          && a.assetId === b.assetId
+          && (a.accountAmount ?? a.cost) === (b.accountAmount ?? b.cost)
+          && (a.currencyInfo ?? '') === (b.currencyInfo ?? '')
           && (a.remark ?? '') === (b.remark ?? '')
-        const linked = (b: Bill) => s.refunds.some((r) => String(r.billId) === keyOf(b))
-          || s.reimbursements.some((r) => String(r.billId) === keyOf(b))
+          && (a.notIntoTotal ?? false) === (b.notIntoTotal ?? false)
+          && (a.notIntoBudget ?? false) === (b.notIntoBudget ?? false)
+          && [...(a.tags ?? [])].sort().join('|') === [...(b.tags ?? [])].sort().join('|')
+          && (a.files?.length ?? 0) === (b.files?.length ?? 0)
+        // 关联判定要按真实 billId（历史/导入数据里 billId 与 syncId 可能不同）
+        const idsOf = (b: Bill) => [String(b.billId), keyOf(b)]
+        const linked = (b: Bill) => {
+          const ids = new Set(idsOf(b))
+          return s.refunds.some((r) => ids.has(String(r.billId)))
+            || s.reimbursements.some((r) => ids.has(String(r.billId)))
+        }
         const drop: Bill[] = []
         const keep: Bill[] = []
         for (const e of entries) {

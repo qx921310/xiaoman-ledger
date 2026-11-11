@@ -1208,3 +1208,27 @@ assert.equal(lifoSell.realized, -200, 'LIFO 先卖 20 元的批次：1800-2000=-
 assert.equal(lifoSell.cost, 10, '剩余是 10 元那批')
 const avgSell = applySellByMethod(fifo, 0, 100, 1800)
 assert.equal(avgSell.realized, 300, '移动加权：均价 15，1800-1500=300')
+
+// Codex P1-2：AA 按金额必须精确到分，5+5.01 ≠ 10 应被拒绝
+state().reset()
+state().addAsset({ assetId: 77, assetName: 'AA 校验账户', assetNumber: 1000 })
+const g2 = state().addSplitGroup({ name: '校验组', members: ['我'] })
+state().addSplitMember(g2.splitGroupId, '甲')
+state().addSplitMember(g2.splitGroupId, '乙')
+const mem2 = state().splitMembers.filter((m) => m.splitGroupId === g2.splitGroupId)
+const b2 = state().addBill({ assetId: 77, parentCategoryId: 7, cost: 10 })
+const bad = { [mem2[0].splitMemberId]: 5, [mem2[1].splitMemberId]: 5.01, [mem2[2].splitMemberId]: 0 }
+assert.equal(state().applySplit(b2.billId, g2.splitGroupId, 1, bad), false, '合计 10.01 必须拒绝')
+const good = { [mem2[0].splitMemberId]: 5, [mem2[1].splitMemberId]: 5, [mem2[2].splitMemberId]: 0 }
+assert.equal(state().applySplit(b2.billId, g2.splitGroupId, 1, good), true, '合计 10 接受')
+
+// Codex P0-2：账户/标签不同不能当作重复删掉
+state().reset()
+state().addAsset({ assetId: 76, assetName: '账户A', assetNumber: 500 })
+state().addAsset({ assetId: 75, assetName: '账户B', assetNumber: 500 })
+const cw = state().addBill({ assetId: 76, parentCategoryId: 7, cost: 50, cycleId: 'rule-z', time: 1000 })
+const cl = state().addBill({ assetId: 75, parentCategoryId: 7, cost: 50, cycleId: 'rule-z', time: 1000 })
+const rr = state().resolvePeriodConflicts([{ id: String(cl.syncId ?? cl.billId), winnerId: String(cw.syncId ?? cw.billId) }])
+assert.equal(rr.kept, 1, '账户不同的同期账单必须保留')
+assert.equal(rr.dropped, 0)
+assert.equal(state().bills.filter((b) => b.cycleId === 'rule-z').length, 2)

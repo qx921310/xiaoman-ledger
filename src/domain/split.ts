@@ -49,8 +49,11 @@ export function splitAmounts(total: number, members: SplitMember[], type: SplitT
   const weights = members.map((m) => (type === 1 ? Number(values[m.splitMemberId]) || 0 : Number(values[m.splitMemberId]) || 0))
   const sum = weights.reduce((s, w) => s + w, 0)
   if (sum <= 0) return { shares, amounts }
-  // 按金额时 sum 必须等于总额；按份额按比例分
-  if (type === 1 && Math.abs(sum - total) > 0.011) return { shares, amounts }
+  // 按金额时必须精确到分：先转成分再比，避免 0.01 容差放过错误输入
+  if (type === 1) {
+    const toCents = (n: number) => Math.round(n * 100)
+    if (toCents(sum) !== toCents(total)) return { shares, amounts }
+  }
 
   let allocated = 0
   members.forEach((m, i) => {
