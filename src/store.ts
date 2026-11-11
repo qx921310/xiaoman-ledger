@@ -89,6 +89,7 @@ interface LedgerState {
   addTransfer: (patch: { fromAssetId: number; toAssetId: number; cost: number; toCost?: number; serviceCharge?: number; time?: number; remark?: string }) => Transfer
   updateTransfer: (transferId: number, patch: Partial<Pick<Transfer, 'fromAssetId' | 'toAssetId' | 'cost' | 'toCost' | 'serviceCharge' | 'time' | 'remark'>>) => void
   addAsset: (patch: Partial<Asset>) => void
+  deleteAsset: (assetId: number) => void
   updateAsset: (asset: Asset) => void
   setBook: (id: string | number) => void
   setAccountBooks: (list: AccountBook[]) => void
@@ -410,6 +411,16 @@ export const useLedger = create<LedgerState>()(
           remark: patch.remark ?? old.remark
         })
       },
+
+      // 删除账户：同时写墓碑，避免下次同步又被拉回来
+      deleteAsset: (assetId) => set((s) => ({
+        assets: s.assets.filter((a) => a.assetId !== assetId),
+        tombstones: [...s.tombstones, {
+          kind: 'asset', id: String(assetId),
+          ownerId: s.assets.find((a) => a.assetId === assetId)?.userId,
+          updatedAt: NOW()
+        }]
+      })),
 
       addAsset: (patch) => set((s) => {
         const id = patch.assetId ?? NOW()

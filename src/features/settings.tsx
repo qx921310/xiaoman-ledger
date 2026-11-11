@@ -35,6 +35,22 @@ function RateInput({ value, onCommit, label }: { value: number; onCommit: (v: nu
   )
 }
 
+/** 常见币种预置（新增时选一个，汇率可随后调整） */
+const CURRENCY_PRESETS = [
+  { code: 'USD', name: '美元', symbol: '$', rate: 7.2 },
+  { code: 'EUR', name: '欧元', symbol: '€', rate: 7.8 },
+  { code: 'JPY', name: '日元', symbol: '¥', rate: 0.048 },
+  { code: 'HKD', name: '港币', symbol: 'HK$', rate: 0.92 },
+  { code: 'GBP', name: '英镑', symbol: '£', rate: 9.1 },
+  { code: 'KRW', name: '韩元', symbol: '₩', rate: 0.0053 },
+  { code: 'AUD', name: '澳元', symbol: 'A$', rate: 4.7 },
+  { code: 'CAD', name: '加元', symbol: 'C$', rate: 5.2 },
+  { code: 'SGD', name: '新加坡元', symbol: 'S$', rate: 5.3 },
+  { code: 'THB', name: '泰铢', symbol: '฿', rate: 0.2 },
+  { code: 'TWD', name: '新台币', symbol: 'NT$', rate: 0.22 },
+  { code: 'MOP', name: '澳门元', symbol: 'MOP$', rate: 0.9 }
+]
+
 /** 把周期规则翻译成一句人话 */
 function describeCycle(c: Cycle): string {
   const t = c.cycleType ?? 'month'
@@ -77,6 +93,9 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
   const currencies = useLedger((s) => s.currencies)
   const defaultCurrency = useLedger((s) => s.defaultCurrency)
   const setCurrencyRate = useLedger((s) => s.setCurrencyRate)
+  const addCurrency = useLedger((s) => s.addCurrency)
+  const removeCurrency = useLedger((s) => s.removeCurrency)
+  const [newCurrency, setNewCurrency] = useState('')
   const tags = useLedger((s) => s.tags)
   const addTag = useLedger((s) => s.addTag)
   const updateTag = useLedger((s) => s.updateTag)
@@ -654,8 +673,25 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
               onCommit={(v) => setCurrencyRate(c.code, v)}
             />
           )}
+          {c.code !== defaultCurrency && (
+            <button className="del" aria-label={`删除币种 ${c.code}`} onClick={() => removeCurrency(c.code)}>删</button>
+          )}
         </div>
       ))}
+      <div className="row2">
+        <select aria-label="新增币种" value={newCurrency} onChange={(e) => setNewCurrency(e.target.value)}>
+          <option value="">新增币种…</option>
+          {CURRENCY_PRESETS.filter((p) => !currencies.some((c) => c.code === p.code)).map((p) => (
+            <option key={p.code} value={p.code}>{p.code} · {p.name}</option>
+          ))}
+        </select>
+        <button className="ghost" disabled={!newCurrency} onClick={() => {
+          const preset = CURRENCY_PRESETS.find((p) => p.code === newCurrency)
+          if (!preset) return
+          addCurrency({ code: preset.code, name: preset.name, symbol: preset.symbol, rate: preset.rate, positionWeight: currencies.length })
+          setNewCurrency('')
+        }}>添加</button>
+      </div>
 
       <h3>云端同步</h3>
       <p className="hint">

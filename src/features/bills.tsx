@@ -425,7 +425,10 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
           <>
             <div className="label">报销</div>
             {myReimbs.length > 0 && (
-              <p className="hint">已报 {money(claimedTotal)} · 还可报 {money(claimRemaining)}</p>
+              <p className="hint">
+                已报 {money(claimedTotal)}
+                {claimRemaining > 0 ? ` · 还可报 ${money(claimRemaining)}` : ' · 已报完'}
+              </p>
             )}
             {myReimbs.map((r) => (
               <div key={r.reimbursementId} className="attach-line">

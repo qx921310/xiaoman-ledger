@@ -20,6 +20,11 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
   const addLend = useLedger((s) => s.addLend)
   const deleteLend = useLedger((s) => s.deleteLend)
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null)
+  const deleteAsset = useLedger((s) => s.deleteAsset)
+  const bills = useLedger((s) => s.bills)
+  const transfers = useLedger((s) => s.transfers)
+  const refunds = useLedger((s) => s.refunds)
+  const reimbursements = useLedger((s) => s.reimbursements)
   const [repayForm, setRepayForm] = useState<{ lendId: number; remaining: number; amount: string; assetId: number } | null>(null)
   const [lendForm, setLendForm] = useState<{ type: 1 | 2 | 3 | 4; assetId: number; counterparty: string; number: string; interest: string; repaymentAssetId: number; remark: string } | null>(null)
   const { receivable, payable } = lendTotals(lends)
@@ -68,6 +73,16 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
           </div>
           <b className={a.assetNumber < 0 ? 'out' : ''}>{accountMoney(a.assetNumber, a.currency, currencies, defaultCurrency)}</b>
           <button className="link" aria-label={`编辑账户 ${a.assetName}`} onClick={() => setEditingAsset(a)}>改</button>
+          <button className="del" aria-label={`删除账户 ${a.assetName}`} onClick={() => {
+            const used = bills.some((b) => b.assetId === a.assetId)
+              || transfers.some((t) => t.fromAssetId === a.assetId || t.toAssetId === a.assetId)
+              || lends.some((l) => l.assetId === a.assetId || l.repaymentAssetId === a.assetId)
+              || refunds.some((r) => r.assetId === a.assetId)
+              || reimbursements.some((r) => r.assetId === a.assetId)
+            if (used) return notify('这个账户已有流水，不能删除；可先隐藏或迁移账单')
+            deleteAsset(a.assetId)
+            notify('账户已删除')
+          }}>删</button>
         </div>
       ))}
 
@@ -97,6 +112,10 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
             </small>
           </div>
           <b className={l.type === 2 || l.type === 4 ? 'neutral' : ''}>{money(l.number)}</b>
+          {(l.type === 1 || l.type === 3) && lendRemaining(l, lends) > 0 && (
+            <button className="link" aria-label={`结清 ${l.counterparty}`}
+              onClick={() => { repayLend({ lendId: l.lendId, amount: lendRemaining(l, lends), repaymentAssetId: l.repaymentAssetId ?? l.assetId }) }}>结清</button>
+          )}
           {(l.type === 1 || l.type === 3) && lendRemaining(l, lends) > 0 && (
             <button className="link" aria-label={`${l.type === 1 ? '收款' : '还款'} ${l.counterparty}`}
               onClick={() => setRepayForm({
