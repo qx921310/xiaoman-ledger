@@ -92,7 +92,7 @@ export default function App() {
     setUser(null)
   }
 
-  if (user === undefined) return <div className="boot">加载中…</div>
+  if (user === undefined) return <div className="boot" role="status">加载中…</div>
   if (user === null) return <AuthScreen onAuthed={afterAuth} />
   return <Shell user={user} onLogout={logout} syncWarning={syncWarning} dismissSyncWarning={() => setSyncWarning('')} />
 }
@@ -140,13 +140,13 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User
       <main className="main">
         {syncWarning && <div className="warn" role="alert">{syncWarning} <button className="link" onClick={() => { setTab('settings'); dismissSyncWarning() }}>查看同步</button></div>}
         {tab === 'add' && <AddBill notify={notify} onClose={() => setTab('bills')} />}
-        {tab === 'bills' && <Bills me={user} />}
+        {tab === 'bills' && <Bills me={user} onAdd={() => setTab('add')} />}
         {tab === 'assets' && <Assets notify={notify} />}
         {tab === 'stats' && <Stats />}
         {tab === 'settings' && <Settings notify={notify} />}
       </main>
 
-      {toast && <div className="toast">{toast}</div>}
+      {toast && <div className="toast" role="status" aria-live="polite">{toast}</div>}
     </div>
   )
 }
@@ -157,7 +157,7 @@ function BookSwitch() {
   const setBook = useLedger((s) => s.setBook)
   const keyOf = (b: AccountBook) => String(b.bookId ?? b.accountBookId)
   return (
-    <select
+    <select aria-label="切换账本"
       value={String(current)}
       onChange={(e) => {
         const v = e.target.value

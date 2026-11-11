@@ -8,8 +8,9 @@ import { syncNow } from '../sync'
 import { money } from '../ui-format'
 import { ROLE_LABEL } from '../ui/roles'
 import { validateBackup } from '../backup'
+import { Modal } from '../ui/modal'
 
-function RateInput({ value, onCommit }: { value: number; onCommit: (v: number) => void }) {
+function RateInput({ value, onCommit, label }: { value: number; onCommit: (v: number) => void; label: string }) {
   const [draft, setDraft] = useState<string | null>(null)
   const commit = () => {
     if (draft === null) return
@@ -20,6 +21,7 @@ function RateInput({ value, onCommit }: { value: number; onCommit: (v: number) =
   return (
     <input
       className="rate"
+      aria-label={label}
       inputMode="decimal"
       value={draft ?? String(value)}
       onFocus={(e) => e.currentTarget.select()}
@@ -278,8 +280,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
         </label>
       </div>
       {restorePreview && (
-        <div className="modal-mask" onClick={() => setRestorePreview(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <Modal label="恢复 JSON 备份" onClose={() => setRestorePreview(null)}>
             <h3>恢复 JSON 备份</h3>
             <p>{restorePreview.name}</p>
             <p>备份包含 {restorePreview.data.bills.length} 条账单、{restorePreview.data.assets.length} 个账户和 {restorePreview.data.refunds.length} 条退款。</p>
@@ -292,8 +293,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
                 catch (e: any) { notify('恢复失败：' + (e?.message || '备份格式不正确')) }
               }}>确认恢复</button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       <h3>周期记账</h3>
@@ -323,24 +323,23 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
       })}>新增周期规则</button>
 
       {cycleForm && (
-        <div className="modal-mask" onClick={() => setCycleForm(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <Modal label="周期记账" onClose={() => setCycleForm(null)}>
             <h3>周期记账</h3>
             <div className="label">名称</div>
-            <input value={cycleForm.name} onChange={(e) => setCycleForm({ ...cycleForm, name: e.target.value })} placeholder="如：房租、工资" />
+            <input aria-label="周期名称" value={cycleForm.name} onChange={(e) => setCycleForm({ ...cycleForm, name: e.target.value })} placeholder="如：房租、工资" />
             <div className="label">类型</div>
-            <select value={cycleForm.kind} onChange={(e) => setCycleForm({ ...cycleForm, kind: e.target.value as any, parentCategoryId: e.target.value === 'income' ? 903 : 4 })}>
+            <select aria-label="收支类型" value={cycleForm.kind} onChange={(e) => setCycleForm({ ...cycleForm, kind: e.target.value as any, parentCategoryId: e.target.value === 'income' ? 903 : 4 })}>
               <option value="expense">支出</option>
               <option value="income">收入</option>
             </select>
             <div className="label">分类</div>
-            <select value={cycleForm.parentCategoryId} onChange={(e) => setCycleForm({ ...cycleForm, parentCategoryId: Number(e.target.value) })}>
+            <select aria-label="周期分类" value={cycleForm.parentCategoryId} onChange={(e) => setCycleForm({ ...cycleForm, parentCategoryId: Number(e.target.value) })}>
               {parents.filter((p) => p.kind === cycleForm.kind).map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
             <div className="label">周期</div>
-            <select value={cycleForm.cycleType} onChange={(e) => setCycleForm({ ...cycleForm, cycleType: e.target.value as any })}>
+            <select aria-label="周期" value={cycleForm.cycleType} onChange={(e) => setCycleForm({ ...cycleForm, cycleType: e.target.value as any })}>
               <option value="month">每月</option>
               <option value="week">每周</option>
               <option value="year">每年</option>
@@ -348,7 +347,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
             <div className="row2">
               <div>
                 <div className="label">金额</div>
-                <input value={cycleForm.cost} inputMode="decimal" autoFocus
+                <input aria-label="周期金额" value={cycleForm.cost} inputMode="decimal" autoFocus
                   onChange={(e) => setCycleForm({ ...cycleForm, cost: e.target.value.replace(/[^\d.]/g, '') })} />
               </div>
               <div>
@@ -368,14 +367,14 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
                     ))}
                   </div>
                 ) : cycleForm.cycleType === 'year' ? (
-                  <select value={cycleForm.monthOfYear}
+                  <select aria-label="月份" value={cycleForm.monthOfYear}
                     onChange={(e) => setCycleForm({ ...cycleForm, monthOfYear: Number(e.target.value) })}>
                     {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
                       <option key={m} value={m}>{m} 月</option>
                     ))}
                   </select>
                 ) : (
-                  <input value={String(cycleForm.dayOfMonth)} inputMode="numeric"
+                  <input aria-label="日期" value={String(cycleForm.dayOfMonth)} inputMode="numeric"
                     onChange={(e) => {
                       const n = Math.min(28, Math.max(1, Number(e.target.value.replace(/\D/g, '')) || 1))
                       setCycleForm({ ...cycleForm, dayOfMonth: n })
@@ -386,7 +385,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
             {cycleForm.cycleType !== 'week' && (
               <>
                 <div className="label">额外日期（可选，逗号分隔，如 15,25）</div>
-                <input value={cycleForm.extraDays} placeholder="留空则只用上面的日期"
+                <input aria-label="额外日期" value={cycleForm.extraDays} placeholder="留空则只用上面的日期"
                   onChange={(e) => setCycleForm({ ...cycleForm, extraDays: e.target.value.replace(/[^\d,，]/g, '') })} />
                 <label className="inline">
                   <input type="checkbox" checked={cycleForm.monthLast}
@@ -396,11 +395,11 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
               </>
             )}
             <div className="label">账户</div>
-            <select value={cycleForm.assetId} onChange={(e) => setCycleForm({ ...cycleForm, assetId: Number(e.target.value) })}>
+            <select aria-label="周期账户" value={cycleForm.assetId} onChange={(e) => setCycleForm({ ...cycleForm, assetId: Number(e.target.value) })}>
               {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
             </select>
             <div className="label">备注</div>
-            <input value={cycleForm.remark} onChange={(e) => setCycleForm({ ...cycleForm, remark: e.target.value })} />
+            <input aria-label="周期备注" value={cycleForm.remark} onChange={(e) => setCycleForm({ ...cycleForm, remark: e.target.value })} />
             <p className="hint">保存后立即补生成当月已到期的账单。</p>
             <div className="modal-btns">
               <button className="ghost" onClick={() => setCycleForm(null)}>取消</button>
@@ -412,6 +411,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
                   kind: cycleForm.kind,
                   parentCategoryId: cycleForm.parentCategoryId,
                   childCategoryId: cycleForm.childCategoryId,
+                  childCategoryIdentityVersion: 2,
                   assetId: cycleForm.assetId,
                   cost: Number(cycleForm.cost) || 0,
                   dayOfMonth: cycleForm.dayOfMonth,
@@ -428,8 +428,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
                 notify('周期规则已保存')
               }}>保存</button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       <h3>数据</h3>
@@ -542,7 +541,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
                 <small>{ROLE_LABEL[m.role] ?? m.role}</small>
               </div>
               {currentBook?.role === 'admin' && m.userId !== currentBook.ownerId && (
-                <select value={m.role} onChange={async (e) => {
+                <select aria-label={`${m.email} 的角色`} value={m.role} onChange={async (e) => {
                   await bookApi.setRole(String(currentBook.bookId), m.userId, e.target.value)
                   setMembers((await bookApi.members(String(currentBook.bookId))).members)
                 }}>
@@ -576,16 +575,17 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
             <div>{t.name}{t.parentName ? <span className="tag">属于 {t.parentName}</span> : null}</div>
           </div>
           <input
+            aria-label={`${t.name} 标签颜色`}
             className="color"
             type="color"
             value={t.color}
             onChange={(e) => updateTag(t.tagId, { color: e.target.value })}
           />
-          <button className="del" onClick={() => deleteTag(t.tagId)}>删</button>
+          <button className="del" aria-label={`删除标签 ${t.name}`} onClick={() => deleteTag(t.tagId)}>删</button>
         </div>
       ))}
       <div className="row2">
-        <input value={newTag} placeholder="新标签名" onChange={(e) => setNewTag(e.target.value)} />
+        <input aria-label="新标签名" value={newTag} placeholder="新标签名" onChange={(e) => setNewTag(e.target.value)} />
         <button className="ghost" onClick={() => {
           if (!newTag.trim()) return
           addTag({ name: newTag.trim(), color: '#FED778' })
@@ -610,6 +610,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
           {c.code !== defaultCurrency && (
             <RateInput
               value={c.rate}
+              label={`${c.code} 汇率`}
               onCommit={(v) => setCurrencyRate(c.code, v)}
             />
           )}

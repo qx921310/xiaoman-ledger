@@ -41,19 +41,19 @@ export function AuthScreen({ onAuthed }: { onAuthed: (u: User) => void }) {
           <button className={mode === 'register' ? 'on' : ''} onClick={() => { setMode('register'); setErr('') }}>注册</button>
         </div>
 
-        <div className="label">邮箱</div>
-        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" />
-        <div className="label">密码</div>
-        <input type="password" value={pw} onChange={(e) => setPw(e.target.value)}
+        <label className="label" htmlFor="auth-email">邮箱</label>
+        <input id="auth-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" />
+        <label className="label" htmlFor="auth-password">密码</label>
+        <input id="auth-password" type="password" value={pw} onChange={(e) => setPw(e.target.value)}
           placeholder="至少 8 位" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
         {mode === 'register' && (
           <>
-            <div className="label">确认密码</div>
-            <input type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} placeholder="再输一次" autoComplete="new-password" />
+            <label className="label" htmlFor="auth-password-confirm">确认密码</label>
+            <input id="auth-password-confirm" type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} placeholder="再输一次" autoComplete="new-password" />
           </>
         )}
 
-        {err && <p className="warn">{err}</p>}
+        {err && <p className="warn" role="alert">{err}</p>}
 
         <button className="primary" onClick={submit} disabled={busy}>{busy ? '处理中…' : (mode === 'login' ? '登录' : '注册并登录')}</button>
         <p className="hint">只支持邮箱注册，不接手机号和第三方登录。数据存在你自己的账号下。</p>

@@ -6,6 +6,7 @@ import { editAmount, evaluateAmount } from '../src/ui/keypad'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { AssetIcon } from '../src/ui/icons'
+import { childCategoryNeedsReview, normalizeBuiltInChild, resolveBillChild, TAXONOMY_CHILDREN } from '../src/taxonomy'
 import { useLedger } from '../src/store'
 import { collectRecords } from '../src/sync'
 import { billNetAmount } from '../src/bill-amount'
@@ -448,4 +449,31 @@ for (const name of ['支付宝', '微信', '招商银行']) {
   assert.match(icon, /\/icons\/assets\//)
   assert.doesNotMatch(icon, /\/icons\/(brands|banks|wallets)\//)
 }
+
+// Built-in child IDs must be globally unique, including after receiving old sync records.
+assert.equal(new Set(TAXONOMY_CHILDREN.map((c) => c.id)).size, TAXONOMY_CHILDREN.length)
+const vegetable = TAXONOMY_CHILDREN.find((c) => c.name === '蔬菜' && c.parentId === 7)!
+const grain = TAXONOMY_CHILDREN.find((c) => c.name === '粮油调味' && c.parentId === 7)!
+assert.notEqual(vegetable.id, grain.id)
+assert.equal(normalizeBuiltInChild({ ...vegetable, id: 701 }).id, vegetable.id)
+state().reset()
+state().addAsset({ assetId: 101, assetName: '分类测试', assetNumber: 50 })
+const classificationBill = state().addBill({ assetId: 101, parentCategoryId: 7, childCategoryId: grain.id, cost: 1 })
+assert.equal(classificationBill.childCategoryIdentityVersion, 2)
+assert.equal(resolveBillChild(classificationBill, state().childCategories)?.name, '粮油调味')
+const legacyAmbiguous = { ...classificationBill, childCategoryIdentityVersion: undefined }
+assert.equal(childCategoryNeedsReview(legacyAmbiguous), true)
+assert.equal(resolveBillChild(legacyAmbiguous, state().childCategories), undefined)
+assert.throws(() => buildExportTable([legacyAmbiguous], state().parentCategories, state().childCategories, state().assets), /分类/)
+const legacyMedical = { ...legacyAmbiguous, parentCategoryId: 1, childCategoryId: 801 }
+assert.equal(childCategoryNeedsReview(legacyMedical), false)
+assert.equal(resolveBillChild(legacyMedical, state().childCategories)?.name, '社保')
+const oldVegetable = { ...vegetable, id: 701 }
+const beforeChildCount = state().childCategories.length
+const oldChildRecord = { kind: 'child', id: '701', payload: oldVegetable, ownerId: 999, updatedAt: 1 }
+state().applyRemote([oldChildRecord])
+state().applyRemote([oldChildRecord])
+assert.equal(state().childCategories.length, beforeChildCount)
+assert.equal(state().childCategories.filter((c) => c.name === '蔬菜' && c.parentId === 7).length, 1)
+assert.equal(state().childCategories.find((c) => c.name === '蔬菜' && c.parentId === 7)!.id, vegetable.id)
 console.log('balance and synthetic CSV tests passed')

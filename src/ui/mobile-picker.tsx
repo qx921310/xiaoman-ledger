@@ -33,7 +33,7 @@ export function MobilePicker({ label, value, options, onChange, className = '', 
   }, [open])
 
   return <>
-    <button ref={trigger} type="button" className={'mobile-picker-trigger ' + className} aria-label={label} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
+    <button ref={trigger} type="button" className={'mobile-picker-trigger ' + className} aria-label={`${label}：${selected?.label ?? placeholder}`} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
       <span>{selected?.label ?? placeholder}</span>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
     </button>
@@ -41,7 +41,7 @@ export function MobilePicker({ label, value, options, onChange, className = '', 
       <section ref={sheet} className="mobile-picker-sheet" role="dialog" aria-modal="true" aria-labelledby={titleId} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => {
         if (e.key === 'Escape') { e.preventDefault(); close(); return }
         if (e.key !== 'Tab') return
-        const buttons = Array.from(sheet.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])
+        const buttons = Array.from(sheet.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? []).filter((button) => button.tabIndex >= 0)
         if (!buttons.length) return
         if (e.shiftKey && document.activeElement === buttons[0]) { e.preventDefault(); buttons[buttons.length - 1].focus() }
         else if (!e.shiftKey && document.activeElement === buttons[buttons.length - 1]) { e.preventDefault(); buttons[0].focus() }
@@ -55,9 +55,11 @@ export function MobilePicker({ label, value, options, onChange, className = '', 
           if (current < 0 || !choices.length) return
           e.preventDefault()
           const direction = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : -1
-          choices[(current + direction + choices.length) % choices.length].focus()
+          const next = (current + direction + choices.length) % choices.length
+          onChange(options[next].value)
+          choices[next].focus()
         }}>
-          {options.length ? options.map((option) => <button type="button" role="radio" key={option.value} aria-checked={option.value === value} onClick={() => { onChange(option.value); close() }}>
+          {options.length ? options.map((option, index) => <button type="button" role="radio" key={option.value} aria-checked={option.value === value} tabIndex={option.value === value || (!selected && index === 0) ? 0 : -1} onClick={() => { onChange(option.value); close() }}>
             <span className="mobile-picker-option-icon" aria-hidden="true">{option.icon ? <b>{option.icon}</b> : option.assetType != null
               ? <AssetIcon type={option.assetType} name={option.label} size={19} /> : label === '选择账本'
               ? <svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="16" rx="3"/><path d="M9 4v16m3-11h4m-4 4h4"/></svg>

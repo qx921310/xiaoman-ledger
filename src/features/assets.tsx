@@ -4,6 +4,7 @@ import { ASSET_TYPE, LEND_TYPE } from '../types'
 import type { Asset } from '../types'
 import { money, dayOf } from '../ui-format'
 import { AssetIcon } from '../ui/icons'
+import { Modal } from '../ui/modal'
 import { accountMoney, toBase } from '../money'
 
 export function Assets({ notify }: { notify: (m: string) => void }) {
@@ -57,7 +58,7 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
             <small>{ASSET_TYPE[a.assetType]}{a.groupName ? ' · ' + a.groupName : ''}</small>
           </div>
           <b className={a.assetNumber < 0 ? 'out' : ''}>{accountMoney(a.assetNumber, a.currency, currencies, defaultCurrency)}</b>
-          <button className="link" onClick={() => setEditingAsset(a)}>改</button>
+          <button className="link" aria-label={`编辑账户 ${a.assetName}`} onClick={() => setEditingAsset(a)}>改</button>
         </div>
       ))}
 
@@ -85,7 +86,7 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
             </small>
           </div>
           <b className={l.type === 2 || l.type === 4 ? 'neutral' : ''}>{money(l.number)}</b>
-          <button className="del" onClick={() => deleteLend(l.lendId)}>删</button>
+          <button className="del" aria-label={`删除${LEND_TYPE[l.type]}记录`} onClick={() => deleteLend(l.lendId)}>删</button>
         </div>
       ))}
       <button className="ghost wide" onClick={() => setLendForm({
@@ -94,22 +95,21 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
       })}>记一笔借贷</button>
 
       {lendForm && (
-        <div className="modal-mask" onClick={() => setLendForm(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <Modal label="借入借出" onClose={() => setLendForm(null)}>
             <h3>借入借出</h3>
             <div className="label">类型</div>
-            <select value={lendForm.type} onChange={(e) => setLendForm({ ...lendForm, type: Number(e.target.value) as any })}>
+            <select aria-label="借贷类型" value={lendForm.type} onChange={(e) => setLendForm({ ...lendForm, type: Number(e.target.value) as any })}>
               {Object.entries(LEND_TYPE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
             <div className="label">对方</div>
-            <input value={lendForm.counterparty} onChange={(e) => setLendForm({ ...lendForm, counterparty: e.target.value })} placeholder="借给谁 / 向谁借" />
+            <input aria-label="借贷对方" value={lendForm.counterparty} onChange={(e) => setLendForm({ ...lendForm, counterparty: e.target.value })} placeholder="借给谁 / 向谁借" />
             <div className="label">金额</div>
-            <input value={lendForm.number} autoFocus inputMode="decimal"
+            <input aria-label="借贷金额" value={lendForm.number} autoFocus inputMode="decimal"
               onChange={(e) => setLendForm({ ...lendForm, number: e.target.value.replace(/[^\d.]/g, '') })} />
             <div className="row2">
               <div>
                 <div className="label">利息（可选）</div>
-                <input value={lendForm.interest} inputMode="decimal"
+                <input aria-label="借贷利息" value={lendForm.interest} inputMode="decimal"
                   onChange={(e) => setLendForm({ ...lendForm, interest: e.target.value.replace(/[^\d.]/g, '') })} />
               </div>
               <div>
@@ -117,6 +117,7 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
                   {lendForm.type === 2 || lendForm.type === 4 ? '收款账户' : '资金账户'}
                 </div>
                 <select
+                  aria-label={lendForm.type === 2 || lendForm.type === 4 ? '收款账户' : '资金账户'}
                   value={lendForm.repaymentAssetId || lendForm.assetId}
                   onChange={(e) => setLendForm({
                     ...lendForm,
@@ -129,7 +130,7 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
               </div>
             </div>
             <div className="label">备注</div>
-            <input value={lendForm.remark} onChange={(e) => setLendForm({ ...lendForm, remark: e.target.value })} />
+            <input aria-label="借贷备注" value={lendForm.remark} onChange={(e) => setLendForm({ ...lendForm, remark: e.target.value })} />
             <p className="hint">借出减少账户余额，收回与借入增加，归还减少；不计入收支。</p>
             <div className="modal-btns">
               <button className="ghost" onClick={() => setLendForm(null)}>取消</button>
@@ -144,19 +145,18 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
                 setLendForm(null)
               }}>保存</button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       <div className="label">新增账户</div>
       <div className="row2">
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="账户名" />
-        <select value={type} onChange={(e) => setType(Number(e.target.value))}>
+        <input aria-label="新账户名称" value={name} onChange={(e) => setName(e.target.value)} placeholder="账户名" />
+        <select aria-label="新账户类型" value={type} onChange={(e) => setType(Number(e.target.value))}>
           {Object.entries(ASSET_TYPE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
       </div>
       <div className="row2">
-        <input value={num} onChange={(e) => setNum(e.target.value.replace(/[^\d.-]/g, ''))} placeholder="余额（信用卡填负数）" />
+        <input aria-label="新账户余额" value={num} onChange={(e) => setNum(e.target.value.replace(/[^\d.-]/g, ''))} placeholder="余额（信用卡填负数）" />
         <button onClick={create}>添加</button>
       </div>
     </section>
@@ -182,34 +182,34 @@ function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => 
   const [num, setNum] = useState('')
 
   return (
-    <div className="modal-mask" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+    <Modal label="编辑账户" onClose={onClose}>
         <h3>编辑账户</h3>
         <div className="label">名称</div>
-        <input value={name} onChange={(e) => setName(e.target.value)} />
+        <input aria-label="账户名称" value={name} onChange={(e) => setName(e.target.value)} />
         <div className="label">币种</div>
-        <select value={currency} disabled={hasActivity} onChange={(e) => setCurrency(e.target.value)}>
+        <select aria-label="账户币种" value={currency} disabled={hasActivity} onChange={(e) => setCurrency(e.target.value)}>
           {currencies.map((c) => <option key={c.code} value={c.code}>{c.code} · {c.name}</option>)}
         </select>
         {hasActivity && <p className="hint">已有流水的账户不能直接更改币种，避免改变历史金额的含义。</p>}
         <div className="label">类型</div>
-        <select value={type} onChange={(e) => setType(Number(e.target.value))}>
+        <select aria-label="账户类型" value={type} onChange={(e) => setType(Number(e.target.value))}>
           {Object.entries(ASSET_TYPE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
         <div className="row2">
           <div>
             <div className="label">总额度（信用卡）</div>
-            <input value={quota} inputMode="decimal" placeholder="可留空"
+            <input aria-label="信用卡总额度" value={quota} inputMode="decimal" placeholder="可留空"
               onChange={(e) => setQuota(e.target.value.replace(/[^\d.]/g, ''))} />
           </div>
           <div>
             <div className="label">卡号后四位</div>
-            <input value={cardCode} placeholder="可留空" maxLength={4}
+            <input aria-label="卡号后四位" value={cardCode} placeholder="可留空" maxLength={4}
               onChange={(e) => setCardCode(e.target.value.replace(/\D/g, ''))} />
           </div>
         </div>
         <div className="label">设为实际余额（当前 {accountMoney(asset.assetNumber, asset.currency, currencies, defaultCurrency)}，信用卡填负数）</div>
         <input
+          aria-label="账户实际余额"
           value={num}
           autoFocus
           placeholder="留空则保持不变"
@@ -226,7 +226,6 @@ function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => 
             assetNumber: num.trim() === '' ? asset.assetNumber : (Number(num) || 0)
           })}>保存</button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }

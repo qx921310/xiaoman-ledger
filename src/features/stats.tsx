@@ -3,6 +3,7 @@ import { useLedger } from '../store'
 import { money, monthOf } from '../ui-format'
 import { CatIcon } from '../ui/icons'
 import { summarizeBills } from '../bill-summary'
+import { Modal } from '../ui/modal'
 
 export function Stats() {
   const bills = useLedger((s) => s.bills)
@@ -48,7 +49,7 @@ export function Stats() {
   return (
     <section className="card">
       <div className="label">月份</div>
-      <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+      <input aria-label="统计月份" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
 
       <div className="label">预算</div>
       {totalBudget > 0 ? (
@@ -135,27 +136,27 @@ export function Stats() {
       ))}
 
       {editing && (
-        <div className="modal-mask" onClick={() => setEditing(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <Modal label="设置预算" onClose={() => setEditing(null)}>
             <h3>设置预算</h3>
             <div className="label">分类</div>
-            <select value={editing.categoryId} onChange={(e) => setEditing({ ...editing, categoryId: Number(e.target.value) })}>
+            <select aria-label="预算分类" value={editing.categoryId} onChange={(e) => setEditing({ ...editing, categoryId: Number(e.target.value) })}>
               <option value={0}>全部支出（总预算）</option>
               {parents.filter((p) => p.kind === 'expense').map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
             <div className="label">周期</div>
-            <select value={editing.type ?? 'month'}
+            <select aria-label="预算周期" value={editing.type ?? 'month'}
               onChange={(e) => setEditing({ ...editing, type: e.target.value as 'month' | 'year' })}>
               <option value="month">按月</option>
               <option value="year">按年</option>
             </select>
             <div className="label">追加额度（可选）</div>
-            <input value={editing.addNum ?? ''} inputMode="decimal" placeholder="在原额度上叠加"
+            <input aria-label="追加额度" value={editing.addNum ?? ''} inputMode="decimal" placeholder="在原额度上叠加"
               onChange={(e) => setEditing({ ...editing, addNum: e.target.value.replace(/[^\d.]/g, '') })} />
             <div className="label">基础额度</div>
             <input
+              aria-label="基础额度"
               value={editing.amount}
               autoFocus
               placeholder="填 0 表示取消"
@@ -175,8 +176,7 @@ export function Stats() {
                 setEditing(null)
               }}>保存</button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </section>
   )

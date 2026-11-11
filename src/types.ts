@@ -23,6 +23,8 @@ export interface Bill {
   cost: number
   parentCategoryId: number
   childCategoryId: number
+  /** Version 2 records a globally unique child-category ID. */
+  childCategoryIdentityVersion?: 2
   assetId: number
   bookId: string | number
   remark: string
@@ -113,6 +115,7 @@ export interface Cycle {
   kind: 'expense' | 'income'
   parentCategoryId: number
   childCategoryId: number
+  childCategoryIdentityVersion?: 2
   assetId: number
   cost: number
   /** 周期类型：每月 / 每周 / 每年 */

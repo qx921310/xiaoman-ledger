@@ -1,4 +1,4 @@
-import type { Category } from './types'
+import type { Bill, Category } from './types'
 
 /** 分类体系取自一木记账默认分类（8 支出大类 + 52 二级 + 14 收入类）。
  *  icon 字段是图标键，对应 public/icons/categories/{parent|child|income}/<key>.svg */
@@ -29,7 +29,7 @@ export const TAXONOMY_INCOME: Category[] = [
   { id: 911, name: '其他', parentId: 0, kind: 'income', color: '#22c55e', positionWeight: 0, icon: 'ic_income_other' },
 ]
 
-export const TAXONOMY_CHILDREN: Category[] = [
+const ORIGINAL_CHILDREN: Category[] = [
   { id: 801, name: '社保', parentId: 1, kind: 'expense', color: '#cbd5e1', positionWeight: 0, icon: 'ic_medical_social_insurance' },
   { id: 802, name: '保险', parentId: 1, kind: 'expense', color: '#cbd5e1', positionWeight: 0, icon: 'ic_medical_insurance' },
   { id: 803, name: '房租', parentId: 4, kind: 'expense', color: '#cbd5e1', positionWeight: 0, icon: 'ic_home_rent' },
@@ -124,3 +124,42 @@ export const TAXONOMY_CHILDREN: Category[] = [
   { id: 102, name: '医院', parentId: 1, kind: 'expense', color: '#cbd5e1', positionWeight: 0, icon: 'ic_medical_hospital' },
   { id: 103, name: '滋补保健', parentId: 1, kind: 'expense', color: '#cbd5e1', positionWeight: 0, icon: 'ic_medical_healthcare' },
 ]
+// These later additions reused IDs belonging to existing categories. Their new
+// IDs are stable across devices; original categories keep their historic IDs.
+const MOVED_ICONS = [
+  'ic_medical_social_insurance', 'ic_medical_insurance', 'ic_home_rent', 'ic_home_money_tree',
+  'ic_game_video_game', 'ic_game_app_member', 'ic_traffic_etc', 'ic_traffic_hotel',
+  'ic_traffic_ticket', 'ic_shopping_overseas', 'ic_shopping_pdd',
+  ...Array.from({ length: 7 }, (_, i) => `other-${i + 1}`),
+  'ic_restaurant_vegetable', 'ic_restaurant_fruit', 'ic_restaurant_afternoon_tea', 'ic_restaurant_night_snack'
+]
+const movedKey = (c: Category) => c.icon === 'ic_misc_other' && c.parentId >= 1 && c.parentId <= 7
+  ? `other-${c.parentId}` : c.icon ?? ''
+const moved = ORIGINAL_CHILDREN.flatMap((c) => {
+  const index = MOVED_ICONS.indexOf(movedKey(c))
+  return index < 0 ? [] : [{ original: c, id: 8_000_000_000_001 + index }]
+})
+
+export const TAXONOMY_CHILDREN: Category[] = ORIGINAL_CHILDREN.map((c) => {
+  const entry = moved.find((m) => m.original === c)
+  return entry ? { ...c, id: entry.id } : c
+})
+
+/** Normalize only a known built-in category; never remap an unrelated custom item. */
+export function normalizeBuiltInChild(category: Category): Category {
+  const entry = moved.find((m) => m.original.id === category.id && m.original.parentId === category.parentId && m.original.name === category.name)
+  return entry ? { ...category, id: entry.id, kind: category.kind ?? entry.original.kind } : category
+}
+
+/** Old IDs that referred to multiple choices under the same parent cannot be reconstructed reliably. */
+export function childCategoryNeedsReview(bill: Pick<Bill, 'parentCategoryId' | 'childCategoryId' | 'childCategoryIdentityVersion'>): boolean {
+  if (!bill.childCategoryId || bill.childCategoryIdentityVersion === 2) return false
+  return ORIGINAL_CHILDREN.filter((c) => c.id === bill.childCategoryId && c.parentId === bill.parentCategoryId).length > 1
+}
+
+export function resolveBillChild(bill: Pick<Bill, 'parentCategoryId' | 'childCategoryId' | 'childCategoryIdentityVersion'>, children: Category[]): Category | undefined {
+  if (childCategoryNeedsReview(bill)) return undefined
+  const entry = moved.find((m) => m.original.id === bill.childCategoryId && m.original.parentId === bill.parentCategoryId)
+  const id = bill.childCategoryIdentityVersion === 2 ? bill.childCategoryId : (entry?.id ?? bill.childCategoryId)
+  return children.find((c) => c.id === id && c.parentId === bill.parentCategoryId)
+}

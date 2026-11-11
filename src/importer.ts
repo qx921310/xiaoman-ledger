@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx'
 import type { AccountBook, Asset, Bill, Category, Refund, Reimbursement, Transfer } from './types'
 import { newBillIdentity } from './identity'
+import { childCategoryNeedsReview, resolveBillChild } from './taxonomy'
 
 export interface ParsedTable {
   headers: string[]
@@ -345,6 +346,7 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
       cost,
       parentCategoryId,
       childCategoryId,
+      childCategoryIdentityVersion: 2,
       assetId,
       bookId: bookIdOfRow,
       remark,
@@ -442,7 +444,9 @@ export function buildExportTable(
     '小满账户币种', '小满账户金额', '小满退款账户', '小满退款币种', '小满退款到账金额', '小满退款本币金额', '小满退款明细']
   const rows = bills.map((b) => {
     const p = parents.find((x) => x.id === b.parentCategoryId)
-    const c = children.find((x) => x.id === b.childCategoryId)
+    if (childCategoryNeedsReview(b)) throw new Error('存在历史子分类编号冲突，请先在账单中核对分类或使用 JSON 备份')
+    const c = resolveBillChild(b, children)
+    if (b.childCategoryId && !c) throw new Error('存在找不到的子分类，请先在账单中核对分类或使用 JSON 备份')
     const a = assets.find((x) => x.assetId === b.assetId)
     const bk = books.find((x) => x.accountBookId === b.bookId)
     const reimb = reimbursements.find((x) => x.billId === b.billId)

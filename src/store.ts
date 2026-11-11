@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import type { AccountBook, Asset, Bill, Category, Currency, Cycle, Lend, Refund, Reimbursement, Tag, Transfer } from './types'
 import type { ImportPlan } from './importer'
-import { TAXONOMY_CHILDREN, TAXONOMY_INCOME, TAXONOMY_PARENTS } from './taxonomy'
+import { childCategoryNeedsReview, normalizeBuiltInChild, resolveBillChild, TAXONOMY_CHILDREN, TAXONOMY_INCOME, TAXONOMY_PARENTS } from './taxonomy'
 import { getCurrentUid, userStorage } from './auth'
 import { deriveAssets } from './balances'
 import { newBillIdentity } from './identity'
@@ -103,6 +103,8 @@ export const useLedger = create<LedgerState>()(
         const changes = typeof update === 'function' ? update(state) : update
         if (!changes) return changes
         const combined = { ...state, ...changes }
+        const children = combined.childCategories.map(normalizeBuiltInChild)
+        if (children.some((child: Category, index: number) => child !== combined.childCategories[index])) changes.childCategories = children
         if (!combined.assets || !combined.bills || !combined.parentCategories) return changes
         const assets = deriveAssets(combined).map(asset => {
           const previous = state.assets.find(a => a.assetId === asset.assetId)
@@ -152,7 +154,7 @@ export const useLedger = create<LedgerState>()(
         while (s.bills.some((b) => b.billId === identity.billId)) identity = newBillIdentity()
         const billId = patch.billId ?? identity.billId
         const parent = s.parentCategories.find((c) => c.id === patch.parentCategoryId)
-        const child = s.childCategories.find((c) => c.id === patch.childCategoryId)
+        const child = s.childCategories.find((c) => c.id === patch.childCategoryId && c.parentId === patch.parentCategoryId)
         const asset = s.assets.find((a) => a.assetId === patch.assetId)
         const bill: Bill = {
           billId,
@@ -161,6 +163,7 @@ export const useLedger = create<LedgerState>()(
           cost: Number(patch.cost ?? 0),
           parentCategoryId: patch.parentCategoryId ?? 199,
           childCategoryId: patch.childCategoryId ?? 0,
+          childCategoryIdentityVersion: 2,
           assetId: patch.assetId ?? 0,
           bookId: patch.bookId ?? s.currentBookId,
           remark: patch.remark ?? '',
@@ -246,6 +249,7 @@ export const useLedger = create<LedgerState>()(
           : a)
 
         const next: Bill = { ...old, ...patch, updateTime: NOW() }
+        if (patch.childCategoryId != null) next.childCategoryIdentityVersion = 2
         const amountChanged = next.cost !== old.cost
         const accountChanged = next.assetId !== old.assetId
         if (old.accountAmount != null && (amountChanged || accountChanged)) {
@@ -262,7 +266,7 @@ export const useLedger = create<LedgerState>()(
         const asset = s.assets.find((a) => a.assetId === next.assetId)
         next.billShareInfo = {
           parentCategoryName: parent?.name ?? '',
-          childCategoryName: s.childCategories.find((c) => c.id === next.childCategoryId)?.name ?? '',
+          childCategoryName: next.childCategoryId ? (resolveBillChild(next, s.childCategories)?.name ?? old.billShareInfo?.childCategoryName ?? '') : '',
           assetName: asset?.assetName ?? ''
         }
 
@@ -527,12 +531,13 @@ export const useLedger = create<LedgerState>()(
             const bill: Bill = {
               billId, syncId, time, cost: c.cost,
               parentCategoryId: c.parentCategoryId, childCategoryId: c.childCategoryId,
+              childCategoryIdentityVersion: c.childCategoryIdentityVersion,
               assetId: c.assetId, bookId: t.currentBookId || 1,
               remark: c.remark || c.name, billType: 4,
               tags: [], files: [], userId: getCurrentUid() || t.userId, updateTime: NOW(),
               billShareInfo: {
                 parentCategoryName: parent?.name ?? '',
-                childCategoryName: t.childCategories.find((x) => x.id === c.childCategoryId)?.name ?? '',
+                childCategoryName: resolveBillChild(c, t.childCategories)?.name ?? '',
                 assetName: asset?.assetName ?? ''
               }
             }
@@ -761,7 +766,12 @@ export const useLedger = create<LedgerState>()(
         const idOf = (kind: string, item: any) =>
           kind === 'budget' ? `${item.month}:${item.categoryId}` : kind === 'bill' ? String(item.syncId ?? item.billId) : String(item[spec[kind][1]])
 
-        for (const r of records || []) {
+        for (const incoming of records || []) {
+          let r = incoming
+          if (r.kind === 'child' && !r.deleted && r.payload) {
+            const normalized = normalizeBuiltInChild(r.payload)
+            if (normalized !== r.payload) r = { ...r, id: String(normalized.id), payload: normalized }
+          }
           const k = spec[r.kind]
           if (!k) continue
           const arr: any[] = next[k[0]] ?? [...(s[k[0]] || [])]
@@ -781,7 +791,9 @@ export const useLedger = create<LedgerState>()(
           if (r.ownerId != null && r.payload.ownerId == null) r.payload = { ...r.payload, ownerId: r.ownerId }
           const idx = arr.findIndex((x) => idOf(r.kind, x) === String(r.id))
           const ownerOf = (x: any) => (x?.ownerId ?? x?.userId ?? 0)
-          if (idx >= 0 && (r.kind !== 'bill' || (!arr[idx].syncId && !r.payload.syncId)) && ownerOf(arr[idx]) !== ownerOf(r.payload)) {
+          const sameBuiltInChild = r.kind === 'child' && TAXONOMY_CHILDREN.some((c) => c.id === r.payload.id && c.parentId === r.payload.parentId && c.name === r.payload.name)
+            && idx >= 0 && arr[idx].parentId === r.payload.parentId && arr[idx].name === r.payload.name
+          if (idx >= 0 && !sameBuiltInChild && (r.kind !== 'bill' || (!arr[idx].syncId && !r.payload.syncId)) && ownerOf(arr[idx]) !== ownerOf(r.payload)) {
             // 同 ID 但身份不同：不覆盖，顺位给一个新 ID，两条并存
             const idField = k[1]
             const taken = new Set(arr.map((x) => String(x[idField])))
@@ -826,7 +838,7 @@ export const useLedger = create<LedgerState>()(
         const RENAMED: Record<string, string> = { '房租还贷': '房贷' }
         const fix = (c: Category): Category => {
           // 旧数据/云端记录可能缺 kind，按 id 段推断，避免同名分类被当成两个
-          if (!c.kind) c = { ...c, kind: c.id >= 900 ? 'income' : 'expense' }
+          if (!c.kind) c = { ...c, kind: c.parentId ? 'expense' : c.id >= 900 ? 'income' : 'expense' }
           const renamed = RENAMED[c.name]
           if (renamed) c = { ...c, name: renamed }
           if (c.icon?.startsWith('ic_')) return c
@@ -889,7 +901,7 @@ export const useLedger = create<LedgerState>()(
         const bills = (remapP.size || remapC.size)
           ? s.bills.map((b) => {
             const p2 = remapP.get(b.parentCategoryId)
-            const c2 = remapC.get(b.childCategoryId)
+            const c2 = childCategoryNeedsReview(b) ? undefined : remapC.get(b.childCategoryId)
             return p2 == null && c2 == null ? b : { ...b, parentCategoryId: p2 ?? b.parentCategoryId, childCategoryId: c2 ?? b.childCategoryId }
           })
           : s.bills
@@ -974,6 +986,7 @@ export const useLedger = create<LedgerState>()(
       storage: createJSONStorage(() => userStorage),
       merge: (persisted: any, current) => {
         const snapshot = { ...current, ...persisted }
+        snapshot.childCategories = snapshot.childCategories.map(normalizeBuiltInChild)
         return { ...snapshot, assets: deriveAssets(snapshot) }
       }
     }

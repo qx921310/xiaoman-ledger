@@ -6,14 +6,17 @@ import { books as bookApi } from '../auth'
 import { money, dayOf, hhmm, monthOf, toLocalInput } from '../ui-format'
 import { CatIcon } from '../ui/icons'
 import { TransferEditor } from './transfer-editor'
+import { Modal } from '../ui/modal'
 import { accountMoney, fromBase, hasCurrencyRate } from '../money'
 import { billNetAmount } from '../bill-amount'
+import { resolveBillChild } from '../taxonomy'
 import { summarizeBills } from '../bill-summary'
 
-export function Bills({ me }: { me?: { id: number; email: string } }) {
+export function Bills({ me, onAdd }: { me?: { id: number; email: string }; onAdd?: () => void }) {
   const bills = useLedger((s) => s.bills)
   const transfers = useLedger((s) => s.transfers)
   const parents = useLedger((s) => s.parentCategories)
+  const children = useLedger((s) => s.childCategories)
   const assets = useLedger((s) => s.assets)
   const currencies = useLedger((s) => s.currencies)
   const defaultCurrency = useLedger((s) => s.defaultCurrency)
@@ -88,7 +91,7 @@ export function Bills({ me }: { me?: { id: number; email: string } }) {
       <div className="row2">
         <div>
           <div className="label">月份</div>
-          <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+          <input aria-label="账单月份" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
         </div>
         <div className="summary">
           <div><small>收入</small><b className="in">{money(income)}</b></div>
@@ -98,19 +101,22 @@ export function Bills({ me }: { me?: { id: number; email: string } }) {
       </div>
 
       <div className="filters">
-        <input className="kw" value={kw} onChange={(e) => setKw(e.target.value)} placeholder="搜索备注 / 分类 / 标签" />
-        <select value={fPid} onChange={(e) => setFPid(Number(e.target.value))}>
+        <input className="kw" aria-label="搜索备注、分类或标签" value={kw} onChange={(e) => setKw(e.target.value)} placeholder="搜索备注 / 分类 / 标签" />
+        <select aria-label="按分类筛选" value={fPid} onChange={(e) => setFPid(Number(e.target.value))}>
           <option value={0}>全部分类</option>
           {parents.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
-        <select value={fAid} onChange={(e) => setFAid(Number(e.target.value))}>
+        <select aria-label="按账户筛选" value={fAid} onChange={(e) => setFAid(Number(e.target.value))}>
           <option value={0}>全部账户</option>
           {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
         </select>
         {Boolean(kw || fPid || fAid) && <button className="ghost" onClick={() => { setKw(''); setFPid(0); setFAid(0) }}>重置</button>}
       </div>
 
-      {groups.length === 0 && <p className="empty">没有符合条件的账单</p>}
+      {groups.length === 0 && <div className="empty">
+        {kw || fPid || fAid ? <><p>没有符合条件的账单</p><button className="ghost" onClick={() => { setKw(''); setFPid(0); setFAid(0) }}>清除筛选</button></>
+          : <><p>本月还没有账单</p>{onAdd && <button className="ghost" onClick={onAdd}>记第一笔</button>}</>}
+      </div>}
 
       {groups.map(([day, rows]) => (
         <div key={day} className="group">
@@ -132,8 +138,8 @@ export function Bills({ me }: { me?: { id: number; email: string } }) {
                     </small>
                   </div>
                   <b className="neutral">{money(t.cost)}</b>
-                  <button className="link" onClick={() => setEditingTransfer(t)}>改</button>
-                  <button className="del" onClick={() => delTransfer(t.transferId)}>删</button>
+                  <button className="link" aria-label="编辑转账" onClick={() => setEditingTransfer(t)}>改</button>
+                  <button className="del" aria-label="删除转账" onClick={() => delTransfer(t.transferId)}>删</button>
                 </div>
               )
             }
@@ -149,6 +155,7 @@ export function Bills({ me }: { me?: { id: number; email: string } }) {
                 <div className="grow">
                   <div>
                     {p?.name ?? '未分类'}
+                    {!!b.childCategoryId && !resolveBillChild(b, children) && <span className="tag">分类待核对</span>}
                     {b.conflict && <span className="foreign" title="并发冲突：与他人同一秒记账撞了 ID，可能有一条未并入 — 点「明细」查看">❗</span>}
                     {b.remark ? <span className="remark"> · {b.remark}</span> : null}
                   </div>
@@ -177,9 +184,9 @@ export function Bills({ me }: { me?: { id: number; email: string } }) {
                   )}
                 </div>
                 <b className={inc ? 'in' : 'out'}>{inc ? '+' : '-'}{money(inc ? b.cost : billNetAmount(b, refunds))}</b>
-                <button className="link" onClick={() => setDetail(b)}>明细</button>
-                {!readOnly && <button className="link" onClick={() => setEditing(b)}>改</button>}
-                {!readOnly && <button className="del" onClick={() => del(b.billId)}>删</button>}
+                <button className="link" aria-label={`查看${p?.name ?? '账单'}明细`} onClick={() => setDetail(b)}>明细</button>
+                {!readOnly && <button className="link" aria-label={`编辑${p?.name ?? '账单'}`} onClick={() => setEditing(b)}>改</button>}
+                {!readOnly && <button className="del" aria-label={`删除${p?.name ?? '账单'}`} onClick={() => del(b.billId)}>删</button>}
               </div>
             )
           })}
@@ -213,6 +220,17 @@ export function Bills({ me }: { me?: { id: number; email: string } }) {
   )
 }
 
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return <div className="drow"><span className="dl">{label}</span><span className="dv">{children}</span></div>
+}
+
+function DetailToggle({ label, on, onToggle }: { label: string; on: boolean; onToggle: () => void }) {
+  return <div className="drow">
+    <span className="dl">{label}</span>
+    <button className={'switch' + (on ? ' on' : '')} role="switch" aria-label={label} aria-checked={on} onClick={onToggle}><i /></button>
+  </div>
+}
+
 function BillDetail({ bill, me, onClose, onEdit }: {
   bill: Bill; me?: { id: number; email: string }
   onClose: () => void; onEdit: () => void
@@ -229,7 +247,7 @@ function BillDetail({ bill, me, onClose, onEdit }: {
   const del = useLedger((s) => s.deleteBill)
 
   const p = parents.find((x) => x.id === bill.parentCategoryId)
-  const c = children.find((x) => x.id === bill.childCategoryId)
+  const c = resolveBillChild(bill, children)
   const a = assets.find((x) => x.assetId === bill.assetId)
   const billRefunds = refunds.filter((r) => r.billId === bill.billId)
   const bk = books.find((b) => String(b.bookId ?? b.accountBookId) === String(bill.bookId))
@@ -244,21 +262,9 @@ function BillDetail({ bill, me, onClose, onEdit }: {
     }).catch(() => {})
   }, [bill.bookId])
 
-  const Row = ({ label, children }: { label: string; children: React.ReactNode }) => (
-    <div className="drow"><span className="dl">{label}</span><span className="dv">{children}</span></div>
-  )
-  const Toggle = ({ label, on }: { label: string; on: boolean }) => (
-    <div className="drow">
-      <span className="dl">{label}</span>
-      <button className={'switch' + (on ? ' on' : '')} onClick={() => updateBill(bill.billId, { [label === '不计入收支' ? 'notIntoTotal' : 'notIntoBudget']: !on } as any)}>
-        <i />
-      </button>
-    </div>
-  )
 
   return (
-    <div className="modal-mask" onClick={onClose}>
-      <div className="modal detail" onClick={(e) => e.stopPropagation()}>
+    <Modal label="账单详情" className="detail" onClose={onClose}>
         <div className="dhead" style={{ background: p?.bg ?? 'var(--accent-soft)', color: p?.color ?? 'var(--ink)' }}>
           <CatIcon k={p?.icon} size={34} />
           <div className="grow">
@@ -269,7 +275,7 @@ function BillDetail({ bill, me, onClose, onEdit }: {
           <div className="damt">{isIncome ? '+' : '-'}{money(isIncome ? bill.cost : billNetAmount(bill, refunds))}</div>
         </div>
 
-        <Row label="账单分类">{p?.name}{c ? ` - ${c.name}` : ''}</Row>
+        <Row label="账单分类">{p?.name}{bill.childCategoryId && !c ? ' - 子分类待核对' : c ? ` - ${c.name}` : ''}</Row>
         <Row label="账单日期">{dayOf(bill.time)} {hhmm(bill.time)}</Row>
         <Row label="收支账户">{a?.assetName ?? '无'}</Row>
         {billRefunds.map((refund) => {
@@ -285,8 +291,8 @@ function BillDetail({ bill, me, onClose, onEdit }: {
             : '无'}
         </Row>
         <Row label="附件">{bill.files && bill.files.length ? `${bill.files.length} 个` : '无'}</Row>
-        <Toggle label="不计入收支" on={!!bill.notIntoTotal} />
-        <Toggle label="不计入预算" on={!!bill.notIntoBudget} />
+        <DetailToggle label="不计入收支" on={!!bill.notIntoTotal} onToggle={() => updateBill(bill.billId, { notIntoTotal: !bill.notIntoTotal })} />
+        <DetailToggle label="不计入预算" on={!!bill.notIntoBudget} onToggle={() => updateBill(bill.billId, { notIntoBudget: !bill.notIntoBudget })} />
         <Row label="所属账本">{bk?.accountBookName ?? '默认账本'}</Row>
         <Row label="记录时间">{dayOf(bill.recordTime ?? bill.time)} {hhmm(bill.recordTime ?? bill.time)}</Row>
         <Row label="记录方式">{BILL_TYPE[bill.billType] ?? '手动记账'}</Row>
@@ -313,8 +319,7 @@ function BillDetail({ bill, me, onClose, onEdit }: {
           <button className="ghost" onClick={() => { del(bill.billId); onClose() }}>删除</button>
           <button className="primary" onClick={onEdit}>编辑</button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -362,7 +367,8 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
 
   const [cost, setCost] = useState(String(bill.cost))
   const [pid, setPid] = useState(bill.parentCategoryId)
-  const [cid, setCid] = useState(bill.childCategoryId)
+  const [cid, setCid] = useState(() => resolveBillChild(bill, children)?.id ?? 0)
+  const [categoryConfirmed, setCategoryConfirmed] = useState(() => !bill.childCategoryId || !!resolveBillChild(bill, children))
   const [aid, setAid] = useState(bill.assetId)
   const [remark, setRemark] = useState(bill.remark)
   const [time, setTime] = useState(toLocalInput(bill.time))
@@ -370,11 +376,11 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
   const subs = children.filter((c) => c.parentId === pid)
 
   return (
-    <div className="modal-mask" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+    <Modal label="修改账单" onClose={onClose}>
         <h3>修改账单</h3>
         <div className="label">金额</div>
         <input
+          aria-label="账单原始金额"
           value={cost}
           autoFocus
 
@@ -383,26 +389,28 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
         />
         {Number(cost) < refundedTotal && <p className="hint">原账单金额不能小于已退款金额。</p>}
         <div className="label">分类</div>
-        <select value={pid} onChange={(e) => { setPid(Number(e.target.value)); setCid(0) }}>
+        <select aria-label="账单分类" value={pid} onChange={(e) => { setPid(Number(e.target.value)); setCid(0); setCategoryConfirmed(true) }}>
           {parents.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
         {subs.length > 0 && (
           <>
             <div className="label">子分类</div>
-            <select value={cid} onChange={(e) => setCid(Number(e.target.value))}>
+            {!categoryConfirmed && <p className="warn">历史子分类编号有冲突，请重新选择，或明确选择“不选”。</p>}
+            <select aria-label="账单子分类" value={categoryConfirmed ? cid : ''} onChange={(e) => { setCid(Number(e.target.value)); setCategoryConfirmed(true) }}>
+              {!categoryConfirmed && <option value="" disabled>请选择正确的子分类</option>}
               <option value={0}>不选</option>
               {subs.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </>
         )}
         <div className="label">账户</div>
-        <select value={aid} onChange={(e) => setAid(Number(e.target.value))}>
+        <select aria-label="账单账户" value={aid} onChange={(e) => setAid(Number(e.target.value))}>
           {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
         </select>
         <div className="label">时间</div>
-        <input type="datetime-local" value={time} onChange={(e) => setTime(e.target.value)} />
+        <input aria-label="账单时间" type="datetime-local" value={time} onChange={(e) => setTime(e.target.value)} />
         <div className="label">备注</div>
-        <input value={remark} onChange={(e) => setRemark(e.target.value)} />
+        <input aria-label="账单备注" value={remark} onChange={(e) => setRemark(e.target.value)} />
         {isExpense && (
           <>
             <div className="label">报销</div>
@@ -419,7 +427,7 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
               </div>
             ) : (
               <div className="row2">
-                <select value={rAsset} onChange={(e) => { setRAsset(Number(e.target.value)); setRAmount('') }}>
+                <select aria-label="报销账户" value={rAsset} onChange={(e) => { setRAsset(Number(e.target.value)); setRAmount('') }}>
                   <option value={0}>报销进哪个账户</option>
                   {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
                 </select>
@@ -461,7 +469,7 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
 
         <div className="modal-btns">
           <button className="ghost" onClick={onClose}>取消</button>
-          <button className="primary" disabled={Number(cost) < refundedTotal} onClick={() => onSave({
+          <button className="primary" disabled={!categoryConfirmed || Number(cost) < refundedTotal} onClick={() => onSave({
             cost: Number(cost) || bill.cost,
             parentCategoryId: pid,
             childCategoryId: cid,
@@ -470,8 +478,7 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
             time: new Date(time).getTime()
           })}>保存</button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 
