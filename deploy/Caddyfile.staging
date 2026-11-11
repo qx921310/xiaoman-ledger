@@ -1,0 +1,5 @@
+# DNS 指向此服务器并由维护者核验后，将站点块合并至服务器 Caddy 配置。
+# 不要在 DNS 未就绪时重载生产 Caddy；发布前先校验完整配置。
+staging.ledger.yele.win {
+    reverse_proxy 127.0.0.1:8091
+}

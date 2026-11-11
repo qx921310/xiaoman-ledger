@@ -26,7 +26,18 @@ export const KIND_MAP: Record<string, [string, string]> = {
   book: ['accountBooks', 'accountBookId'],
   reimbursement: ['reimbursements', 'reimbursementId'],
   refund: ['refunds', 'refundId'],
-  budget: ['budgets', 'month']
+  budget: ['budgets', 'month'],
+  // P0-1：新实体也要同步，否则换设备会丢
+  splitGroup: ['splitGroups', 'splitGroupId'],
+  splitMember: ['splitMembers', 'splitMemberId'],
+  splitExpense: ['splitExpenses', 'splitExpenseId'],
+  stockAsset: ['stockAssets', 'stockAssetId'],
+  stockInfo: ['stockInfos', 'stockInfoId'],
+  template: ['templates', 'templateId'],
+  homeLoan: ['homeLoans', 'loanId'],
+  instalment: ['instalments', 'instalmentId'],
+  billGroup: ['billGroups', 'billGroupId'],
+  billRelated: ['billRelated', 'relatedId']
 }
 
 type Entity = Record<string, unknown>

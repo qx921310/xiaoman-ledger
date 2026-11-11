@@ -1,9 +1,13 @@
-import type { AccountBook, Asset, Bill, Category, Currency, Cycle, Lend, Refund, Reimbursement, Tag, TombstoneV1, Transfer } from './types'
+import type {
+  AccountBook, Asset, Bill, BillGroup, BillRelated, Category, Currency, Cycle,
+  HomeLoan, Instalment, Lend, Refund, Reimbursement, SplitExpense, SplitGroup,
+  SplitMember, StockAsset, StockInfo, Tag, Template, TombstoneV1, Transfer
+} from './types'
 import type { Budget } from './store'
 
 /** 备份文件结构；v1 没有 settings 快照 */
 export interface BackupFile {
-  version: 1 | 2
+  version: 1 | 2 | 3
   exportedAt?: string
   accountBooks: AccountBook[]
   assets: Asset[]
@@ -21,6 +25,17 @@ export interface BackupFile {
   defaultCurrency?: string
   tombstones?: TombstoneV1[]
   currentBookId?: string | number
+  // v3：AA / 持仓 / 模板 / 房贷 / 分期 / 账单组
+  splitGroups?: SplitGroup[]
+  splitMembers?: SplitMember[]
+  splitExpenses?: SplitExpense[]
+  stockAssets?: StockAsset[]
+  stockInfos?: StockInfo[]
+  templates?: Template[]
+  homeLoans?: HomeLoan[]
+  instalments?: Instalment[]
+  billGroups?: BillGroup[]
+  billRelated?: BillRelated[]
 }
 
 type BackupRecord = Record<string, unknown>
@@ -29,9 +44,13 @@ type BackupRecord = Record<string, unknown>
 export function validateBackup(input: unknown): BackupFile {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('不是有效的备份对象')
   const data = input as Record<string, unknown>
-  if (data.version !== 1 && data.version !== 2) throw new Error('不支持的备份版本')
+  if (data.version !== 1 && data.version !== 2 && data.version !== 3) throw new Error('不支持的备份版本')
   const collections = ['accountBooks', 'assets', 'bills', 'transfers', 'budgets', 'reimbursements', 'refunds', 'lends', 'cycles', 'parentCategories', 'childCategories']
-  if (data.version === 2) collections.push('tags', 'currencies', 'tombstones')
+  if (data.version >= 2) collections.push('tags', 'currencies', 'tombstones')
+  if (data.version === 3) {
+    collections.push('splitGroups', 'splitMembers', 'splitExpenses', 'stockAssets', 'stockInfos',
+      'templates', 'homeLoans', 'instalments', 'billGroups', 'billRelated')
+  }
   const rows = (key: string) => data[key] as BackupRecord[]
   for (const key of collections) {
     const value = data[key]

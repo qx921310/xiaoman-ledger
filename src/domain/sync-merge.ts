@@ -28,7 +28,17 @@ const KIND_SPEC: Record<string, [string, string]> = {
   book: ['accountBooks', 'accountBookId'],
   reimbursement: ['reimbursements', 'reimbursementId'], refund: ['refunds', 'refundId'],
   budget: ['budgets', 'month'],
-  tag: ['tags', 'tagId']
+  tag: ['tags', 'tagId'],
+  splitGroup: ['splitGroups', 'splitGroupId'],
+  splitMember: ['splitMembers', 'splitMemberId'],
+  splitExpense: ['splitExpenses', 'splitExpenseId'],
+  stockAsset: ['stockAssets', 'stockAssetId'],
+  stockInfo: ['stockInfos', 'stockInfoId'],
+  template: ['templates', 'templateId'],
+  homeLoan: ['homeLoans', 'loanId'],
+  instalment: ['instalments', 'instalmentId'],
+  billGroup: ['billGroups', 'billGroupId'],
+  billRelated: ['billRelated', 'relatedId']
 }
 
 const idOf = (kind: string, item: Record<string, unknown>) =>

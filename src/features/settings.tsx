@@ -14,6 +14,8 @@ import { Modal } from '../ui/modal'
 import { DEFAULT_TAG_COLOR } from '../default-colors'
 import type { BackupFile } from '../backup'
 import { errorMessage } from '../errors'
+import { visibleAssets } from '../domain/asset-scope'
+import { validateOcrDraft, type OcrDraft } from '../domain/ocr-confirm'
 
 function RateInput({ value, onCommit, label }: { value: number; onCommit: (v: number) => void; label: string }) {
   const [draft, setDraft] = useState<string | null>(null)
@@ -166,7 +168,8 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
   const updateSplitMember = useLedger((s) => s.updateSplitMember)
   const settleSplit = useLedger((s) => s.settleSplit)
   const [ocrBusy, setOcrBusy] = useState(false)
-  const [ocrResult, setOcrResult] = useState<{ date: string; amount: number; direction: string; category: string; remark: string; payment?: string } | null>(null)
+  const [ocrSaving, setOcrSaving] = useState(false)
+  const [ocrResult, setOcrResult] = useState<OcrDraft | null>(null)
   const addBill = useLedger((s) => s.addBill)
   const [newGroup, setNewGroup] = useState('')
   const [newMember, setNewMember] = useState<Record<number, string>>({})
@@ -360,41 +363,75 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
               r.onerror = () => reject(new Error('读取图片失败'))
               r.readAsDataURL(f)
             })
-            const resp = await fetch('/api/ocr', {
+            const controller = new AbortController()
+            const timer = setTimeout(() => controller.abort(), 30000)
+            let resp: Response
+            try { resp = await fetch('/api/ocr', {
               method: 'POST', credentials: 'same-origin',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ image: dataUrl })
-            })
+              body: JSON.stringify({ image: dataUrl }), signal: controller.signal
+            }) } finally { clearTimeout(timer) }
             const json = await resp.json()
             if (json.code !== 0) throw new Error(json.msg || '识别失败')
-            setOcrResult(json.result)
-          } catch (err) { notify(errorMessage(err, '识别失败')) }
-          finally { setOcrBusy(false) }
+            const result = json.result as { date?: string; amount?: number; direction?: string; category?: string; remark?: string; payment?: string }
+            const direction = result.direction === 'income' ? 'income' : 'expense'
+            const category = parents.find((p) => p.kind === direction && p.name === result.category)
+            setOcrResult({ date: result.date ?? '', amount: Number.isFinite(result.amount) ? String(result.amount) : '', direction, categoryId: category ? String(category.id) : '', assetId: '', remark: result.remark ?? '', payment: result.payment })
+          } catch (err) { notify(err instanceof Error && err.name === 'AbortError' ? '识别超时，请稍后重试' : errorMessage(err, '识别失败，请稍后重试')) }
+          finally { setOcrBusy(false); e.target.value = '' }
         }} />
       </label>
       {ocrBusy && <p className="hint">识别中…</p>}
       {ocrResult && (
         <div className="budget-box small">
-          <div className="budget-line"><span>日期</span><b>{ocrResult.date}</b></div>
-          <div className="budget-line"><span>金额</span><b>{money(ocrResult.amount)}（{ocrResult.direction === 'income' ? '收入' : '支出'}）</b></div>
-          <div className="budget-line"><span>分类</span><b>{ocrResult.category}</b></div>
-          <div className="budget-line"><span>商户</span><b>{ocrResult.remark || '—'}</b></div>
+          <p className="hint">请核对并修改识别结果，确认后才会记账。</p>
+          <div className="label">日期</div>
+          <input aria-label="识别账单日期" type="date" value={ocrResult.date} onChange={(e) => setOcrResult({ ...ocrResult, date: e.target.value })} />
+          <div className="label">金额（{defaultCurrency}）</div>
+          <input aria-label="识别账单金额" inputMode="decimal" value={ocrResult.amount} onChange={(e) => setOcrResult({ ...ocrResult, amount: e.target.value })} />
+          <div className="label">收支方向</div>
+          <select aria-label="识别账单方向" value={ocrResult.direction} onChange={(e) => setOcrResult({ ...ocrResult, direction: e.target.value as 'income' | 'expense', categoryId: '' })}>
+            <option value="expense">支出</option><option value="income">收入</option>
+          </select>
+          <div className="label">分类</div>
+          <select aria-label="识别账单分类" value={ocrResult.categoryId} onChange={(e) => setOcrResult({ ...ocrResult, categoryId: e.target.value })}>
+            <option value="">请选择分类</option>{parents.filter((p) => p.kind === ocrResult.direction && !p.hide).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <div className="label">账户</div>
+          <select aria-label="识别账单账户" value={ocrResult.assetId} onChange={(e) => setOcrResult({ ...ocrResult, assetId: e.target.value })}>
+            <option value="">请选择账户</option>{visibleAssets(assets, currentBookId, me?.id).map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
+          </select>
+          {!assets.length && <p className="hint">请先到资产页新建账户。</p>}
+          <div className="label">备注</div>
+          <input aria-label="识别账单备注" value={ocrResult.remark} onChange={(e) => setOcrResult({ ...ocrResult, remark: e.target.value })} />
+          {ocrResult.payment && <p className="hint">识别到的支付方式：{ocrResult.payment}；请手动选择账户。</p>}
           <div className="btns">
-            <button className="primary" onClick={() => {
-              const cat = parents.find((p) => p.name === ocrResult.category)
-                ?? parents.find((p) => p.kind === (ocrResult.direction === 'income' ? 'income' : 'expense'))
-              const acc = assets[0]
-              if (!acc) return notify('请先建一个账户')
+            <button className="primary" disabled={ocrSaving} onClick={async () => {
+              if (ocrSaving) return
+              if (!currentBookId) return notify('请先选择具体账本')
+              setOcrSaving(true)
+              try {
+              let freshBooks = accountBooks
+              try {
+                const result = await bookApi.members(String(currentBookId))
+                if (!Array.isArray(result?.members) || !result.members.length) throw new Error('无法确认账本成员')
+                freshBooks = accountBooks.map((b) => String(b.bookId) === String(currentBookId) ? { ...b, memberCount: result.members.length } : b)
+                if (!freshBooks.some((b) => String(b.bookId) === String(currentBookId))) throw new Error('无法确认账本')
+              } catch { return notify('无法确认账本成员，请联网后重试') }
+              if (String(useLedger.getState().currentBookId) !== String(currentBookId) || useLedger.getState().userId !== currentUserId) return notify('账号或账本已切换，请重新确认')
+              const checked = validateOcrDraft(ocrResult, assets, parents, currentBookId, freshBooks, currencies, defaultCurrency, me?.id ?? currentUserId)
+              if ('error' in checked) return notify(checked.error)
               addBill({
-                assetId: acc.assetId,
-                parentCategoryId: cat?.id ?? 7,
-                cost: ocrResult.amount,
+                assetId: checked.asset.assetId,
+                parentCategoryId: checked.category.id,
+                cost: checked.amount,
                 remark: ocrResult.remark,
-                time: new Date(ocrResult.date + 'T12:00:00').getTime()
+                time: checked.time
               })
               setOcrResult(null)
               notify('已按识别结果记一笔')
-            }}>记一笔</button>
+              } finally { setOcrSaving(false) }
+            }}>{ocrSaving ? '保存中…' : '记一笔'}</button>
             <button className="ghost" onClick={() => setOcrResult(null)}>忽略</button>
           </div>
         </div>

@@ -1196,6 +1196,11 @@ export const useLedger = create<LedgerState>()(
         sessionSyncAt: 0,
         assets: [], bills: [], transfers: [], budgets: [],
         reimbursements: [], refunds: [], lends: [], cycles: [], seeded: false,
+        // 新增实体也要一起清空，否则"清空数据"会留下 AA/持仓/模板等
+        splitGroups: [], splitMembers: [], splitExpenses: [],
+        stockAssets: [], stockInfos: [], templates: [],
+        homeLoans: [], instalments: [],
+        billGroups: [], billRelated: [],
         parentCategories: [...TAXONOMY_PARENTS, ...TAXONOMY_INCOME],
         childCategories: TAXONOMY_CHILDREN
       }),
@@ -1203,7 +1208,7 @@ export const useLedger = create<LedgerState>()(
       exportAll: () => {
         const s = get()
         return {
-          version: 2,
+          version: 3,
           exportedAt: new Date().toISOString(),
           accountBooks: s.accountBooks,
           assets: s.assets,
@@ -1220,7 +1225,18 @@ export const useLedger = create<LedgerState>()(
           currencies: s.currencies,
           defaultCurrency: s.defaultCurrency,
           tombstones: s.tombstones,
-          currentBookId: s.currentBookId
+          currentBookId: s.currentBookId,
+          // v3：AA / 持仓 / 模板 / 房贷 / 分期 / 账单组 也要进备份，否则换设备就丢
+          splitGroups: s.splitGroups,
+          splitMembers: s.splitMembers,
+          splitExpenses: s.splitExpenses,
+          stockAssets: s.stockAssets,
+          stockInfos: s.stockInfos,
+          templates: s.templates,
+          homeLoans: s.homeLoans,
+          instalments: s.instalments,
+          billGroups: s.billGroups,
+          billRelated: s.billRelated
         }
       },
 
@@ -1472,13 +1488,24 @@ export const useLedger = create<LedgerState>()(
           cycles: data.cycles,
           parentCategories: data.parentCategories,
           childCategories: data.childCategories,
-          ...(data.version === 2 ? {
+          ...(data.version >= 2 ? {
             tags: data.tags,
             currencies: data.currencies,
             defaultCurrency: data.defaultCurrency,
             tombstones: data.tombstones,
             currentBookId: data.currentBookId ?? s.currentBookId
           } : {}),
+          // v3 新增实体：旧备份没有这些字段，用空数组兜底
+          splitGroups: data.splitGroups ?? [],
+          splitMembers: data.splitMembers ?? [],
+          splitExpenses: data.splitExpenses ?? [],
+          stockAssets: data.stockAssets ?? [],
+          stockInfos: data.stockInfos ?? [],
+          templates: data.templates ?? [],
+          homeLoans: data.homeLoans ?? [],
+          instalments: data.instalments ?? [],
+          billGroups: data.billGroups ?? [],
+          billRelated: data.billRelated ?? [],
           seeded: true
         }))
       }
