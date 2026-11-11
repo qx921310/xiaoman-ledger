@@ -92,6 +92,7 @@ interface LedgerState {
   deleteLend: (lendId: number) => void
   addRefund: (patch: { billId: string | number; number: number; assetId?: number; baseAmount?: number }) => void
   deleteRefund: (refundId: number) => void
+  updateRefund: (refundId: number, patch: { number?: number; assetId?: number; baseAmount?: number }) => boolean
   setBudget: (budget: Budget) => void
   removeBudget: (month: string, categoryId: number) => void
   removeBudgetById: (budgetId: number) => void
@@ -721,6 +722,30 @@ export const useLedger = create<LedgerState>()(
       // 账户余额由退款流水自动推导，不再手动改缓存。
       addRefund: (patch) => set((s) => addRefundChanges(s, patch, NOW())),
       deleteRefund: (refundId) => set((s) => deleteRefundChanges(s, refundId, NOW())),
+
+      // 编辑已有退款：校验累计不超过账单金额；余额由退款派生，自动跟着变
+      updateRefund: (refundId, patch) => {
+        const s = get()
+        const rec = s.refunds.find((r) => r.refundId === refundId)
+        if (!rec) return false
+        const bill = s.bills.find((b) => b.billId === rec.billId)
+        if (!bill) return false
+        const number = patch.number ?? rec.number
+        const baseAmount = Number(patch.baseAmount ?? (number === rec.number ? rec.baseAmount
+          : toBase(number, rec.currency ?? s.defaultCurrency, s.currencies, s.defaultCurrency)))
+        const others = s.refunds.filter((r) => r.billId === rec.billId && r.refundId !== refundId)
+        const refunded = others.reduce((sum, r) => sum + (r.baseAmount ?? 0), 0)
+        if (!Number.isFinite(number) || number <= 0) return false
+        if (!Number.isFinite(baseAmount) || baseAmount <= 0) return false
+        if (refunded + baseAmount > bill.cost + 1e-6) return false
+        set((st) => ({
+          refunds: st.refunds.map((r) => r.refundId === refundId
+            ? { ...r, number, baseAmount, assetId: patch.assetId ?? r.assetId, updateTime: NOW() } : r),
+          bills: st.bills.map((b) => b.billId === rec.billId
+            ? { ...b, refundNum: +(refunded + baseAmount).toFixed(2), updateTime: NOW() } : b)
+        }))
+        return true
+      },
 
       // 预算身份：自定义预算用 budgetId（可并存多个），月/年预算用 type+分类
       setBudget: (budget) => set((s) => {

@@ -925,3 +925,29 @@ const r2 = state().resolvePeriodConflicts([{ id: String(cand2.syncId ?? cand2.bi
 assert.equal(r2.kept, 1, '改过金额的候选保留')
 const keptConflict = state().bills.find((b) => String(b.syncId ?? b.billId) === String(cand2.syncId ?? cand2.billId))
 assert.equal(keptConflict?.conflict, true, '保留项标记待核对')
+
+// 编辑账单：优惠金额与 AA 分摊必须真正持久化（曾出现输入无效）
+state().reset()
+state().addAsset({ assetId: 87, assetName: '编辑账户', assetNumber: 500 })
+const editable = state().addBill({ assetId: 87, parentCategoryId: 7, cost: 100 })
+state().updateBill(editable.billId, {
+  discountNumber: 12,
+  billShares: [{ name: '我', amount: 50 }, { name: '分摊人1', amount: 50 }]
+})
+const afterEdit = state().bills.find((b) => b.billId === editable.billId)!
+assert.equal(afterEdit.discountNumber, 12, '优惠金额已保存')
+assert.equal(afterEdit.billShares?.length, 2, 'AA 分摊已保存')
+assert.equal(balance(87), 400, '优惠与分摊不改变余额')
+
+// 编辑已有退款：金额可改，超过可退额被拒，余额随之变化
+state().reset()
+state().addAsset({ assetId: 86, assetName: '退款账户', assetNumber: 1000 })
+const rb = state().addBill({ assetId: 86, parentCategoryId: 7, cost: 100 })
+state().addRefund({ billId: rb.billId, number: 30 })
+assert.equal(balance(86), 930, '退款到账后 930')
+const refundId = state().refunds[0].refundId
+assert.equal(state().updateRefund(refundId, { number: 20 }), true)
+assert.equal(state().refunds[0].number, 20)
+assert.equal(balance(86), 920, '改为 20 后余额跟着变')
+assert.equal(state().updateRefund(refundId, { number: 200 }), false, '超过可退额被拒')
+assert.equal(state().refunds[0].number, 20, '被拒时保持原值')

@@ -433,6 +433,7 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
   const endReimbursement = useLedger((s) => s.endReimbursement)
   const addRefund = useLedger((s) => s.addRefund)
   const deleteRefund = useLedger((s) => s.deleteRefund)
+  const updateRefund = useLedger((s) => s.updateRefund)
 
   const myReimbs = reimbursements.filter((r) => r.billId === bill.billId)
   const claimedTotal = +myReimbs.reduce((sum, r) => sum + (Number(r.number) || 0), 0).toFixed(2)
@@ -593,6 +594,16 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
             {myRefunds.map((r) => (
               <div key={r.refundId} className="attach-line">
                 <span>{r.baseAmount == null ? '原币退款' : money(r.baseAmount)}（到账 {accountMoney(r.number, r.currency ?? assets.find((a) => a.assetId === (r.assetId ?? bill.assetId))?.currency, currencies, defaultCurrency)} · {assets.find((a) => a.assetId === (r.assetId ?? bill.assetId))?.assetName ?? '账户'}）</span>
+                <input aria-label={`退款金额 ${r.refundId}`} className="kw" inputMode="decimal"
+                  defaultValue={String(r.baseAmount ?? r.number)}
+                  onBlur={(e) => {
+                    const v = Number(e.target.value)
+                    if (!Number.isFinite(v) || v <= 0) return
+                    if (!updateRefund(r.refundId, { baseAmount: v })) {
+                      alert('改动超过了账单可退金额')
+                      e.target.value = String(r.baseAmount ?? r.number)
+                    }
+                  }} />
                 <button className="del" onClick={() => deleteRefund(r.refundId)}>撤销</button>
               </div>
             ))}
@@ -621,7 +632,18 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
             childCategoryId: cid,
             assetId: aid,
             remark,
-            time: new Date(time).getTime()
+            time: new Date(time).getTime(),
+            // 这两个必须真的提交，否则用户填了等于没填
+            discountNumber: discount.trim() === '' ? undefined : Number(discount),
+            billShares: (() => {
+              const n = Number(shareCount)
+              const total = Number(cost) || bill.cost
+              if (!(n > 1)) return undefined
+              const each = +(total / n).toFixed(2)
+              const shares = Array.from({ length: n - 1 }, (_, i) => ({ name: `分摊人${i + 1}`, amount: each }))
+              shares.push({ name: '我', amount: +(total - each * (n - 1)).toFixed(2) })
+              return shares
+            })()
           })}>保存</button>
         </div>
     </Modal>

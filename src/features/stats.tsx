@@ -4,6 +4,7 @@ import { money, monthOf } from '../ui-format'
 import { CatIcon } from '../ui/icons'
 import { summarizeBills } from '../bill-summary'
 import { byAsset, byTag, dailyTrend } from '../domain/stats-breakdown'
+import type { Bill } from '../types'
 import { Modal } from '../ui/modal'
 import { IMPORTED_CATEGORY_COLOR } from '../default-colors'
 
@@ -19,6 +20,9 @@ export function Stats() {
   const removeBudget = useLedger((s) => s.removeBudget)
   const removeBudgetById = useLedger((s) => s.removeBudgetById)
   const [month, setMonth] = useState(monthOf(Date.now()))
+  const [rangeMode, setRangeMode] = useState<'month' | 'week' | 'year' | 'custom'>('month')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
   const [editing, setEditing] = useState<{
     categoryId: number; amount: string; addNum?: string
     type?: 'month' | 'year' | 'custom'
@@ -31,6 +35,28 @@ export function Stats() {
   )
 
   const monthSummary = useMemo(() => summarizeBills(monthBills, parents, refunds), [monthBills, parents, refunds])
+
+  // 时间范围：周 / 年 / 自定义（一木的日常·月·年·自定义）
+  const rangeBills = useMemo(() => {
+    const inBook = (b: Bill) => currentBookId === 0 || b.bookId === currentBookId
+    if (rangeMode === 'month') return monthBills
+    if (rangeMode === 'year') {
+      const y = month.slice(0, 4)
+      return bills.filter((b) => inBook(b) && String(monthOf(b.time)).slice(0, 4) === y)
+    }
+    if (rangeMode === 'week') {
+      // 以所选月份 1 号为锚点，取包含它的那一周（周一为一周开始）
+      const base = new Date(`${month}-01T00:00:00`).getTime()
+      const d = new Date(base)
+      const shift = (d.getDay() + 6) % 7
+      const start = new Date(d.getFullYear(), d.getMonth(), d.getDate() - shift).getTime()
+      const end = start + 7 * 86400000 - 1
+      return bills.filter((b) => inBook(b) && b.time >= start && b.time <= end)
+    }
+    const from = customFrom ? new Date(customFrom + 'T00:00:00').getTime() : 0
+    const to = customTo ? new Date(customTo + 'T23:59:59').getTime() : Number.MAX_SAFE_INTEGER
+    return bills.filter((b) => inBook(b) && b.time >= from && b.time <= to)
+  }, [rangeMode, monthBills, bills, currentBookId, month, customFrom, customTo])
   const rows = useMemo(() => {
     return [...monthSummary.expenseByCategory.entries()]
       .map(([id, v]) => ({ p: parents.find((x) => x.id === id)!, v }))
@@ -66,15 +92,43 @@ export function Stats() {
     return b.categoryId === 0 ? s2.budget : (s2.budgetByCategory.get(b.categoryId) ?? 0)
   }
 
-  const trend = useMemo(() => dailyTrend(monthBills, parents, refunds, month), [monthBills, parents, refunds, month])
-  const assetRows = useMemo(() => byAsset(monthBills, assets, parents, refunds), [monthBills, assets, parents, refunds])
-  const tagRows = useMemo(() => byTag(monthBills, tags, parents, refunds), [monthBills, tags, parents, refunds])
+  const trend = useMemo(() => {
+    const byMonth = new Map<string, Bill[]>()
+    for (const b of rangeBills) {
+      const k = monthOf(b.time)
+      byMonth.set(k, [...(byMonth.get(k) ?? []), b])
+    }
+    return [...byMonth.entries()].flatMap(([m, list]) => dailyTrend(list, parents, refunds, m))
+      .sort((a, b) => (a.day < b.day ? -1 : 1))
+  }, [rangeBills, parents, refunds])
+  const assetRows = useMemo(() => byAsset(rangeBills, assets, parents, refunds), [rangeBills, assets, parents, refunds])
+  const tagRows = useMemo(() => byTag(rangeBills, tags, parents, refunds), [rangeBills, tags, parents, refunds])
+  const rangeSummary = useMemo(() => summarizeBills(rangeBills, parents, refunds), [rangeBills, parents, refunds])
   const trendMax = Math.max(1, ...trend.map((d) => Math.max(d.income, d.expense)))
 
   return (
     <section className="card">
-      <div className="label">月份</div>
-      <input aria-label="统计月份" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+      <div className="label">时间范围</div>
+      <div className="row2">
+        <select aria-label="统计范围" value={rangeMode} onChange={(e) => setRangeMode(e.target.value as 'month' | 'week' | 'year' | 'custom')}>
+          <option value="month">按月</option>
+          <option value="week">按周</option>
+          <option value="year">按年</option>
+          <option value="custom">自定义</option>
+        </select>
+        {rangeMode !== 'custom' && (
+          <input aria-label="统计月份" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+        )}
+      </div>
+      {rangeMode === 'custom' && (
+        <div className="row2">
+          <input aria-label="统计开始日期" type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} />
+          <input aria-label="统计结束日期" type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} />
+        </div>
+      )}
+      <p className="hint">
+        范围合计：支出 {money(rangeSummary.expense)} · 收入 {money(rangeSummary.income)} · 结余 {money(rangeSummary.income - rangeSummary.expense)}（{rangeBills.length} 笔）
+      </p>
 
       <div className="label">预算</div>
       {totalBudget > 0 ? (
