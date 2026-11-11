@@ -72,14 +72,15 @@ for (const c of TAXONOMY_CHILDREN) canonical.set(`${c.parentId}|${c.name}|child`
 
 const keepP = new Map<string, Category>()
 for (const c of parents) {
-  const k = c.name
+  const k = `${c.name}|${c.kind}`
   const prev = keepP.get(k)
   if (!prev) { keepP.set(k, c); continue }
   const want = canonical.get(`${c.name}|${c.kind}`)
   // 若当前这个是内置 id 而已有的不是，则替换
   if (want != null && c.id === want && prev.id !== want) keepP.set(k, c)
 }
-const parentNameOf = (id: number) => (keepP.get([...keepP.values()].find((p) => p.id === id)?.name ?? '')?.name ?? String(id))
+// 父 id → 父名（去重后的保留项）
+const parentNameOf = (id: number) => [...keepP.values()].find((p) => p.id === id)?.name ?? String(id)
 const keepC = new Map<string, Category>()
 for (const c of children) {
   const k = `${parentNameOf(c.parentId)}|${c.name}`
@@ -90,7 +91,7 @@ for (const c of children) {
 }
 const remapP = new Map<number, number>()
 for (const c of parents) {
-  const keep = keepP.get(c.name)
+  const keep = keepP.get(`${c.name}|${c.kind}`)
   if (keep && keep.id !== c.id) remapP.set(c.id, keep.id)
 }
 const remapC = new Map<number, number>()

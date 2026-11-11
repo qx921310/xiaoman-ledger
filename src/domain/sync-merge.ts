@@ -1,6 +1,6 @@
 import { normalizeBuiltInChild, TAXONOMY_CHILDREN } from '../taxonomy'
 import type {
-  AccountBook, Asset, Bill, Category, Cycle, Lend, Refund, Reimbursement, SyncIncoming, TombstoneV1, Transfer
+  AccountBook, Asset, Bill, Category, Cycle, Lend, Refund, Reimbursement, SyncIncoming, Tag, TombstoneV1, Transfer
 } from '../types'
 
 /** 合并远端记录时需要用到的本地状态（只读） */
@@ -15,6 +15,7 @@ export interface MergeableState {
   accountBooks: AccountBook[]
   reimbursements: Reimbursement[]
   refunds: Refund[]
+  tags: Tag[]
   tombstones: TombstoneV1[]
 }
 
@@ -24,7 +25,8 @@ const KIND_SPEC: Record<string, [string, string]> = {
   parent: ['parentCategories', 'id'], child: ['childCategories', 'id'],
   book: ['accountBooks', 'accountBookId'],
   reimbursement: ['reimbursements', 'reimbursementId'], refund: ['refunds', 'refundId'],
-  budget: ['budgets', 'month']
+  budget: ['budgets', 'month'],
+  tag: ['tags', 'tagId']
 }
 
 const idOf = (kind: string, item: Record<string, unknown>) =>
@@ -58,8 +60,13 @@ export function mergeRemote(s: MergeableState, records: SyncIncoming[], now = Da
       // 本地版本比墓碑新 → 墓碑已过期，保留本地记录
       if (local && Number(local.updateTime ?? 0) > Number(r.updatedAt ?? 0)) continue
       next[k[0]] = arr.filter((x) => idOf(r.kind, x) !== String(r.id))
-      if (!tombstones.some((t) => t.kind === r.kind && t.id === String(r.id))) {
-        tombstones.push({ kind: r.kind, id: String(r.id), updatedAt: r.updatedAt || now })
+      // 墓碑时间必须取较新的一次，否则更早的记录会被误判为更新而复活
+      const existingTomb = tombstones.findIndex((t) => t.kind === r.kind && t.id === String(r.id))
+      const tombTime = r.updatedAt || now
+      if (existingTomb < 0) {
+        tombstones.push({ kind: r.kind, id: String(r.id), updatedAt: tombTime })
+      } else if (tombTime > tombstones[existingTomb].updatedAt) {
+        tombstones[existingTomb] = { ...tombstones[existingTomb], updatedAt: tombTime }
       }
       continue
     }

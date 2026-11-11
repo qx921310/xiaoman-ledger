@@ -86,6 +86,7 @@ export interface Reimbursement {
   billId: string | number
   /** 报销账户（资产） */
   assetId: number
+  bookId?: string | number
   number: number
   detail: string
   /** pending=登记待报销，done=已到账（钱已进报销账户） */
@@ -182,6 +183,8 @@ export interface Refund {
   /** Account and currency receiving the refund at registration time. */
   assetId?: number
   currency?: string
+  /** 所属账本（共享账本里必须与账单一致，否则服务器会当个人记录） */
+  bookId?: string | number
   /** Refunded amount in the ledger's base currency, captured when recorded. */
   baseAmount?: number
   number: number

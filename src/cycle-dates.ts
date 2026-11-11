@@ -23,8 +23,8 @@ export function cycleDueDates(c: Cycle, until: Date = new Date()): Date[] {
   if (type === 'year') {
     const m = (c.monthOfYear ?? 1) - 1
     for (let y = start.getFullYear(); y <= today.getFullYear(); y++) {
-      const days = c.monthLast ? [new Date(y, m + 1, 0).getDate()]
-        : (c.monthDays && c.monthDays.length ? c.monthDays : [c.dayOfMonth])
+      if (c.monthLast) { push(new Date(y, m + 1, 0)); continue }   // 月末取该月实际最后一天
+      const days = c.monthDays && c.monthDays.length ? c.monthDays : [c.dayOfMonth]
       for (const day of days) push(new Date(y, m, Math.min(day, 28)))
     }
     return out

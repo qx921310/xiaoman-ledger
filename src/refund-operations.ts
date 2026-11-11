@@ -30,6 +30,7 @@ export function addRefundChanges(s: RefundState, input: NewRefund, now: number) 
   while (s.refunds.some((r) => r.refundId === refundId) || s.tombstones.some((t) => t.kind === 'refund' && t.id === String(refundId))) refundId++
   const rec: Refund = {
     refundId, billId: bill.billId, assetId: asset.assetId, currency: asset.currency ?? s.defaultCurrency,
+    bookId: (bill as { bookId?: string | number }).bookId,
     number: amount, baseAmount: base, userId: s.userId, updateTime: now
   }
   return {

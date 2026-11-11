@@ -458,6 +458,7 @@ export const useLedger = create<LedgerState>()(
         while (s.reimbursements.some((r) => r.reimbursementId === rid)) rid++
         const rec: Reimbursement = {
           reimbursementId: rid, billId, assetId, number: Number(number) || 0,
+          bookId: bill.bookId,
           detail: detail ?? '', status: 'pending', userId: s.userId, updateTime: NOW()
         }
         const total = claimed + rec.number

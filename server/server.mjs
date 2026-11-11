@@ -541,29 +541,35 @@ const server = createServer(async (req, res) => {
     }
 
     // 与原产品同构的写接口（供后续对接）
+    // ---- 旧版 REST 接口（已由 /api/data/* 取代）：必须登录，且只能读写自己的数据 ----
+    if (path.startsWith('/api/bill/') || path.startsWith('/api/asset/') || path === '/api/sync/push') {
+      const u = currentUser(req)
+      if (!u) return fail(res, '请先登录', 401)
+      req.legacyUser = u
+    }
     if (path === '/api/bill/addOrUpdateBill' && req.method === 'POST') {
       const b = await readBody(req)
       if (!b.billId || typeof b.cost !== 'number') return fail(res, 'bad bill')
       db.prepare('INSERT INTO bills (bill_id, payload, user_id) VALUES (?,?,?) ON CONFLICT(bill_id) DO UPDATE SET payload=excluded.payload')
-        .run(b.billId, JSON.stringify(b), userId)
+        .run(b.billId, JSON.stringify(b), req.legacyUser.id)
       return ok(res, b)
     }
     if (path === '/api/bill/deleteBill' && req.method === 'POST') {
       const b = await readBody(req)
-      db.prepare('DELETE FROM bills WHERE bill_id = ?').run(b.billId)
+      // 只能删自己的账单
+      db.prepare('DELETE FROM bills WHERE bill_id = ? AND user_id = ?').run(b.billId, req.legacyUser.id)
       return ok(res, { billId: b.billId })
     }
     if (path.startsWith('/api/bill/getAccountBillPage/')) {
-      const [, , , u, off] = path.split('/')
-      const offset = Number(off || 0)
+      const offset = Number(path.split('/')[5] || 0)
       const rows = db.prepare('SELECT payload FROM bills WHERE user_id = ? ORDER BY bill_id DESC LIMIT 200 OFFSET ?')
-        .all(Number(u || 1), offset).map((r) => JSON.parse(r.payload))
+        .all(req.legacyUser.id, offset).map((r) => JSON.parse(r.payload))
       return ok(res, rows)
     }
     if (path === '/api/asset/addOrUpdateAsset' && req.method === 'POST') {
       const a = await readBody(req)
       db.prepare('INSERT INTO assets (asset_id, payload, user_id) VALUES (?,?,?) ON CONFLICT(asset_id) DO UPDATE SET payload=excluded.payload')
-        .run(a.assetId, JSON.stringify(a), userId)
+        .run(a.assetId, JSON.stringify(a), req.legacyUser.id)
       return ok(res, a)
     }
 
