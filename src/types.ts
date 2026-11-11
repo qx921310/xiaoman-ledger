@@ -300,6 +300,8 @@ export interface Category {
   icon?: string
   /** 图标底色（大类磁贴用） */
   bg?: string
+  /** 修改时间，用于跨设备比较版本 */
+  updateTime?: number
 }
 
 export interface Transfer {

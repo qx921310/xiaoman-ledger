@@ -8,6 +8,7 @@ import { money } from '../ui-format'
 import { ROLE_LABEL } from '../ui/roles'
 import { validateBackup } from '../backup'
 import { DEFAULT_BOOK_COLOR } from '../default-colors'
+import { CHILD_ICONS, PARENT_ICONS } from '../ui/category-icons'
 import { dateKey, pendingDates } from '../cycle-dates'
 import { Modal } from '../ui/modal'
 import { DEFAULT_TAG_COLOR } from '../default-colors'
@@ -49,7 +50,16 @@ const CURRENCY_PRESETS = [
   { code: 'SGD', name: '新加坡元', symbol: 'S$', rate: 5.3 },
   { code: 'THB', name: '泰铢', symbol: '฿', rate: 0.2 },
   { code: 'TWD', name: '新台币', symbol: 'NT$', rate: 0.22 },
-  { code: 'MOP', name: '澳门元', symbol: 'MOP$', rate: 0.9 }
+  { code: 'MOP', name: '澳门元', symbol: 'MOP$', rate: 0.9 },
+  { code: 'CHF', name: '瑞士法郎', symbol: 'CHF', rate: 8.1 },
+  { code: 'NZD', name: '新西兰元', symbol: 'NZ$', rate: 4.3 },
+  { code: 'MYR', name: '马来西亚林吉特', symbol: 'RM', rate: 1.6 },
+  { code: 'PHP', name: '菲律宾比索', symbol: '₱', rate: 0.126 },
+  { code: 'VND', name: '越南盾', symbol: '₫', rate: 0.00028 },
+  { code: 'INR', name: '印度卢比', symbol: '₹', rate: 0.086 },
+  { code: 'AED', name: '阿联酋迪拉姆', symbol: 'AED', rate: 1.96 },
+  { code: 'RUB', name: '俄罗斯卢布', symbol: '₽', rate: 0.079 },
+  { code: 'BRL', name: '巴西雷亚尔', symbol: 'R$', rate: 1.3 }
 ]
 
 /** 把周期规则翻译成一句人话 */
@@ -137,6 +147,13 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
   const cycles = useLedger((s) => s.cycles)
   const skipCycleDate = useLedger((s) => s.skipCycleDate)
   const bindCycleBook = useLedger((s) => s.bindCycleBook)
+  const addCategory = useLedger((s) => s.addCategory)
+  const updateCategory = useLedger((s) => s.updateCategory)
+  const deleteCategory = useLedger((s) => s.deleteCategory)
+  const moveCategory = useLedger((s) => s.moveCategory)
+  const parentCategories = useLedger((s) => s.parentCategories)
+  const childCategories = useLedger((s) => s.childCategories)
+  const [newCat, setNewCat] = useState<{ parentId: number; kind: 'expense' | 'income'; name: string; icon: string } | null>(null)
   const addCycle = useLedger((s) => s.addCycle)
   const deleteCycle = useLedger((s) => s.deleteCycle)
   const toggleCycle = useLedger((s) => s.toggleCycle)
@@ -678,6 +695,86 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
           </div>
           <button className="link" onClick={() => setInvite(null)}>收起</button>
         </div>
+      )}
+
+      <h3>分类</h3>
+      <p className="hint">可以新增、改名、换图标、调顺序；已有账单用到的分类不能删除。</p>
+      {(['expense', 'income'] as const).map((kind) => (
+        <div key={kind}>
+          <div className="label">{kind === 'expense' ? '支出分类' : '收入分类'}</div>
+          {parentCategories.filter((p) => p.kind === kind).sort((a, b) => (a.positionWeight ?? 0) - (b.positionWeight ?? 0)).map((p) => (
+            <div key={p.id} className="cat-block">
+              <div className="row">
+                <span className="tag-dot" style={{ background: p.color }} />
+                <div className="grow">
+                  <input aria-label={`${p.name} 分类名称`} value={p.name}
+                    onChange={(e) => updateCategory(p.id, { name: e.target.value })} />
+                  <small>{childCategories.filter((c) => c.parentId === p.id).length} 个子分类</small>
+                </div>
+                <select aria-label={`${p.name} 图标`} value={p.icon ?? ''}
+                  onChange={(e) => updateCategory(p.id, { icon: e.target.value || undefined })}>
+                  <option value="">默认</option>
+                  {(kind === 'income' ? PARENT_ICONS : PARENT_ICONS).map((k) => (
+                    <option key={k} value={k}>{k.replace('ic_parent_', '')}</option>
+                  ))}
+                </select>
+                <input aria-label={`${p.name} 颜色`} className="color" type="color" value={p.color}
+                  onChange={(e) => updateCategory(p.id, { color: e.target.value })} />
+                <button className="link" aria-label={`${p.name} 上移`} onClick={() => moveCategory(p.id, -1)}>↑</button>
+                <button className="link" aria-label={`${p.name} 下移`} onClick={() => moveCategory(p.id, 1)}>↓</button>
+                <button className="del" aria-label={`删除分类 ${p.name}`} onClick={() => {
+                  if (!deleteCategory(p.id)) notify('这个分类已有账单在用，不能删除')
+                }}>删</button>
+              </div>
+              <div className="cat-children">
+                {childCategories.filter((c) => c.parentId === p.id).sort((a, b) => (a.positionWeight ?? 0) - (b.positionWeight ?? 0)).map((c) => (
+                  <div key={c.id} className="cat-child">
+                    <input aria-label={`${c.name} 子分类名称`} value={c.name}
+                      onChange={(e) => updateCategory(c.id, { name: e.target.value })} />
+                    <select aria-label={`${c.name} 图标`} value={c.icon ?? ''}
+                      onChange={(e) => updateCategory(c.id, { icon: e.target.value || undefined })}>
+                      <option value="">默认</option>
+                      {CHILD_ICONS.map((k) => <option key={k} value={k}>{k.replace('ic_', '')}</option>)}
+                    </select>
+                    <button className="link" aria-label={`${c.name} 上移`} onClick={() => moveCategory(c.id, -1)}>↑</button>
+                    <button className="link" aria-label={`${c.name} 下移`} onClick={() => moveCategory(c.id, 1)}>↓</button>
+                    <button className="del" aria-label={`删除子分类 ${c.name}`} onClick={() => {
+                      if (!deleteCategory(c.id)) notify('这个子分类已有账单在用，不能删除')
+                    }}>删</button>
+                  </div>
+                ))}
+                <button className="link" onClick={() => setNewCat({ parentId: p.id, kind, name: '', icon: '' })}>＋ 新增子分类</button>
+              </div>
+            </div>
+          ))}
+          <button className="ghost" onClick={() => setNewCat({ parentId: 0, kind, name: '', icon: '' })}>
+            ＋ 新增大类
+          </button>
+        </div>
+      ))}
+
+      {newCat && (
+        <Modal label="新增分类" onClose={() => setNewCat(null)}>
+          <h3>新增分类</h3>
+          <div className="label">名称</div>
+          <input aria-label="分类名称" value={newCat.name} autoFocus
+            onChange={(e) => setNewCat({ ...newCat, name: e.target.value })} />
+          <div className="label">图标</div>
+          <select aria-label="分类图标" value={newCat.icon}
+            onChange={(e) => setNewCat({ ...newCat, icon: e.target.value })}>
+            <option value="">默认</option>
+            {(newCat.parentId === 0 ? PARENT_ICONS : CHILD_ICONS).map((k) => <option key={k} value={k}>{k}</option>)}
+          </select>
+          <div className="modal-btns">
+            <button className="ghost" onClick={() => setNewCat(null)}>取消</button>
+            <button className="primary" onClick={() => {
+              if (!newCat.name.trim()) return notify('请填写名称')
+              addCategory({ ...newCat, name: newCat.name.trim(), icon: newCat.icon || undefined })
+              setNewCat(null)
+              notify('分类已添加')
+            }}>保存</button>
+          </div>
+        </Modal>
       )}
 
       <h3>标签</h3>

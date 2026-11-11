@@ -579,3 +579,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 /* 记账页属性开关（一木「属性」入口） */
 .entry-attrs { display: flex; gap: 16px; align-items: center; font-size: var(--font-sm); color: var(--muted); }
 .entry-attrs label { display: inline-flex; gap: 4px; align-items: center; }
+
+/* 分类管理 */
+.cat-block { border: 1px solid var(--line); border-radius: var(--r-md); padding: 8px 10px; margin-bottom: 8px; }
+.cat-block .row { flex-wrap: wrap; }
+.cat-block input[aria-label$="分类名称"] { font-weight: 600; }
+.cat-children { margin: 6px 0 0 18px; display: flex; flex-direction: column; gap: 4px; }
+.cat-child { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.cat-child input { flex: 1 1 96px; min-width: 96px; }
+.cat-child select { flex: 0 1 130px; }

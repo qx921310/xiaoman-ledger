@@ -891,3 +891,22 @@ const syncId = String(cand.syncId ?? cand.billId)
 state().dropCandidates([syncId])
 assert.equal(state().bills.some((b) => String(b.syncId ?? b.billId) === syncId), false, '本地候选已移除')
 assert.ok(state().tombstones.some((t) => t.kind === 'bill' && t.id === syncId), '留下墓碑避免重推')
+
+// 分类管理：新增/改名/换图标/排序/删除保护
+state().reset()
+const newParent = state().addCategory({ name: '宠物', kind: 'expense', parentId: 0, icon: 'ic_parent_other' })
+assert.ok(state().parentCategories.some((c) => c.id === newParent.id), '大类已新增')
+const newChild = state().addCategory({ name: '猫粮', kind: 'expense', parentId: newParent.id })
+assert.ok(state().childCategories.some((c) => c.id === newChild.id), '子分类已新增')
+state().updateCategory(newChild.id, { name: '猫砂', icon: 'ic_shopping_bag' })
+assert.equal(state().childCategories.find((c) => c.id === newChild.id)?.name, '猫砂')
+// 排序：把新大类往上移一位
+const beforeOrder = state().parentCategories.filter((c) => c.kind === 'expense').sort((a, b) => (a.positionWeight ?? 0) - (b.positionWeight ?? 0)).map((c) => c.id)
+state().moveCategory(newParent.id, -1)
+const afterOrder = state().parentCategories.filter((c) => c.kind === 'expense').sort((a, b) => (a.positionWeight ?? 0) - (b.positionWeight ?? 0)).map((c) => c.id)
+assert.notDeepEqual(beforeOrder, afterOrder, '排序生效')
+// 删除保护：有账单引用时不能删
+state().addAsset({ assetId: 90, assetName: '分类测试账户', assetNumber: 100 })
+state().addBill({ assetId: 90, parentCategoryId: newParent.id, cost: 10 })
+assert.equal(state().deleteCategory(newParent.id), false, '被引用时拒绝删除')
+assert.ok(state().parentCategories.some((c) => c.id === newParent.id))

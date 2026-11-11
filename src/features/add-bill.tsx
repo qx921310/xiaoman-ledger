@@ -74,9 +74,12 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
   const switchMode = (m: 'expense' | 'income' | 'transfer') => {
     setMode(m)
     setKeypadField('cost')
-    setCid(0)
-    if (m === 'expense') setPid(7)
-    if (m === 'income') setPid(903)
+    // 切到支出/收入时，父分类跟着换，并自动选中它的第一个子分类
+    const nextPid = m === 'income' ? 903 : m === 'expense' ? 7 : pid
+    setPid(nextPid)
+    const first = children.filter((c) => c.parentId === nextPid)
+      .sort((a, b) => (a.positionWeight ?? 0) - (b.positionWeight ?? 0))[0]
+    setCid(m === 'transfer' ? 0 : (first?.id ?? 0))
   }
 
   const submit = (): boolean => {
@@ -170,13 +173,17 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
             <label>手续费<input value={fee} placeholder="0.00" inputMode="none" onFocus={() => { setKeypadField('fee'); setKeypadOpen(true) }} onChange={(e) => setFee(e.target.value.replace(/[^\d.]/g, ''))} /></label>
           </div> : <>
             <div className="entry-categories" aria-label="大类">
-              {list.map((p) => <button key={p.id} type="button" aria-pressed={p.id === cur} className={'entry-category' + (p.id === cur ? ' on' : '')} onClick={() => { setPid(p.id); setCid(0) }}>
+              {list.map((p) => <button key={p.id} type="button" aria-pressed={p.id === cur} className={'entry-category' + (p.id === cur ? ' on' : '')} onClick={() => {
+                  setPid(p.id)
+                  const first = children.filter((c) => c.parentId === p.id)
+                    .sort((a, b) => (a.positionWeight ?? 0) - (b.positionWeight ?? 0))[0]
+                  setCid(first ? first.id : 0)
+                }}>
                 <span className="entry-category-icon" style={{ '--category-color': p.color, '--category-bg': p.bg ?? 'var(--accent-soft)' } as React.CSSProperties}><CatIcon k={p.icon} size={22} /></span><span>{p.name}</span>
               </button>)}
             </div>
             {subs.length > 0 && <div className="entry-subsection"><div className="entry-subtitle">{parents.find((p) => p.id === cur)?.name}</div>
               <div className="entry-categories" aria-label="子分类">
-                <button type="button" aria-pressed={cid === 0} className={'entry-category child' + (cid === 0 ? ' on' : '')} onClick={() => setCid(0)}><span className="entry-category-icon" aria-hidden="true">—</span><span>不选</span></button>
                 {subs.map((c) => <button key={c.id} type="button" aria-pressed={cid === c.id} className={'entry-category child' + (cid === c.id ? ' on' : '')} onClick={() => setCid(c.id)}>
                   <span className="entry-category-icon"><CatIcon k={c.icon} size={19} /></span><span>{c.name}</span>
                 </button>)}
@@ -286,7 +293,12 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
           <div className="label">分类</div>
           <div className="chips category-grid">
             {list.map((p) => (
-                <button key={p.id} aria-pressed={p.id === cur} className={'chip' + (p.id === cur ? ' on' : '')} onClick={() => { setPid(p.id); setCid(0) }}>
+                <button key={p.id} aria-pressed={p.id === cur} className={'chip' + (p.id === cur ? ' on' : '')} onClick={() => {
+                  setPid(p.id)
+                  const first = children.filter((c) => c.parentId === p.id)
+                    .sort((a, b) => (a.positionWeight ?? 0) - (b.positionWeight ?? 0))[0]
+                  setCid(first ? first.id : 0)
+                }}>
                 <CatIcon k={p.icon} size={16} />{p.name}
               </button>
             ))}
@@ -296,7 +308,6 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
             <>
               <div className="label">子分类</div>
               <div className="chips small category-grid">
-                <button aria-pressed={cid === 0} className={'chip' + (cid === 0 ? ' on' : '')} onClick={() => setCid(0)}>不选</button>
                 {subs.map((c) => (
                   <button key={c.id} aria-pressed={cid === c.id} className={'chip' + (cid === c.id ? ' on' : '')} onClick={() => setCid(c.id)}><CatIcon k={c.icon} size={16} />{c.name}</button>
                 ))}

@@ -115,6 +115,10 @@ interface LedgerState {
   importAll: (data: unknown) => void
   applyImport: (plan: ImportPlan) => void
   mergeTaxonomy: () => void
+  addCategory: (patch: { name: string; kind: 'expense' | 'income'; parentId: number; icon?: string; color?: string }) => Category
+  updateCategory: (id: number, patch: Partial<Pick<Category, 'name' | 'icon' | 'color' | 'bg' | 'hide'>>) => void
+  deleteCategory: (id: number) => boolean
+  moveCategory: (id: number, dir: -1 | 1) => void
   addTag: (patch: Omit<Tag, 'tagId' | 'positionWeight'> & { positionWeight?: number }) => Tag
   updateTag: (tagId: number, patch: Partial<Tag>) => void
   deleteTag: (tagId: number) => void
@@ -173,7 +177,22 @@ export const useLedger = create<LedgerState>()(
         { code: 'USD', name: '美元', symbol: '$', rate: 7.2, positionWeight: 90 },
         { code: 'EUR', name: '欧元', symbol: '€', rate: 7.8, positionWeight: 80 },
         { code: 'JPY', name: '日元', symbol: '¥', rate: 0.048, positionWeight: 70 },
-        { code: 'HKD', name: '港币', symbol: 'HK$', rate: 0.92, positionWeight: 60 }
+        { code: 'HKD', name: '港币', symbol: 'HK$', rate: 0.92, positionWeight: 60 },
+        { code: 'GBP', name: '英镑', symbol: '£', rate: 9.1, positionWeight: 50 },
+        { code: 'KRW', name: '韩元', symbol: '₩', rate: 0.0053, positionWeight: 40 },
+        { code: 'AUD', name: '澳元', symbol: 'A$', rate: 4.7, positionWeight: 30 },
+        { code: 'CAD', name: '加元', symbol: 'C$', rate: 5.2, positionWeight: 20 },
+        { code: 'SGD', name: '新加坡元', symbol: 'S$', rate: 5.3, positionWeight: 10 },
+        { code: 'THB', name: '泰铢', symbol: '฿', rate: 0.2, positionWeight: 9 },
+        { code: 'TWD', name: '新台币', symbol: 'NT$', rate: 0.22, positionWeight: 8 },
+        { code: 'MOP', name: '澳门元', symbol: 'MOP$', rate: 0.9, positionWeight: 7 },
+        { code: 'CHF', name: '瑞士法郎', symbol: 'CHF', rate: 8.1, positionWeight: 6 },
+        { code: 'NZD', name: '新西兰元', symbol: 'NZ$', rate: 4.3, positionWeight: 5 },
+        { code: 'MYR', name: '马来西亚林吉特', symbol: 'RM', rate: 1.6, positionWeight: 4 },
+        { code: 'PHP', name: '菲律宾比索', symbol: '₱', rate: 0.126, positionWeight: 3 },
+        { code: 'VND', name: '越南盾', symbol: '₫', rate: 0.00028, positionWeight: 2 },
+        { code: 'INR', name: '印度卢比', symbol: '₹', rate: 0.086, positionWeight: 1 },
+        { code: 'AED', name: '阿联酋迪拉姆', symbol: 'AED', rate: 1.96, positionWeight: 0 }
       ],
       defaultCurrency: 'CNY',
       tombstones: [],
@@ -931,6 +950,72 @@ export const useLedger = create<LedgerState>()(
 
       // 补齐内置分类（缺失的加上），并把老数据里的 emoji 图标迁移成图标键
       // 分类规范化：算法在 domain/taxonomy-merge.ts
+      // 新增分类：parentId=0 表示大类，否则是子分类
+      addCategory: (patch) => {
+        const s = get()
+        const sameLevel = patch.parentId === 0 ? s.parentCategories.filter((c) => c.kind === patch.kind) : s.childCategories.filter((c) => c.parentId === patch.parentId)
+        let id = Date.now()
+        while ([...s.parentCategories, ...s.childCategories].some((c) => c.id === id)) id++
+        const cat: Category = {
+          id, name: patch.name.trim(), parentId: patch.parentId, kind: patch.kind,
+          color: patch.color ?? DEFAULT_TAG_COLOR, positionWeight: sameLevel.length,
+          icon: patch.icon, updateTime: NOW()
+        }
+        set((st) => patch.parentId === 0
+          ? { parentCategories: [...st.parentCategories, cat] }
+          : { childCategories: [...st.childCategories, cat] })
+        return cat
+      },
+
+      updateCategory: (id, patch) => set((s) => ({
+        parentCategories: s.parentCategories.map((c) => c.id === id ? { ...c, ...patch, updateTime: NOW() } : c),
+        childCategories: s.childCategories.map((c) => c.id === id ? { ...c, ...patch, updateTime: NOW() } : c)
+      })),
+
+      // 删除分类：大类会连子分类一起删；被账单引用时拒绝，避免历史账目丢失分类
+      deleteCategory: (id) => {
+        const s = get()
+        const isParent = s.parentCategories.some((c) => c.id === id)
+        const childIds = s.childCategories.filter((c) => c.parentId === id).map((c) => c.id)
+        const used = s.bills.some((b) => b.parentCategoryId === id || childIds.includes(b.childCategoryId ?? -1))
+          || s.cycles.some((c) => c.parentCategoryId === id || childIds.includes(c.childCategoryId))
+        if (used) return false
+        set((st) => ({
+          parentCategories: isParent ? st.parentCategories.filter((c) => c.id !== id) : st.parentCategories,
+          childCategories: st.childCategories.filter((c) => c.id !== id && c.parentId !== id),
+          tombstones: [
+            ...st.tombstones,
+            ...(isParent ? [{ kind: 'parent', id: String(id), updatedAt: NOW() }] : [{ kind: 'child', id: String(id), updatedAt: NOW() }]),
+            ...childIds.map((cid) => ({ kind: 'child', id: String(cid), updatedAt: NOW() }))
+          ]
+        }))
+        return true
+      },
+
+      // 排序：同级重排后统一重新编号，避免权重重复导致“交换等于没换”
+      moveCategory: (id, dir) => set((s) => {
+        const inParent = s.parentCategories.some((c) => c.id === id)
+        const list = inParent ? s.parentCategories : s.childCategories
+        const target = list.find((c) => c.id === id)
+        if (!target) return {}
+        const siblings = (inParent
+          ? list.filter((c) => c.kind === target.kind)
+          : list.filter((c) => c.parentId === target.parentId))
+          .slice()
+          .sort((a, b) => (a.positionWeight ?? 0) - (b.positionWeight ?? 0) || a.id - b.id)
+        const idx = siblings.findIndex((c) => c.id === id)
+        const next = idx + dir
+        if (next < 0 || next >= siblings.length) return {}
+        const reordered = [...siblings]
+        const [moved] = reordered.splice(idx, 1)
+        reordered.splice(next, 0, moved)
+        const weight = new Map(reordered.map((c, i) => [c.id, i]))
+        const apply = (c: Category) => weight.has(c.id) ? { ...c, positionWeight: weight.get(c.id)! } : c
+        return inParent
+          ? { parentCategories: s.parentCategories.map(apply) }
+          : { childCategories: s.childCategories.map(apply) }
+      }),
+
       mergeTaxonomy: () => set((s) => {
         // 旧周期规则不做静默绑定：历史归属无法可靠推断，留空则由生成时按当前账本兜底
         return mergeTaxonomyState(s)
