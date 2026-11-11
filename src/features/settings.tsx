@@ -173,6 +173,9 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
     notIntoTotal?: boolean
     notIntoBudget?: boolean
     reimbursement?: boolean
+    toAssetId?: number
+    fromAssetId?: number
+    serviceCharge?: string
     endMode?: 'never' | 'times' | 'date'
     times?: string
     endDate?: string
@@ -515,6 +518,30 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
                 onChange={(e) => setCycleForm({ ...cycleForm, reimbursement: e.target.checked })} />
               生成的账单标记为待报销
             </label>
+
+            <div className="label">类型</div>
+            <select aria-label="周期类型" value={cycleForm.toAssetId ? 'transfer' : 'bill'}
+              onChange={(e) => setCycleForm({ ...cycleForm, toAssetId: e.target.value === 'transfer' ? (assets[1]?.assetId ?? 0) : undefined })}>
+              <option value="bill">记账（支出/收入）</option>
+              <option value="transfer">转账</option>
+            </select>
+            {cycleForm.toAssetId != null && (
+              <>
+                <div className="label">转出账户</div>
+                <select aria-label="周期转出账户" value={String(cycleForm.fromAssetId ?? '')}
+                  onChange={(e) => setCycleForm({ ...cycleForm, fromAssetId: Number(e.target.value) })}>
+                  {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
+                </select>
+                <div className="label">转入账户</div>
+                <select aria-label="周期转入账户" value={String(cycleForm.toAssetId)}
+                  onChange={(e) => setCycleForm({ ...cycleForm, toAssetId: Number(e.target.value) })}>
+                  {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
+                </select>
+                <div className="label">手续费（可选）</div>
+                <input aria-label="周期转账手续费" value={cycleForm.serviceCharge ?? ''} inputMode="decimal"
+                  onChange={(e) => setCycleForm({ ...cycleForm, serviceCharge: e.target.value.replace(/[^\d.]/g, '') })} />
+              </>
+            )}
 
             <div className="label">结束方式</div>
             <div className="row2">

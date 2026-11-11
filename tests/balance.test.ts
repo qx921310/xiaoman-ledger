@@ -1036,3 +1036,26 @@ assert.equal(made.hide, true, '隐藏标记保留')
 assert.equal(made.intoTotalAsset, false, '不计总资产保留')
 assert.equal(made.simpleName, '招行', '简称保留')
 assert.equal(made.bookId, 'book-x', '归属账本保留')
+
+// 周期转账（一木 Cycle 带 toAssetId）：生成转账而不是账单，手续费单独成账单
+const transferCycle = {
+  cycleId: 'cyc-transfer', bookId: 'book-a', name: '每月转存', kind: 'expense' as const,
+  parentCategoryId: 7, childCategoryId: 0, assetId: 3001, cost: 200,
+  fromAssetId: 3001, toAssetId: 3002, serviceCharge: 2,
+  dayOfMonth: 1, startTime: new Date(2026, 0, 1).getTime(), enabled: true, generated: []
+}
+const tPlan = planCycles({
+  cycles: [transferCycle as any],
+  bills: [],
+  assets: [
+    { assetId: 3001, assetName: '储蓄卡', assetType: 1, assetNumber: 1000, currency: 'CNY', positionWeight: 0, remark: '', userId: 1, updateTime: 1 },
+    { assetId: 3002, assetName: '理财', assetType: 4, assetNumber: 0, currency: 'CNY', positionWeight: 1, remark: '', userId: 1, updateTime: 1 }
+  ],
+  parentCategories: state().parentCategories, childCategories: state().childCategories,
+  currencies: [{ code: 'CNY', name: '人民币', symbol: '¥', rate: 1 }], defaultCurrency: 'CNY',
+  userId: 1, currentBookId: 'book-a'
+}, new Date(2026, 2, 1))
+assert.equal(tPlan.bills.length, 0, '周期转账不生成账单')
+assert.equal(tPlan.transfers?.length, 3, '1/2/3 月各一次转账')
+assert.equal(tPlan.transfers?.[0].toAssetId, 3002)
+assert.equal(tPlan.transfers?.[0].serviceCharge, 2)

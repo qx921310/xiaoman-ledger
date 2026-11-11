@@ -21,6 +21,8 @@ export interface CyclePlanInput {
 export interface CyclePlan {
   /** 本次要新增的账单 */
   bills: Bill[]
+  /** 本次要新增的周期转账（一木 CycleServiceCharge/toAssetId） */
+  transfers?: Array<{ cycleId: string | number; time: number; fromAssetId: number; toAssetId: number; cost: number; serviceCharge: number; remark?: string }>
   /** 更新后的周期规则（含 generated） */
   cycles: Cycle[]
   /** 各账户的余额变化（收入为正） */
@@ -37,6 +39,8 @@ export function planCycles(input: CyclePlanInput, now = new Date()): CyclePlan {
   const assetDelta = new Map<number, number>()
   const usedIds = new Set(existing.map((b) => String(b.billId)))
   const updatedCycles: Cycle[] = []
+  // 周期转账（一木：Cycle 带 toAssetId）单独收集，由 store 走 addTransfer
+  const transferPlans: Array<{ cycleId: string | number; time: number; fromAssetId: number; toAssetId: number; cost: number; serviceCharge: number; remark?: string }> = []
 
   // 未确认所属账本的旧规则暂不自动生成，避免多设备各记到不同账本
   for (const c of input.cycles.filter((x) => x.enabled && x.bookId != null)) {
@@ -52,6 +56,24 @@ export function planCycles(input: CyclePlanInput, now = new Date()): CyclePlan {
       fresh = fresh.slice(0, left)
     }
     if (!fresh.length) continue
+
+    // 周期转账：有 toAssetId 就不生成账单
+    if (c.toAssetId) {
+      for (const d of fresh) {
+        transferPlans.push({
+          cycleId: c.cycleId,
+          time: d.getTime(),
+          fromAssetId: c.fromAssetId ?? c.assetId,
+          toAssetId: c.toAssetId,
+          cost: c.cost,
+          serviceCharge: c.serviceCharge ?? 0,
+          remark: c.remark || c.name
+        })
+        done.add(dateKey(d))
+      }
+      updatedCycles.push({ ...c, generated: [...done], updateTime: Date.now() })
+      continue
+    }
 
     for (const d of fresh) {
       const time = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 9, 0, 0).getTime()
@@ -94,5 +116,5 @@ export function planCycles(input: CyclePlanInput, now = new Date()): CyclePlan {
     updatedCycles.push({ ...c, generated: [...done], updateTime: Date.now() })
   }
 
-  return { bills: created, cycles: updatedCycles, assetDelta, count: created.length }
+  return { bills: created, transfers: transferPlans, cycles: updatedCycles, assetDelta, count: created.length + transferPlans.length }
 }

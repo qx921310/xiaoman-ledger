@@ -805,6 +805,13 @@ export const useLedger = create<LedgerState>()(
         })
         if (!plan.count) return 0
         const cycleMap = new Map(plan.cycles.map((c) => [c.cycleId, c]))
+        // 周期转账先走 addTransfer（它会自己带出手续费账单），再落周期状态
+        for (const t of plan.transfers ?? []) {
+          get().addTransfer({
+            fromAssetId: t.fromAssetId, toAssetId: t.toAssetId,
+            cost: t.cost, serviceCharge: t.serviceCharge, time: t.time, remark: t.remark
+          })
+        }
         set((st) => ({
           bills: [...plan.bills, ...st.bills],
           assets: st.assets.map((a) => plan.assetDelta.has(a.assetId)

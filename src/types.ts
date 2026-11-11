@@ -261,6 +261,12 @@ export interface Cycle {
   reimbursement?: boolean
   /** 报销账户（reimbursement 为真时使用） */
   reimbursementAssetId?: number
+  /** 周期转账：收款方账户（有值即转账，否则是普通账单） */
+  toAssetId?: number
+  /** 周期转账：转出账户（fromAssetId） */
+  fromAssetId?: number
+  /** 周期转账：手续费 */
+  serviceCharge?: number
   /** 结束方式：不限 / 记满 N 次 / 到某天为止 */
   endMode?: 'never' | 'times' | 'date'
   /** endMode=times 时的总次数 */
