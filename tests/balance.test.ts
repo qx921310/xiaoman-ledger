@@ -12,6 +12,7 @@ import { fullDay, humanDay } from '../src/ui-format'
 import { accountHistory } from '../src/domain/account-history'
 import { parseShares, splitAmounts } from '../src/domain/split'
 import { buildAssetSankey, sankeyGroupOf } from '../src/domain/asset-sankey'
+import { planInstalment, planLoan } from '../src/domain/loan'
 import { byAsset, byTag, dailyTrend } from '../src/domain/stats-breakdown'
 import { dateKey, pendingDates } from '../src/cycle-dates'
 import { createElement } from 'react'
@@ -1059,3 +1060,63 @@ assert.equal(tPlan.bills.length, 0, '周期转账不生成账单')
 assert.equal(tPlan.transfers?.length, 3, '1/2/3 月各一次转账')
 assert.equal(tPlan.transfers?.[0].toAssetId, 3002)
 assert.equal(tPlan.transfers?.[0].serviceCharge, 2)
+
+// 房贷：等额本息公式、总额守恒、组合贷合并
+const ep = planLoan({ commercial: { amount: 1000000, rate: 0.043 }, periods: 360, repayment: 'equal-payment' })
+assert.equal(ep.periods.length, 360)
+assert.equal(ep.totalPrincipal, 1000000, '本金合计等于贷款额')
+// 经典校验：100 万 / 4.3% / 30 年，等额本息月供约 4948.7
+assert.ok(Math.abs(ep.firstMonthly - 4948.71) < 1.5, '首月月供接近理论值, 实际 ' + ep.firstMonthly)
+assert.ok(Math.abs(ep.periods.reduce((s, x) => s + x.total, 0) - (ep.totalPrincipal + ep.totalInterest)) < 0.5, '还款总额 = 本金 + 利息')
+
+// 等额本金：首月最高，逐期递减，本金每期相同
+const eq = planLoan({ commercial: { amount: 300000, rate: 0.043 }, periods: 120, repayment: 'equal-principal' })
+assert.equal(eq.totalPrincipal, 300000)
+assert.ok(eq.periods[0].total > eq.periods[eq.periods.length - 1].total, '等额本金逐期递减')
+assert.equal(eq.periods[0].principal, eq.periods[1].principal, '本金每期相同')
+
+// 组合贷：商贷 + 公积金，按期合并
+const combo = planLoan({
+  commercial: { amount: 400000, rate: 0.043 },
+  provident: { amount: 600000, rate: 0.031 },
+  periods: 240, repayment: 'equal-payment'
+})
+assert.equal(combo.totalPrincipal, 1000000, '组合贷本金合计')
+assert.ok(combo.firstMonthly > 0)
+
+// LPR 加点：加点后利息更高
+const base = planLoan({ commercial: { amount: 500000, rate: 0.035 }, periods: 120, repayment: 'equal-payment' })
+const add = planLoan({ commercial: { amount: 500000, rate: 0.035, lprAdd: 0.6 }, periods: 120, repayment: 'equal-payment' })
+assert.ok(add.totalInterest > base.totalInterest, 'LPR 加点后利息更高')
+
+// 信用卡分期：一次性 / 每期手续费，合计守恒
+const insOnce = planInstalment({ total: 12000, periods: 12, serviceRate: 0.072, serviceType: 0 })
+assert.equal(insOnce.periods.length, 12)
+assert.equal(insOnce.totalService, 864, '总手续费 = 本金 × 费率')
+assert.equal(insOnce.periods[0].service, 864, '一次性手续费全在第 1 期')
+assert.equal(insOnce.periods[1].service, 0)
+assert.equal(insOnce.periods.reduce((s, x) => s + x.principal, 0), 12000, '本金合计守恒')
+const insPer = planInstalment({ total: 12000, periods: 12, serviceRate: 0.072, serviceType: 1 })
+assert.equal(Math.round(insPer.periods.reduce((s, x) => s + x.service, 0)), 864, '每期手续费合计等于总手续费')
+
+// 房贷/分期计划可持久化，分期能生成每期账单
+state().reset()
+state().addAsset({ assetId: 79, assetName: '信用卡', assetType: 2, assetNumber: 0 })
+const loanRec = state().addHomeLoan({
+  name: '首套', commercial: 400000, commercialRate: 0.043,
+  provident: 200000, providentRate: 0.031, periods: 120, repayment: 'equal-payment'
+})
+assert.equal(state().homeLoans.length, 1)
+assert.equal(loanRec.commercial, 400000)
+const insRec = state().addInstalment({
+  totalNumber: 1200, periods: 6, serviceRate: 0.06, serviceType: 0,
+  accountMonth: '2026-11', assetId: 79
+})
+assert.equal(state().instalments.length, 1)
+const posted = state().postInstalmentBills(insRec.instalmentId)
+assert.equal(posted, 6, '生成 6 期账单')
+assert.equal(state().postInstalmentBills(insRec.instalmentId), 0, '重复生成会被跳过')
+assert.equal(state().bills.filter((b) => b.assetId === 79).length, 6)
+state().deleteInstalment(insRec.instalmentId)
+state().deleteHomeLoan(loanRec.loanId)
+assert.equal(state().instalments.length + state().homeLoans.length, 0)

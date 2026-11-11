@@ -12,6 +12,7 @@ import { planCycles } from './domain/cycles'
 import { dedupeCycleBills as dedupeBills } from './domain/cycle-dedupe'
 import { mergeTaxonomyState } from './domain/taxonomy-merge'
 import { serializeShares, splitAmounts } from './domain/split'
+import { planInstalment } from './domain/loan'
 import { fromBase, toBase } from './money'
 import { validateBackup } from './backup'
 import { addRefundChanges, deleteRefundChanges } from './refund-operations'
@@ -62,6 +63,8 @@ interface LedgerState {
   cycles: Cycle[]
   /** 币种表；默认币种固定为 CNY，其余按 rate 折算 */
   tags: Tag[]
+  homeLoans: import('./types').HomeLoan[]
+  instalments: import('./types').Instalment[]
   billGroups: import('./types').BillGroup[]
   billRelated: import('./types').BillRelated[]
   splitGroups: import('./types').SplitGroup[]
@@ -120,6 +123,12 @@ interface LedgerState {
   dissolveBillGroup: (billGroupId: number) => void
   removeFromBillGroup: (billGroupId: number, billId: string | number) => void
   /** 账单关联：两两关联（一木 BillRelated） */
+  addHomeLoan: (patch: Omit<import('./types').HomeLoan, 'loanId' | 'updateTime'>) => import('./types').HomeLoan
+  deleteHomeLoan: (loanId: number) => void
+  addInstalment: (patch: Omit<import('./types').Instalment, 'instalmentId' | 'updateTime'>) => import('./types').Instalment
+  deleteInstalment: (instalmentId: number) => void
+  /** 分期转成每期账单（记到信用卡账户上） */
+  postInstalmentBills: (instalmentId: number) => number
   linkBills: (a: string | number, b: string | number) => boolean
   unlinkBills: (relatedId: number) => void
   updateBill: (billId: string | number, patch: Partial<Bill>) => void
@@ -195,6 +204,8 @@ export const useLedger = create<LedgerState>()(
       lends: [],
       cycles: [],
       tags: [],
+      homeLoans: [],
+      instalments: [],
       billGroups: [],
       billRelated: [],
       splitGroups: [],
@@ -423,6 +434,50 @@ export const useLedger = create<LedgerState>()(
         splitExpenses: s.splitExpenses.map((x) => x.splitExpenseId === splitExpenseId
           ? { ...x, settlement, updateTime: NOW() } : x)
       })),
+
+      addHomeLoan: (patch) => {
+        const s = get()
+        let loanId = Date.now()
+        while (s.homeLoans.some((x) => x.loanId === loanId)) loanId++
+        const loan: import('./types').HomeLoan = { ...patch, loanId, updateTime: NOW() }
+        set((st) => ({ homeLoans: [...st.homeLoans, loan] }))
+        return loan
+      },
+
+      deleteHomeLoan: (loanId) => set((s) => ({ homeLoans: s.homeLoans.filter((x) => x.loanId !== loanId) })),
+
+      addInstalment: (patch) => {
+        const s = get()
+        let instalmentId = Date.now()
+        while (s.instalments.some((x) => x.instalmentId === instalmentId)) instalmentId++
+        const rec: import('./types').Instalment = { ...patch, instalmentId, updateTime: NOW() }
+        set((st) => ({ instalments: [...st.instalments, rec] }))
+        return rec
+      },
+
+      deleteInstalment: (instalmentId) => set((s) => ({ instalments: s.instalments.filter((x) => x.instalmentId !== instalmentId) })),
+
+      // 把分期计划的每期本金+手续费生成账单（支出），只生成一次
+      postInstalmentBills: (instalmentId) => {
+        const s = get()
+        const rec = s.instalments.find((x) => x.instalmentId === instalmentId)
+        if (!rec || !rec.assetId) return 0
+        const plan = planInstalment({ total: rec.totalNumber, periods: rec.periods, serviceRate: rec.serviceRate, serviceType: rec.serviceType })
+        const start = new Date(`${rec.accountMonth}-01T00:00:00`)
+        let created = 0
+        for (const p of plan.periods) {
+          const time = new Date(start.getFullYear(), start.getMonth() + (p.period - 1), 20, 12).getTime()
+          const exists = get().bills.some((b) => b.assetId === rec.assetId && b.time === time && b.cost === p.total)
+          if (exists) continue
+          get().addBill({
+            assetId: rec.assetId, parentCategoryId: 4, cost: p.total, time,
+            remark: `分期第 ${p.period}/${rec.periods} 期${p.service ? '（含手续费 ' + p.service + '）' : ''}`,
+            notIntoTotal: false
+          })
+          created++
+        }
+        return created
+      },
 
       // 账单组（一木 BillGroup）：要求同一账本、至少两条且不重复
       createBillGroup: (billIds) => {

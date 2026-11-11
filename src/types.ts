@@ -11,6 +11,45 @@ export const ASSET_TYPE: Record<number, string> = {
 /** 信用卡余额以负数表示 */
 export const CREDIT_CARD = 2
 
+/** 一木：房贷计划（组合贷） */
+export interface HomeLoan {
+  loanId: number
+  name: string
+  /** 商业贷款本金与年利率 */
+  commercial: number
+  commercialRate: number
+  /** 公积金本金与年利率 */
+  provident: number
+  providentRate: number
+  /** LPR 加点（百分点） */
+  lprAdd?: number
+  periods: number
+  repayment: 'equal-payment' | 'equal-principal'
+  /** 首次还款日 */
+  firstRepayment?: number
+  /** 关联的贷款账户 */
+  assetId?: number
+  updateTime?: number
+}
+
+/** 一木：信用卡分期 */
+export interface Instalment {
+  instalmentId: number
+  assetId?: number
+  /** 分期本金 */
+  totalNumber: number
+  periods: number
+  /** 总手续费率 */
+  serviceRate: number
+  /** 0 一次性 / 1 每期 */
+  serviceType: 0 | 1
+  /** 账单月份 YYYY-MM */
+  accountMonth: string
+  billId?: string | number
+  remark?: string
+  updateTime?: number
+}
+
 /** 一木：账单组（把多条账单合成一条展示） */
 export interface BillGroup {
   billGroupId: number
