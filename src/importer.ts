@@ -10,7 +10,7 @@ export interface ParsedTable {
   sheetName: string
 }
 
-export type SourceFormat = 'yimu' | 'transfer' | 'generic' | 'unknown'
+export type SourceFormat = 'yimu' | 'wechat' | 'alipay' | 'transfer' | 'generic' | 'unknown'
 
 /** 解析 xlsx / xls / csv（自动识别 UTF-8 与 GBK） */
 export function parseLedgerFile(buf: ArrayBuffer, fileName: string): ParsedTable {
@@ -55,6 +55,11 @@ function isUtf8(b: Uint8Array) {
 
 export function detectFormat(headers: string[]): SourceFormat {
   const has = (k: string) => headers.includes(k)
+  const some = (k: string) => headers.some((h) => h.includes(k))
+  // 微信支付账单：交易时间 / 交易类型 / 交易对方 / 商品 / 收/支 / 金额(元)
+  if (some('交易时间') && some('收/支') && some('金额(元)')) return 'wechat'
+  // 支付宝账单：交易时间 / 交易分类 / 交易对方 / 商品说明 / 收/支 / 金额 / 收/付款方式
+  if (some('交易号') || (some('交易时间') && some('收/付款方式')) || (some('交易分类') && some('收/支'))) return 'alipay'
   if (has('日期') && has('收支类型') && has('金额') && (has('类别') || has('分类'))) return 'yimu'
   if (has('转出账户') && has('转入账户') && has('金额')) return 'transfer'
   if ((has('时间') || has('日期')) && has('金额')) return 'generic'
@@ -128,8 +133,44 @@ function parseTime(v: unknown): number {
   return Number.isNaN(t) ? NaN : t
 }
 
+/**
+ * 微信/支付宝导出的列名与一木不同，先归一到我们的通用列，
+ * 后面的解析、去重、账本归属都能直接复用。
+ */
+function normalizeThirdPartyTable(table: ParsedTable): ParsedTable {
+  const format = detectFormat(table.headers)
+  if (format !== 'wechat' && format !== 'alipay') return table
+  const find = (kw: string) => table.headers.findIndex((h) => h.includes(kw))
+  const iTime = find('交易时间') >= 0 ? find('交易时间') : find('时间')
+  const iAmount = find('金额(元)') >= 0 ? find('金额(元)') : find('金额')
+  const iFlow = find('收/支')
+  const iPeer = find('交易对方')
+  const iGoods = find('商品')
+  const iCat = find('交易分类')
+  const iPay = find('付款方式') >= 0 ? find('付款方式') : find('收/付款方式')
+
+  const headers = ['日期', '收支类型', '金额', '类别', '账户', '备注']
+  const rows = table.rows.map((r) => {
+    const flowText = String(r[iFlow] ?? '').trim()
+    const flow = flowText.includes('支出') ? '支出' : flowText.includes('收入') ? '收入' : ''
+    const remark = [r[iPeer], r[iGoods]].filter(Boolean).join(' · ')
+    return [
+      String(r[iTime] ?? ''),
+      flow,
+      String(r[iAmount] ?? '').replace(/[¥￥,]/g, ''),
+      String(r[iCat] ?? ''),
+      String(r[iPay] ?? ''),
+      remark
+    ]
+  // 微信/支付宝账单末尾常有汇总行，没有时间或金额的直接丢掉
+  }).filter((r) => r[0] && r[2])
+  return { headers, rows, sheetName: table.sheetName }
+}
+
 export function buildImportPlan(args: BuildArgs): ImportPlan {
-  const { table, existingBills, existingAssets, existingBooks, parentCategories, childCategories, userId, bookId } = args
+  const normalized = normalizeThirdPartyTable(args.table)
+  const table = normalized
+  const { existingBills, existingAssets, existingBooks, parentCategories, childCategories, userId, bookId } = args
   const format = detectFormat(table.headers)
   const col = buildIndex(table.headers)
 

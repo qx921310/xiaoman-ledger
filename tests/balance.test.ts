@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { deriveAssets } from '../src/balances'
-import { buildExportTable, buildImportPlan, parseLedgerFile } from '../src/importer'
+import { buildExportTable, buildImportPlan, detectFormat, parseLedgerFile } from '../src/importer'
 import * as XLSX from 'xlsx'
 import { editAmount, evaluateAmount, formatAmount } from '../src/ui/keypad'
 import { lendRemaining, lendTotals } from '../src/lend'
@@ -1135,3 +1135,37 @@ assert.equal(state().bills[0].cost, 12, '模板金额')
 assert.equal(balance(78), 488)
 state().deleteTemplate(tpl.templateId)
 assert.equal(state().templates.length, 0)
+
+// 微信/支付宝账单导入：表头归一后能正确识别收支与金额
+const wxTable = {
+  headers: ['交易时间', '交易类型', '交易对方', '商品', '收/支', '金额(元)', '支付方式'],
+  rows: [
+    ['2026-06-01 08:30:00', '商户消费', '早餐店', '包子', '支出', '¥12.00', '零钱'],
+    ['2026-06-02 09:00:00', '转账', '张三', '红包', '收入', '¥50.00', '零钱'],
+    ['', '', '', '', '', '', ''] // 汇总行
+  ],
+  sheetName: '微信支付账单'
+}
+assert.equal(detectFormat(wxTable.headers), 'wechat')
+const wxPlan = buildImportPlan({
+  table: wxTable as any, existingBills: [], existingAssets: [], existingBooks: [],
+  parentCategories: state().parentCategories, childCategories: state().childCategories,
+  userId: 1, bookId: 1
+})
+assert.equal(wxPlan.bills.length, 2, '两条有效记录，汇总行被丢弃')
+assert.equal(wxPlan.bills[0].cost, 12, '金额去掉货币符号')
+assert.equal(wxPlan.bills[0].parentCategoryId > 0, true, '支出分类已归到默认类')
+
+const aliTable = {
+  headers: ['交易时间', '交易分类', '交易对方', '商品说明', '收/支', '金额', '收/付款方式'],
+  rows: [['2026-06-03 12:00:00', '餐饮美食', '面馆', '牛肉面', '支出', '25.00', '花呗']],
+  sheetName: '支付宝账单'
+}
+assert.equal(detectFormat(aliTable.headers), 'alipay')
+const aliPlan = buildImportPlan({
+  table: aliTable as any, existingBills: [], existingAssets: [], existingBooks: [],
+  parentCategories: state().parentCategories, childCategories: state().childCategories,
+  userId: 1, bookId: 1
+})
+assert.equal(aliPlan.bills.length, 1)
+assert.equal(aliPlan.bills[0].cost, 25)
