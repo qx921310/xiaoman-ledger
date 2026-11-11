@@ -10,13 +10,14 @@
     "api": "node server/server.mjs",
     "typecheck": "tsc --noEmit",
     "test": "npm run test:balances && npm run test:sync-identities",
-    "check": "npm run typecheck && npm test && npm run icons:check && npm run ui:tokens && npm run ui:contrast && npm run build",
+    "check": "npm run typecheck && npm test && npm run icons:check && npm run ui:tokens && npm run ui:contrast && npm run lint && npm run build",
     "icons": "node scripts/icon-manifest.mjs --write",
     "icons:check": "node scripts/icon-manifest.mjs",
     "ui:tokens": "node scripts/ui-tokens.mjs",
     "ui:contrast": "node scripts/ui-contrast.mjs",
     "test:balances": "node tests/run-balances.cjs",
-    "test:sync-identities": "node --test tests/sync-identities.test.mjs"
+    "test:sync-identities": "node --test tests/sync-identities.test.mjs",
+    "lint": "eslint src"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -28,7 +29,9 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
+    "eslint": "^9.39.4",
     "typescript": "^5.5.4",
+    "typescript-eslint": "^8.72.2",
     "vite": "^5.4.2"
   },
   "pnpm": {

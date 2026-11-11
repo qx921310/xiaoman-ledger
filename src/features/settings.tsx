@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLedger } from '../store'
-import type { Cycle, Transfer } from '../types'
+import type { Cycle } from '../types'
 import type { ImportPlan } from '../importer'
-import { api } from '../api'
 import { books as bookApi, type BookInfo } from '../auth'
 import { syncNow } from '../sync'
 import { money } from '../ui-format'
@@ -66,8 +65,6 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
   const reimbursements = useLedger((s) => s.reimbursements)
   const refunds = useLedger((s) => s.refunds)
   const currentBookId = useLedger((s) => s.currentBookId)
-  const updateTransfer = useLedger((s) => s.updateTransfer)
-  const [editingTransfer, setEditingTransfer] = useState<Transfer | null>(null)
 
   const [plan, setPlan] = useState<ImportPlan | null>(null)
   const [restorePreview, setRestorePreview] = useState<{ name: string; data: any } | null>(null)
@@ -204,16 +201,6 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
     }
     r.onerror = () => notify('备份文件读取失败')
     r.readAsText(f)
-  }
-
-  const doSync = async () => {
-    setSyncMsg('连接中…')
-    try {
-      const h = await api.health()
-      setSyncMsg(h?.result?.writable ? '服务端在线，可写' : '服务端在线，但只读（未配置写令牌）')
-    } catch (e: any) {
-      setSyncMsg('连接失败：' + e.message)
-    }
   }
 
   return (

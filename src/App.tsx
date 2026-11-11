@@ -168,7 +168,6 @@ function BookSwitch() {
       <option value="0">全部账本</option>
       {books.map((b) => {
         const k = keyOf(b)
-        const shared = b.role && b.role !== 'admin' || (b.ownerId && b.ownerId !== 0 && b.role)
         return (
           <option key={k} value={k}>
             {b.accountBookName}{b.role ? ` · ${ROLE_LABEL[b.role] ?? b.role}` : ''}

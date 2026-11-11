@@ -46,7 +46,6 @@ export function Bills({ me, onAdd }: { me?: { id: number; email: string }; onAdd
   const [detail, setDetail] = useState<Bill | null>(null)
 
   const nameOf = (pid: number) => parents.find((p) => p.id === pid)?.name ?? ''
-  const isIncome = (pid: number) => parents.find((p) => p.id === pid)?.kind === 'income'
 
   const match = (b: Bill) => {
     if (monthOf(b.time) !== month) return false
@@ -344,14 +343,6 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
   const defaultCurrency = useLedger((s) => s.defaultCurrency)
   const reimbursements = useLedger((s) => s.reimbursements)
   const refunds = useLedger((s) => s.refunds)
-  const currentBookId = useLedger((s) => s.currentBookId)
-  const tags = useLedger((s) => s.tags)
-  const tagsByName = useMemo(() => new Map(tags.map((t) => [t.name, t])), [tags])
-  const accountBooks = useLedger((s) => s.accountBooks)
-  const myRole = accountBooks.find((b) => b.bookId && String(b.bookId) === String(currentBookId))?.role
-  const readOnly = myRole === 'silent'
-  const updateTransfer = useLedger((s) => s.updateTransfer)
-  const [editingTransfer, setEditingTransfer] = useState<Transfer | null>(null)
   const addReimbursement = useLedger((s) => s.addReimbursement)
   const settleReimbursement = useLedger((s) => s.settleReimbursement)
   const deleteReimbursement = useLedger((s) => s.deleteReimbursement)
