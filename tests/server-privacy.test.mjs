@@ -61,8 +61,10 @@ test('共享账本服务端保护私有账户和历史快照', async () => {
       assert.equal(blocked.body.result.denied, 1, `${kind} 不能引用私有账户`)
     }
   } finally {
-    child.kill()
-    await once(child, 'exit').catch(() => {})
+    if (child.exitCode === null && child.signalCode === null) {
+      child.kill()
+      await once(child, 'exit').catch(() => {})
+    }
     await rm(temp, { recursive: true, force: true })
   }
 })

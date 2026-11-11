@@ -199,6 +199,50 @@ const myBooks = (userId) =>
 const bookMembers = (bookId) =>
   db.prepare('SELECT m.user_id AS userId, m.role, u.email, n.member_no AS memberNo FROM book_members m JOIN users u ON u.id = m.user_id LEFT JOIN book_member_numbers n ON n.book_id=m.book_id AND n.user_id=m.user_id WHERE m.book_id = ? ORDER BY n.member_no').all(bookId)
 
+// 仅依赖服务端已保存的账户或同一请求中可被正常写入的新版本。
+function accountForBook(assetId, ownerId, bookId, pending = []) {
+  const id = String(assetId)
+  const saved = db.prepare('SELECT payload, updated_at, deleted, user_id, book_id FROM records WHERE kind = ? AND rid = ? AND (user_id = ? OR book_id = ?) ORDER BY CASE WHEN user_id = ? THEN 0 ELSE 1 END')
+    .all('asset', id, ownerId, bookId, ownerId)
+  let row = saved[0]
+  const candidates = pending.filter((r) => r?.kind === 'asset' && String(r.id) === id && String(r.payload?.assetId) === id && !r.deleted)
+  const candidate = candidates.reduce((best, r) => !best || Number(r.updatedAt || 0) > Number(best.updatedAt || 0) ? r : best, null)
+  if (candidate && (!row || (Number(row.user_id) === Number(ownerId) && Number(candidate.updatedAt || 0) > Number(row.updated_at || 0)))) {
+    const candidateBook = candidate.bookId || candidate.payload.bookId || null
+    const sameScope = !row?.book_id || !candidateBook || String(row.book_id) === String(candidateBook)
+    if (sameScope && (!candidateBook || (String(candidateBook) === String(bookId) && canWrite(roleOf(String(bookId), ownerId))))) {
+      row = { payload: JSON.stringify(candidate.payload), updated_at: Number(candidate.updatedAt || 0), deleted: 0, user_id: ownerId, book_id: candidateBook }
+    }
+  }
+  if (!row || row.deleted) return null
+  try { return { ...JSON.parse(row.payload), scopeBook: row.book_id } } catch { return null }
+}
+
+function referencedAccounts(kind, payload) {
+  if (!payload || typeof payload !== 'object') return []
+  const keys = {
+    bill: ['assetId'], transfer: ['fromAssetId', 'toAssetId'], cycle: ['assetId', 'fromAssetId', 'toAssetId', 'reimbursementAssetId'],
+    refund: ['assetId'], reimbursement: ['assetId'], lend: ['assetId', 'repaymentAssetId'], billGroup: ['assetList']
+  }[kind] ?? []
+  return keys.flatMap((key) => Array.isArray(payload[key]) ? payload[key] : [payload[key]])
+    .filter((id) => id != null && id !== '' && String(id) !== '0')
+}
+
+function isAccountShared(asset, bookId) {
+  return Boolean(asset && asset.scopeBook != null && String(asset.scopeBook) === String(bookId))
+}
+
+// 只对传输结果脱敏，不改数据库的原始快照或记录版本。
+function redactPrivateSnapshot(kind, payload, ownerId, bookId, viewerId) {
+  if (!payload || kind !== 'bill' || !bookId || Number(ownerId) === Number(viewerId)) return payload
+  const asset = payload.assetId ? accountForBook(payload.assetId, ownerId, bookId) : null
+  if (isAccountShared(asset, bookId)) return payload
+  const out = { ...payload }
+  if (out.billSnapshot && typeof out.billSnapshot === 'object') out.billSnapshot = { ...out.billSnapshot, assetName: '私有账户' }
+  if (out.billShareInfo && typeof out.billShareInfo === 'object' && !Array.isArray(out.billShareInfo)) out.billShareInfo = { ...out.billShareInfo, assetName: '私有账户' }
+  return out
+}
+
 const emailOk = (v) => typeof v === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
 // 写接口默认关闭：只有设置了 LEDGER_WRITE_TOKEN 且请求带 x-write-token 才允许写入。
 // 记账数据本来只存浏览器本地，服务端只是可选同步点，公开部署不该留匿名写入口。
@@ -509,6 +553,19 @@ const server = createServer(async (req, res) => {
           if (!canWrite(role)) { denied++; continue }
           const others = existing.filter((e) => e.book_id === bookId && e.user_id !== user.id)
           if (others.length && !isAdmin(role)) { denied++; continue }
+          const multiMember = db.prepare('SELECT COUNT(*) AS n FROM book_members WHERE book_id = ?').get(bookId).n > 1
+          if (multiMember && !r.deleted && r.payload) {
+            // 若账户不明，宁可拒绝并提示核对，也不能把私有账户快照发给其他成员。
+            const refs = referencedAccounts(r.kind, r.payload)
+            if (refs.some((id) => !isAccountShared(accountForBook(id, user.id, bookId, list), bookId))) { denied++; continue }
+          }
+          // 非所有者拿到的是脱敏快照，不能把该快照写回覆盖原始历史记录。
+          if (!r.deleted && r.kind === 'bill' && existing.some((e) => e.book_id === bookId && Number(e.user_id) !== Number(user.id))) {
+            const old = db.prepare('SELECT payload,user_id FROM records WHERE kind = ? AND rid = ? AND book_id = ? LIMIT 1').get(r.kind, rid, bookId)
+            let previous = null
+            try { previous = old && JSON.parse(old.payload) } catch { /* 未能确认隐私时拒绝 */ }
+            if (!previous || !isAccountShared(accountForBook(previous.assetId, old.user_id, bookId), bookId)) { denied++; continue }
+          }
         }
 
         // 3) 版本比较（同一身份下）
@@ -561,7 +618,7 @@ const server = createServer(async (req, res) => {
       const records = rows.map((r) => ({
         kind: r.kind,
         id: r.rid,
-        payload: r.payload ? JSON.parse(r.payload) : null,
+        payload: r.payload ? redactPrivateSnapshot(r.kind, JSON.parse(r.payload), r.user_id, r.book_id, user.id) : null,
         updatedAt: r.updated_at,
         deleted: r.deleted === 1,
         ownerId: r.user_id,
