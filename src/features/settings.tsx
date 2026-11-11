@@ -128,6 +128,8 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
   const fmtLabel = (f: string) =>
     f === 'yimu' ? '一木记账导出' : f === 'transfer' ? '转账流水' : f === 'generic' ? '通用账单表' : '未识别的表头'
 
+  const currentUserId = useLedger((s) => s.userId)
+
   const pickFile = async (f: File) => {
     setErr('')
     setPlan(null)
@@ -136,7 +138,9 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
       const table = parseLedgerFile(await f.arrayBuffer(), f.name)
       const p = buildImportPlan({
         table, existingBills: bills, existingAssets: assets, existingBooks: accountBooks,
-        parentCategories: parents, childCategories: children, userId: 1, bookId: 1
+        parentCategories: parents, childCategories: children,
+        // 用当前登录账号与当前账本，不能写死 1
+        userId: currentUserId, bookId: currentBookId || 1
       })
       setFileName(f.name)
       setPlan(p)
@@ -157,7 +161,9 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
       const table = parseLedgerFile(buf, 'demo-yimu.xlsx')
       const p = buildImportPlan({
         table, existingBills: bills, existingAssets: assets, existingBooks: accountBooks,
-        parentCategories: parents, childCategories: children, userId: 1, bookId: 1
+        parentCategories: parents, childCategories: children,
+        // 用当前登录账号与当前账本，不能写死 1
+        userId: currentUserId, bookId: currentBookId || 1
       })
       setFileName('内置示例 demo-yimu.xlsx')
       setPlan(p)

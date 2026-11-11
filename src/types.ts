@@ -106,6 +106,8 @@ export interface Tag {
   /** 父标签名（空表示顶层） */
   parentName?: string
   positionWeight: number
+  /** 修改时间，用于跨设备比较版本 */
+  updateTime?: number
 }
 
 /** 币种。rate 语义：1 单位该币种 = rate 个默认币种 */
@@ -271,6 +273,8 @@ export interface TombstoneV1 {
   id: string
   updatedAt: number
   bookId?: string | number
+  /** 记录属主；跨账号同名编号时用它区分，避免误删 */
+  ownerId?: number
 }
 
 /** 从服务端拉回的一条同步记录 */

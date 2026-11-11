@@ -538,6 +538,26 @@ assert.deepEqual(dedupedA.bills.map((b: any) => b.billId), ['a'])
 assert.equal(dedupedA.removed.length, 2)
 const crossBook = dedupeBills([mkCycleBill('x', 'book-a'), mkCycleBill('y', 'book-b')])
 assert.equal(crossBook.removed.length, 0, '不同账本不能互相去重')
+
+// 同一墓碑重复拉取，不能删掉另一属主的记录
+let rep: any = { ...emptyMergeState(), assets: [
+  { assetId: 7, assetName: '本地卡', ownerId: 1, userId: 1, updateTime: 10 },
+  { assetId: 7002, assetName: '对方卡', ownerId: 2, userId: 2, updateTime: 20, __originId: '7', __originOwner: 2 }
+] }
+const tombRec = { kind: 'asset', id: '7', ownerId: 2, updatedAt: 40, deleted: true, payload: null }
+rep = { ...rep, ...mergeRemote(rep, [tombRec]) }
+assert.deepEqual(rep.assets.map((a: any) => a.assetId), [7], '第一次应删掉属主 2 的记录')
+rep = { ...rep, ...mergeRemote(rep, [tombRec]) }
+assert.deepEqual(rep.assets.map((a: any) => a.assetId), [7], '重复墓碑不能再删属主 1 的记录')
+
+// 去重时带退款/报销的账单必须保留
+const keepRefund = mkCycleBill('r1', 'book-a')
+const protectedSet = new Set<string>(['r1'])
+const withProtected = dedupeBills([keepRefund, mkCycleBill('r2', 'book-a')], protectedSet)
+assert.ok(withProtected.bills.some((b: any) => b.billId === 'r2'), '没有关联的那条可以删')
+assert.ok(withProtected.bills.some((b: any) => b.billId === 'r1'), '有退款的那条必须保留')
+const allProtected = dedupeBills([mkCycleBill('r1', 'book-a'), mkCycleBill('r2', 'book-a')], new Set(['r1', 'r2']))
+assert.equal(allProtected.removed.length, 0, '全都有业务关联时不做去重')
 const unmigratedBackup = JSON.parse(JSON.stringify(backup))
 delete unmigratedBackup.assets[0].openingBalance
 state().importAll(unmigratedBackup)

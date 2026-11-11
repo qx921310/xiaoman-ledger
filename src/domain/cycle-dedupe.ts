@@ -19,7 +19,7 @@ export interface CycleDedupeResult {
  * 周期账单去重：同一 (cycleId, 日期) 只保留编号最小的一条。
  * 用确定性规则选保留项，两台设备各自执行也会收敛到同一条。
  */
-export function dedupeCycleBills(bills: Bill[]): CycleDedupeResult {
+export function dedupeCycleBills(bills: Bill[], protectedIds: Set<string> = new Set()): CycleDedupeResult {
   const groups = new Map<string, Bill[]>()
   for (const b of bills) {
     const key = cycleBillKey(b)
@@ -31,7 +31,12 @@ export function dedupeCycleBills(bills: Bill[]): CycleDedupeResult {
   const drop = new Set<Bill>()
   for (const list of groups.values()) {
     if (list.length < 2) continue
-    const sorted = [...list].sort((a, b) => String(a.syncId ?? a.billId).localeCompare(String(b.syncId ?? b.billId)))
+    // 带退款或报销的账单不能删：关联记录会指向已删除的 ID，金额也会算错
+    const safe = list.filter((b) => !protectedIds.has(String(b.syncId ?? b.billId)))
+    if (safe.length < 2) continue
+    // 用明确的字符序比较，不依赖 locale
+    const key = (b: Bill) => String(b.syncId ?? b.billId)
+    const sorted = [...safe].sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0))
     for (const extra of sorted.slice(1)) drop.add(extra)
   }
   if (!drop.size) return { bills, removed: [] }

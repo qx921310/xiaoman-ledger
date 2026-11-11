@@ -91,7 +91,8 @@ interface BuildArgs {
   parentCategories: Category[]
   childCategories: Category[]
   userId: number
-  bookId: number
+  /** 当前账本；服务端账本是字符串 id，本地默认账本是数字 */
+  bookId: string | number
 }
 
 const num = (v: unknown) => {

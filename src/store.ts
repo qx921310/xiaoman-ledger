@@ -273,7 +273,9 @@ export const useLedger = create<LedgerState>()(
           memberNo: undefined,
           sequenceNo: undefined,
           time: NOW(),
-          updateTime: NOW()
+          updateTime: NOW(),
+          // 复制出来的账单不属于任何周期规则，否则会被周期去重当成重复账单删掉
+          cycleId: undefined
         }
         return { bills: [...s.bills, copy] }
       }),
@@ -537,7 +539,12 @@ export const useLedger = create<LedgerState>()(
       // 周期账单去重：必须走这层 set，才能触发余额重算并把墓碑写入待同步队列
       dedupeCycleBills: () => {
         const s = get()
-        const { bills, removed } = dedupeBills(s.bills)
+        // 有退款/报销关联的账单不参与删除
+        const protectedIds = new Set<string>([
+          ...s.refunds.map((r) => String(r.billId)),
+          ...s.reimbursements.map((r) => String(r.billId))
+        ])
+        const { bills, removed } = dedupeBills(s.bills, protectedIds)
         if (!removed.length) return 0
         set((st) => ({
           bills,
@@ -564,7 +571,10 @@ export const useLedger = create<LedgerState>()(
           assets: st.assets.map((a) => plan.assetDelta.has(a.assetId)
             ? { ...a, assetNumber: +(a.assetNumber + (plan.assetDelta.get(a.assetId) ?? 0)).toFixed(2), updateTime: NOW() }
             : a),
-          cycles: st.cycles.map((c) => cycleMap.get(c.cycleId) ?? c)
+          cycles: st.cycles.map((c) => {
+            const next = cycleMap.get(c.cycleId) ?? c
+            return next.bookId == null ? { ...next, bookId: s.currentBookId || 1 } : next
+          })
         }))
         return plan.count
       },
@@ -643,7 +653,12 @@ export const useLedger = create<LedgerState>()(
 
       setBudget: (budget) => set((s) => {
         const rest = s.budgets.filter((b) => !(b.month === budget.month && b.categoryId === budget.categoryId))
-        return { budgets: budget.amount > 0 ? [...rest, { ...budget, updateTime: NOW() }] : rest }
+        if (budget.amount > 0) return { budgets: [...rest, { ...budget, updateTime: NOW() }] }
+        // 填 0 表示取消：要写墓碑，否则云端旧预算会再拉回来
+        return {
+          budgets: rest,
+          tombstones: [...s.tombstones, { kind: 'budget', id: `${budget.month}:${budget.categoryId}`, updatedAt: NOW() }]
+        }
       }),
 
       removeBudget: (month, categoryId) => set((s) => ({
@@ -739,17 +754,21 @@ export const useLedger = create<LedgerState>()(
           name: patch.name,
           color: patch.color || DEFAULT_TAG_COLOR,
           parentName: patch.parentName || undefined,
-          positionWeight: patch.positionWeight ?? 0
+          positionWeight: patch.positionWeight ?? 0,
+          updateTime: NOW()
         }
         set((s) => ({ tags: [...s.tags, tag] }))
         return tag
       },
 
       updateTag: (tagId, patch) => set((s) => ({
-        tags: s.tags.map((t) => t.tagId === tagId ? { ...t, ...patch } : t)
+        tags: s.tags.map((t) => t.tagId === tagId ? { ...t, ...patch, updateTime: NOW() } : t)
       })),
 
-      deleteTag: (tagId) => set((s) => ({ tags: s.tags.filter((t) => t.tagId !== tagId) })),
+      deleteTag: (tagId) => set((s) => ({
+        tags: s.tags.filter((t) => t.tagId !== tagId),
+        tombstones: [...s.tombstones, { kind: 'tag', id: String(tagId), updatedAt: NOW() }]
+      })),
 
       // 导入/输入时按名字补齐标签实体，返回补齐数量
       ensureTags: (names) => {
@@ -800,12 +819,8 @@ export const useLedger = create<LedgerState>()(
       // 补齐内置分类（缺失的加上），并把老数据里的 emoji 图标迁移成图标键
       // 分类规范化：算法在 domain/taxonomy-merge.ts
       mergeTaxonomy: () => set((s) => {
-        const changes = mergeTaxonomyState(s)
-        // 历史周期规则没有账本归属：首次整理时固定到当前账本，避免之后随切换漂移
-        const stale = s.cycles.filter((c) => c.bookId == null)
-        return stale.length
-          ? { ...changes, cycles: s.cycles.map((c) => c.bookId == null ? { ...c, bookId: s.currentBookId || 1 } : c) }
-          : changes
+        // 旧周期规则不做静默绑定：历史归属无法可靠推断，留空则由生成时按当前账本兜底
+        return mergeTaxonomyState(s)
       }),
 
       // 合并式导入：新增分类/账户先落地，账单像正常记账一样冲账户余额
