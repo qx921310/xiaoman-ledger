@@ -10,13 +10,24 @@ import { accountMoney, toBase } from '../money'
 import { visibleAssets } from '../domain/asset-scope'
 import { accountHistory } from '../domain/account-history'
 import { planInstalment, planLoan } from '../domain/loan'
+import { IconPicker } from '../ui/icon-picker'
 import { lendRemaining, lendTotals } from '../lend'
+
+/** 图标 key → 中文名，用于选择按钮上显示 */
+function iconLabel(key: string): string {
+  for (const g of ASSET_ICON_GROUPS) {
+    const hit = g.options.find(([k]) => k === key)
+    if (hit) return hit[1]
+  }
+  return ''
+}
 
 export function Assets({ notify }: { notify: (m: string) => void }) {
   const allAssets = useLedger((s) => s.assets)
   const currentBookId = useLedger((s) => s.currentBookId)
   const meId = useLedger((s) => s.userId)
   const assets = visibleAssets(allAssets, currentBookId, meId)
+  const accountBooks = useLedger((s) => s.accountBooks)
   const currencies = useLedger((s) => s.currencies)
   const defaultCurrency = useLedger((s) => s.defaultCurrency)
   const total = useTotalAssets()
@@ -51,10 +62,34 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
   const [type, setType] = useState(1)
   const [num, setNum] = useState('')
   const [newIcon, setNewIcon] = useState('')
+  const [newCurrency, setNewCurrency] = useState(defaultCurrency)
+  const [newSimple, setNewSimple] = useState('')
+  const [newCardCode, setNewCardCode] = useState('')
+  const [newBookId, setNewBookId] = useState('')
+  const [newQuota, setNewQuota] = useState('')
+  const [newInDay, setNewInDay] = useState('')
+  const [newOutDay, setNewOutDay] = useState('')
+  const [newIntoTotal, setNewIntoTotal] = useState(true)
+  const [newRemark, setNewRemark] = useState('')
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   const create = () => {
     if (!name.trim()) return notify('请输入账户名')
-    addAsset({ assetName: name.trim(), assetType: type, assetNumber: Number(num) || 0, assetIcon: newIcon || undefined })
+    addAsset({
+      assetName: name.trim(),
+      assetType: type,
+      assetNumber: Number(num) || 0,
+      assetIcon: newIcon || undefined,
+      currency: newCurrency,
+      simpleName: newSimple.trim() || undefined,
+      cardCode: newCardCode || undefined,
+      bookId: newBookId === '' ? undefined : newBookId,
+      totalQuota: type === 2 && newQuota ? Number(newQuota) : undefined,
+      inAccountDate: type === 2 && newInDay ? Number(newInDay) : undefined,
+      outAccountDate: type === 2 && newOutDay ? Number(newOutDay) : undefined,
+      intoTotalAsset: newIntoTotal,
+      remark: newRemark
+    })
     setName(''); setNum(''); setNewIcon('')
     notify('账户已添加')
   }
@@ -139,6 +174,312 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
           </Modal>
         )
       })()}
+
+      <h3>房贷计划</h3>
+      <p className="hint">组合贷：商业贷款 + 公积金贷款，支持等额本息/等额本金与 LPR 加点。</p>
+      <div className="row2">
+        <input aria-label="商业贷款金额" placeholder="商贷金额" value={loanForm.commercial} inputMode="decimal"
+          onChange={(e) => setLoanForm({ ...loanForm, commercial: e.target.value.replace(/[^\d.]/g, '') })} />
+        <input aria-label="商贷年利率" placeholder="商贷年利率 %" value={loanForm.commercialRate} inputMode="decimal"
+          onChange={(e) => setLoanForm({ ...loanForm, commercialRate: e.target.value.replace(/[^\d.]/g, '') })} />
+      </div>
+      <div className="row2">
+        <input aria-label="公积金贷款金额" placeholder="公积金金额" value={loanForm.provident} inputMode="decimal"
+          onChange={(e) => setLoanForm({ ...loanForm, provident: e.target.value.replace(/[^\d.]/g, '') })} />
+        <input aria-label="公积金年利率" placeholder="公积金年利率 %" value={loanForm.providentRate} inputMode="decimal"
+          onChange={(e) => setLoanForm({ ...loanForm, providentRate: e.target.value.replace(/[^\d.]/g, '') })} />
+      </div>
+      <div className="row2">
+        <input aria-label="期数" placeholder="期数（月）" value={loanForm.periods} inputMode="numeric"
+          onChange={(e) => setLoanForm({ ...loanForm, periods: e.target.value.replace(/\D/g, '') })} />
+        <select aria-label="还款方式" value={loanForm.repayment}
+          onChange={(e) => setLoanForm({ ...loanForm, repayment: e.target.value as 'equal-payment' | 'equal-principal' })}>
+          <option value="equal-payment">等额本息</option>
+          <option value="equal-principal">等额本金</option>
+        </select>
+      </div>
+      {(() => {
+        const plan = planLoan({
+          commercial: { amount: Number(loanForm.commercial) || 0, rate: (Number(loanForm.commercialRate) || 0) / 100 },
+          provident: { amount: Number(loanForm.provident) || 0, rate: (Number(loanForm.providentRate) || 0) / 100 },
+          periods: Number(loanForm.periods) || 360,
+          repayment: loanForm.repayment
+        })
+        if (!plan.periods.length) return null
+        return (
+          <div className="budget-box small">
+            <div className="budget-line"><span>首期月供</span><b>{money(plan.firstMonthly)}</b></div>
+            <div className="budget-line"><span>利息总额</span><b>{money(plan.totalInterest)}</b></div>
+            <div className="budget-line"><span>还款总额</span><b>{money(plan.totalPrincipal + plan.totalInterest)}</b></div>
+            <button className="ghost wide" onClick={() => {
+              addHomeLoan({
+                name: loanForm.name,
+                commercial: Number(loanForm.commercial) || 0,
+                commercialRate: (Number(loanForm.commercialRate) || 0) / 100,
+                provident: Number(loanForm.provident) || 0,
+                providentRate: (Number(loanForm.providentRate) || 0) / 100,
+                lprAdd: Number(loanForm.lprAdd) || undefined,
+                periods: Number(loanForm.periods) || 360,
+                repayment: loanForm.repayment
+              })
+              notify('房贷计划已保存')
+            }}>保存计划</button>
+          </div>
+        )
+      })()}
+      {homeLoans.map((l) => {
+        const plan = planLoan({
+          commercial: { amount: l.commercial, rate: l.commercialRate },
+          provident: { amount: l.provident, rate: l.providentRate },
+          periods: l.periods, repayment: l.repayment
+        })
+        return (
+          <div key={l.loanId} className="row">
+            <div className="grow">
+              <div>{l.name} · {l.repayment === 'equal-payment' ? '等额本息' : '等额本金'}</div>
+              <small>本金 {money(l.commercial + l.provident)} · 月供 {money(plan.firstMonthly)} · 利息 {money(plan.totalInterest)}</small>
+            </div>
+            <button className="del" onClick={() => deleteHomeLoan(l.loanId)}>删</button>
+          </div>
+        )
+      })}
+
+      <h3>信用卡分期</h3>
+      <div className="row2">
+        <input aria-label="分期本金" placeholder="分期本金" value={insForm.total} inputMode="decimal"
+          onChange={(e) => setInsForm({ ...insForm, total: e.target.value.replace(/[^\d.]/g, '') })} />
+        <input aria-label="分期期数" placeholder="期数" value={insForm.periods} inputMode="numeric"
+          onChange={(e) => setInsForm({ ...insForm, periods: e.target.value.replace(/\D/g, '') })} />
+      </div>
+      <div className="row2">
+        <input aria-label="手续费率" placeholder="总手续费率 %" value={insForm.serviceRate} inputMode="decimal"
+          onChange={(e) => setInsForm({ ...insForm, serviceRate: e.target.value.replace(/[^\d.]/g, '') })} />
+        <select aria-label="手续费方式" value={insForm.serviceType}
+          onChange={(e) => setInsForm({ ...insForm, serviceType: Number(e.target.value) })}>
+          <option value={0}>手续费一次性收</option>
+          <option value={1}>手续费每期收</option>
+        </select>
+      </div>
+      {(() => {
+        const plan = planInstalment({
+          total: Number(insForm.total) || 0,
+          periods: Number(insForm.periods) || 12,
+          serviceRate: (Number(insForm.serviceRate) || 0) / 100,
+          serviceType: insForm.serviceType === 1 ? 1 : 0
+        })
+        if (!plan.periods.length) return null
+        return (
+          <div className="budget-box small">
+            <div className="budget-line"><span>每期本金</span><b>{money(plan.periods[0].principal)}</b></div>
+            <div className="budget-line"><span>手续费合计</span><b>{money(plan.totalService)}</b></div>
+            <button className="ghost wide" onClick={() => {
+              addInstalment({
+                totalNumber: Number(insForm.total) || 0,
+                periods: Number(insForm.periods) || 12,
+                serviceRate: (Number(insForm.serviceRate) || 0) / 100,
+                serviceType: insForm.serviceType === 1 ? 1 : 0,
+                accountMonth: insForm.month,
+                assetId: insForm.assetId || assets.find((a) => a.assetType === 2)?.assetId
+              })
+              notify('分期已登记')
+            }}>登记分期</button>
+          </div>
+        )
+      })()}
+      {instalments.map((i) => {
+        const plan = planInstalment({ total: i.totalNumber, periods: i.periods, serviceRate: i.serviceRate, serviceType: i.serviceType })
+        return (
+          <div key={i.instalmentId} className="row">
+            <div className="grow">
+              <div>{money(i.totalNumber)} · {i.periods} 期 · 手续费 {money(plan.totalService)}</div>
+              <small>每期约 {money(plan.periods[0]?.principal ?? 0)} · 从 {i.accountMonth} 起</small>
+            </div>
+            <button className="link" onClick={() => {
+              const n = postInstalmentBills(i.instalmentId)
+              notify(n ? `已生成 ${n} 期账单` : '没有可生成的账单（账户缺失或已生成）')
+            }}>生成账单</button>
+            <button className="del" onClick={() => deleteInstalment(i.instalmentId)}>删</button>
+          </div>
+        )
+      })}
+
+      {editingAsset && (
+        <AssetEditor
+          asset={editingAsset}
+          onClose={() => setEditingAsset(null)}
+          onSave={(next) => { updateAsset(next); setEditingAsset(null); notify('账户已更新') }}
+        />
+      )}
+
+      <h3>借入借出</h3>
+      {(receivable !== 0 || payable !== 0) && (
+        <p className="hint">待收回 {money(receivable)} · 待归还 {money(payable)}</p>
+      )}
+      {lends.length === 0 && <p className="hint">还没有借贷记录。</p>}
+      {lends.slice(0, 8).map((l) => (
+        <div key={l.lendId} className="row">
+          <div className="grow">
+            <div>{LEND_TYPE[l.type]} · {l.counterparty || '未填对方'}</div>
+            <small>
+              {assets.find((a) => a.assetId === l.assetId)?.assetName ?? '账户'} · {dayOf(l.time)}
+              {l.interest ? ` · 利息 ${money(l.interest)}` : ''}
+              {(l.type === 1 || l.type === 3) && l.parentLendId == null
+                ? (lendRemaining(l, lends) > 0
+                  ? ` · ${l.type === 1 ? '未收' : '未还'} ${money(lendRemaining(l, lends))}`
+                  : ' · ✅ 已结清')
+                : ''}
+              {l.remark ? ' · ' + l.remark : ''}
+            </small>
+          </div>
+          <b className={l.type === 2 || l.type === 4 ? 'neutral' : ''}>{money(l.number)}</b>
+          {(l.type === 1 || l.type === 3) && lendRemaining(l, lends) > 0 && (
+            <button className="link" aria-label={`结清 ${l.counterparty}`}
+              onClick={() => { repayLend({ lendId: l.lendId, amount: lendRemaining(l, lends), repaymentAssetId: l.repaymentAssetId ?? l.assetId }) }}>结清</button>
+          )}
+          {(l.type === 1 || l.type === 3) && lendRemaining(l, lends) > 0 && (
+            <button className="link" aria-label={`${l.type === 1 ? '收款' : '还款'} ${l.counterparty}`}
+              onClick={() => setRepayForm({
+                lendId: l.lendId, remaining: lendRemaining(l, lends), amount: '',
+                assetId: l.repaymentAssetId ?? l.assetId
+              })}>{l.type === 1 ? '收' : '还'}</button>
+          )}
+          <button className="del" aria-label={`删除${LEND_TYPE[l.type]}记录`} onClick={() => deleteLend(l.lendId)}>删</button>
+        </div>
+      ))}
+      <button className="ghost wide" onClick={() => setLendForm({
+        type: 1, assetId: assets[0]?.assetId ?? 0, counterparty: '', number: '',
+        interest: '', repaymentAssetId: 0, remark: ''
+      })}>记一笔借贷</button>
+
+      {repayForm && (
+        <Modal label="部分还款" onClose={() => setRepayForm(null)}>
+          <h3>{lends.find((x) => x.lendId === repayForm.lendId)?.type === 1 ? '收回' : '还款'}</h3>
+          <p className="hint">剩余 {money(repayForm.remaining)}</p>
+          <div className="label">本次金额</div>
+          <input aria-label="本次还款金额" autoFocus inputMode="decimal" value={repayForm.amount}
+            placeholder={`最多 ${repayForm.remaining}`}
+            onChange={(e) => setRepayForm({ ...repayForm, amount: e.target.value.replace(/[^\d.]/g, '') })} />
+          <div className="label">进哪个账户</div>
+          <select aria-label="还款账户" value={repayForm.assetId}
+            onChange={(e) => setRepayForm({ ...repayForm, assetId: Number(e.target.value) })}>
+            {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
+          </select>
+          <div className="modal-btns">
+            <button className="ghost" onClick={() => setRepayForm(null)}>取消</button>
+            <button className="primary"
+              disabled={!(Number(repayForm.amount) > 0) || Number(repayForm.amount) > repayForm.remaining}
+              onClick={() => { repayLend({ lendId: repayForm.lendId, amount: Number(repayForm.amount), repaymentAssetId: repayForm.assetId }); setRepayForm(null) }}>确认</button>
+          </div>
+        </Modal>
+      )}
+
+      {lendForm && (
+        <Modal label="借入借出" onClose={() => setLendForm(null)}>
+            <h3>借入借出</h3>
+            <div className="label">类型</div>
+            <select aria-label="借贷类型" value={lendForm.type} onChange={(e) => setLendForm({ ...lendForm, type: Number(e.target.value) as 1 | 2 | 3 | 4 })}>
+              {Object.entries(LEND_TYPE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+            <div className="label">对方</div>
+            <input aria-label="借贷对方" value={lendForm.counterparty} onChange={(e) => setLendForm({ ...lendForm, counterparty: e.target.value })} placeholder="借给谁 / 向谁借" />
+            <div className="label">金额</div>
+            <input aria-label="借贷金额" value={lendForm.number} autoFocus inputMode="decimal"
+              onChange={(e) => setLendForm({ ...lendForm, number: e.target.value.replace(/[^\d.]/g, '') })} />
+            <div className="row2">
+              <div>
+                <div className="label">利息（可选）</div>
+                <input aria-label="借贷利息" value={lendForm.interest} inputMode="decimal"
+                  onChange={(e) => setLendForm({ ...lendForm, interest: e.target.value.replace(/[^\d.]/g, '') })} />
+              </div>
+              <div>
+                <div className="label">
+                  {lendForm.type === 2 || lendForm.type === 4 ? '收款账户' : '资金账户'}
+                </div>
+                <select
+                  aria-label={lendForm.type === 2 || lendForm.type === 4 ? '收款账户' : '资金账户'}
+                  value={lendForm.repaymentAssetId || lendForm.assetId}
+                  onChange={(e) => setLendForm({
+                    ...lendForm,
+                    ...(lendForm.type === 2 || lendForm.type === 4
+                      ? { repaymentAssetId: Number(e.target.value) }
+                      : { assetId: Number(e.target.value) })
+                  })}>
+                  {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="label">备注</div>
+            <input aria-label="借贷备注" value={lendForm.remark} onChange={(e) => setLendForm({ ...lendForm, remark: e.target.value })} />
+            <p className="hint">借出减少账户余额，收回与借入增加，归还减少；不计入收支。</p>
+            <div className="modal-btns">
+              <button className="ghost" onClick={() => setLendForm(null)}>取消</button>
+              <button className="primary" onClick={() => {
+                addLend({
+                  type: lendForm.type, assetId: lendForm.assetId,
+                  counterparty: lendForm.counterparty, number: Number(lendForm.number) || 0,
+                  interest: Number(lendForm.interest) || 0,
+                  repaymentAssetId: lendForm.repaymentAssetId || undefined,
+                  remark: lendForm.remark
+                })
+                setLendForm(null)
+              }}>保存</button>
+            </div>
+        </Modal>
+      )}
+
+      <div className="label">新增账户</div>
+      {/* 字段顺序照一木 AddCapitalActivity / AddCreditCardActivity */}
+      <input aria-label="新账户名称" value={name} onChange={(e) => setName(e.target.value)} placeholder="账户名（如：招行储蓄卡）" />
+      <div className="row2">
+        <select aria-label="新账户类型" value={type} onChange={(e) => setType(Number(e.target.value))}>
+          {Object.entries(ASSET_TYPE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+        <select aria-label="新账户币种" value={newCurrency} onChange={(e) => setNewCurrency(e.target.value)}>
+          {currencies.map((c) => <option key={c.code} value={c.code}>{c.code} · {c.name}</option>)}
+        </select>
+      </div>
+      <div className="row2">
+        <input aria-label="账户简称" value={newSimple} onChange={(e) => setNewSimple(e.target.value)} placeholder="简称（可选）" maxLength={8} />
+        <input aria-label="卡号后四位" value={newCardCode} onChange={(e) => setNewCardCode(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="卡号后四位（可选）" />
+      </div>
+      <div className="row2">
+        <input aria-label="新账户余额" value={num} onChange={(e) => setNum(e.target.value.replace(/[^\d.-]/g, ''))} placeholder="余额（信用卡填负数）" />
+        <select aria-label="新账户归属" value={newBookId} onChange={(e) => setNewBookId(e.target.value)}>
+          <option value="">私有（只有我可见）</option>
+          {accountBooks.filter((b) => b.bookId != null).map((b) => (
+            <option key={String(b.bookId)} value={String(b.bookId)}>共享到「{b.accountBookName}」</option>
+          ))}
+        </select>
+      </div>
+
+      {type === 2 && (
+        <div className="row2">
+          <input aria-label="信用额度" value={newQuota} onChange={(e) => setNewQuota(e.target.value.replace(/[^\d.]/g, ''))} placeholder="信用额度" />
+          <input aria-label="账单日" value={newInDay} onChange={(e) => setNewInDay(e.target.value.replace(/\D/g, '').slice(0, 2))} placeholder="账单日（1-28）" />
+          <input aria-label="还款日" value={newOutDay} onChange={(e) => setNewOutDay(e.target.value.replace(/\D/g, '').slice(0, 2))} placeholder="还款日（1-28）" />
+        </div>
+      )}
+
+      <div className="label">账户图标</div>
+      <button type="button" className="icon-pick" onClick={() => setPickerOpen(true)}>
+        <span className="asset-badge"><AssetIcon type={type} name={name} icon={newIcon} size={20} /></span>
+        <span>{iconLabel(newIcon) || '点击选择图标'}</span>
+        <span className="muted">›</span>
+      </button>
+
+      <label className="hint" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <input type="checkbox" checked={newIntoTotal} onChange={(e) => setNewIntoTotal(e.target.checked)} />
+        计入总资产
+      </label>
+      <input aria-label="账户备注" value={newRemark} onChange={(e) => setNewRemark(e.target.value)} placeholder="备注（可选）" />
+
+      <button className="ghost wide" onClick={create}>添加</button>
+
+      {pickerOpen && (
+        <IconPicker value={newIcon} assetType={type}
+          onChange={(icon) => setNewIcon(icon ?? '')}
+          onClose={() => setPickerOpen(false)} />
+      )}
 
       <h3>房贷计划</h3>
       <p className="hint">组合贷：商业贷款 + 公积金贷款，支持等额本息/等额本金与 LPR 加点。</p>

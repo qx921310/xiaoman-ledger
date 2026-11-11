@@ -593,3 +593,25 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .sankey { margin: 6px 0 14px; }
 .sankey-svg { width: 100%; height: auto; display: block; }
 .sankey-legend { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+
+/* 图标选择器 */
+.icon-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+.icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); gap: 8px; max-height: 46vh; overflow-y: auto; }
+.icon-cell {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 8px 4px; border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--card); cursor: pointer; font-size: var(--font-xs); color: var(--muted);
+}
+.icon-cell.on { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
+.icon-cell span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+/* 图标预览统一为方形并居中，避免与文字错位 */
+.asset-badge { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; }
+.asset-badge img { display: block; }
+
+/* 图标选择按钮 */
+.icon-pick {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--card); cursor: pointer; text-align: left; color: var(--ink);
+}
+.icon-pick .muted { margin-left: auto; color: var(--muted); }
