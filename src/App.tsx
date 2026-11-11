@@ -5,14 +5,15 @@ import { syncNow } from './sync'
 
 import { AuthScreen } from './features/auth'
 import { AddBill } from './features/add-bill'
-import { Bills } from './features/bills'
+import { Home } from './features/home'
+import { CalendarPage } from './features/calendar'
 import { Assets } from './features/assets'
 import { Stats } from './features/stats'
 import { Settings } from './features/settings'
 import { ROLE_LABEL } from './ui/roles'
 import type { AccountBook } from './types'
 
-type Tab = 'add' | 'bills' | 'assets' | 'stats' | 'settings'
+type Tab = 'home' | 'calendar' | 'assets' | 'stats' | 'me' | 'add'
 
 export default function App() {
   const [user, setUser] = useState<User | null | undefined>(undefined)
@@ -100,7 +101,7 @@ export default function App() {
 
 
 function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User; onLogout: () => void; syncWarning: string; dismissSyncWarning: () => void }) {
-  const [tab, setTab] = useState<Tab>('add')
+  const [tab, setTab] = useState<Tab>('home')
   const mergeTaxonomy = useLedger((s) => s.mergeTaxonomy)
 
   const runCycles = useLedger((s) => s.runCycles)
@@ -147,18 +148,19 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User
       </header>
 
       <nav className="nav">
-        {([['add', '记账'], ['bills', '账单'], ['assets', '资产'], ['stats', '统计'], ['settings', '设置']] as [Tab, string][]).map(([k, label]) => (
+        {([['home', '首页'], ['calendar', '日历'], ['assets', '资产'], ['stats', '统计'], ['me', '我的']] as [Tab, string][]).map(([k, label]) => (
           <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{label}</button>
         ))}
       </nav>
 
       <main className="main">
-        {syncWarning && <div className="warn" role="alert">{syncWarning} <button className="link" onClick={() => { setTab('settings'); dismissSyncWarning() }}>查看同步</button></div>}
-        {tab === 'add' && <AddBill notify={notify} onClose={() => setTab('bills')} />}
-        {tab === 'bills' && <Bills me={user} onAdd={() => setTab('add')} />}
+        {syncWarning && <div className="warn" role="alert">{syncWarning} <button className="link" onClick={() => { setTab('me'); dismissSyncWarning() }}>查看同步</button></div>}
+        {tab === 'home' && <Home me={user} onAdd={() => setTab('add')} />}
+        {tab === 'calendar' && <CalendarPage />}
         {tab === 'assets' && <Assets notify={notify} />}
         {tab === 'stats' && <Stats />}
-        {tab === 'settings' && <Settings notify={notify} />}
+        {tab === 'me' && <Settings notify={notify} />}
+        {tab === 'add' && <AddBill notify={notify} onClose={() => setTab('home')} />}
       </main>
 
       {toast && <div className="toast" role="status" aria-live="polite">{toast}</div>}

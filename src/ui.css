@@ -525,3 +525,44 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 /* 周期到期提醒 */
 .due-hint { color: var(--accent); }
+
+/* 首页（照一木单列：汇总 → 预算 → 记账入口 → 流水） */
+.home-summary {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--r-lg); padding: 14px;
+}
+.hm-item { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.hm-item small { color: var(--muted); font-size: var(--font-xs); }
+.hm-item b { font-size: var(--font-xl); font-variant-numeric: tabular-nums; }
+.home-budget {
+  margin-top: 10px; padding: 12px 14px;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md);
+}
+.hb-head { display: flex; justify-content: space-between; font-size: var(--font-sm); color: var(--muted); }
+.hb-bar { height: 8px; border-radius: var(--r-pill); background: var(--accent-soft); overflow: hidden; margin: 8px 0 6px; }
+.hb-bar i { display: block; height: 100%; background: var(--accent); border-radius: var(--r-pill); }
+.home-add {
+  width: 100%; height: 45px; margin: 12px 0 4px;
+  border: 0; border-radius: var(--r-md); cursor: pointer;
+  background: var(--accent); color: var(--on-accent); font-size: var(--font-lg); font-weight: 600;
+}
+.home-add:disabled { opacity: .55; cursor: not-allowed; }
+.home-flow { margin-top: 12px; }
+.hf-head { font-size: var(--font-sm); color: var(--muted); margin: 8px 2px; }
+.card.embedded { padding: 0; border: 0; background: transparent; }
+
+/* 日历 */
+.cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-weekdays span { text-align: center; font-size: var(--font-xs); color: var(--muted); padding: 4px 0; }
+.cal-cell {
+  min-height: 52px; padding: 4px 2px; border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: var(--card); display: flex; flex-direction: column; align-items: center; gap: 1px;
+  font-size: var(--font-xs); cursor: pointer; overflow: hidden;
+}
+.cal-cell.empty { border: 0; background: transparent; cursor: default; }
+.cal-cell.on { border-color: var(--accent); background: var(--accent-soft); }
+.cal-cell em { font-style: normal; color: var(--ink); }
+.cal-cell i { font-style: normal; font-size: var(--font-xs); white-space: nowrap; }
+.cal-list { margin-top: 14px; }

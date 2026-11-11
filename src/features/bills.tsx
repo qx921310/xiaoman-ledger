@@ -12,7 +12,7 @@ import { billNetAmount } from '../bill-amount'
 import { resolveBillChild } from '../taxonomy'
 import { summarizeBills } from '../bill-summary'
 
-export function Bills({ me, onAdd }: { me?: { id: number; email: string }; onAdd?: () => void }) {
+export function Bills({ me, onAdd, embedded = false }: { me?: { id: number; email: string }; onAdd?: () => void; embedded?: boolean }) {
   const bills = useLedger((s) => s.bills)
   const transfers = useLedger((s) => s.transfers)
   const parents = useLedger((s) => s.parentCategories)
@@ -90,7 +90,8 @@ export function Bills({ me, onAdd }: { me?: { id: number; email: string }; onAdd
   }, [list, tList])
 
   return (
-    <section className="card">
+    <section className={embedded ? 'card embedded' : 'card'}>
+      {!embedded && (
       <div className="row2">
         <div>
           <div className="label">月份</div>
@@ -102,7 +103,9 @@ export function Bills({ me, onAdd }: { me?: { id: number; email: string }; onAdd
           <div><small>结余</small><b>{money(income - expense)}</b></div>
         </div>
       </div>
+      )}
 
+      {!embedded && (
       <div className="filters">
         <input className="kw" aria-label="搜索备注、分类或标签" value={kw} onChange={(e) => setKw(e.target.value)} placeholder="搜索备注 / 分类 / 标签" />
         <select aria-label="按分类筛选" value={fPid} onChange={(e) => setFPid(Number(e.target.value))}>
@@ -115,6 +118,7 @@ export function Bills({ me, onAdd }: { me?: { id: number; email: string }; onAdd
         </select>
         {Boolean(kw || fPid || fAid) && <button className="ghost" onClick={() => { setKw(''); setFPid(0); setFAid(0) }}>重置</button>}
       </div>
+      )}
 
       {groups.length === 0 && <div className="empty">
         {kw || fPid || fAid ? <><p>没有符合条件的账单</p><button className="ghost" onClick={() => { setKw(''); setFPid(0); setFAid(0) }}>清除筛选</button></>
