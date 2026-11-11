@@ -40,11 +40,12 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
   const [name, setName] = useState('')
   const [type, setType] = useState(1)
   const [num, setNum] = useState('')
+  const [newIcon, setNewIcon] = useState('')
 
   const create = () => {
     if (!name.trim()) return notify('请输入账户名')
-    addAsset({ assetName: name.trim(), assetType: type, assetNumber: Number(num) || 0 })
-    setName(''); setNum('')
+    addAsset({ assetName: name.trim(), assetType: type, assetNumber: Number(num) || 0, assetIcon: newIcon || undefined })
+    setName(''); setNum(''); setNewIcon('')
     notify('账户已添加')
   }
 
@@ -260,10 +261,17 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
           {Object.entries(ASSET_TYPE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
       </div>
-      <div className="row2">
-        <input aria-label="新账户余额" value={num} onChange={(e) => setNum(e.target.value.replace(/[^\d.-]/g, ''))} placeholder="余额（信用卡填负数）" />
-        <button className="ghost" onClick={create}>添加</button>
-      </div>
+      <div className="label">余额（可选）</div>
+      <input aria-label="新账户余额" value={num} onChange={(e) => setNum(e.target.value.replace(/[^\d.-]/g, ''))} placeholder="余额（信用卡填负数）" />
+      <div className="label">账户图标（可选）</div>
+      <select aria-label="新账户图标" value={newIcon} onChange={(e) => setNewIcon(e.target.value)}>
+        <option value="">按类型默认</option>
+        {ASSET_ICON_GROUPS.map((group) => <optgroup key={group.label} label={group.label}>
+          {group.options.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+        </optgroup>)}
+      </select>
+      <span className="asset-badge" aria-label="新账户图标预览"><AssetIcon type={type} name={name} icon={newIcon} size={20} /></span>
+      <button className="ghost wide" onClick={create}>添加</button>
     </section>
   )
 }

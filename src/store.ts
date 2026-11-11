@@ -453,6 +453,7 @@ export const useLedger = create<LedgerState>()(
           assetId: id,
           assetName: patch.assetName ?? '未命名账户',
           assetType: patch.assetType ?? 1,
+          assetIcon: patch.assetIcon,
           currency: patch.currency ?? s.defaultCurrency,
           assetNumber: Number(patch.assetNumber ?? 0),
           openingBalance: Number(patch.openingBalance ?? patch.assetNumber ?? 0),

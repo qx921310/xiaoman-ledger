@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLedger } from './store'
-import { adoptAnonymousData, auth, books as bookApi, hasUserData, setCurrentUid, type BookInfo, type User } from './auth'
+import { auth, books as bookApi, setCurrentUid, type BookInfo, type User } from './auth'
+import { loadAccountData } from './account-session'
 import { syncNow } from './sync'
 
 import { AuthScreen } from './features/auth'
@@ -24,13 +25,7 @@ export default function App() {
    * 顺序：切换身份 → 清会话状态 → 载入该账号数据 → 设当前用户 → 加载账本 → 同步。
    */
   const initAccount = async (u: User) => {
-    setCurrentUid(u.id)
-    adoptAnonymousData(u.id)
-    // 必须先恢复账号数据：切换 currentUid 后，任何 store 写入都会持久化到该账号。
-    if (!hasUserData(u.id)) useLedger.getState().reset()
-    await useLedger.persist.rehydrate()
-    // 账号身份同步进 store：导入、记账都依赖它，不能再依赖初始值 1
-    useLedger.setState({ userId: u.id, sessionSyncAt: 0 })
+    await loadAccountData(u.id)
     setUser(u)
     await loadBooks()
     autoSyncOnce()

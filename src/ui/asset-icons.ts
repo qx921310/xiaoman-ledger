@@ -33,11 +33,18 @@ export const ASSET_ICON_GROUPS = [
     ['ic_asset_vehicle','车辆'], ['ic_asset_default','其他']
   ] },
   { label: '银行', options: banks.map(([key, label]) => [`bank:ic_bank_${key}`, label]) },
-  { label: '钱包与账户', options: wallets.map(([key, label]) => [`wallet:ic_asset_${key}`, label]) }
+  { label: '钱包与账户', options: wallets.map(([key, label]) => [`wallet:ic_asset_${key}`, label]) },
+  { label: '支付品牌', options: [
+    ['brand:alipay', '支付宝'], ['brand:wechat', '微信支付'], ['brand:applepay', 'Apple Pay'],
+    ['brand:googlepay', 'Google Pay'], ['brand:mastercard', 'Mastercard'], ['brand:visa', 'Visa'],
+    ['brand:paypal', 'PayPal'], ['brand:paytm', 'Paytm'], ['brand:stripe', 'Stripe']
+  ] }
 ] as { label: string; options: string[][] }[]
 
 export function assetIconImagePath(icon?: string): string | null {
   if (!icon) return null
+  const brand = /^brand:([a-z0-9_]+)$/.exec(icon)
+  if (brand && ASSET_ICON_GROUPS.some((group) => group.options.some(([key]) => key === icon))) return `/icons/brands/${brand[1]}.svg`
   const match = /^(bank|wallet):(ic_(?:bank|asset)_[a-z0-9_]+)$/.exec(icon)
   if (!match || !ASSET_ICON_GROUPS.some((group) => group.options.some(([key]) => key === icon))) return null
   return `/icons/${match[1] === 'bank' ? 'banks' : 'wallets'}/${match[2]}.png`
