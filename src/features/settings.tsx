@@ -165,6 +165,9 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
   const deleteSplitMember = useLedger((s) => s.deleteSplitMember)
   const updateSplitMember = useLedger((s) => s.updateSplitMember)
   const settleSplit = useLedger((s) => s.settleSplit)
+  const [ocrBusy, setOcrBusy] = useState(false)
+  const [ocrResult, setOcrResult] = useState<{ date: string; amount: number; direction: string; category: string; remark: string; payment?: string } | null>(null)
+  const addBill = useLedger((s) => s.addBill)
   const [newGroup, setNewGroup] = useState('')
   const [newMember, setNewMember] = useState<Record<number, string>>({})
   const [newCat, setNewCat] = useState<{ parentId: number; kind: 'expense' | 'income'; name: string; icon: string } | null>(null)
@@ -339,6 +342,61 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
           <button className="primary" onClick={confirmImport} disabled={plan.bills.length + plan.transfers.length === 0}>
             确认导入 {plan.bills.length + plan.transfers.length} 条
           </button>
+        </div>
+      )}
+
+      <h3>截图识别</h3>
+      <p className="hint">截图支付账单 → 自动识别金额、商户与分类 → 确认后直接入账（对应一木的截图记账）。</p>
+      <label className="filebtn">
+        选择账单截图
+        <input type="file" accept="image/*" hidden onChange={async (e) => {
+          const f = e.target.files?.[0]
+          if (!f) return
+          setOcrBusy(true); setOcrResult(null)
+          try {
+            const dataUrl = await new Promise<string>((resolve, reject) => {
+              const r = new FileReader()
+              r.onload = () => resolve(String(r.result))
+              r.onerror = () => reject(new Error('读取图片失败'))
+              r.readAsDataURL(f)
+            })
+            const resp = await fetch('/api/ocr', {
+              method: 'POST', credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ image: dataUrl })
+            })
+            const json = await resp.json()
+            if (json.code !== 0) throw new Error(json.msg || '识别失败')
+            setOcrResult(json.result)
+          } catch (err) { notify(errorMessage(err, '识别失败')) }
+          finally { setOcrBusy(false) }
+        }} />
+      </label>
+      {ocrBusy && <p className="hint">识别中…</p>}
+      {ocrResult && (
+        <div className="budget-box small">
+          <div className="budget-line"><span>日期</span><b>{ocrResult.date}</b></div>
+          <div className="budget-line"><span>金额</span><b>{money(ocrResult.amount)}（{ocrResult.direction === 'income' ? '收入' : '支出'}）</b></div>
+          <div className="budget-line"><span>分类</span><b>{ocrResult.category}</b></div>
+          <div className="budget-line"><span>商户</span><b>{ocrResult.remark || '—'}</b></div>
+          <div className="btns">
+            <button className="primary" onClick={() => {
+              const cat = parents.find((p) => p.name === ocrResult.category)
+                ?? parents.find((p) => p.kind === (ocrResult.direction === 'income' ? 'income' : 'expense'))
+              const acc = assets[0]
+              if (!acc) return notify('请先建一个账户')
+              addBill({
+                assetId: acc.assetId,
+                parentCategoryId: cat?.id ?? 7,
+                cost: ocrResult.amount,
+                remark: ocrResult.remark,
+                time: new Date(ocrResult.date + 'T12:00:00').getTime()
+              })
+              setOcrResult(null)
+              notify('已按识别结果记一笔')
+            }}>记一笔</button>
+            <button className="ghost" onClick={() => setOcrResult(null)}>忽略</button>
+          </div>
         </div>
       )}
 

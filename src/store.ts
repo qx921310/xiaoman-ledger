@@ -127,7 +127,7 @@ interface LedgerState {
   dissolveBillGroup: (billGroupId: number) => void
   removeFromBillGroup: (billGroupId: number, billId: string | number) => void
   /** 账单关联：两两关联（一木 BillRelated） */
-  addStockAsset: (patch: { name: string; code?: string; price?: number; num?: number; cost?: number }) => import('./types').StockAsset
+  addStockAsset: (patch: { name: string; code?: string; price?: number; num?: number; cost?: number; addBill?: boolean }) => import('./types').StockAsset
   deleteStockAsset: (stockAssetId: number) => void
   /** 买入/卖出：更新持仓成本与已实现盈亏，并记录一笔 StockInfo */
   tradeStock: (stockAssetId: number, type: 1 | 2, num: number, amount: number, fee?: number, time?: number) => boolean
@@ -464,6 +464,7 @@ export const useLedger = create<LedgerState>()(
           historyIncome: 0,
           price: patch.price,
           intoTotalAsset: true,
+          addBill: patch.addBill ?? false,
           updateTime: NOW()
         }
         set((st) => ({ stockAssets: [...st.stockAssets, rec] }))
@@ -484,6 +485,16 @@ export const useLedger = create<LedgerState>()(
         if (next === h) return false                     // 卖出超量或参数非法
         let stockInfoId = Date.now()
         while (s.stockInfos.some((x) => x.stockInfoId === stockInfoId)) stockInfoId++
+        // 一木 addBill：交易同时生成账单
+        if (rec.addBill && s.assets[0]) {
+          get().addBill({
+            assetId: s.assets[0].assetId,
+            parentCategoryId: 4,
+            cost: amount,
+            remark: `${type === 1 ? '买入' : '卖出'} ${rec.name}`,
+            time: time ?? Date.now()
+          })
+        }
         set((st) => ({
           stockAssets: st.stockAssets.map((x) => x.stockAssetId === stockAssetId
             ? { ...x, primeNum: next.num, primeCost: next.cost, historyIncome: next.realized, updateTime: NOW() }

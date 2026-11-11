@@ -293,7 +293,7 @@ const server = createServer(async (req, res) => {
     // 账号相关接口例外：注册/登录本身就是写操作，且必须对公网开放
     // 账号与数据接口走会话鉴权，不再需要写令牌
     // 白名单式：走会话鉴权的接口都在这里，新增一组记得加进来
-    const isSessionPath = ['/api/auth/', '/api/data/', '/api/books/', '/api/files'].some((p) => path.startsWith(p))
+    const isSessionPath = ['/api/auth/', '/api/data/', '/api/books/', '/api/files', '/api/ocr'].some((p) => path.startsWith(p))
     if (req.method === 'POST' && path.startsWith('/api/') && !isSessionPath) {
       if (!WRITE_TOKEN || req.headers['x-write-token'] !== WRITE_TOKEN) {
         return send(res, 403, { code: 1, msg: '服务端只读：写接口需要 x-write-token，且必须与 LEDGER_WRITE_TOKEN 一致' })
@@ -572,6 +572,59 @@ const server = createServer(async (req, res) => {
 
     // 旧版 REST/sync 接口已移除：客户端只用 /api/data/*、/api/auth/*、/api/books/*
     // 这些接口曾用请求头 user-id 识别用户，无法安全鉴权，保留即是越权入口。
+
+    // 截图识别：调用网关 vision 模型，返回结构化账单字段
+    if (path === '/api/ocr' && req.method === 'POST') {
+      const u = currentUser(req)
+      if (!u) return fail(res, '请先登录', 401)
+      const visionUrl = process.env.LEDGER_VISION_URL
+      const visionKey = process.env.LEDGER_VISION_KEY
+      const visionModel = process.env.LEDGER_VISION_MODEL || 'deepseek-v4-flash-vision-exp'
+      if (!visionUrl || !visionKey) return fail(res, '服务端未配置识别服务（LEDGER_VISION_KEY）')
+      const body = await readBody(req)
+      const image = String(body.image || '')
+      if (!image.startsWith('data:image/')) return fail(res, '请上传图片')
+      const prompt = [
+        '你是记账助手。请从这张账单/支付截图里提取信息，只输出 JSON，不要解释。',
+        '字段：date(YYYY-MM-DD，识别不到就给今天)、amount(数字，正数)、direction(支出/收入)、',
+        'category(尽量用：食品餐饮/交通出行/购物消费/居家生活/休闲娱乐/医疗健康/教育文化 之一)、',
+        'remark(商户或商品，简短)、payment(支付方式，如 微信/支付宝/银行卡)。',
+        '示例：{"date":"2026-06-01","amount":25.5,"direction":"支出","category":"食品餐饮","remark":"兰州拉面","payment":"微信"}'
+      ].join('')
+      try {
+        const r = await fetch(`${visionUrl.replace(/\/$/, '')}/chat/completions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${visionKey}` },
+          body: JSON.stringify({
+            model: visionModel,
+            messages: [{
+              role: 'user',
+              content: [
+                { type: 'text', text: prompt },
+                { type: 'image_url', image_url: { url: image } }
+              ]
+            }],
+            temperature: 0
+          })
+        })
+        const data = await r.json()
+        if (!r.ok) return fail(res, data?.error?.message || '识别服务返回错误')
+        const text = data?.choices?.[0]?.message?.content ?? ''
+        const m = String(text).match(/\{[\s\S]*\}/)
+        if (!m) return fail(res, '没能从图片里识别出账单')
+        const parsed = JSON.parse(m[0])
+        return ok(res, {
+          date: parsed.date || new Date().toISOString().slice(0, 10),
+          amount: Number(parsed.amount) || 0,
+          direction: parsed.direction === '收入' ? 'income' : 'expense',
+          category: parsed.category || '其他',
+          remark: parsed.remark || '',
+          payment: parsed.payment || ''
+        })
+      } catch (e) {
+        return fail(res, '识别失败：' + (e?.message || '网络错误'))
+      }
+    }
 
     // 附件上传：鉴权后写入 server/data/uploads，返回可访问路径
     if (path === '/api/files' && req.method === 'POST') {

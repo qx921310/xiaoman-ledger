@@ -67,6 +67,8 @@ export interface StockAsset {
   /** 当前价（手动维护，一木靠行情接口） */
   price?: number
   monetary?: boolean
+  /** 一木 addBill：交易时是否生成账单 */
+  addBill?: boolean
   hide?: boolean
   intoTotalAsset?: boolean
   remark?: string
