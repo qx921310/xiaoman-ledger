@@ -6,7 +6,7 @@ import { IMPORTED_CATEGORY_COLOR } from './default-colors'
 
 export interface ParsedTable {
   headers: string[]
-  rows: any[][]
+  rows: unknown[][]
   sheetName: string
 }
 
@@ -29,9 +29,9 @@ export function parseLedgerFile(buf: ArrayBuffer, fileName: string): ParsedTable
   const sheetName = wb.SheetNames[0]
   if (!sheetName) throw new Error('文件里没有可读的工作表')
   const sheet = wb.Sheets[sheetName]
-  const aoa = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1, defval: '', raw: false })
+  const aoa = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '', raw: false })
   const headerIdx = aoa.findIndex((r) => Array.isArray(r) && r.some((c) => String(c).trim()))
-  const rawHeaders = (aoa[headerIdx] || []) as any[]
+  const rawHeaders = (aoa[headerIdx] || [])
   const headers = rawHeaders.map((h) => String(h ?? '').trim())
   const rows = aoa
     .slice(headerIdx + 1)
@@ -94,11 +94,11 @@ interface BuildArgs {
   bookId: number
 }
 
-const num = (v: any) => {
+const num = (v: unknown) => {
   const n = Number(String(v).replace(/[¥$€,，\s]/g, ''))
   return Number.isFinite(n) ? n : 0
 }
-const str = (v: any) => String(v ?? '').trim()
+const str = (v: unknown) => String(v ?? '').trim()
 
 function buildIndex(headers: string[]) {
   const idx: Record<string, number> = {}
@@ -108,7 +108,7 @@ function buildIndex(headers: string[]) {
   return (name: string) => (idx[name] !== undefined ? idx[name] : -1)
 }
 
-function parseTime(v: any): number {
+function parseTime(v: unknown): number {
   const s = str(v)
   if (!s) return NaN
   if (/^\d{10,13}$/.test(s)) return Number(s.length === 10 ? s + '000' : s)
@@ -477,7 +477,7 @@ export function buildExportTable(
     }
     const isIncome = p?.kind === 'income'
     const flags = [b.notIntoTotal ? '不计入收支' : '', b.notIntoBudget ? '不计入预算' : ''].filter(Boolean).join('、')
-    const files = (b.files || []).slice(0, 5).map((f: any) => f?.remotePath ?? '')
+    const files = (b.files || []).slice(0, 5).map((f) => f?.remotePath ?? '')
     while (files.length < 5) files.push('')
     return [
       fmtTime(b.time),

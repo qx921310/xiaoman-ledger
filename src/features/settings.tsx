@@ -10,6 +10,8 @@ import { validateBackup } from '../backup'
 import { dateKey, pendingDates } from '../cycle-dates'
 import { Modal } from '../ui/modal'
 import { DEFAULT_TAG_COLOR } from '../default-colors'
+import type { BackupFile } from '../backup'
+import { errorMessage } from '../errors'
 
 function RateInput({ value, onCommit, label }: { value: number; onCommit: (v: number) => void; label: string }) {
   const [draft, setDraft] = useState<string | null>(null)
@@ -67,7 +69,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
   const currentBookId = useLedger((s) => s.currentBookId)
 
   const [plan, setPlan] = useState<ImportPlan | null>(null)
-  const [restorePreview, setRestorePreview] = useState<{ name: string; data: any } | null>(null)
+  const [restorePreview, setRestorePreview] = useState<{ name: string; data: BackupFile } | null>(null)
   const [fileName, setFileName] = useState('')
   const [err, setErr] = useState('')
   const [syncMsg, setSyncMsg] = useState('')
@@ -104,8 +106,8 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
     try {
       const r = await syncNow()
       setSyncMsg(`已推送 ${r.pushed} 条（跳过 ${r.skipped} 条较旧记录），拉回 ${r.pulled} 条` + (r.denied ? `；${r.denied} 条未能推送，请核对权限、账本和记录身份` : ''))
-    } catch (e: any) {
-      setSyncMsg('同步失败：' + (e?.message || '未知错误'))
+    } catch (e) {
+      setSyncMsg('同步失败：' + (errorMessage(e, '未知错误')))
     } finally {
       setSyncing(false)
     }
@@ -139,8 +141,8 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
       setFileName(f.name)
       setPlan(p)
       if (p.total === 0) setErr('文件里没有数据行')
-    } catch (e: any) {
-      setErr('解析失败：' + (e?.message || e))
+    } catch (e) {
+      setErr('解析失败：' + errorMessage(e, String(e)))
       setFileName(f.name)
     }
   }
@@ -159,8 +161,8 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
       })
       setFileName('内置示例 demo-yimu.xlsx')
       setPlan(p)
-    } catch (e: any) {
-      setErr('载入示例失败：' + (e?.message || e))
+    } catch (e) {
+      setErr('载入示例失败：' + errorMessage(e, String(e)))
     }
   }
 
@@ -187,8 +189,8 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
       const { exportXlsx } = await import('../importer')
       exportXlsx(bills, parents, children, assets, accountBooks, reimbursements, refunds)
       notify(`已导出 ${bills.length} 条为 Excel`)
-    } catch (e: any) {
-      notify('导出失败：' + (e?.message || '请检查账户信息'))
+    } catch (e) {
+      notify('导出失败：' + (errorMessage(e, '请检查账户信息')))
     }
   }
 
@@ -197,7 +199,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
     r.onload = () => {
       try {
         setRestorePreview({ name: f.name, data: validateBackup(JSON.parse(String(r.result))) })
-      } catch (e: any) { notify('备份无法读取：' + (e?.message || '文件格式不对')) }
+      } catch (e) { notify('备份无法读取：' + (errorMessage(e, '文件格式不对'))) }
     }
     r.onerror = () => notify('备份文件读取失败')
     r.readAsText(f)
@@ -280,7 +282,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
               <button className="ghost" onClick={() => setRestorePreview(null)}>取消</button>
               <button className="primary" onClick={() => {
                 try { importAll(restorePreview.data); setRestorePreview(null); notify('已恢复本地 JSON 备份') }
-                catch (e: any) { notify('恢复失败：' + (e?.message || '备份格式不正确')) }
+                catch (e) { notify('恢复失败：' + (errorMessage(e, '备份格式不正确'))) }
               }}>确认恢复</button>
             </div>
         </Modal>
@@ -335,7 +337,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
             <div className="label">名称</div>
             <input aria-label="周期名称" value={cycleForm.name} onChange={(e) => setCycleForm({ ...cycleForm, name: e.target.value })} placeholder="如：房租、工资" />
             <div className="label">类型</div>
-            <select aria-label="收支类型" value={cycleForm.kind} onChange={(e) => setCycleForm({ ...cycleForm, kind: e.target.value as any, parentCategoryId: e.target.value === 'income' ? 903 : 4 })}>
+            <select aria-label="收支类型" value={cycleForm.kind} onChange={(e) => setCycleForm({ ...cycleForm, kind: e.target.value as 'income' | 'expense', parentCategoryId: e.target.value === 'income' ? 903 : 4 })}>
               <option value="expense">支出</option>
               <option value="income">收入</option>
             </select>
@@ -346,7 +348,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
               ))}
             </select>
             <div className="label">周期</div>
-            <select aria-label="周期" value={cycleForm.cycleType} onChange={(e) => setCycleForm({ ...cycleForm, cycleType: e.target.value as any })}>
+            <select aria-label="周期" value={cycleForm.cycleType} onChange={(e) => setCycleForm({ ...cycleForm, cycleType: e.target.value as 'month' | 'week' | 'year' })}>
               <option value="month">每月</option>
               <option value="week">每周</option>
               <option value="year">每年</option>
@@ -479,7 +481,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
             await bookApi.join(code.trim().toUpperCase())
             await reloadBooks()
             notify('已加入账本')
-          } catch (e: any) { notify(e?.message || '加入失败') }
+          } catch (e) { notify(errorMessage(e, '加入失败')) }
         }}>加入账本</button>
       </div>
 
@@ -495,7 +497,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
                 const r = await bookApi.invite(String(currentBook.bookId))
                 setInvite({ code: r.code, expiresAt: r.expiresAt })
                 notify(`邀请码 ${r.code}`)
-              } catch (e: any) { notify(e?.message || '生成失败') }
+              } catch (e) { notify(errorMessage(e, '生成失败')) }
             }}>生成邀请码</button>
           )}
         </div>
@@ -514,7 +516,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
             try {
               const r = await bookApi.clear(String(currentBook.bookId))
               notify(`已清空 ${r.removed} 条服务端记录（本地请点「清空数据」）`)
-            } catch (e: any) { notify(e?.message || '失败') }
+            } catch (e) { notify(errorMessage(e, '失败')) }
           }}>清空账本</button>
           {me?.id === currentBook.ownerId && (
             <button className="danger" onClick={async () => {
@@ -523,7 +525,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
                 await bookApi.remove(String(currentBook.bookId))
                 await reloadBooks()
                 notify('账本已删除')
-              } catch (e: any) { notify(e?.message || '失败') }
+              } catch (e) { notify(errorMessage(e, '失败')) }
             }}>删除账本</button>
           )}
         </div>

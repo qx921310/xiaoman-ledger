@@ -3,7 +3,7 @@ import { useLedger } from './store'
 export interface SyncRecord {
   kind: string
   id: string
-  payload: any
+  payload: Record<string, unknown> | null
   updatedAt: number
   deleted?: boolean
   bookId?: string | number
@@ -25,23 +25,29 @@ export const KIND_MAP: Record<string, [string, string]> = {
   budget: ['budgets', 'month']
 }
 
-const idOf = (kind: string, item: any) =>
+type Entity = Record<string, unknown>
+
+const idOf = (kind: string, item: Entity) =>
   kind === 'budget' ? `${item.month}:${item.categoryId}` : kind === 'bill' ? String(item.syncId ?? item.billId) : String(item[KIND_MAP[kind][1]])
 
 export function collectRecords(): SyncRecord[] {
-  const s: any = useLedger.getState()
+  const s = useLedger.getState() as unknown as Record<string, Entity[]> & { tombstones?: Array<Record<string, unknown>> }
   const out: SyncRecord[] = []
   for (const kind of Object.keys(KIND_MAP)) {
-    const arr = s[KIND_MAP[kind][0]] as any[]
-    for (const item of arr || []) {
-      const payload = kind === 'asset'
-        ? (({ assetNumber, ...rest }) => rest)(item)
+    const arr = (s[KIND_MAP[kind][0]] ?? []) as Entity[]
+    for (const item of arr) {
+      const payload: Entity = kind === 'asset'
+        ? (({ assetNumber: _balance, ...rest }) => rest)(item)
         : item
-      out.push({ kind, id: idOf(kind, item), payload, updatedAt: item.updateTime ?? 0 })
+      out.push({ kind, id: idOf(kind, item), payload, updatedAt: Number(item.updateTime ?? 0) })
     }
   }
-  for (const t of s.tombstones || []) {
-    out.push({ kind: t.kind, id: String(t.id), bookId: t.bookId, payload: null, updatedAt: t.updatedAt, deleted: true })
+  for (const t of (s.tombstones ?? [])) {
+    out.push({
+      kind: String(t.kind), id: String(t.id),
+      bookId: t.bookId as string | number | undefined,
+      payload: null, updatedAt: Number(t.updatedAt ?? 0), deleted: true
+    })
   }
   return out
 }

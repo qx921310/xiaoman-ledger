@@ -138,7 +138,7 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
         <Modal label="借入借出" onClose={() => setLendForm(null)}>
             <h3>借入借出</h3>
             <div className="label">类型</div>
-            <select aria-label="借贷类型" value={lendForm.type} onChange={(e) => setLendForm({ ...lendForm, type: Number(e.target.value) as any })}>
+            <select aria-label="借贷类型" value={lendForm.type} onChange={(e) => setLendForm({ ...lendForm, type: Number(e.target.value) as 1 | 2 | 3 | 4 })}>
               {Object.entries(LEND_TYPE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
             <div className="label">对方</div>

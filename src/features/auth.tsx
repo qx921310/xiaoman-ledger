@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { auth, type User } from '../auth'
+import { errorMessage } from '../errors'
 
 export function AuthScreen({ onAuthed }: { onAuthed: (u: User) => void }) {
   const [mode, setMode] = useState<'login' | 'register'>('login')
@@ -18,8 +19,8 @@ export function AuthScreen({ onAuthed }: { onAuthed: (u: User) => void }) {
     try {
       const r = mode === 'login' ? await auth.login(email.trim(), pw) : await auth.register(email.trim(), pw)
       onAuthed(r.user)
-    } catch (e: any) {
-      setErr(e?.message || '操作失败')
+    } catch (e) {
+      setErr(errorMessage(e, '操作失败'))
     } finally {
       setBusy(false)
     }

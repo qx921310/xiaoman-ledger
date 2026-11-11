@@ -11,6 +11,11 @@ export const ASSET_TYPE: Record<number, string> = {
 /** 信用卡余额以负数表示 */
 export const CREDIT_CARD = 2
 
+export interface BillFile {
+  name: string
+  remotePath: string
+}
+
 export interface Bill {
   billId: string | number
   /** Stable creation identity; old records may have only the numeric billId. */
@@ -30,7 +35,8 @@ export interface Bill {
   remark: string
   billType: number
   tags: string[]
-  files: any[]
+  /** 附件引用 */
+  files: BillFile[]
   userId: number
   updateTime: number
   billShareInfo?: { parentCategoryName: string; childCategoryName: string; assetName: string }
@@ -250,4 +256,23 @@ export interface AccountBook {
   accountBookName: string
   userId: number
   createTime: number
+}
+
+/** 同步删除标记 */
+export interface TombstoneV1 {
+  kind: string
+  id: string
+  updatedAt: number
+  bookId?: string | number
+}
+
+/** 从服务端拉回的一条同步记录 */
+export interface SyncIncoming {
+  kind: string
+  id: string | number
+  payload: Record<string, unknown> | null
+  updatedAt?: number
+  deleted?: boolean
+  ownerId?: number
+  bookId?: string | number
 }

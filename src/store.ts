@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
-import type { AccountBook, Asset, Bill, Category, Currency, Cycle, Lend, Refund, Reimbursement, Tag, Transfer } from './types'
+import type { AccountBook, Asset, Bill, Category, Currency, Cycle, Lend, Refund, Reimbursement, SyncIncoming, Tag, Transfer } from './types'
 import type { ImportPlan } from './importer'
 import { childCategoryNeedsReview, normalizeBuiltInChild, resolveBillChild, TAXONOMY_CHILDREN, TAXONOMY_INCOME, TAXONOMY_PARENTS } from './taxonomy'
 import { getCurrentUid, userStorage } from './auth'
@@ -87,7 +87,7 @@ interface LedgerState {
   seed: () => void
   reset: () => void
   exportAll: () => object
-  importAll: (data: any) => void
+  importAll: (data: unknown) => void
   applyImport: (plan: ImportPlan) => void
   mergeTaxonomy: () => void
   addTag: (patch: Omit<Tag, 'tagId' | 'positionWeight'> & { positionWeight?: number }) => Tag
@@ -97,7 +97,7 @@ interface LedgerState {
   setCurrencyRate: (code: string, rate: number) => void
   addCurrency: (c: Currency) => void
   removeCurrency: (code: string) => void
-  applyRemote: (records: any[]) => void
+  applyRemote: (records: SyncIncoming[]) => void
   setLastSync: (t: number) => void
   tombstone: (kind: string, id: string | number) => void
 }
@@ -106,7 +106,7 @@ export const useLedger = create<LedgerState>()(
   persist(
     (persistSet, get) => {
       // Keep assetNumber as a local display cache, never as a source of truth.
-      const set: typeof persistSet = (update: any, replace?: any) => persistSet((state) => {
+      const set: typeof persistSet = (update, replace) => persistSet((state) => {
         const changes = typeof update === 'function' ? update(state) : update
         if (!changes) return changes
         const combined = { ...state, ...changes }
@@ -256,7 +256,7 @@ export const useLedger = create<LedgerState>()(
         const { syncId, billId: newId } = newBillIdentity()
         const copy: Bill = {
           ...old,
-          billId: newId as any,
+          billId: newId,
           syncId,
           displayId: undefined,
           memberNo: undefined,
@@ -802,8 +802,8 @@ export const useLedger = create<LedgerState>()(
       })),
 
       // 合并云端记录：逐条 last-write-wins，删除墓碑生效
-      applyRemote: (records) => set((s: any) => {
-        const next: any = {}
+      applyRemote: (records) => set((s) => {
+        const next: Record<string, unknown[]> = {}
         const tombstones = [...s.tombstones]
         const spec: Record<string, [string, string]> = {
           bill: ['bills', 'billId'], asset: ['assets', 'assetId'], transfer: ['transfers', 'transferId'],
@@ -813,22 +813,23 @@ export const useLedger = create<LedgerState>()(
           reimbursement: ['reimbursements', 'reimbursementId'], refund: ['refunds', 'refundId'],
           budget: ['budgets', 'month']
         }
-        const idOf = (kind: string, item: any) =>
+        const idOf = (kind: string, item: Record<string, unknown>) =>
           kind === 'budget' ? `${item.month}:${item.categoryId}` : kind === 'bill' ? String(item.syncId ?? item.billId) : String(item[spec[kind][1]])
 
         for (const incoming of records || []) {
           let r = incoming
           if (r.kind === 'child' && !r.deleted && r.payload) {
-            const normalized = normalizeBuiltInChild(r.payload)
-            if (normalized !== r.payload) r = { ...r, id: String(normalized.id), payload: normalized }
+            const normalized = normalizeBuiltInChild(r.payload as unknown as Category)
+            if (normalized !== (r.payload as unknown as Category)) r = { ...r, id: String(normalized.id), payload: normalized as unknown as Record<string, unknown> }
           }
           const k = spec[r.kind]
           if (!k) continue
-          const arr: any[] = next[k[0]] ?? [...(s[k[0]] || [])]
+          const stateView = s as unknown as Record<string, unknown[]>
+          const arr = (next[k[0]] ?? [...(stateView[k[0]] || [])]) as Record<string, unknown>[]
           if (r.deleted) {
             const local = arr.find((x) => idOf(r.kind, x) === String(r.id))
             // 本地版本比墓碑更新 → 说明墓碑过期，保留本地记录
-            if (local && (local.updateTime ?? 0) > (r.updatedAt ?? 0)) continue
+            if (local && Number(local.updateTime ?? 0) > Number(r.updatedAt ?? 0)) continue
             next[k[0]] = arr.filter((x) => idOf(r.kind, x) !== String(r.id))
             if (!tombstones.some((t) => t.kind === r.kind && t.id === String(r.id))) {
               tombstones.push({ kind: r.kind, id: String(r.id), updatedAt: r.updatedAt || NOW() })
@@ -840,9 +841,10 @@ export const useLedger = create<LedgerState>()(
           if (deleted && deleted.updatedAt >= (r.updatedAt ?? 0)) continue
           if (r.ownerId != null && r.payload.ownerId == null) r.payload = { ...r.payload, ownerId: r.ownerId }
           const idx = arr.findIndex((x) => idOf(r.kind, x) === String(r.id))
-          const ownerOf = (x: any) => (x?.ownerId ?? x?.userId ?? 0)
-          const sameBuiltInChild = r.kind === 'child' && TAXONOMY_CHILDREN.some((c) => c.id === r.payload.id && c.parentId === r.payload.parentId && c.name === r.payload.name)
-            && idx >= 0 && arr[idx].parentId === r.payload.parentId && arr[idx].name === r.payload.name
+          const ownerOf = (x: Record<string, unknown>) => (x?.ownerId ?? x?.userId ?? 0)
+          const localRow = idx >= 0 ? arr[idx] : undefined
+          const sameBuiltInChild = r.kind === 'child' && TAXONOMY_CHILDREN.some((c) => c.id === r.payload!.id && c.parentId === r.payload!.parentId && c.name === r.payload!.name)
+            && !!localRow && localRow.parentId === r.payload!.parentId && localRow.name === r.payload!.name
           if (idx >= 0 && !sameBuiltInChild && (r.kind !== 'bill' || (!arr[idx].syncId && !r.payload.syncId)) && ownerOf(arr[idx]) !== ownerOf(r.payload)) {
             // 同 ID 但身份不同：不覆盖，顺位给一个新 ID，两条并存
             const idField = k[1]
@@ -853,18 +855,18 @@ export const useLedger = create<LedgerState>()(
             next[k[0]] = arr
             continue
           }
-          const localTime = idx >= 0 ? (arr[idx].updateTime ?? 0) : -1
+          const localTime = idx >= 0 ? Number(arr[idx].updateTime ?? 0) : -1
           if (r.kind === 'bill' && idx >= 0 && r.payload.displayId) {
             arr[idx] = { ...arr[idx], memberNo: r.payload.memberNo, sequenceNo: r.payload.sequenceNo, displayId: r.payload.displayId, ownerId: r.ownerId }
             next[k[0]] = arr
           }
-          if (idx < 0 || (r.updatedAt ?? 0) > localTime) {
+          if (idx < 0 || Number(r.updatedAt ?? 0) > localTime) {
             if (idx >= 0) arr[idx] = r.payload
             else arr.push(r.payload)
           }
           next[k[0]] = arr
         }
-        return { ...next, tombstones }
+        return { ...next, tombstones } as Partial<LedgerState>
       }),
 
       // 补齐内置分类（缺失的加上），并把老数据里的 emoji 图标迁移成图标键
@@ -927,7 +929,7 @@ export const useLedger = create<LedgerState>()(
           // 若当前这个是内置 id 而已有的不是，则替换
           if (want != null && c.id === want && prev.id !== want) keepP.set(k, c)
         }
-        const parentNameOf = (id: number) => (keepP.get([...keepP.values()].find((p: any) => p.id === id)?.name ?? '')?.name ?? String(id))
+        const parentNameOf = (id: number) => (keepP.get([...keepP.values()].find((p) => p.id === id)?.name ?? '')?.name ?? String(id))
         const keepC = new Map<string, Category>()
         for (const c of children) {
           const k = `${parentNameOf(c.parentId)}|${c.name}`
@@ -1034,8 +1036,8 @@ export const useLedger = create<LedgerState>()(
     {
       name: 'xiaoman-data',
       storage: createJSONStorage(() => userStorage),
-      merge: (persisted: any, current) => {
-        const snapshot = { ...current, ...persisted }
+      merge: (persisted, current) => {
+        const snapshot = { ...current, ...(persisted as Partial<LedgerState>) }
         snapshot.childCategories = snapshot.childCategories.map(normalizeBuiltInChild)
         return { ...snapshot, assets: deriveAssets(snapshot) }
       }
