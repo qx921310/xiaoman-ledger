@@ -442,6 +442,21 @@ assert.equal(state().refunds[0].baseAmount, 3)
 assert.equal(state().currencies.find(c => c.code === 'USD')!.rate, 9.5)
 assert.ok(state().tags.some(t => t.tagId === backupTag.tagId))
 assert.ok(state().tombstones.some(t => t.id === 'deleted-backup-test'))
+// 其余集合也要完整往返（借贷、周期、转账、报销、预算）
+state().addLend({ type: 1, assetId: 81, counterparty: '备份借贷', number: 50 })
+state().addTransfer({ fromAssetId: 81, toAssetId: 81, cost: 1 })
+state().addReimbursement({ billId: backupBill.billId, assetId: 81, number: 2 })
+state().setBudget({ month: '2026-11', categoryId: 7, amount: 300 } as any)
+const fullBackup = JSON.parse(JSON.stringify(state().exportAll()))
+const backupShape = (st: any) => ({
+  lends: st.lends.length, transfers: st.transfers.length,
+  reimbursements: st.reimbursements.length, budgets: st.budgets.length,
+  receivable: lendTotals(st.lends).receivable
+})
+const snapBefore = backupShape(state())
+state().reset()
+state().importAll(fullBackup)
+assert.deepEqual(backupShape(state()), snapBefore)
 const unmigratedBackup = JSON.parse(JSON.stringify(backup))
 delete unmigratedBackup.assets[0].openingBalance
 state().importAll(unmigratedBackup)
