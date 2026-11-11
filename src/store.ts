@@ -2,12 +2,14 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import type { AccountBook, Asset, Bill, Category, Currency, Cycle, Lend, Refund, Reimbursement, SyncIncoming, Tag, Transfer } from './types'
 import type { ImportPlan } from './importer'
-import { childCategoryNeedsReview, normalizeBuiltInChild, resolveBillChild, TAXONOMY_CHILDREN, TAXONOMY_INCOME, TAXONOMY_PARENTS } from './taxonomy'
+import { normalizeBuiltInChild, resolveBillChild, TAXONOMY_CHILDREN, TAXONOMY_INCOME, TAXONOMY_PARENTS } from './taxonomy'
 import { getCurrentUid, userStorage } from './auth'
 import { deriveAssets } from './balances'
 import { newBillIdentity } from './identity'
 import { lendRemaining } from './lend'
-import { cycleDueDates, handledDates } from './cycle-dates'
+import { mergeRemote, type MergeableState } from './domain/sync-merge'
+import { planCycles } from './domain/cycles'
+import { mergeTaxonomyState } from './domain/taxonomy-merge'
 import { fromBase, toBase } from './money'
 import { validateBackup } from './backup'
 import { addRefundChanges, deleteRefundChanges } from './refund-operations'
@@ -523,58 +525,21 @@ export const useLedger = create<LedgerState>()(
 
       runCycles: () => {
         const s = get()
-        const today = new Date()
-        today.setHours(23, 59, 59, 999)
-        const dkey = (d: Date) =>
-          `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-
-        /** 到期日算法已抽到 cycle-dates.ts，界面与生成共用 */
-        const dueDates = (c: Cycle) => cycleDueDates(c)
-
-        let count = 0
-        const updated: Cycle[] = []
-
-        for (const c of s.cycles.filter((x) => x.enabled)) {
-          const done = handledDates(c)
-          const fresh = dueDates(c).filter((d) => !done.has(dkey(d)))
-          for (const d of fresh) {
-            const time = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 9, 0, 0).getTime()
-            const t = get()
-            let identity = newBillIdentity()
-            while (t.bills.some((b) => b.billId === identity.billId)) identity = newBillIdentity()
-            const { billId, syncId } = identity
-            const parent = t.parentCategories.find((p) => p.id === c.parentCategoryId)
-            const asset = t.assets.find((a) => a.assetId === c.assetId)
-            const bill: Bill = {
-              billId, syncId, time, cost: c.cost,
-              parentCategoryId: c.parentCategoryId, childCategoryId: c.childCategoryId,
-              childCategoryIdentityVersion: c.childCategoryIdentityVersion,
-              assetId: c.assetId, bookId: t.currentBookId || 1,
-              remark: c.remark || c.name, billType: 4,
-              tags: [], files: [], userId: getCurrentUid() || t.userId, updateTime: NOW(),
-              billShareInfo: {
-                parentCategoryName: parent?.name ?? '',
-                childCategoryName: resolveBillChild(c, t.childCategories)?.name ?? '',
-                assetName: asset?.assetName ?? ''
-              }
-            }
-            const sign = parent?.kind === 'income' ? 1 : -1
-            set((st) => ({
-              bills: [bill, ...st.bills],
-              assets: st.assets.map((a) => a.assetId === c.assetId
-                ? { ...a, assetNumber: +(a.assetNumber + sign * c.cost).toFixed(2), updateTime: NOW() } : a)
-            }))
-            done.add(dkey(d))
-            count++
-          }
-          if (fresh.length) updated.push({ ...c, generated: [...done], updateTime: NOW() })
-        }
-
-        if (updated.length) {
-          const map = new Map(updated.map((u) => [u.cycleId, u]))
-          set((st) => ({ cycles: st.cycles.map((c) => map.get(c.cycleId) ?? c) }))
-        }
-        return count
+        const plan = planCycles({
+          cycles: s.cycles, bills: s.bills, assets: s.assets,
+          parentCategories: s.parentCategories, childCategories: s.childCategories,
+          currentBookId: s.currentBookId, userId: s.userId, uid: getCurrentUid() || undefined
+        })
+        if (!plan.count) return 0
+        const cycleMap = new Map(plan.cycles.map((c) => [c.cycleId, c]))
+        set((st) => ({
+          bills: [...plan.bills, ...st.bills],
+          assets: st.assets.map((a) => plan.assetDelta.has(a.assetId)
+            ? { ...a, assetNumber: +(a.assetNumber + (plan.assetDelta.get(a.assetId) ?? 0)).toFixed(2), updateTime: NOW() }
+            : a),
+          cycles: st.cycles.map((c) => cycleMap.get(c.cycleId) ?? c)
+        }))
+        return plan.count
       },
 
       // 借出 -、借入 +、收回 +、还款 -；删除则反向冲正
@@ -801,179 +766,12 @@ export const useLedger = create<LedgerState>()(
         ]
       })),
 
-      // 合并云端记录：逐条 last-write-wins，删除墓碑生效
-      applyRemote: (records) => set((s) => {
-        const next: Record<string, unknown[]> = {}
-        const tombstones = [...s.tombstones]
-        const spec: Record<string, [string, string]> = {
-          bill: ['bills', 'billId'], asset: ['assets', 'assetId'], transfer: ['transfers', 'transferId'],
-          lend: ['lends', 'lendId'], cycle: ['cycles', 'cycleId'],
-          parent: ['parentCategories', 'id'], child: ['childCategories', 'id'],
-          book: ['accountBooks', 'accountBookId'],
-          reimbursement: ['reimbursements', 'reimbursementId'], refund: ['refunds', 'refundId'],
-          budget: ['budgets', 'month']
-        }
-        const idOf = (kind: string, item: Record<string, unknown>) =>
-          kind === 'budget' ? `${item.month}:${item.categoryId}` : kind === 'bill' ? String(item.syncId ?? item.billId) : String(item[spec[kind][1]])
-
-        for (const incoming of records || []) {
-          let r = incoming
-          if (r.kind === 'child' && !r.deleted && r.payload) {
-            const normalized = normalizeBuiltInChild(r.payload as unknown as Category)
-            if (normalized !== (r.payload as unknown as Category)) r = { ...r, id: String(normalized.id), payload: normalized as unknown as Record<string, unknown> }
-          }
-          const k = spec[r.kind]
-          if (!k) continue
-          const stateView = s as unknown as Record<string, unknown[]>
-          const arr = (next[k[0]] ?? [...(stateView[k[0]] || [])]) as Record<string, unknown>[]
-          if (r.deleted) {
-            const local = arr.find((x) => idOf(r.kind, x) === String(r.id))
-            // 本地版本比墓碑更新 → 说明墓碑过期，保留本地记录
-            if (local && Number(local.updateTime ?? 0) > Number(r.updatedAt ?? 0)) continue
-            next[k[0]] = arr.filter((x) => idOf(r.kind, x) !== String(r.id))
-            if (!tombstones.some((t) => t.kind === r.kind && t.id === String(r.id))) {
-              tombstones.push({ kind: r.kind, id: String(r.id), updatedAt: r.updatedAt || NOW() })
-            }
-            continue
-          }
-          if (!r.payload) continue
-          const deleted = tombstones.find((t) => t.kind === r.kind && t.id === String(r.id))
-          if (deleted && deleted.updatedAt >= (r.updatedAt ?? 0)) continue
-          if (r.ownerId != null && r.payload.ownerId == null) r.payload = { ...r.payload, ownerId: r.ownerId }
-          const idx = arr.findIndex((x) => idOf(r.kind, x) === String(r.id))
-          const ownerOf = (x: Record<string, unknown>) => (x?.ownerId ?? x?.userId ?? 0)
-          const localRow = idx >= 0 ? arr[idx] : undefined
-          const sameBuiltInChild = r.kind === 'child' && TAXONOMY_CHILDREN.some((c) => c.id === r.payload!.id && c.parentId === r.payload!.parentId && c.name === r.payload!.name)
-            && !!localRow && localRow.parentId === r.payload!.parentId && localRow.name === r.payload!.name
-          if (idx >= 0 && !sameBuiltInChild && (r.kind !== 'bill' || (!arr[idx].syncId && !r.payload.syncId)) && ownerOf(arr[idx]) !== ownerOf(r.payload)) {
-            // 同 ID 但身份不同：不覆盖，顺位给一个新 ID，两条并存
-            const idField = k[1]
-            const taken = new Set(arr.map((x) => String(x[idField])))
-            let nextId = (Number(r.id) || 0) + 1
-            while (taken.has(String(nextId))) nextId++
-            arr.push({ ...r.payload, [idField]: nextId })
-            next[k[0]] = arr
-            continue
-          }
-          const localTime = idx >= 0 ? Number(arr[idx].updateTime ?? 0) : -1
-          if (r.kind === 'bill' && idx >= 0 && r.payload.displayId) {
-            arr[idx] = { ...arr[idx], memberNo: r.payload.memberNo, sequenceNo: r.payload.sequenceNo, displayId: r.payload.displayId, ownerId: r.ownerId }
-            next[k[0]] = arr
-          }
-          if (idx < 0 || Number(r.updatedAt ?? 0) > localTime) {
-            if (idx >= 0) arr[idx] = r.payload
-            else arr.push(r.payload)
-          }
-          next[k[0]] = arr
-        }
-        return { ...next, tombstones } as Partial<LedgerState>
-      }),
+      // 合并云端记录：算法在 domain/sync-merge.ts，这里只做接线
+      applyRemote: (records) => set((s) => mergeRemote(s as unknown as MergeableState, records) as Partial<LedgerState>),
 
       // 补齐内置分类（缺失的加上），并把老数据里的 emoji 图标迁移成图标键
-      mergeTaxonomy: () => set((s) => {
-        // 汇率自修复：任何非正汇率都恢复为默认值（0 会导致外币按 1:1 记账）
-        const DEFAULT_RATE: Record<string, number> = { CNY: 1, USD: 7.2, EUR: 7.8, JPY: 0.048, HKD: 0.92 }
-        const currencies = (s.currencies ?? []).map((c) =>
-          !c.rate || c.rate <= 0 ? { ...c, rate: DEFAULT_RATE[c.code] ?? 1 } : c)
-        const key = (c: Category) => `${c.parentId}|${c.name}|${c.kind}`
-        const haveP = new Set(s.parentCategories.map(key))
-        const haveC = new Set(s.childCategories.map(key))
-        const addP = [...TAXONOMY_PARENTS, ...TAXONOMY_INCOME].filter((c) => !haveP.has(key(c)))
-        const addC = TAXONOMY_CHILDREN.filter((c) => !haveC.has(key(c)))
-
-        // name+kind → 内置定义，用于修正图标/配色
-        const byName = new Map<string, Category>()
-        for (const c of [...TAXONOMY_PARENTS, ...TAXONOMY_INCOME, ...TAXONOMY_CHILDREN]) {
-          byName.set(`${c.name}|${c.kind}`, c)
-        }
-        // 老名字 → 新名字（同一分类改名时避免被当成两个）
-        const RENAMED: Record<string, string> = { '房租还贷': '房贷' }
-        const fix = (c: Category): Category => {
-          // 旧数据/云端记录可能缺 kind，按 id 段推断，避免同名分类被当成两个
-          if (!c.kind) c = { ...c, kind: c.parentId ? 'expense' : c.id >= 900 ? 'income' : 'expense' }
-          const renamed = RENAMED[c.name]
-          if (renamed) c = { ...c, name: renamed }
-          if (c.icon?.startsWith('ic_')) return c
-          const t = byName.get(`${c.name}|${c.kind}`)
-          return t ? { ...c, icon: t.icon, color: t.color, bg: t.bg } : c
-        }
-        let parents = s.parentCategories.map(fix)
-        let children = s.childCategories.map(fix)
-
-        // 一次性清理：早期测试造出来的分类，若没有任何账单引用就删掉
-        const JUNK = new Set(['通讯', '人情', '外卖', '三餐', '零食饮料', '药品'])
-        const used = new Set<number>()
-        for (const b of s.bills) {
-          used.add(b.parentCategoryId)
-          if (b.childCategoryId) used.add(b.childCategoryId)
-        }
-        children = children.filter((c) => !JUNK.has(c.name) || used.has(c.id))
-        parents = parents.filter((c) => !JUNK.has(c.name) || used.has(c.id))
-
-        // 这 3 个原先被错放进「收入」，实际属于「支出 > 其他」
-        const INCOME_MISPLACED = new Set(['慈善捐助', '理财支出', '罚款赔偿'])
-        parents = parents.filter((c) => !(c.kind === 'income' && INCOME_MISPLACED.has(c.name) && !used.has(c.id)))
-
-        const ratesFixed = currencies.some((c, i) => c !== (s.currencies ?? [])[i])
-        // ---- 去重：同名分类只保留一个（优先保留内置 id，其次最小的）----
-        const canonical = new Map<string, number>()
-        for (const c of [...TAXONOMY_PARENTS, ...TAXONOMY_INCOME]) canonical.set(`${c.name}|${c.kind}`, c.id)
-        for (const c of TAXONOMY_CHILDREN) canonical.set(`${c.parentId}|${c.name}|child`, c.id)
-
-        const keepP = new Map<string, Category>()
-        for (const c of parents) {
-          const k = c.name
-          const prev = keepP.get(k)
-          if (!prev) { keepP.set(k, c); continue }
-          const want = canonical.get(`${c.name}|${c.kind}`)
-          // 若当前这个是内置 id 而已有的不是，则替换
-          if (want != null && c.id === want && prev.id !== want) keepP.set(k, c)
-        }
-        const parentNameOf = (id: number) => (keepP.get([...keepP.values()].find((p) => p.id === id)?.name ?? '')?.name ?? String(id))
-        const keepC = new Map<string, Category>()
-        for (const c of children) {
-          const k = `${parentNameOf(c.parentId)}|${c.name}`
-          const prev = keepC.get(k)
-          if (!prev) { keepC.set(k, c); continue }
-          const want = canonical.get(`${c.parentId}|${c.name}|child`)
-          if (want != null && c.id === want && prev.id !== want) keepC.set(k, c)
-        }
-        const remapP = new Map<number, number>()
-        for (const c of parents) {
-          const keep = keepP.get(c.name)
-          if (keep && keep.id !== c.id) remapP.set(c.id, keep.id)
-        }
-        const remapC = new Map<number, number>()
-        for (const c of children) {
-          const keep = keepC.get(`${parentNameOf(c.parentId)}|${c.name}`)
-          if (keep && keep.id !== c.id) remapC.set(c.id, keep.id)
-        }
-        parents = [...keepP.values()]
-        children = [...keepC.values()]
-        const bills = (remapP.size || remapC.size)
-          ? s.bills.map((b) => {
-            const p2 = remapP.get(b.parentCategoryId)
-            const c2 = childCategoryNeedsReview(b) ? undefined : remapC.get(b.childCategoryId)
-            return p2 == null && c2 == null ? b : { ...b, parentCategoryId: p2 ?? b.parentCategoryId, childCategoryId: c2 ?? b.childCategoryId }
-          })
-          : s.bills
-
-        if (!addP.length && !addC.length) {
-          const changed =
-            parents.length !== s.parentCategories.length
-            || children.length !== s.childCategories.length
-            || parents.some((c, i) => c !== s.parentCategories[i])
-            || children.some((c, i) => c !== s.childCategories[i])
-          if (!changed && !ratesFixed) return {}
-          return { parentCategories: parents, childCategories: children, bills, ...(ratesFixed ? { currencies } : {}) }
-        }
-        return {
-          parentCategories: [...parents, ...addP],
-          childCategories: [...children, ...addC],
-          bills,
-          ...(ratesFixed ? { currencies } : {})
-        }
-      }),
+      // 分类规范化：算法在 domain/taxonomy-merge.ts
+      mergeTaxonomy: () => set((s) => mergeTaxonomyState(s)),
 
       // 合并式导入：新增分类/账户先落地，账单像正常记账一样冲账户余额
       applyImport: (plan) => set((s) => {
