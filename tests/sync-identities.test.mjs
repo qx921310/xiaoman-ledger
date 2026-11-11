@@ -70,6 +70,14 @@ test('offline bills receive stable, non-reused book member sequences', async () 
     await call('/data/push', { records: [{ ...make(offlineDeleted), updatedAt: 300 }] }, a)
     rows = (await call('/data/pull', undefined, a)).data.records.filter(r => r.kind === 'bill')
     assert.equal(rows.find(r => r.id === offlineDeleted).deleted, true)
+    // Legacy numeric IDs are not a safe shared-book identity: a peer's same-ID
+    // write is denied, rather than being silently treated as a distinct bill.
+    const legacyId = '1700000000000'
+    const legacy = { kind: 'bill', id: legacyId, updatedAt: 400,
+      payload: { billId: Number(legacyId), bookId: book, cost: 3, updateTime: 400 } }
+    assert.equal((await call('/data/push', { records: [legacy] }, a)).data.accepted, 1)
+    const peerLegacy = await call('/data/push', { records: [legacy] }, b)
+    assert.equal(peerLegacy.data.denied, 1)
     // Departing members retain their number; newcomers cannot inherit it.
     await call('/books/leave', { bookId: book }, b)
     const cReg = await call('/auth/register', { email: 'c@example.test', password: 'testpassword' })

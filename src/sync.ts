@@ -65,7 +65,7 @@ export async function syncNow() {
   useLedger.getState().applyRemote(pulled.records || [])
   // 云端记录会带回旧分类，合并后再跑一次规范/去重
   useLedger.getState().mergeTaxonomy()
-  useLedger.getState().setLastSync(Date.now())
+  if (!pushed.denied) useLedger.getState().setLastSync(Date.now())
   return {
     pushed: pushed.accepted as number,
     skipped: pushed.skipped as number,

@@ -237,7 +237,7 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
   }
 
   // 记录「行号 → 账单」用于回填报销/退款的 billId
-  const pendings: { bill: Bill; reimb?: { assetName: string; amount: number; detail: string }; refund?: { amount: number; assetId?: number; currency?: string; baseAmount?: number } }[] = []
+  const pendings: { bill: Bill; reimb?: { assetName: string; amount: number; detail: string }; refunds?: { amount: number; assetId?: number; currency?: string; baseAmount?: number }[] }[] = []
 
   table.rows.forEach((r, i) => {
     const dateRaw = r[col('日期')] ?? r[col('时间')] ?? r[col('日期时间')]
@@ -269,12 +269,29 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
     const refundAmountText = str(r[col('小满退款到账金额')])
     const refundBaseText = str(r[col('小满退款本币金额')])
     const refundMetadata = !!(refundAccountName || refundCurrency || refundAmountText || refundBaseText)
+    const refundDetailsText = str(r[col('小满退款明细')])
+    let refundDetails: { account: string; currency: string; amount: number; baseAmount: number }[] = []
+    if (refundDetailsText) {
+      try {
+        const parsed: unknown = JSON.parse(refundDetailsText)
+        if (!Array.isArray(parsed) || parsed.length < 2 || parsed.some((x) => !x || typeof x.account !== 'string' || !x.account.trim() ||
+          typeof x.currency !== 'string' || !/^[A-Z]{3}$/.test(x.currency) ||
+          typeof x.amount !== 'number' || !Number.isFinite(x.amount) || x.amount <= 0 ||
+          typeof x.baseAmount !== 'number' || !Number.isFinite(x.baseAmount) || x.baseAmount <= 0)) throw new Error('invalid')
+        refundDetails = parsed
+        const total = +refundDetails.reduce((sum, item) => sum + item.baseAmount, 0).toFixed(2)
+        if (refundMetadata || total > cost || total !== refundAmt) throw new Error('invalid')
+      } catch {
+        skipped.push({ row: i + 2, reason: '多笔退款明细不完整或金额不一致' })
+        return
+      }
+    }
     const legacyRefundAccount = str(r[col('退款账户')])
     if (reconstructFullRefund) {
       const sourceCurrency = str(r[col('多币种')])
       const paymentAccounts = assets.filter((a) => a.assetName === accountName)
       const targetAccounts = assets.filter((a) => a.assetName === (legacyRefundAccount || accountName))
-      if (refundMetadata || (sourceCurrency && !['CNY', '人民币'].includes(sourceCurrency)) ||
+      if (refundMetadata || refundDetailsText || (sourceCurrency && !['CNY', '人民币'].includes(sourceCurrency)) ||
           paymentAccounts.length > 1 || targetAccounts.length > 1 ||
           [...paymentAccounts, ...targetAccounts].some((a) => (a.currency ?? 'CNY') !== 'CNY') ||
           (accountCurrency && accountCurrency !== 'CNY')) {
@@ -291,11 +308,11 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
       skipped.push({ row: i + 2, reason: '账户或退款扩展字段不完整或金额无效' })
       return
     }
-    const requestedAccounts = [[accountName, accountCurrency], [refundAccountName, refundCurrency]].filter(([name, currency]) => name && currency)
+    const requestedAccounts = [[accountName, accountCurrency], [refundAccountName, refundCurrency], ...refundDetails.map((r) => [r.account, r.currency])].filter(([name, currency]) => name && currency)
     const conflictingAccounts = requestedAccounts.some(([name, currency]) => {
       const matches = assets.filter((a) => a.assetName === name)
       return matches.length > 1 || matches.some((a) => (a.currency || 'CNY') !== currency)
-    }) || (accountName === refundAccountName && !!accountCurrency && !!refundCurrency && accountCurrency !== refundCurrency)
+    }) || requestedAccounts.some(([name, currency]) => requestedAccounts.some(([otherName, otherCurrency]) => name === otherName && currency !== otherCurrency))
     if (conflictingAccounts) {
       skipped.push({ row: i + 2, reason: '同名账户的币种不一致或账户名不唯一，请先核对账户' })
       return
@@ -314,7 +331,7 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
     seen.add(key)
 
     if (isIncome) income += cost
-    else expense += cost - (reconstructFullRefund ? refundAmt : refundBaseText ? Number(refundBaseText) : 0)
+    else expense += cost - (reconstructFullRefund || refundDetails.length ? refundAmt : refundBaseText ? Number(refundBaseText) : 0)
 
     // 「其他」列写成 "不计入收支、不计入预算" 这类文本
     const otherText = str(r[col('其他')])
@@ -357,9 +374,10 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
     pendings.push({
       bill,
       reimb: (reimbAcc || reimbAmt > 0) ? { assetName: reimbAcc, amount: reimbAmt, detail: reimbDetail } : undefined,
-      refund: reconstructFullRefund ? { amount: refundAmt, assetId: ensureAsset(legacyRefundAccount || accountName, 'CNY'), currency: 'CNY', baseAmount: refundAmt }
-        : refundMetadata ? { amount: Number(refundAmountText), assetId: ensureAsset(refundAccountName, refundCurrency), currency: refundCurrency, baseAmount: refundBaseText ? Number(refundBaseText) : undefined }
-        : refundAmt > 0 ? { amount: refundAmt } : undefined
+      refunds: reconstructFullRefund ? [{ amount: refundAmt, assetId: ensureAsset(legacyRefundAccount || accountName, 'CNY'), currency: 'CNY', baseAmount: refundAmt }]
+        : refundDetails.length ? refundDetails.map((r) => ({ amount: r.amount, assetId: ensureAsset(r.account, r.currency), currency: r.currency, baseAmount: r.baseAmount }))
+        : refundMetadata ? [{ amount: Number(refundAmountText), assetId: ensureAsset(refundAccountName, refundCurrency), currency: refundCurrency, baseAmount: refundBaseText ? Number(refundBaseText) : undefined }]
+        : refundAmt > 0 ? [{ amount: refundAmt }] : undefined
     })
     if (reconstructFullRefund) warnings.push({ row: i + 2, reason: legacyRefundAccount
       ? '已按人民币全额退款还原原支出和指定退款账户，请核对'
@@ -393,14 +411,14 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
         updateTime: Date.now()
       })
     }
-    if (p.refund) {
+    for (const refund of p.refunds ?? []) {
       refunds.push({
         refundId: Date.now() + (rseq++),
         billId: p.bill.billId,
-        number: p.refund.amount,
-        assetId: p.refund.assetId,
-        currency: p.refund.currency,
-        baseAmount: p.refund.baseAmount,
+        number: refund.amount,
+        assetId: refund.assetId,
+        currency: refund.currency,
+        baseAmount: refund.baseAmount,
         userId,
         updateTime: Date.now()
       })
@@ -421,7 +439,7 @@ export function buildExportTable(
 ) {
   const header = ['日期', '收支类型', '金额', '类别', '二级分类', '账户', '账本', '退款', '优惠', '备注', '标签',
     '报销账户', '报销金额', '报销明细', '多币种', '地址', '创建用户', '其他', '附件1', '附件2', '附件3', '附件4', '附件5',
-    '小满账户币种', '小满账户金额', '小满退款账户', '小满退款币种', '小满退款到账金额', '小满退款本币金额']
+    '小满账户币种', '小满账户金额', '小满退款账户', '小满退款币种', '小满退款到账金额', '小满退款本币金额', '小满退款明细']
   const rows = bills.map((b) => {
     const p = parents.find((x) => x.id === b.parentCategoryId)
     const c = children.find((x) => x.id === b.childCategoryId)
@@ -429,9 +447,21 @@ export function buildExportTable(
     const bk = books.find((x) => x.accountBookId === b.bookId)
     const reimb = reimbursements.find((x) => x.billId === b.billId)
     const billRefunds = refunds.filter((x) => x.billId === b.billId)
-    if (billRefunds.length > 1) throw new Error('一笔账单有多条退款，Excel 暂不支持完整导出，请使用 JSON 备份')
-    const refund = billRefunds[0]
+    const refund = billRefunds.length === 1 ? billRefunds[0] : undefined
     const refundAsset = refund?.assetId != null ? assets.find((x) => x.assetId === refund.assetId) : undefined
+    const multipleDetails = billRefunds.length > 1 ? billRefunds.map((r) => {
+      const account = assets.find((x) => x.assetId === r.assetId)
+      if (!account || !r.currency || (account.currency ?? 'CNY') !== r.currency || r.baseAmount == null ||
+          !Number.isFinite(r.baseAmount) || r.baseAmount <= 0 || !Number.isFinite(r.number) || r.number <= 0 ||
+          assets.filter((x) => x.assetName === account.assetName).length > 1) {
+        throw new Error('多笔退款的账户或金额不完整，请先核对或使用 JSON 备份')
+      }
+      return { account: account.assetName, currency: r.currency, amount: r.number, baseAmount: r.baseAmount }
+    }) : []
+    const multipleTotal = +multipleDetails.reduce((sum, r) => sum + r.baseAmount, 0).toFixed(2)
+    if (multipleDetails.length && (multipleTotal !== b.refundNum || multipleTotal > b.cost)) {
+      throw new Error('多笔退款的累计金额不一致，请先核对或使用 JSON 备份')
+    }
     if ((b.accountAmount != null && (!a || !b.accountCurrency || (a.currency ?? 'CNY') !== b.accountCurrency)) ||
         (refund?.assetId != null && (!refundAsset || !refund.currency || (refundAsset.currency ?? 'CNY') !== refund.currency)) ||
         (refund?.baseAmount != null && (!refundAsset || refund.baseAmount !== b.refundNum || refund.baseAmount > b.cost))) {
@@ -469,7 +499,8 @@ export function buildExportTable(
       refundAsset?.assetName ?? '',
       refundAsset ? refund?.currency ?? '' : '',
       refundAsset ? refund?.number ?? '' : '',
-      refundAsset ? refund?.baseAmount ?? '' : ''
+      refundAsset ? refund?.baseAmount ?? '' : '',
+      multipleDetails.length ? JSON.stringify(multipleDetails) : ''
     ]
   })
   return { headers: header, rows, sheetName: '账单' }

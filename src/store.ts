@@ -6,8 +6,9 @@ import { TAXONOMY_CHILDREN, TAXONOMY_INCOME, TAXONOMY_PARENTS } from './taxonomy
 import { getCurrentUid, userStorage } from './auth'
 import { deriveAssets } from './balances'
 import { newBillIdentity } from './identity'
-import { fromBase, hasCurrencyRate, toBase } from './money'
+import { fromBase, toBase } from './money'
 import { validateBackup } from './backup'
+import { addRefundChanges, deleteRefundChanges } from './refund-operations'
 
 const NOW = () => Date.now()
 
@@ -589,47 +590,9 @@ export const useLedger = create<LedgerState>()(
         }
       }),
 
-      // 退款：钱退回原支付账户，直接冲减这笔支出
-      addRefund: ({ billId, number, assetId, baseAmount }) => set((s) => {
-        const bill = s.bills.find((b) => b.billId === billId)
-        if (!bill) return {}
-        if (s.parentCategories.find((p) => p.id === bill.parentCategoryId)?.kind === 'income') return {}
-        const asset = s.assets.find((a) => a.assetId === (assetId || bill.assetId))
-        if (!asset) return {}
-        const amt = Number(number) || 0
-        if (!Number.isFinite(amt) || amt <= 0) return {}
-        if (!hasCurrencyRate(asset.currency, s.currencies, s.defaultCurrency)) return {}
-        const base = baseAmount ?? toBase(amt, asset.currency, s.currencies, s.defaultCurrency)
-        // 多次退款：累计不得超过原账单金额
-        const refunded = s.refunds.filter((r) => r.billId === billId)
-          .reduce((sum, r) => sum + (Number(r.baseAmount) || 0), 0)
-        if (!Number.isFinite(base) || base <= 0 || base > +(bill.cost - refunded).toFixed(2)) return {}
-        let refundId = Date.now()
-        while (s.refunds.some((r) => r.refundId === refundId) || s.tombstones.some((t) => t.kind === 'refund' && t.id === String(refundId))) refundId++
-        const rec: Refund = {
-          refundId, billId, assetId: asset.assetId, currency: asset.currency ?? s.defaultCurrency,
-          number: amt, baseAmount: base, userId: s.userId, updateTime: NOW()
-        }
-        return {
-          refunds: [rec, ...s.refunds],
-          bills: s.bills.map((b) => b.billId === billId ? { ...b, refundNum: base, updateTime: NOW() } : b),
-          assets: s.assets.map((a) => a.assetId === asset.assetId
-            ? { ...a, assetNumber: +(a.assetNumber + amt).toFixed(2), updateTime: NOW() } : a)
-        }
-      }),
-
-      deleteRefund: (refundId) => set((s) => {
-        const rec = s.refunds.find((r) => r.refundId === refundId)
-        if (!rec) return {}
-        const bill = s.bills.find((b) => b.billId === rec.billId)
-        return {
-          refunds: s.refunds.filter((r) => r.refundId !== refundId),
-          tombstones: [...s.tombstones, { kind: 'refund', id: String(refundId), updatedAt: NOW() }],
-          bills: s.bills.map((b) => b.billId === rec.billId ? { ...b, refundNum: 0, updateTime: NOW() } : b),
-          assets: bill ? s.assets.map((a) => a.assetId === bill.assetId
-            ? { ...a, assetNumber: +(a.assetNumber - rec.number).toFixed(2), updateTime: NOW() } : a) : s.assets
-        }
-      }),
+      // 账户余额由退款流水自动推导，不再手动改缓存。
+      addRefund: (patch) => set((s) => addRefundChanges(s, patch, NOW())),
+      deleteRefund: (refundId) => set((s) => deleteRefundChanges(s, refundId, NOW())),
 
       setBudget: (budget) => set((s) => {
         const rest = s.budgets.filter((b) => !(b.month === budget.month && b.categoryId === budget.categoryId))

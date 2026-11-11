@@ -231,8 +231,7 @@ function BillDetail({ bill, me, onClose, onEdit }: {
   const p = parents.find((x) => x.id === bill.parentCategoryId)
   const c = children.find((x) => x.id === bill.childCategoryId)
   const a = assets.find((x) => x.assetId === bill.assetId)
-  const refund = refunds.find((r) => r.billId === bill.billId)
-  const refundAsset = assets.find((x) => x.assetId === (refund?.assetId ?? bill.assetId))
+  const billRefunds = refunds.filter((r) => r.billId === bill.billId)
   const bk = books.find((b) => String(b.bookId ?? b.accountBookId) === String(bill.bookId))
   const isIncome = p?.kind === 'income'
   const tagColor = (name: string) => tags.find((t) => t.name === name)?.color
@@ -273,7 +272,10 @@ function BillDetail({ bill, me, onClose, onEdit }: {
         <Row label="账单分类">{p?.name}{c ? ` - ${c.name}` : ''}</Row>
         <Row label="账单日期">{dayOf(bill.time)} {hhmm(bill.time)}</Row>
         <Row label="收支账户">{a?.assetName ?? '无'}</Row>
-        {refund && <Row label="已退款">{refund.baseAmount != null ? money(refund.baseAmount) : accountMoney(refund.number, refund.currency ?? refundAsset?.currency, currencies, defaultCurrency)} · {refundAsset?.assetName ?? '账户'}</Row>}
+        {billRefunds.map((refund) => {
+          const refundAsset = assets.find((x) => x.assetId === (refund.assetId ?? bill.assetId))
+          return <Row key={refund.refundId} label="已退款">{refund.baseAmount != null ? money(refund.baseAmount) : accountMoney(refund.number, refund.currency ?? refundAsset?.currency, currencies, defaultCurrency)} · {refundAsset?.assetName ?? '账户'}</Row>
+        })}
         <Row label="备注">{bill.remark || '无'}</Row>
         <Row label="标签">
           {(bill.tags && bill.tags.length)
@@ -340,7 +342,7 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
 
   const myReimb = reimbursements.find((r) => r.billId === bill.billId)
   const myRefunds = refunds.filter((r) => r.billId === bill.billId)
-  const myRefund = myRefunds[0]                       // 兼容旧逻辑（币种/账户回退）
+  const hasLegacyRefund = myRefunds.some((r) => r.baseAmount == null)
   const refundedTotal = +myRefunds.reduce((sum, r) => sum + (Number(r.baseAmount) || 0), 0).toFixed(2)
   const refundRemaining = +Math.max(0, bill.cost - refundedTotal).toFixed(2)
   const [rAsset, setRAsset] = useState(bill.assetId || assets[0]?.assetId || 0)
@@ -351,8 +353,8 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
   const [fAmount, setFAmount] = useState('')
   const [fAsset, setFAsset] = useState(0)
   const reimbursementCurrency = assets.find((a) => a.assetId === rAsset)?.currency ?? defaultCurrency
-  const refundAccount = assets.find((a) => a.assetId === (myRefund?.assetId ?? (fAsset || bill.assetId)))
-  const refundCurrency = myRefund?.currency ?? refundAccount?.currency ?? defaultCurrency
+  const refundAccount = assets.find((a) => a.assetId === (fAsset || bill.assetId))
+  const refundCurrency = refundAccount?.currency ?? defaultCurrency
   const refundBase = Number(fAmount)
   const refundRateAvailable = hasCurrencyRate(refundCurrency, currencies, defaultCurrency)
   const refundAccountAmount = refundRateAvailable && Number.isFinite(refundBase) ? fromBase(refundBase, refundCurrency, currencies, defaultCurrency) : 0
@@ -379,7 +381,7 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
           onChange={(e) => setCost(e.target.value.replace(/[^\d.]/g, ''))}
           inputMode="decimal"
         />
-        {myRefund?.baseAmount != null && Number(cost) < myRefund.baseAmount && <p className="hint">原账单金额不能小于已退款金额。</p>}
+        {Number(cost) < refundedTotal && <p className="hint">原账单金额不能小于已退款金额。</p>}
         <div className="label">分类</div>
         <select value={pid} onChange={(e) => { setPid(Number(e.target.value)); setCid(0) }}>
           {parents.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -436,11 +438,12 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
             )}
             {myRefunds.map((r) => (
               <div key={r.refundId} className="attach-line">
-                <span>{money(Number(r.baseAmount) || 0)}（到账 {accountMoney(r.number, r.currency ?? defaultCurrency, currencies, defaultCurrency)} · {assets.find((a) => a.assetId === (r.assetId ?? bill.assetId))?.assetName ?? '账户'}）</span>
+                <span>{r.baseAmount == null ? '原币退款' : money(r.baseAmount)}（到账 {accountMoney(r.number, r.currency ?? assets.find((a) => a.assetId === (r.assetId ?? bill.assetId))?.currency, currencies, defaultCurrency)} · {assets.find((a) => a.assetId === (r.assetId ?? bill.assetId))?.assetName ?? '账户'}）</span>
                 <button className="del" onClick={() => deleteRefund(r.refundId)}>撤销</button>
               </div>
             ))}
-            {refundRemaining > 0 && (
+            {hasLegacyRefund && <p className="hint">旧退款缺少本币金额，请先核对并处理旧退款，再登记新的退款。</p>}
+            {!hasLegacyRefund && refundRemaining > 0 && (
               <>
                 <input value={fAmount} onChange={(e) => setFAmount(e.target.value.replace(/[^\d.]/g, ''))} placeholder={`本次退款金额（${defaultCurrency}，最多 ${refundRemaining}）`} aria-label={`本次退款金额（${defaultCurrency}）`} inputMode="decimal" />
                 <select value={fAsset} onChange={(e) => setFAsset(Number(e.target.value))} aria-label="退款账户">

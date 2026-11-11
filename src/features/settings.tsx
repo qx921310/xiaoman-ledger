@@ -102,7 +102,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
     setSyncMsg('')
     try {
       const r = await syncNow()
-      setSyncMsg(`已推送 ${r.pushed} 条（跳过 ${r.skipped} 条较旧记录），拉回 ${r.pulled} 条` + (r.denied ? `；${r.denied} 条因权限未能推送` : ''))
+      setSyncMsg(`已推送 ${r.pushed} 条（跳过 ${r.skipped} 条较旧记录），拉回 ${r.pulled} 条` + (r.denied ? `；${r.denied} 条未能推送，请核对权限、账本和记录身份` : ''))
     } catch (e: any) {
       setSyncMsg('同步失败：' + (e?.message || '未知错误'))
     } finally {
@@ -628,7 +628,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
 
       <h3>关于</h3>
       <p className="hint">
-        数据默认只存本机浏览器；登录后可手动同步到你自己账号下，不传给第三方。导出 Excel 后可再导回或换工具。
+        数据保存在当前设备；登录后打开应用会尝试自动同步，也可手动同步。同步数据保存在服务端，供账号和共享账本成员使用。
       </p>
     </section>
   )

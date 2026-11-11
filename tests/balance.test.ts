@@ -2,6 +2,7 @@ import { strict as assert } from 'node:assert'
 import { deriveAssets } from '../src/balances'
 import { buildExportTable, buildImportPlan, parseLedgerFile } from '../src/importer'
 import * as XLSX from 'xlsx'
+import { editAmount, evaluateAmount } from '../src/ui/keypad'
 import { useLedger } from '../src/store'
 import { collectRecords } from '../src/sync'
 import { billNetAmount } from '../src/bill-amount'
@@ -128,7 +129,11 @@ assert.equal(refund.assetId, 31)
 assert.equal(refund.currency, 'USD')
 assert.equal(balance(31), 94)
 state().addRefund({ billId: refundedBill.billId, number: 4 })
+assert.equal(state().refunds.length, 2)
+assert.equal(balance(31), 98)
+state().deleteRefund(state().refunds[0].refundId)
 assert.equal(state().refunds.length, 1)
+assert.equal(balance(31), 94)
 state().updateBill(refundedBill.billId, { assetId: 32 })
 assert.equal(balance(31), 104)
 assert.equal(balance(32), 90)
@@ -339,6 +344,51 @@ state().applyImport(anotherPlan)
 assert.equal(state().assets.find(a => a.assetName === '导入钱包')!.assetNumber, -6)
 assert.equal(state().assets.find(a => a.assetName === '另一张卡')!.assetNumber, -1)
 
+// Separate partial refunds can use different account currencies and be revoked independently.
+state().reset()
+state().setCurrencyRate('USD', 8)
+state().addAsset({ assetId: 91, assetName: '人民币退款', assetNumber: 100, currency: 'CNY' })
+state().addAsset({ assetId: 92, assetName: '美元退款', assetNumber: 0, currency: 'USD' })
+const partialBill = state().addBill({ assetId: 91, parentCategoryId: 7, cost: 72 })
+state().addRefund({ billId: partialBill.billId, number: 8, baseAmount: 8 })
+const firstPartial = state().refunds[0]
+state().addRefund({ billId: partialBill.billId, assetId: 92, number: 4, baseAmount: 32 })
+assert.equal(state().refunds.length, 2)
+assert.equal(state().bills.find(b => b.billId === partialBill.billId)!.refundNum, 40)
+assert.equal(billNetAmount(state().bills.find(b => b.billId === partialBill.billId)!, state().refunds), 32)
+assert.equal(balance(91), 36)
+assert.equal(balance(92), 4)
+const multiExport = buildExportTable(state().bills, state().parentCategories, state().childCategories, state().assets, state().accountBooks, state().reimbursements, state().refunds)
+const multiWorkbook = XLSX.utils.book_new()
+XLSX.utils.book_append_sheet(multiWorkbook, XLSX.utils.aoa_to_sheet([multiExport.headers, ...multiExport.rows]), multiExport.sheetName)
+const multiBytes = XLSX.write(multiWorkbook, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer
+const multiParsed = parseLedgerFile(multiBytes, 'multi-refunds.xlsx')
+const multiPlan = buildImportPlan({ table: multiParsed, existingBills: [], existingAssets: [], existingBooks: state().accountBooks,
+  parentCategories: state().parentCategories, childCategories: state().childCategories, userId: 1, bookId: 1 })
+assert.equal(multiPlan.skipped.length, 0)
+assert.equal(multiPlan.refunds.length, 2)
+assert.equal(multiPlan.expense, 32)
+assert.equal(billNetAmount(multiPlan.bills[0], multiPlan.refunds), 32)
+const multiAssets = deriveAssets({ ...state(), assets: multiPlan.newAssets.map(a => ({ ...a, openingBalance: 0 })), bills: multiPlan.bills,
+  refunds: multiPlan.refunds, transfers: [], lends: [], reimbursements: [] })
+assert.equal(multiAssets.find(a => a.assetName === '人民币退款')!.assetNumber, -64)
+assert.equal(multiAssets.find(a => a.assetName === '美元退款')!.assetNumber, 4)
+const damagedMulti = { ...multiParsed, rows: multiParsed.rows.map(row => [...row]) }
+damagedMulti.rows[0][multiParsed.headers.indexOf('小满退款明细')] = '[坏数据]'
+const rejectedMulti = buildImportPlan({ table: damagedMulti, existingBills: [], existingAssets: [], existingBooks: state().accountBooks,
+  parentCategories: state().parentCategories, childCategories: state().childCategories, userId: 1, bookId: 1 })
+assert.equal(rejectedMulti.bills.length, 0)
+assert.equal(rejectedMulti.skipped.length, 1)
+state().addRefund({ billId: partialBill.billId, number: 33, baseAmount: 33 })
+assert.equal(state().refunds.length, 2)
+state().updateBill(partialBill.billId, { cost: 39 })
+assert.equal(state().bills.find(b => b.billId === partialBill.billId)!.cost, 72)
+state().deleteRefund(firstPartial.refundId)
+assert.equal(state().bills.find(b => b.billId === partialBill.billId)!.refundNum, 32)
+assert.equal(balance(91), 28)
+assert.equal(balance(92), 4)
+assert.equal(billNetAmount(state().bills.find(b => b.billId === partialBill.billId)!, state().refunds), 40)
+
 // JSON backup preserves account movements, settings and deletion markers.
 state().reset()
 state().addAsset({ assetId: 81, assetName: '备份账户', assetNumber: 100 })
@@ -379,4 +429,15 @@ state().importAll({ ...v1, version: 1 })
 assert.equal(balance(81), 93)
 assert.equal(state().currencies.find(c => c.code === 'USD')!.rate, 8)
 assert.ok(state().tags.some(t => t.tagId === backupTag.tagId))
+assert.equal(editAmount('', '.'), '0.')
+assert.equal(editAmount('3.2', '.'), '3.2')
+assert.equal(editAmount('3.', '00'), '3.00')
+assert.equal(editAmount('3.00', '退格'), '3.0')
+assert.equal(editAmount('3.0', '清空'), '')
+assert.equal(editAmount('3+2', '.'), '3+2.')
+assert.equal(editAmount('3+', '×'), '3×')
+assert.equal(evaluateAmount('3+2×4'), 11)
+assert.equal(evaluateAmount('10-6÷2'), 7)
+assert.equal(evaluateAmount('1÷0'), null)
+assert.equal(evaluateAmount('3+'), null)
 console.log('balance and synthetic CSV tests passed')
