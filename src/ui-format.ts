@@ -5,6 +5,11 @@ export const monthOf = (t: number) => {
   const d = new Date(t)
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`
 }
+/** 完整本地日期键 YYYY-MM-DD，用于分组与 humanDay */
+export const fullDay = (t: number) => {
+  const d = new Date(t)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 export const dayOf = (t: number) => {
   const d = new Date(t)
   return `${d.getMonth() + 1}月${d.getDate()}日`

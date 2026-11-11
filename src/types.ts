@@ -303,6 +303,8 @@ export interface Category {
 }
 
 export interface Transfer {
+  /** 归属账本：共享账本里的事务 */
+  bookId?: string | number
   transferId: number
   fromAssetId: number
   toAssetId: number
@@ -325,6 +327,8 @@ export interface AccountBook {
   bookId?: string
   /** 创建者 userId */
   ownerId?: number
+  /** 账本成员数（用于判断是否多人共享） */
+  memberCount?: number
   /** 我在这个账本里的角色 */
   role?: 'silent' | 'peer' | 'admin'
   accountBookId: number

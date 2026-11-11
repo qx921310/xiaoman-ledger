@@ -1,3 +1,5 @@
+import { ASSET_ICON_GROUPS, assetIconImagePath } from './asset-icons'
+
 const iconGroup = (k: string) =>
   k.startsWith('ic_parent_') ? 'parent'
     : (k.startsWith('ic_income_') || k.startsWith('ic_other_') || k.startsWith('ic_r_')) ? 'income'
@@ -32,7 +34,10 @@ const ASSET_NAME_ICONS: [RegExp, string][] = [
 ]
 
 export function AssetIcon({ type, size = 18, name, icon }: { type: number; size?: number; name?: string; icon?: string }) {
-  const k = ASSET_NAME_ICONS.find(([pattern]) => pattern.test(name ?? ''))?.[1] ?? ASSET_TYPE_ICONS[type] ?? 'ic_asset_default'
+  const image = assetIconImagePath(icon)
+  if (image) return <img src={image} alt="" width={size} height={size} style={{ objectFit: 'contain' }} />
+  const selected = ASSET_ICON_GROUPS[0].options.some(([key]) => key === icon) ? icon : undefined
+  const k = selected ?? ASSET_NAME_ICONS.find(([pattern]) => pattern.test(name ?? ''))?.[1] ?? ASSET_TYPE_ICONS[type] ?? 'ic_asset_default'
   const url = `/icons/assets/${k}.svg`
   return <span className="asset-ico" title={name} style={{ width: size, height: size, WebkitMaskImage: `url(${url})`, maskImage: `url(${url})` } as React.CSSProperties} />
 }

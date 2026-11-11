@@ -3,7 +3,7 @@ import { useLedger } from '../store'
 import { BILL_TYPE } from '../types'
 import type { Bill, Transfer } from '../types'
 import { books as bookApi } from '../auth'
-import { money, dayOf, hhmm, monthOf, toLocalInput , humanDay} from '../ui-format'
+import { money, dayOf, fullDay, hhmm, monthOf, toLocalInput, humanDay } from '../ui-format'
 import { CatIcon } from '../ui/icons'
 import { TransferEditor } from './transfer-editor'
 import { Modal } from '../ui/modal'
@@ -54,6 +54,11 @@ export function Bills({ me, onAdd, embedded = false }: { me?: { id: number; emai
   const nameOf = (pid: number) => parents.find((p) => p.id === pid)?.name ?? ''
 
   const dateRangeActive = Boolean(fFrom || fTo)
+  const hasFilters = Boolean(kw || fPid || fAid || fTag || fMin || fMax || fFrom || fTo)
+  const resetFilters = () => {
+    setKw(''); setFPid(0); setFAid(0); setFTag('')
+    setFMin(''); setFMax(''); setFFrom(''); setFTo('')
+  }
   const match = (b: Bill) => {
     // 指定了日期范围时按范围过滤，不再受月份限制
     if (!dateRangeActive && monthOf(b.time) !== month) return false
@@ -85,15 +90,30 @@ export function Bills({ me, onAdd, embedded = false }: { me?: { id: number; emai
   const list = useMemo(() => bills.filter(match).sort((a, b) => b.time - a.time), [bills, month, kw, fPid, fAid, parents, currentBookId, fMin, fMax, fTag, fFrom, fTo, dateRangeActive])
 
   const tList = useMemo(() => transfers.filter((t) => {
-    if (monthOf(t.time) !== month) return false
+    if (!dateRangeActive && monthOf(t.time) !== month) return false
+    if (currentBookId !== 0 && t.bookId !== undefined && String(t.bookId) !== String(currentBookId)) return false
     if (fAid && t.fromAssetId !== fAid && t.toAssetId !== fAid) return false
     if (fPid) return false
+    // 金额范围同样作用于转账本金
+    const amount = Number(t.cost) || 0
+    if (fMin !== '' && amount < Number(fMin)) return false
+    if (fMax !== '' && amount > Number(fMax)) return false
+    // 标签筛选：转账通常没有标签，指定标签时不显示
+    if (fTag) return false
+    if (fFrom) {
+      const from = new Date(fFrom + 'T00:00:00').getTime()
+      if (t.time < from) return false
+    }
+    if (fTo) {
+      const to = new Date(fTo + 'T23:59:59').getTime()
+      if (t.time > to) return false
+    }
     if (kw) {
       const hay = (t.remark || '') + ' 转账'
       if (!hay.toLowerCase().includes(kw.toLowerCase())) return false
     }
     return true
-  }), [transfers, month, kw, fPid, fAid])
+  }), [transfers, month, kw, fPid, fAid, currentBookId, fMin, fMax, fTag, fFrom, fTo, dateRangeActive])
 
   const { income, expense } = summarizeBills(list, parents, refunds)
 
@@ -105,7 +125,7 @@ export function Bills({ me, onAdd, embedded = false }: { me?: { id: number; emai
     ].sort((x, y) => y.time - x.time)
     const m = new Map<string, Item[]>()
     all.forEach((it) => {
-      const k = dayOf(it.time)
+      const k = fullDay(it.time)
       if (!m.has(k)) m.set(k, [])
       m.get(k)!.push(it)
     })
@@ -149,16 +169,12 @@ export function Bills({ me, onAdd, embedded = false }: { me?: { id: number; emai
           onChange={(e) => setFMax(e.target.value.replace(/[^\d.]/g, ''))} />
         <input aria-label="起始日期" type="date" value={fFrom} onChange={(e) => setFFrom(e.target.value)} />
         <input aria-label="结束日期" type="date" value={fTo} onChange={(e) => setFTo(e.target.value)} />
-        {Boolean(kw || fPid || fAid || fTag || fMin || fMax || fFrom || fTo) && (
-          <button className="ghost" onClick={() => {
-            setKw(''); setFPid(0); setFAid(0); setFTag(''); setFMin(''); setFMax(''); setFFrom(''); setFTo('')
-          }}>重置</button>
-        )}
+        {hasFilters && <button className="ghost" onClick={resetFilters}>重置</button>}
       </div>
       )}
 
       {groups.length === 0 && <div className="empty">
-        {kw || fPid || fAid || fTag || fMin || fMax || fFrom || fTo ? <><p>没有符合条件的账单</p><button className="ghost" onClick={() => { setKw(''); setFPid(0); setFAid(0) }}>清除筛选</button></>
+        {hasFilters ? <><p>没有符合条件的账单</p><button className="ghost" onClick={() => { setKw(''); setFPid(0); setFAid(0) }}>清除筛选</button></>
           : <><p>本月还没有账单</p>{onAdd && <button className="ghost" onClick={onAdd}>记第一笔</button>}</>}
       </div>}
 

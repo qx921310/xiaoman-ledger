@@ -8,6 +8,7 @@ import { mergeRemote } from '../src/domain/sync-merge'
 import { leaksPrivateAccount, visibleAssets } from '../src/domain/asset-scope'
 import { dedupeCycleBills as dedupeBills } from '../src/domain/cycle-dedupe'
 import { planCycles } from '../src/domain/cycles'
+import { fullDay, humanDay } from '../src/ui-format'
 import { accountHistory } from '../src/domain/account-history'
 import { byAsset, byTag, dailyTrend } from '../src/domain/stats-breakdown'
 import { dateKey, pendingDates } from '../src/cycle-dates'
@@ -682,8 +683,11 @@ const scopeAssets: any[] = [
 ]
 assert.deepEqual(visibleAssets(scopeAssets, 'book-a', 7).map((a) => a.assetId), [1, 2], '私有本人 + 本账本共享')
 assert.deepEqual(visibleAssets(scopeAssets, 'book-b', 8).map((a) => a.assetId), [3], '看不到别人的私有账户')
-assert.equal(leaksPrivateAccount(scopeAssets[0] as any, 'book-a'), true, '私有账户用于共享账本会泄露')
-assert.equal(leaksPrivateAccount(scopeAssets[1] as any, 'book-a'), false, '共享账户不泄露')
+const twoPersonBook = [{ bookId: 'book-a', memberCount: 2 }]
+const soloBook = [{ bookId: 'solo', memberCount: 1 }]
+assert.equal(leaksPrivateAccount(scopeAssets[0] as any, 'book-a', twoPersonBook), true, '私有账户用于多人账本会泄露')
+assert.equal(leaksPrivateAccount(scopeAssets[1] as any, 'book-a', twoPersonBook), false, '共享账户不泄露')
+assert.equal(leaksPrivateAccount(scopeAssets[0] as any, 'solo', soloBook), false, '单人账本不误拦')
 
 // showBook 显式指定可见账本时优先于 bookId
 const showBookAssets: any[] = [
@@ -847,3 +851,43 @@ assert.equal(tagRows.length, 1, '只有被标签标记的支出进入标签统�
 assert.equal(tagRows[0].name, '出差')
 assert.equal(tagRows[0].amount, 30)
 assert.equal(sBill.time, t1)
+
+// 账户流水期末余额必须等于资产余额（含转账手续费只算一次）
+state().reset()
+state().addAsset({ assetId: 97, assetName: '流水A', assetNumber: 1000 })
+state().addAsset({ assetId: 98, assetName: '流水B', assetNumber: 0 })
+state().addTransfer({ fromAssetId: 97, toAssetId: 98, cost: 100, serviceCharge: 2 })
+const a97 = state().assets.find((a) => a.assetId === 97)!
+const h97 = accountHistory({
+  asset: a97, bills: state().bills, transfers: state().transfers, lends: [],
+  refunds: [], reimbursements: [], parents: state().parentCategories
+})
+assert.equal(h97.closing, a97.assetNumber, '流水期末 = 资产余额（手续费不重复）')
+assert.equal(a97.assetNumber, 898, '转出 100 + 手续费 2')
+
+// 日期分组键必须是完整本地日期，避免 NaN
+assert.equal(fullDay(new Date(2026, 10, 11, 9).getTime()), '2026-11-11')
+assert.ok(humanDay('2025-03-05').includes('月'), 'humanDay 接受 YYYY-MM-DD')
+assert.equal(humanDay(fullDay(Date.now())), '今天', '当天显示今天')
+
+// 预算身份：月预算与自定义预算并存，不互相覆盖
+state().reset()
+state().setBudget({ month: 'all', categoryId: 0, amount: 1000, type: 'month' } as any)
+state().setBudget({ month: 'all', categoryId: 0, amount: 200, type: 'custom', budgetId: 11, budgetName: '装修' } as any)
+assert.equal(state().budgets.length, 2, '月预算与自定义预算并存')
+state().setBudget({ month: 'all', categoryId: 0, amount: 150, type: 'custom', budgetId: 12, budgetName: '旅行' } as any)
+assert.equal(state().budgets.filter((b) => b.type === 'custom').length, 2, '多个自定义预算并存')
+state().setBudget({ month: 'all', categoryId: 0, amount: 1200, type: 'month' } as any)
+assert.equal(state().budgets.filter((b) => b.type === 'month').length, 1, '月预算原地更新')
+assert.equal(state().budgets.find((b) => b.type === 'month')?.amount, 1200)
+state().removeBudgetById(11)
+assert.equal(state().budgets.filter((b) => b.type === 'custom').length, 1, '按 id 删除自定义预算')
+
+// 服务端判定期号冲突后：本地候选作废并留墓碑，不会覆盖胜出记录
+state().reset()
+state().addAsset({ assetId: 99, assetName: '周期账户', assetNumber: 1000 })
+const cand = state().addBill({ assetId: 99, parentCategoryId: 7, cost: 50, cycleId: 'rule-x' })
+const syncId = String(cand.syncId ?? cand.billId)
+state().dropCandidates([syncId])
+assert.equal(state().bills.some((b) => String(b.syncId ?? b.billId) === syncId), false, '本地候选已移除')
+assert.ok(state().tombstones.some((t) => t.kind === 'bill' && t.id === syncId), '留下墓碑避免重推')

@@ -53,6 +53,14 @@ db.exec(`
     PRIMARY KEY (book_id, record_id),
     UNIQUE (book_id, member_no, sequence_no)
   );
+  CREATE TABLE IF NOT EXISTS files (
+    file_id TEXT PRIMARY KEY,
+    owner_id INTEGER NOT NULL,
+    book_id TEXT,
+    bill_id TEXT,
+    name TEXT,
+    created_at INTEGER NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS bill_periods (
     book_id TEXT NOT NULL,
     period_key TEXT NOT NULL,
@@ -183,7 +191,11 @@ function billNumber(bookId, recordId, userId) {
   return { creator_id: userId, member_no: memberNo, sequence_no: sequenceNo }
 }
 const myBooks = (userId) =>
-  db.prepare('SELECT b.book_id AS bookId, b.name, b.owner_id AS ownerId, m.role, n.member_no AS memberNo FROM books b JOIN book_members m ON m.book_id = b.book_id LEFT JOIN book_member_numbers n ON n.book_id=m.book_id AND n.user_id=m.user_id WHERE m.user_id = ?').all(userId)
+  db.prepare(`SELECT b.book_id AS bookId, b.name, b.owner_id AS ownerId, m.role, n.member_no AS memberNo,
+      (SELECT COUNT(*) FROM book_members x WHERE x.book_id = b.book_id) AS memberCount
+    FROM books b JOIN book_members m ON m.book_id = b.book_id
+    LEFT JOIN book_member_numbers n ON n.book_id=m.book_id AND n.user_id=m.user_id
+    WHERE m.user_id = ?`).all(userId)
 const bookMembers = (bookId) =>
   db.prepare('SELECT m.user_id AS userId, m.role, u.email, n.member_no AS memberNo FROM book_members m JOIN users u ON u.id = m.user_id LEFT JOIN book_member_numbers n ON n.book_id=m.book_id AND n.user_id=m.user_id WHERE m.book_id = ? ORDER BY n.member_no').all(bookId)
 
@@ -471,6 +483,8 @@ const server = createServer(async (req, res) => {
       const body = await readBody(req)
       const list = Array.isArray(body.records) ? body.records : []
       let accepted = 0, skipped = 0, denied = 0, duplicates = 0
+      // 逐条权威结果：客户端据此作废本地候选，而不是靠排序猜
+      const authoritative = []
       db.exec('BEGIN IMMEDIATE')
       try { for (const r of list) {
         if (!r || typeof r.kind !== 'string' || r.id == null) { skipped++; continue }
@@ -506,7 +520,11 @@ const server = createServer(async (req, res) => {
         if (r.kind === 'bill' && !r.deleted && bookId && r.periodKey) {
           const held = db.prepare('SELECT record_id FROM bill_periods WHERE book_id = ? AND period_key = ?')
             .get(bookId, String(r.periodKey))
-          if (held && held.record_id !== rid) { duplicates++; continue }
+          if (held && held.record_id !== rid) {
+            duplicates++
+            authoritative.push({ kind: 'bill', id: rid, periodKey: String(r.periodKey), winnerId: held.record_id, reason: 'duplicate-period' })
+            continue
+          }
         }
         if (r.kind === 'bill' && !r.deleted && bookId && payload) {
           if (payload.syncId && payload.syncId !== rid) { denied++; continue }
@@ -529,7 +547,7 @@ const server = createServer(async (req, res) => {
       upsertKv(`lastSync:${user.id}`, Date.now())
       db.exec('COMMIT')
       } catch (e) { db.exec('ROLLBACK'); throw e }
-      return ok(res, { accepted, skipped, denied, duplicates, at: Date.now() })
+      return ok(res, { accepted, skipped, denied, duplicates, authoritative, at: Date.now() })
     }
 
     if (path === '/api/data/pull' && req.method === 'GET') {
@@ -566,6 +584,14 @@ const server = createServer(async (req, res) => {
       if (!buf.length) return fail(res, '空文件')
       const file = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
       writeFileSync(join(UPLOAD_DIR, file), buf)
+      // 记录归属：只有本人或该账本成员可以访问
+      const bookId = url.searchParams.get('bookId') || null
+      const billId = url.searchParams.get('billId') || null
+      if (bookId && !roleOf(bookId, u.id)) {
+        return fail(res, '没有该账本的写入权限')
+      }
+      db.prepare('INSERT INTO files (file_id, owner_id, book_id, bill_id, name, created_at) VALUES (?,?,?,?,?,?)')
+        .run(file, u.id, bookId, billId, raw, Date.now())
       return ok(res, { url: `/uploads/${file}`, name: raw })
     }
 
@@ -576,6 +602,12 @@ const server = createServer(async (req, res) => {
       const file = basename(decodeURIComponent(path.slice('/uploads/'.length)))
       const full = join(UPLOAD_DIR, file)
       if (!existsSync(full)) return send(res, 404, { code: 1, msg: '文件不存在' })
+      const u = currentUser(req)
+      const meta2 = db.prepare('SELECT owner_id, book_id FROM files WHERE file_id = ?').get(file)
+      const allowed = meta2
+        ? Number(meta2.owner_id) === u.id || (meta2.book_id && Boolean(roleOf(meta2.book_id, u.id)))
+        : false
+      if (!allowed) return send(res, 403, { code: 1, msg: '无权访问该附件' })
       res.writeHead(200, { 'Content-Type': MIME[extname(full)] || 'application/octet-stream', 'Cache-Control': 'private,max-age=86400' })
       createReadStream(full).pipe(res)
       return

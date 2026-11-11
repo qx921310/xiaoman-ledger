@@ -22,9 +22,9 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
   const allAssets = useLedger((s) => s.assets)
   const meId = useLedger((s) => s.userId)
   const assets = visibleAssets(allAssets, curBookId, meId)
-  const pickedAsset = assets.find((a) => a.assetId === aid)
-  const privacyBlocked = leaksPrivateAccount(pickedAsset, curBookId)
   const addBill = useLedger((s) => s.addBill)
+  // Hook 必须在组件顶层，不能放在条件分支里
+  const holdRef = useRef<{ delay?: ReturnType<typeof setTimeout>; timer?: ReturnType<typeof setInterval> }>({})
   const [notIntoTotal, setNotIntoTotal] = useState(false)
   const [notIntoBudget, setNotIntoBudget] = useState(false)
   const addTransfer = useLedger((s) => s.addTransfer)
@@ -41,6 +41,9 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
   const [pid, setPid] = useState(lastParentId)
   const [cid, setCid] = useState(lastChildId)
   const [aid, setAid] = useState(lastAssetId || 0)
+  // 选中账户与隐私校验必须在 aid 之后计算
+  const pickedAsset = assets.find((a) => a.assetId === aid)
+  const privacyBlocked = leaksPrivateAccount(pickedAsset, curBookId, accountBooks, meId)
   const [toAid, setToAid] = useState(0)
   const [fee, setFee] = useState('')
   const [toCost, setToCost] = useState('')
@@ -101,6 +104,10 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
     }
 
     if (!aid) return fail('请选择账户')
+    // 统一校验：私有账户不许记进多人账本（再记、完成、桌面端都会走到这里）
+    if (leaksPrivateAccount(assets.find((a) => a.assetId === aid), curBookId, accountBooks, meId)) {
+      return fail('该账户是私有账户，记到多人账本会让成员看到；请先设为共享或换账户')
+    }
     const accountCurrency = assets.find((a) => a.assetId === aid)?.currency
     if (!hasCurrencyRate(currency, currencies, defaultCurrency)) return fail(`请先设置 ${currency} 汇率`)
     if (!hasCurrencyRate(accountCurrency, currencies, defaultCurrency)) return fail(`请先设置 ${accountCurrency} 汇率`)
@@ -121,7 +128,6 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
   if (mobileKeypad) {
     const displayCurrency = mode === 'transfer' ? (assets.find((a) => a.assetId === aid)?.currency ?? defaultCurrency) : currency
     const evaluatedCost = evaluateAmount(cost)
-    const holdRef = useRef<{ delay?: ReturnType<typeof setTimeout>; timer?: ReturnType<typeof setInterval> }>({})
     const startHold = () => {
       holdRef.current.delay = setTimeout(() => {
         holdRef.current.timer = setInterval(() => setKey('退格'), 100)
@@ -213,7 +219,7 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
             {key('4')}{key('5')}{key('6')}<div className="entry-operators">{key('+')}{key('-')}</div>
             {key('7')}{key('8')}{key('9')}<div className="entry-operators">{key('×')}{key('÷')}</div>
             <button type="button" className="key-control" disabled={readOnly} onClick={() => { submit() }}>再记</button>{key('0')}{key('.')}
-            <button type="button" className="key-finish" disabled={readOnly || privacyBlocked} onClick={() => { if (submit()) onClose?.() }}>完成</button>
+            <button type="button" className="key-finish" disabled={readOnly} onClick={() => { if (submit()) onClose?.() }}>完成</button>
           </div>}
         </div>
       </section>

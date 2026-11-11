@@ -94,6 +94,7 @@ interface LedgerState {
   deleteRefund: (refundId: number) => void
   setBudget: (budget: Budget) => void
   removeBudget: (month: string, categoryId: number) => void
+  removeBudgetById: (budgetId: number) => void
   deleteBill: (billId: string | number) => void
   restoreBill: (bill: Bill) => void
   duplicateBill: (billId: string | number) => void
@@ -124,6 +125,8 @@ interface LedgerState {
   applyRemote: (records: SyncIncoming[]) => void
   setLastSync: (t: number) => void
   setSessionSyncAt: (t: number) => void
+  /** 丢弃本地候选账单（服务端判定期号冲突时使用） */
+  dropCandidates: (syncIds: string[]) => void
   tombstone: (kind: string, id: string | number) => void
 }
 
@@ -699,19 +702,40 @@ export const useLedger = create<LedgerState>()(
       addRefund: (patch) => set((s) => addRefundChanges(s, patch, NOW())),
       deleteRefund: (refundId) => set((s) => deleteRefundChanges(s, refundId, NOW())),
 
+      // 预算身份：自定义预算用 budgetId（可并存多个），月/年预算用 type+分类
       setBudget: (budget) => set((s) => {
-        const rest = s.budgets.filter((b) => !(b.month === budget.month && b.categoryId === budget.categoryId))
+        const sameKey = (b: typeof budget) => budget.type === 'custom'
+          ? b.type === 'custom' && b.budgetId === budget.budgetId
+          : (b.type ?? 'month') === (budget.type ?? 'month') && b.categoryId === budget.categoryId
+        const rest = s.budgets.filter((b) => !sameKey(b))
+        const tombId = budget.type === 'custom'
+          ? String(budget.budgetId)
+          : `${budget.type ?? 'month'}:${budget.categoryId}`
         if (budget.amount > 0) return { budgets: [...rest, { ...budget, updateTime: NOW() }] }
         // 填 0 表示取消：要写墓碑，否则云端旧预算会再拉回来
         return {
           budgets: rest,
-          tombstones: [...s.tombstones, { kind: 'budget', id: `${budget.month}:${budget.categoryId}`, updatedAt: NOW() }]
+          tombstones: [...s.tombstones, { kind: 'budget', id: tombId, updatedAt: NOW() }]
         }
       }),
 
-      removeBudget: (month, categoryId) => set((s) => ({
-        budgets: s.budgets.filter((b) => !(b.month === month && b.categoryId === categoryId)),
-        tombstones: [...s.tombstones, { kind: 'budget', id: `${month}:${categoryId}`, updatedAt: NOW() }]
+      removeBudget: (month, categoryId) => set((s) => {
+        const target = s.budgets.find((b) => b.month === month && b.categoryId === categoryId
+          && (b.type ?? 'month') === 'month')
+        const id = target?.type === 'custom' && target.budgetId != null
+          ? String(target.budgetId)
+          : `month:${categoryId}`
+        return {
+          budgets: s.budgets.filter((b) => !(b.month === month && b.categoryId === categoryId
+            && (b.type ?? 'month') === 'month')),
+          tombstones: [...s.tombstones, { kind: 'budget', id, updatedAt: NOW() }]
+        }
+      }),
+
+      // 自定义预算删除：按 budgetId 精确定位
+      removeBudgetById: (budgetId: number) => set((s) => ({
+        budgets: s.budgets.filter((b) => b.budgetId !== budgetId),
+        tombstones: [...s.tombstones, { kind: 'budget', id: String(budgetId), updatedAt: NOW() }]
       })),
 
       updateAsset: (asset) => set((s) => ({
@@ -810,6 +834,19 @@ export const useLedger = create<LedgerState>()(
 
       setLastSync: (t) => set({ lastSync: t }),
       setSessionSyncAt: (t) => set({ sessionSyncAt: t }),
+
+      // 服务端已裁决：本地这条候选作废，并记墓碑避免下次又推上去
+      dropCandidates: (syncIds) => set((s) => {
+        const keys = new Set(syncIds.map(String))
+        const dropped = s.bills.filter((b) => keys.has(String(b.syncId ?? b.billId)))
+        if (!dropped.length) return {}
+        return {
+          bills: s.bills.filter((b) => !dropped.includes(b)),
+          tombstones: [...s.tombstones, ...dropped.map((b) => ({
+            kind: 'bill' as const, id: String(b.syncId ?? b.billId), bookId: b.bookId, updatedAt: NOW()
+          }))]
+        }
+      }),
 
       addTag: (patch) => {
         const parent = patch.parentTagId != null ? get().tags.find((t) => t.tagId === patch.parentTagId) : undefined

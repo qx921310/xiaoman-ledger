@@ -60,8 +60,8 @@ export function MobilePicker({ label, value, options, onChange, className = '', 
           choices[next].focus()
         }}>
           {options.length ? options.map((option, index) => <button type="button" role="radio" key={option.value} aria-checked={option.value === value} tabIndex={option.value === value || (!selected && index === 0) ? 0 : -1} onClick={() => { onChange(option.value); close() }}>
-            <span className="mobile-picker-option-icon" aria-hidden="true">{option.icon ? <b>{option.icon}</b> : option.assetType != null
-              ? <AssetIcon type={option.assetType} name={option.label} size={19} /> : label === '选择账本'
+            <span className="mobile-picker-option-icon" aria-hidden="true">{option.assetType != null
+              ? <AssetIcon type={option.assetType} name={option.label} icon={option.icon} size={19} /> : option.icon ? <b>{option.icon}</b> : label === '选择账本'
               ? <svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="16" rx="3"/><path d="M9 4v16m3-11h4m-4 4h4"/></svg>
               : <svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="13" rx="4"/><path d="M7 6V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1M15 12h3"/></svg>}</span>
             <span className="mobile-picker-option-copy"><strong>{option.label}</strong>{option.detail && <small>{option.detail}</small>}</span>

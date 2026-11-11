@@ -17,6 +17,7 @@ export function Stats() {
   const tags = useLedger((s) => s.tags)
   const setBudget = useLedger((s) => s.setBudget)
   const removeBudget = useLedger((s) => s.removeBudget)
+  const removeBudgetById = useLedger((s) => s.removeBudgetById)
   const [month, setMonth] = useState(monthOf(Date.now()))
   const [editing, setEditing] = useState<{
     categoryId: number; amount: string; addNum?: string
@@ -133,7 +134,7 @@ export function Stats() {
             </div>
             <div className="budget-foot">
               <span>{p ? p.name : '全部支出'} · 剩余 {money(limit - used)}</span>
-              <button className="del" aria-label="删除预算" onClick={() => removeBudget(b.month, b.categoryId)}>删</button>
+              <button className="del" aria-label="删除预算" onClick={() => (b.budgetId != null ? removeBudgetById(b.budgetId) : removeBudget(b.month, b.categoryId))}>删</button>
             </div>
           </div>
         )

@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react'
 import { useLedger } from '../store'
-import { money } from '../ui-format'
+import { money, fullDay } from '../ui-format'
+import { billNetAmount } from '../bill-amount'
 
 /** 日历：按月看每日收支（照一木「日历」标签的最小可用版） */
 export function CalendarPage() {
   const bills = useLedger((s) => s.bills)
   const parents = useLedger((s) => s.parentCategories)
+  const refunds = useLedger((s) => s.refunds)
   const bookId = useLedger((s) => s.currentBookId)
   const [cursor, setCursor] = useState(() => new Date())
   const [picked, setPicked] = useState<string | null>(null)
@@ -18,15 +20,18 @@ export function CalendarPage() {
       if (bookId !== 0 && String(b.bookId) !== String(bookId)) continue
       const d = new Date(b.time)
       if (d.getFullYear() !== cursor.getFullYear() || d.getMonth() !== cursor.getMonth()) continue
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      const key = fullDay(b.time)
       const row = map.get(key) ?? { income: 0, expense: 0, count: 0 }
-      if (kindOf.get(b.parentCategoryId) === 'income') row.income += b.cost
-      else row.expense += b.cost
+      // 与统计同口径：不计收支的不进日历，支出扣退款后的净额
+      if (!b.notIntoTotal) {
+        if (kindOf.get(b.parentCategoryId) === 'income') row.income = +(row.income + b.cost).toFixed(2)
+        else row.expense = +(row.expense + billNetAmount(b, refunds)).toFixed(2)
+      }
       row.count++
       map.set(key, row)
     }
     return map
-  }, [bills, bookId, cursor, kindOf])
+  }, [bills, bookId, cursor, kindOf, refunds])
 
   const year = cursor.getFullYear()
   const monthIdx = cursor.getMonth()
@@ -38,11 +43,10 @@ export function CalendarPage() {
   ]
 
   const keyOf = (day: number) => `${year}-${String(monthIdx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+
   const pickedBills = picked
-    ? bills.filter((b) => {
-      const d = new Date(b.time)
-      return (bookId === 0 || String(b.bookId) === String(bookId)) && keyOf(d.getDate()) === picked
-    }).sort((a, b) => b.time - a.time)
+    ? bills.filter((b) => (bookId === 0 || String(b.bookId) === String(bookId)) && fullDay(b.time) === picked)
+      .sort((a, b) => b.time - a.time)
     : []
 
   return (

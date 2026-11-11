@@ -86,6 +86,13 @@ export async function syncNow() {
 
 async function runSync(records: ReturnType<typeof collectRecords>) {
   const pushed = await call('/data/push', { method: 'POST', body: JSON.stringify({ records }) })
+
+  // 服务端权威：期号冲突的本地候选要作废（不能靠排序猜谁留下）
+  const authoritative = (pushed.authoritative ?? []) as Array<{ id: string; winnerId: string; reason: string }>
+  if (authoritative.length) {
+    useLedger.getState().dropCandidates(authoritative.map((a) => a.id))
+  }
+
   const pulled = await call('/data/pull')
   useLedger.getState().applyRemote(pulled.records || [])
   // 云端记录会带回旧分类，合并后再跑一次规范/去重
@@ -98,6 +105,7 @@ async function runSync(records: ReturnType<typeof collectRecords>) {
     pushed: pushed.accepted as number,
     skipped: pushed.skipped as number,
     denied: pushed.denied as number,
+    duplicates: (pushed.duplicates ?? 0) as number,
     pulled: (pulled.records || []).length as number
   }
 }

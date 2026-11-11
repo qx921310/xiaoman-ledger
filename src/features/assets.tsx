@@ -4,6 +4,7 @@ import { ASSET_TYPE, LEND_TYPE } from '../types'
 import type { Asset } from '../types'
 import { money, dayOf } from '../ui-format'
 import { AssetIcon } from '../ui/icons'
+import { ASSET_ICON_GROUPS } from '../ui/asset-icons'
 import { Modal } from '../ui/modal'
 import { accountMoney, toBase } from '../money'
 import { visibleAssets } from '../domain/asset-scope'
@@ -356,10 +357,11 @@ function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => 
             <div className="label">图标</div>
             <select aria-label="账户图标" value={icon} onChange={(e) => setIcon(e.target.value)}>
               <option value="">按类型默认</option>
-              {['ic_asset_wallet','ic_asset_credit_card','ic_asset_savings_card','ic_asset_cash','ic_asset_investment','ic_asset_deposit','ic_asset_fixed_deposit','ic_asset_insurance'].map((k) => (
-                <option key={k} value={k}>{k.replace('ic_asset_', '')}</option>
-              ))}
+              {ASSET_ICON_GROUPS.map((group) => <optgroup key={group.label} label={group.label}>
+                {group.options.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+              </optgroup>)}
             </select>
+            <span className="asset-badge" aria-label="所选图标预览"><AssetIcon type={type} name={name} icon={icon} size={20} /></span>
           </div>
         </div>
         <div className="row2">

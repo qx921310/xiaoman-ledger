@@ -22,9 +22,23 @@ export function visibleAssets(assets: Asset[], bookId: string | number, me?: num
   })
 }
 
-/** 私有账户被用在共享账本里会泄露账户名，记账前应拦截 */
-export function leaksPrivateAccount(asset: Asset | undefined, bookId: string | number): boolean {
+/**
+ * 私有账户被用在「多人账本」里会泄露账户名。
+ * 只有当前账本存在其他成员时才算泄露；单人账本不拦（Codex 指出的误拦截）。
+ */
+export function leaksPrivateAccount(
+  asset: Asset | undefined,
+  bookId: string | number,
+  books: Array<{ bookId?: string | number; memberCount?: number; members?: unknown[] }> = [],
+  me?: number
+): boolean {
   if (!asset) return false
   if (asset.bookId != null) return false
-  return Number(bookId) !== 0
+  if (Number(bookId) === 0) return false
+  const book = books.find((b) => b.bookId != null && String(b.bookId) === String(bookId))
+  if (!book) return false
+  // 优先用成员数；没有成员数信息时按「有归属账本即为共享」保守判断
+  const count = book.memberCount ?? (Array.isArray(book.members) ? book.members.length : undefined)
+  if (count != null) return count > 1
+  return true
 }

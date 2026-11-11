@@ -26,8 +26,7 @@ export default function App() {
   const initAccount = async (u: User) => {
     setCurrentUid(u.id)
     adoptAnonymousData(u.id)
-    // 切账号先清会话标记，避免沿用上一个账号的同步完成状态
-    useLedger.setState({ sessionSyncAt: 0 })
+    // 必须先恢复账号数据：切换 currentUid 后，任何 store 写入都会持久化到该账号。
     if (!hasUserData(u.id)) useLedger.getState().reset()
     await useLedger.persist.rehydrate()
     // 账号身份同步进 store：导入、记账都依赖它，不能再依赖初始值 1
@@ -159,7 +158,7 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User
         {tab === 'calendar' && <CalendarPage />}
         {tab === 'assets' && <Assets notify={notify} />}
         {tab === 'stats' && <Stats />}
-        {tab === 'me' && <Settings notify={notify} />}
+        {tab === 'me' && <Settings notify={notify} me={user} />}
         {tab === 'add' && <AddBill notify={notify} onClose={() => setTab('home')} />}
       </main>
 
