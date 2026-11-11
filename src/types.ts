@@ -157,8 +157,8 @@ export interface SplitMember {
 export interface SplitExpense {
   splitExpenseId: number
   splitGroupId: number
-  /** 关联的账单 id；独立 AA 支出为 0 */
-  sourceBillId: number
+  /** 关联的账单 id（我们的账单 id 是 UUID 字符串）；独立 AA 支出为 0 */
+  sourceBillId: string | number
   title: string
   amount: number
   /** 谁付的钱 */

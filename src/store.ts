@@ -162,7 +162,7 @@ interface LedgerState {
   applyImport: (plan: ImportPlan) => void
   mergeTaxonomy: () => void
   addCategory: (patch: { name: string; kind: 'expense' | 'income'; parentId: number; icon?: string; color?: string }) => Category
-  updateCategory: (id: number, patch: Partial<Pick<Category, 'name' | 'icon' | 'color' | 'bg' | 'hide'>>) => void
+  updateCategory: (id: number, patch: Partial<Pick<Category, 'name' | 'icon' | 'color' | 'bg' | 'hide' | 'positionWeight'>>) => void
   deleteCategory: (id: number) => boolean
   moveCategory: (id: number, dir: -1 | 1) => void
   addTag: (patch: Omit<Tag, 'tagId' | 'positionWeight'> & { positionWeight?: number }) => Tag
@@ -434,7 +434,7 @@ export const useLedger = create<LedgerState>()(
         while (s.splitExpenses.some((x) => x.splitExpenseId === splitExpenseId)) splitExpenseId++
         const expense: import('./types').SplitExpense = {
           splitExpenseId, splitGroupId,
-          sourceBillId: Number(bill.billId) || 0,
+          sourceBillId: bill.billId,
           title: bill.remark || 'AA 支出', amount: bill.cost,
           payerMemberId: payerMemberId ?? members.find((m) => m.self)?.splitMemberId ?? members[0].splitMemberId,
           splitType, settlement: false, time: bill.time,
@@ -443,7 +443,8 @@ export const useLedger = create<LedgerState>()(
         set((st) => ({
           bills: st.bills.map((b) => b.billId === billId
             ? { ...b, billShareInfo: serializeShares(shares), splitGroupId, updateTime: NOW() } : b),
-          splitExpenses: [...st.splitExpenses.filter((x) => x.sourceBillId !== expense.sourceBillId), expense]
+          // 按字符串比较：UUID 转数字会全变成 0，导致不同账单的分摊互相覆盖
+          splitExpenses: [...st.splitExpenses.filter((x) => String(x.sourceBillId) !== String(expense.sourceBillId)), expense]
         }))
         return true
       },

@@ -1267,3 +1267,36 @@ assert.equal(state().templates.length, 1, '模板还原')
 assert.equal(state().billGroups.length, 1, '账单组还原')
 assert.equal(state().billRelated.length, 1, '账单关联还原')
 assert.equal(state().bills.length, 2, '账单还原')
+
+// Codex 复验：同一持仓连续卖出，LIFO/FIFO 盈亏必须各自正确
+let seq = { num: 0, cost: 0, realized: 0, lots: [] as Array<{ num: number; cost: number }> }
+seq = applyBuyWithLot(seq, 100, 1000)   // 10 元
+seq = applyBuyWithLot(seq, 100, 2000)   // 20 元
+// LIFO 卖两次各 50：都先吃 20 元那批
+let seqL1 = applySellByMethod(seq, 2, 50, 900)
+assert.equal(seqL1.realized, -100, 'LIFO 第一次：900 - 50×20 = -100')
+let seqL2 = applySellByMethod(seqL1, 2, 50, 900)
+assert.equal(seqL2.realized, -200, 'LIFO 第二次仍吃 20 元批次，累计 -200')
+assert.equal(seqL2.num, 100)
+assert.equal(seqL2.cost, 10, '20 元批次卖完后只剩 10 元批次')
+// FIFO 连续两次各 50：都吃 10 元那批
+let seqF1 = applySellByMethod(seq, 1, 50, 900)
+assert.equal(seqF1.realized, 400, 'FIFO 第一次：900 - 50×10 = 400')
+let seqF2 = applySellByMethod(seqF1, 1, 50, 900)
+assert.equal(seqF2.realized, 800, 'FIFO 第二次仍吃 10 元批次，累计 800')
+assert.equal(seqF2.cost, 20, '10 元批次卖完后只剩 20 元批次')
+
+// Codex 复验：两张账单各自 AA 分摊，不能互相覆盖
+state().reset()
+state().addAsset({ assetId: 69, assetName: 'AA 两单', assetNumber: 1000 })
+const ag = state().addSplitGroup({ name: '两单组', members: ['我'] })
+const am = state().splitMembers.filter((m) => m.splitGroupId === ag.splitGroupId)
+const sa1 = state().addBill({ assetId: 69, parentCategoryId: 7, cost: 100 })
+const sa2 = state().addBill({ assetId: 69, parentCategoryId: 7, cost: 200 })
+assert.equal(state().applySplit(sa1.billId, ag.splitGroupId, 0), true)
+assert.equal(state().applySplit(sa2.billId, ag.splitGroupId, 0), true)
+assert.equal(state().splitExpenses.length, 2, '两张账单各有自己的 AA 记录')
+const bySource = new Map(state().splitExpenses.map((x) => [String(x.sourceBillId), x.amount]))
+assert.equal(bySource.get(String(sa1.billId)), 100)
+assert.equal(bySource.get(String(sa2.billId)), 200)
+assert.ok(am.length >= 1)

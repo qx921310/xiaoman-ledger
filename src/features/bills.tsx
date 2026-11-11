@@ -405,7 +405,7 @@ function BillDetail({ bill, me, onClose, onEdit }: {
           if (!shares.length) return null
           const group = splitGroups.find((g) => g.splitGroupId === bill.splitGroupId)
           const members = splitMembers.filter((m) => m.splitGroupId === bill.splitGroupId)
-          const expense = splitExpenses.find((x) => x.sourceBillId === Number(bill.billId))
+          const expense = splitExpenses.find((x) => String(x.sourceBillId) === String(bill.billId))
           const { amounts } = splitAmounts(bill.cost, members, expense?.splitType ?? 0,
             Object.fromEntries(shares.map((x) => [x.memberId, x.value])))
           return (

@@ -79,22 +79,28 @@ export function applySellByMethod(
   if (!(num > 0) || num > h.num + 1e-9 || !(amount > 0)) return h
   if (method === 0 || !h.lots?.length) return applySell(h, num, amount, fee)
 
+  // 按索引消费批次：先进先出从小到大，后进先出从大到小。
+  // 不再 reverse 数组副本（连续卖出时顺序会错乱）。
   const lots = h.lots.map((x) => ({ ...x }))
-  const order = method === 1 ? [...lots] : [...lots].reverse()
+  const order = lots.map((_, i) => i)
+  if (method === 2) order.reverse()
+
   let left = num
   let costPart = 0
-  for (const lot of order) {
-    if (left <= 0) break
+  for (const i of order) {
+    if (left <= 1e-9) break
+    const lot = lots[i]
     const take = Math.min(lot.num, left)
     costPart += take * lot.cost
     lot.num = +(lot.num - take).toFixed(6)
     left = +(left - take).toFixed(6)
   }
   if (left > 1e-9) return h          // 批次不足（数据不一致时不动作）
+
   const realized = +((amount - fee) - costPart).toFixed(2)
-  const kept = (method === 1 ? lots : lots.reverse()).filter((x) => x.num > 1e-6)
-  const totalNum = +kept.reduce((s, x) => s + x.num, 0).toFixed(6)
-  const totalCost = totalNum ? +(kept.reduce((s, x) => s + x.num * x.cost, 0) / totalNum).toFixed(6) : 0
+  const kept = lots.filter((x) => x.num > 1e-6)
+  const totalNum = +kept.reduce((s2, x) => s2 + x.num, 0).toFixed(6)
+  const totalCost = totalNum ? +(kept.reduce((s2, x) => s2 + x.num * x.cost, 0) / totalNum).toFixed(6) : 0
   return { num: totalNum, cost: totalCost, realized: +(h.realized + realized).toFixed(2), lots: kept }
 }
 
