@@ -8,6 +8,7 @@ import { mergeRemote } from '../src/domain/sync-merge'
 import { leaksPrivateAccount, visibleAssets } from '../src/domain/asset-scope'
 import { dedupeCycleBills as dedupeBills } from '../src/domain/cycle-dedupe'
 import { planCycles } from '../src/domain/cycles'
+import { accountHistory } from '../src/domain/account-history'
 import { dateKey, pendingDates } from '../src/cycle-dates'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -810,3 +811,17 @@ state().setBudget(bCustom as any)
 const custom = state().budgets.find((b) => b.type === 'custom')
 assert.equal(custom?.budgetName, '装修')
 assert.equal((custom?.amount ?? 0) + (custom?.addNum ?? 0), 600, '额度含追加')
+
+// 账户流水：期初 + 逐笔变动 = 当前余额
+state().reset()
+state().addAsset({ assetId: 95, assetName: '流水账户', assetNumber: 300 })
+state().addBill({ assetId: 95, parentCategoryId: 7, cost: 40 })
+state().addBill({ assetId: 95, parentCategoryId: 903, cost: 20 })
+const flowAsset = state().assets.find((a) => a.assetId === 95)!
+const h = accountHistory({
+  asset: flowAsset, bills: state().bills, transfers: [], lends: [],
+  refunds: [], reimbursements: [], parents: state().parentCategories
+})
+assert.equal(h.entries.length, 2)
+assert.equal(h.closing, flowAsset.assetNumber, '逐笔累加应与余额一致')
+assert.equal(h.entries[h.entries.length - 1].time >= h.entries[0].time, true, '按时间排序')

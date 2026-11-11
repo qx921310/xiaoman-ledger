@@ -7,6 +7,7 @@ import { AssetIcon } from '../ui/icons'
 import { Modal } from '../ui/modal'
 import { accountMoney, toBase } from '../money'
 import { visibleAssets } from '../domain/asset-scope'
+import { accountHistory } from '../domain/account-history'
 import { lendRemaining, lendTotals } from '../lend'
 
 export function Assets({ notify }: { notify: (m: string) => void }) {
@@ -26,9 +27,11 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null)
   const deleteAsset = useLedger((s) => s.deleteAsset)
   const bills = useLedger((s) => s.bills)
+  const allAssetsParents = useLedger((s) => s.parentCategories)
   const transfers = useLedger((s) => s.transfers)
   const refunds = useLedger((s) => s.refunds)
   const reimbursements = useLedger((s) => s.reimbursements)
+  const [historyAsset, setHistoryAsset] = useState<Asset | null>(null)
   const [repayForm, setRepayForm] = useState<{ lendId: number; remaining: number; amount: string; assetId: number } | null>(null)
   const [lendForm, setLendForm] = useState<{ type: 1 | 2 | 3 | 4; assetId: number; counterparty: string; number: string; interest: string; repaymentAssetId: number; remark: string } | null>(null)
   const { receivable, payable } = lendTotals(lends)
@@ -62,7 +65,8 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
           <div className="grow">
 
             <div>
-              {a.simpleName || a.assetName}
+              <button className="link" aria-label={`查看 ${a.assetName} 流水`}
+                onClick={() => setHistoryAsset(a)}>{a.simpleName || a.assetName}</button>
               {a.cardCode && <span className="tag">尾号 {a.cardCode}</span>}
             </div>
             <small>
@@ -92,6 +96,37 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
           }}>删</button>
         </div>
       ))}
+
+      {historyAsset && (() => {
+        const { entries, opening } = accountHistory({
+          asset: historyAsset, bills, transfers, lends, refunds, reimbursements, parents: allAssetsParents
+        })
+        let running = opening
+        return (
+          <Modal label={`${historyAsset.assetName} 流水`} onClose={() => setHistoryAsset(null)}>
+            <h3>{historyAsset.simpleName || historyAsset.assetName}</h3>
+            <p className="hint">
+              期初 {money(opening)} · 当前 {accountMoney(historyAsset.assetNumber, historyAsset.currency, currencies, defaultCurrency)} · 共 {entries.length} 笔
+            </p>
+            {entries.length === 0 && <p className="hint">这个账户还没有流水。</p>}
+            {entries.map((e) => {
+              running = +(running + e.delta).toFixed(2)
+              return (
+                <div key={e.key} className="row">
+                  <div className="grow">
+                    <div>{e.label}</div>
+                    <small>{dayOf(e.time)} · 余额 {money(running)}</small>
+                  </div>
+                  <b className={e.delta >= 0 ? 'in' : 'out'}>{e.delta >= 0 ? '+' : '-'}{money(Math.abs(e.delta))}</b>
+                </div>
+              )
+            })}
+            <div className="modal-btns">
+              <button className="ghost" onClick={() => setHistoryAsset(null)}>关闭</button>
+            </div>
+          </Modal>
+        )
+      })()}
 
       {editingAsset && (
         <AssetEditor
