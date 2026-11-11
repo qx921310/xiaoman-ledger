@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { resolve, join } from 'node:path'
 import { buildSync } from 'esbuild'
@@ -54,8 +54,14 @@ test('each account icon choice resolves to a local file', () => {
   const page = makePage('ledger-icon-catalog')
   const choices = page.ASSET_ICON_GROUPS.flatMap((group) => group.options)
   assert.equal(new Set(choices.map(([key]) => key)).size, choices.length)
+  assert.equal(page.assetIconImagePath('wallet:ic_asset_invest'), '/icons/assets/ic_asset_investment.svg')
   for (const [key] of choices) {
     const url = page.assetIconImagePath(key) ?? `/icons/assets/${key}.svg`
-    assert.ok(existsSync(join('public', url)), `${key} is missing ${url}`)
+    const path = join('public', url)
+    assert.ok(existsSync(path), `${key} is missing ${url}`)
+    if (url.endsWith('.png')) {
+      const header = readFileSync(path).subarray(0, 8)
+      assert.deepEqual(header, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), `${key} is not a PNG image`)
+    }
   }
 })

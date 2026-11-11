@@ -43,6 +43,8 @@ export const ASSET_ICON_GROUPS = [
 
 export function assetIconImagePath(icon?: string): string | null {
   if (!icon) return null
+  // 保留已保存的图标 key，使用项目自有的投资图标。
+  if (icon === 'wallet:ic_asset_invest') return '/icons/assets/ic_asset_investment.svg'
   const brand = /^brand:([a-z0-9_]+)$/.exec(icon)
   if (brand && ASSET_ICON_GROUPS.some((group) => group.options.some(([key]) => key === icon))) return `/icons/brands/${brand[1]}.svg`
   const match = /^(bank|wallet):(ic_(?:bank|asset)_[a-z0-9_]+)$/.exec(icon)
