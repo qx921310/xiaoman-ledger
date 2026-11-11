@@ -5,7 +5,7 @@ import type { Bill, Transfer } from '../types'
 import { books as bookApi } from '../auth'
 import { money, dayOf, fullDay, hhmm, monthOf, toLocalInput, humanDay } from '../ui-format'
 import { parseShares, splitAmounts } from '../domain/split'
-import { CatIcon } from '../ui/icons'
+import { AssetIcon, CatIcon } from '../ui/icons'
 import { TransferEditor } from './transfer-editor'
 import { Modal } from '../ui/modal'
 import { accountMoney, fromBase, hasCurrencyRate } from '../money'
@@ -390,13 +390,14 @@ function BillDetail({ bill, me, onClose, onEdit }: {
   return (
     <Modal label="账单详情" className="detail" onClose={onClose}>
         <div className="dhead" style={{ background: p?.bg ?? 'var(--accent-soft)', color: p?.color ?? 'var(--ink)' }}>
-          <CatIcon k={p?.icon} size={34} />
+          <CatIcon k={c?.icon ?? p?.icon} size={34} />
           <div className="grow">
             <div className="dt">{p?.name}{c ? ` - ${c.name}` : ''}</div>
             <div className="ds">{dayOf(bill.time)} {hhmm(bill.time)}</div>
             {bill.remark && <div className="ds">{bill.remark}</div>}
           </div>
           <div className="damt">{isIncome ? '+' : '-'}{money(isIncome ? bill.cost : billNetAmount(bill, refunds))}</div>
+          <button type="button" className="detail-close" aria-label="关闭账单详情" onClick={onClose}>×</button>
         </div>
 
         {(() => {
@@ -413,9 +414,9 @@ function BillDetail({ bill, me, onClose, onEdit }: {
             </Row>
           )
         })()}
-        <Row label="账单分类">{p?.name}{bill.childCategoryId && !c ? ' - 子分类待核对' : c ? ` - ${c.name}` : ''}</Row>
+        <Row label="账单分类"><CatIcon k={c?.icon ?? p?.icon} size={18} />{p?.name}{bill.childCategoryId && !c ? ' - 子分类待核对' : c ? ` - ${c.name}` : ''}</Row>
         <Row label="账单日期">{dayOf(bill.time)} {hhmm(bill.time)}</Row>
-        <Row label="收支账户">{a?.assetName ?? '无'}</Row>
+        <Row label="收支账户">{a && <AssetIcon type={a.assetType} name={a.assetName} icon={a.assetIcon} size={20} />}{a?.assetName ?? '无'}</Row>
         {billRefunds.map((refund) => {
           const refundAsset = assets.find((x) => x.assetId === (refund.assetId ?? bill.assetId))
           return <Row key={refund.refundId} label="已退款">{refund.baseAmount != null ? money(refund.baseAmount) : accountMoney(refund.number, refund.currency ?? refundAsset?.currency, currencies, defaultCurrency)} · {refundAsset?.assetName ?? '账户'}</Row>
@@ -461,11 +462,13 @@ function BillDetail({ bill, me, onClose, onEdit }: {
         <DetailToggle label="不计入预算" on={!!bill.notIntoBudget} onToggle={() => updateBill(bill.billId, { notIntoBudget: !bill.notIntoBudget })} />
         <Row label="所属账本">{bk?.accountBookName ?? '默认账本'}</Row>
         <Row label="记录时间">{dayOf(bill.recordTime ?? bill.time)} {hhmm(bill.recordTime ?? bill.time)}</Row>
-        <Row label="关联与合并">
+        <details className="detail-related">
+          <summary>关联与合并账单</summary>
+          <p className="hint">关联相关账单，或将已关联的账单归为一组。</p>
           <div className="row2">
             <select aria-label="选择要关联的账单" value={linkTarget} onChange={(e) => setLinkTarget(e.target.value)}>
               <option value="">选择另一笔账单…</option>
-              {bills.filter((b) => Number(b.billId) !== Number(bill.billId) && String(b.bookId ?? '') === String(bill.bookId ?? ''))
+              {bills.filter((b) => String(b.billId) !== String(bill.billId) && String(b.bookId ?? '') === String(bill.bookId ?? ''))
                 .slice(0, 50)
                 .map((b) => <option key={String(b.billId)} value={String(b.billId)}>
                   {dayOf(b.time)} {parents.find((p) => p.id === b.parentCategoryId)?.name ?? ''} {money(b.cost)}
@@ -486,7 +489,7 @@ function BillDetail({ bill, me, onClose, onEdit }: {
           {billGroupsAll.some((g) => g.billList.map(String).includes(String(bill.billId))) && (
             <p className="hint">这笔账单已在某个账单组里，在列表可解散。</p>
           )}
-        </Row>
+        </details>
         <Row label="记录方式">{BILL_TYPE[bill.billType] ?? '手动记账'}</Row>
         {bill.currencyInfo && (
           <Row label="币种">

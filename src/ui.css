@@ -280,8 +280,16 @@ label.inline input { width: auto; }
 input.color { width: 34px; height: 30px; padding: 2px; flex: none; border-radius: var(--r-sm); cursor: pointer; }
 
 /* 账单明细 */
-.modal.detail { width: min(460px, 100%); padding: 0; overflow: hidden; }
-.dhead { display: flex; align-items: center; gap: 12px; padding: 18px 20px; }
+.modal.detail { width: min(460px, 100%); padding: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.modal.detail::-webkit-scrollbar { display: none; }
+.dhead { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 12px; padding: 18px 20px; }
+.dhead .grow { min-width: 0; }
+.detail-close { flex: none; width: 44px; height: 44px; border: 0; border-radius: var(--r-pill); background: var(--card); color: var(--ink); cursor: pointer; font-size: var(--font-lg); line-height: 1; }
+.detail-related { padding: 12px 20px; border-bottom: 1px solid var(--line); }
+.detail-related summary { color: var(--muted); cursor: pointer; min-height: 44px; display: flex; align-items: center; }
+.detail-related summary::after { content: '＋'; margin-left: auto; }
+.detail-related[open] summary::after { content: '－'; }
+.detail-related .row2 { margin: 8px 0; }
 .dhead .dt { font-size: var(--font-md); font-weight: 600; }
 .dhead .ds { font-size: var(--font-xs); opacity: .75; }
 .dhead .damt { font-size: var(--font-lg); font-weight: 700; font-variant-numeric: tabular-nums; }
