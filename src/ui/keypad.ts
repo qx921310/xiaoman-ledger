@@ -11,6 +11,9 @@ export function editAmount(value: string, key: string): string {
     return last.includes('.') ? value : value + (last ? '.' : '0.')
   }
   if (!/^\d{1,2}$/.test(key)) return value
+  // 避免 "007"：当前段只有 0 时，用新数字替换（"00" 这类快捷键按去零后的值处理）
+  const segment = value.split(/[+\-×÷]/).pop() ?? ''
+  if (segment === '0') return value.slice(0, -1) + (key.replace(/^0+/, '') || '0')
   return value + key
 }
 
