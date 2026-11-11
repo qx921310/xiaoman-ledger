@@ -17,7 +17,9 @@
     "ui:contrast": "node scripts/ui-contrast.mjs",
     "test:balances": "node tests/run-balances.cjs",
     "test:sync-identities": "node --test tests/sync-identities.test.mjs",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "hooks:install": "node scripts/install-hooks.mjs",
+    "guard": "node scripts/guard-staged.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
