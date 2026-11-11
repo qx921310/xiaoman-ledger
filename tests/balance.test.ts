@@ -475,6 +475,19 @@ state().skipCycleDate(cyc.cycleId, handledFirst)
 assert.equal(pendingDates(state().cycles[0]).some((d) => dateKey(d) === handledFirst), false)
 state().runCycles()
 assert.equal(state().bills.length, afterFirst)
+
+// 删除父借贷应连带删除还款子记录，且余额完全回退
+state().reset()
+state().addAsset({ assetId: 71, assetName: '借贷账户', assetNumber: 500, currency: 'CNY' })
+const baseBalance = balance(71)
+state().addLend({ type: 1, assetId: 71, counterparty: '李四', number: 200 })
+const parent = state().lends[0]
+state().repayLend({ lendId: parent.lendId, amount: 120 })
+assert.equal(balance(71), baseBalance - 80)
+assert.equal(state().lends.length, 2)
+state().deleteLend(parent.lendId)
+assert.equal(state().lends.length, 0)
+assert.equal(balance(71), baseBalance)
 const unmigratedBackup = JSON.parse(JSON.stringify(backup))
 delete unmigratedBackup.assets[0].openingBalance
 state().importAll(unmigratedBackup)

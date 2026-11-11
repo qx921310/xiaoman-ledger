@@ -7,7 +7,7 @@ import { getCurrentUid, userStorage } from './auth'
 import { deriveAssets } from './balances'
 import { newBillIdentity } from './identity'
 import { lendRemaining } from './lend'
-import { cycleDueDates, dateKey, handledDates, pendingDates } from './cycle-dates'
+import { cycleDueDates, dateKey, handledDates } from './cycle-dates'
 import { fromBase, toBase } from './money'
 import { validateBackup } from './backup'
 import { addRefundChanges, deleteRefundChanges } from './refund-operations'
@@ -623,16 +623,25 @@ export const useLedger = create<LedgerState>()(
         })
       },
 
+      // 删借贷：删除父记录时连带删除其还款/收款子记录，避免留下孤记录
       deleteLend: (lendId) => set((s) => {
         const rec = s.lends.find((x) => x.lendId === lendId)
         if (!rec) return {}
-        const sign = rec.type === 1 || rec.type === 4 ? 1 : -1
-        const cashAsset = (rec.type === 2 || rec.type === 4) && rec.repaymentAssetId ? rec.repaymentAssetId : rec.assetId
+        const targets = [rec, ...s.lends.filter((x) => x.parentLendId === lendId)]
+        let assets = s.assets
+        let tombstones = s.tombstones
+        for (const r of targets) {
+          const sign = r.type === 1 || r.type === 4 ? 1 : -1
+          const cashAsset = (r.type === 2 || r.type === 4) && r.repaymentAssetId ? r.repaymentAssetId : r.assetId
+          assets = assets.map((a) => a.assetId === cashAsset
+            ? { ...a, assetNumber: +(a.assetNumber + sign * r.number).toFixed(2), updateTime: NOW() } : a)
+          tombstones = [...tombstones.filter((t) => !(t.kind === 'lend' && t.id === String(r.lendId))),
+            { kind: 'lend', id: String(r.lendId), updatedAt: NOW() }]
+        }
         return {
-          lends: s.lends.filter((x) => x.lendId !== lendId),
-          assets: s.assets.map((a) => a.assetId === cashAsset
-            ? { ...a, assetNumber: +(a.assetNumber + sign * rec.number).toFixed(2), updateTime: NOW() } : a),
-          tombstones: [...s.tombstones, { kind: 'lend', id: String(lendId), updatedAt: NOW() }]
+          lends: s.lends.filter((x) => !targets.some((r) => r.lendId === x.lendId)),
+          assets,
+          tombstones
         }
       }),
 
