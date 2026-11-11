@@ -155,7 +155,7 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User
         {tab === 'assets' && <Assets notify={notify} />}
         {tab === 'stats' && <Stats />}
         {tab === 'me' && <Settings notify={notify} me={user} />}
-        {tab === 'add' && <AddBill notify={notify} onClose={() => setTab('home')} />}
+        {tab === 'add' && <AddBill notify={notify} onClose={() => setTab('home')} onNeedAsset={() => setTab('assets')} />}
       </main>
 
       {toast && <div className="toast" role="status" aria-live="polite">{toast}</div>}

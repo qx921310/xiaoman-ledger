@@ -7,7 +7,7 @@ import { editAmount, evaluateAmount, formatAmount } from '../ui/keypad'
 import { MobilePicker } from '../ui/mobile-picker'
 import { leaksPrivateAccount, visibleAssets } from '../domain/asset-scope'
 
-export function AddBill({ notify, onClose }: { notify: (m: string) => void; onClose?: () => void }) {
+export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) => void; onClose?: () => void; onNeedAsset?: () => void }) {
   const accountBooks = useLedger((s) => s.accountBooks)
   const curBookId = useLedger((s) => s.currentBookId)
   const setBook = useLedger((s) => s.setBook)
@@ -127,6 +127,18 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
     setCost(''); setRemark(''); setCid(0); setCurrency(defaultCurrency)
     notify(`${mode === 'expense' ? '支出' : '收入'} ${money(v)} 已记录`)
     return true
+  }
+
+  // 没有任何账户时，一木会引导先去建账户；我们不展示空选择器
+  if (assets.length === 0) {
+    return (
+      <section className="card">
+        <h3>还没有账户</h3>
+        <p className="hint">记账必须先选一个账户（现金、银行卡、支付宝都算）。先去「资产」建一个，再回来记账。</p>
+        <button className="primary" onClick={() => onNeedAsset?.()}>去添加账户</button>
+        {onClose && <button className="ghost" onClick={onClose}>稍后再说</button>}
+      </section>
+    )
   }
 
   if (mobileKeypad) {
@@ -258,14 +270,14 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
             <div>
               <div className="label">转出账户</div>
               <select aria-label="转出账户" value={aid} onChange={(e) => setAid(Number(e.target.value))}>
-                <option value={0}>请选择</option>
+                <option value={0}>{assets.length ? '请选择账户' : '请先添加账户'}</option>
                 {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}（{accountMoney(a.assetNumber, a.currency, currencies, defaultCurrency)}）</option>)}
               </select>
             </div>
             <div>
               <div className="label">转入账户</div>
               <select aria-label="转入账户" value={toAid} onChange={(e) => setToAid(Number(e.target.value))}>
-                <option value={0}>请选择</option>
+                <option value={0}>{assets.length ? '请选择账户' : '请先添加账户'}</option>
                 {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
               </select>
             </div>
@@ -320,7 +332,7 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
             <div>
               <div className="label">账户</div>
               <select aria-label="记账账户" value={aid} onChange={(e) => setAid(Number(e.target.value))}>
-                <option value={0}>请选择</option>
+                <option value={0}>{assets.length ? '请选择账户' : '请先添加账户'}</option>
                 {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}（{accountMoney(a.assetNumber, a.currency, currencies, defaultCurrency)}）</option>)}
               </select>
             </div>
