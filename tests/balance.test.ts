@@ -4,6 +4,7 @@ import { buildExportTable, buildImportPlan, parseLedgerFile } from '../src/impor
 import * as XLSX from 'xlsx'
 import { editAmount, evaluateAmount, formatAmount } from '../src/ui/keypad'
 import { lendRemaining, lendTotals } from '../src/lend'
+import { dateKey, pendingDates } from '../src/cycle-dates'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { AssetIcon } from '../src/ui/icons'
@@ -457,6 +458,23 @@ const snapBefore = backupShape(state())
 state().reset()
 state().importAll(fullBackup)
 assert.deepEqual(backupShape(state()), snapBefore)
+
+// 周期：跳过某一期后不再生成，且不影响下一期
+state().reset()
+state().addAsset({ assetId: 61, assetName: '周期账户', assetNumber: 0, currency: 'CNY' })
+const cycleStart = new Date(); cycleStart.setDate(1)
+state().addCycle({ name: '房租', kind: 'expense', parentCategoryId: 2, childCategoryId: 0,
+  assetId: 61, cost: 100, dayOfMonth: 1, startTime: cycleStart.getTime(), enabled: true, cycleType: 'month' } as any)
+const cyc = state().cycles[0]
+const handledFirst = dateKey(new Date(cycleStart))
+assert.equal(pendingDates(cyc).length > 0, true)
+state().runCycles()
+const afterFirst = state().bills.length
+assert.equal(afterFirst > 0, true)
+state().skipCycleDate(cyc.cycleId, handledFirst)
+assert.equal(pendingDates(state().cycles[0]).some((d) => dateKey(d) === handledFirst), false)
+state().runCycles()
+assert.equal(state().bills.length, afterFirst)
 const unmigratedBackup = JSON.parse(JSON.stringify(backup))
 delete unmigratedBackup.assets[0].openingBalance
 state().importAll(unmigratedBackup)

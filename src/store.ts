@@ -7,6 +7,7 @@ import { getCurrentUid, userStorage } from './auth'
 import { deriveAssets } from './balances'
 import { newBillIdentity } from './identity'
 import { lendRemaining } from './lend'
+import { cycleDueDates, dateKey, handledDates, pendingDates } from './cycle-dates'
 import { fromBase, toBase } from './money'
 import { validateBackup } from './backup'
 import { addRefundChanges, deleteRefundChanges } from './refund-operations'
@@ -63,6 +64,7 @@ interface LedgerState {
   addCycle: (patch: Omit<Cycle, 'cycleId' | 'generated' | 'userId' | 'updateTime' | 'enabled'> & { enabled?: boolean }) => void
   deleteCycle: (cycleId: number) => void
   toggleCycle: (cycleId: number) => void
+  skipCycleDate: (cycleId: number, key: string) => void
   runCycles: () => number
   addLend: (patch: { type: 1 | 2 | 3 | 4; assetId: number; counterparty: string; number: number; interest?: number; repaymentAssetId?: number; time?: number; remark?: string; parentLendId?: number }) => void
   repayLend: (patch: { lendId: number; amount: number; repaymentAssetId?: number; time?: number }) => void
@@ -512,6 +514,13 @@ export const useLedger = create<LedgerState>()(
       })),
 
       // 补生成所有到期未生成的周期账单；返回本次生成条数
+      // 跳过某一期：记进 skipDates，这期不再生成，后续不受影响
+      skipCycleDate: (cycleId, key) => set((s) => ({
+        cycles: s.cycles.map((c) => c.cycleId === cycleId
+          ? { ...c, skipDates: Array.from(new Set([...(c.skipDates ?? []), key])), updateTime: NOW() }
+          : c)
+      })),
+
       runCycles: () => {
         const s = get()
         const today = new Date()
@@ -519,44 +528,14 @@ export const useLedger = create<LedgerState>()(
         const dkey = (d: Date) =>
           `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
-        /** 列出规则从 startTime 到今天的全部到期日 */
-        const dueDates = (c: Cycle): Date[] => {
-          const start = new Date(c.startTime)
-          start.setHours(0, 0, 0, 0)
-          const out: Date[] = []
-          const push = (d: Date) => { if (d >= start && d <= today) out.push(d) }
-          const type = c.cycleType ?? 'month'
-
-          if (type === 'week') {
-            const days = (c.weekdays && c.weekdays.length ? c.weekdays : [1]).map(Number)
-            for (let d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
-              if (days.includes(d.getDay())) push(new Date(d))
-            }
-          } else if (type === 'year') {
-            const m = (c.monthOfYear ?? 1) - 1
-            for (let y = start.getFullYear(); y <= today.getFullYear(); y++) {
-              const days = c.monthLast
-                ? [new Date(y, m + 1, 0).getDate()]
-                : (c.monthDays && c.monthDays.length ? c.monthDays : [c.dayOfMonth])
-              for (const day of days) push(new Date(y, m, Math.min(day, 28)))
-            }
-          } else {
-            // 每月
-            for (let d = new Date(start.getFullYear(), start.getMonth(), 1); d <= today; d.setMonth(d.getMonth() + 1)) {
-              const y = d.getFullYear(), m = d.getMonth()
-              if (c.monthLast) { push(new Date(y, m + 1, 0)); continue }
-              const days = c.monthDays && c.monthDays.length ? c.monthDays : [c.dayOfMonth]
-              for (const day of days) push(new Date(y, m, Math.min(day, 28)))
-            }
-          }
-          return out
-        }
+        /** 到期日算法已抽到 cycle-dates.ts，界面与生成共用 */
+        const dueDates = (c: Cycle) => cycleDueDates(c)
 
         let count = 0
         const updated: Cycle[] = []
 
         for (const c of s.cycles.filter((x) => x.enabled)) {
-          const done = new Set(c.generated)
+          const done = handledDates(c)
           const fresh = dueDates(c).filter((d) => !done.has(dkey(d)))
           for (const d of fresh) {
             const time = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 9, 0, 0).getTime()

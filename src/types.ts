@@ -135,6 +135,8 @@ export interface Cycle {
   /** 生效起始月（时间戳，取当月即可） */
   startTime: number
   /** 已生成过的日期，格式 YYYY-MM-DD，保证不重复 */
+  /** 手动跳过的日期键（这期不记，也不影响后续） */
+  skipDates?: string[]
   generated: string[]
   userId: number
   updateTime: number

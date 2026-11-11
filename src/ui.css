@@ -522,3 +522,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 /* 还款提醒标签 */
 .tag.due { background: var(--accent-soft); color: var(--accent); margin-top: 2px; }
+
+/* 周期到期提醒 */
+.due-hint { color: var(--accent); }

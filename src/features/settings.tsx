@@ -8,6 +8,7 @@ import { syncNow } from '../sync'
 import { money } from '../ui-format'
 import { ROLE_LABEL } from '../ui/roles'
 import { validateBackup } from '../backup'
+import { dateKey, pendingDates } from '../cycle-dates'
 import { Modal } from '../ui/modal'
 import { DEFAULT_TAG_COLOR } from '../default-colors'
 
@@ -113,6 +114,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
     }
   }
   const cycles = useLedger((s) => s.cycles)
+  const skipCycleDate = useLedger((s) => s.skipCycleDate)
   const addCycle = useLedger((s) => s.addCycle)
   const deleteCycle = useLedger((s) => s.deleteCycle)
   const toggleCycle = useLedger((s) => s.toggleCycle)
@@ -299,6 +301,16 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
 
       <h3>周期记账</h3>
       <p className="hint">每月固定日期自动生成账单；打开应用时补生成，不会重复。</p>
+      {(() => {
+        const pending = cycles.filter((c) => c.enabled).flatMap((c) => pendingDates(c).map((d) => ({ c, key: dateKey(d) })))
+        return pending.length > 0 ? (
+          <p className="hint due-hint">
+            有 {pending.length} 期待生成：
+            {pending.slice(0, 3).map(({ c, key }) => ` ${c.name} ${key.slice(5)}`).join('、')}
+            {pending.length > 3 ? ' …' : ''}
+          </p>
+        ) : null
+      })()}
       {cycles.length === 0 && <p className="hint">还没有周期规则（比如房租、工资）。</p>}
       {cycles.map((c) => {
         const p = parents.find((x) => x.id === c.parentCategoryId)
@@ -312,6 +324,13 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
               </div>
               <small>{p?.name ?? '分类'} · {a?.assetName ?? '账户'} · {money(c.cost)} · {c.enabled ? '启用中' : '已暂停'}</small>
             </div>
+            {(() => {
+              const next = pendingDates(c)[0]
+              return next ? (
+                <button className="link" aria-label={`跳过 ${c.name} 下一期`}
+                  onClick={() => skipCycleDate(c.cycleId, dateKey(next))}>跳过{next.getMonth() + 1}/{next.getDate()}</button>
+              ) : null
+            })()}
             <button className="link" onClick={() => toggleCycle(c.cycleId)}>{c.enabled ? '暂停' : '启用'}</button>
             <button className="del" onClick={() => deleteCycle(c.cycleId)}>删</button>
           </div>
