@@ -10,6 +10,7 @@ import { dedupeCycleBills as dedupeBills } from '../src/domain/cycle-dedupe'
 import { planCycles } from '../src/domain/cycles'
 import { fullDay, humanDay } from '../src/ui-format'
 import { accountHistory } from '../src/domain/account-history'
+import { parseShares, splitAmounts } from '../src/domain/split'
 import { byAsset, byTag, dailyTrend } from '../src/domain/stats-breakdown'
 import { dateKey, pendingDates } from '../src/cycle-dates'
 import { createElement } from 'react'
@@ -951,3 +952,33 @@ assert.equal(state().refunds[0].number, 20)
 assert.equal(balance(86), 920, '改为 20 后余额跟着变')
 assert.equal(state().updateRefund(refundId, { number: 200 }), false, '超过可退额被拒')
 assert.equal(state().refunds[0].number, 20, '被拒时保持原值')
+
+// AA 群组（一木模型）：群组→成员→按三种方式分摊，合计必须等于账单
+state().reset()
+state().addAsset({ assetId: 85, assetName: 'AA 账户', assetNumber: 1000 })
+const group = state().addSplitGroup({ name: '周末聚餐', members: ['我'] })
+state().addSplitMember(group.splitGroupId, '张三')
+state().addSplitMember(group.splitGroupId, '李四')
+const mem = state().splitMembers.filter((m) => m.splitGroupId === group.splitGroupId)
+assert.equal(mem.length, 3, '群组三名成员')
+const aaGroupBill = state().addBill({ assetId: 85, parentCategoryId: 7, cost: 300 })
+// 均分：每人 100
+assert.equal(state().applySplit(aaGroupBill.billId, group.splitGroupId, 0), true)
+const savedBill = state().bills.find((b) => b.billId === aaGroupBill.billId)!
+const savedShares = parseShares(savedBill.billShareInfo)
+assert.equal(savedShares.length, 3, '均分三人')
+assert.equal(savedShares.every((x) => x.value === 1), true, '均分时 value 固定为 1')
+const equalAmounts = splitAmounts(300, mem, 0, {}).amounts
+assert.equal(Object.values(equalAmounts).reduce((a, b) => a + b, 0), 300, '均分合计等于总额')
+// 按金额：合计不等时拒绝
+const values = { [mem[0].splitMemberId]: 100, [mem[1].splitMemberId]: 100, [mem[2].splitMemberId]: 50 }
+assert.equal(state().applySplit(aaGroupBill.billId, group.splitGroupId, 1, values), false, '合计不等于总额应拒绝')
+values[mem[2].splitMemberId] = 100
+assert.equal(state().applySplit(aaGroupBill.billId, group.splitGroupId, 1, values), true, '合计相等才接受')
+// 待结算 + 结算
+const aaExpense = state().splitExpenses[0]
+assert.equal(aaExpense.settlement, false)
+state().settleSplit(aaExpense.splitExpenseId, true)
+assert.equal(state().splitExpenses[0].settlement, true)
+// 分摊不影响余额
+assert.equal(balance(85), 700, 'AA 分摊不改变账户余额')

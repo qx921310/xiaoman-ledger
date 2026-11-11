@@ -4,6 +4,7 @@ import { BILL_TYPE } from '../types'
 import type { Bill, Transfer } from '../types'
 import { books as bookApi } from '../auth'
 import { money, dayOf, fullDay, hhmm, monthOf, toLocalInput, humanDay } from '../ui-format'
+import { parseShares, splitAmounts } from '../domain/split'
 import { CatIcon } from '../ui/icons'
 import { TransferEditor } from './transfer-editor'
 import { Modal } from '../ui/modal'
@@ -321,6 +322,9 @@ function BillDetail({ bill, me, onClose, onEdit }: {
   const assets = useLedger((s) => s.assets)
   const books = useLedger((s) => s.accountBooks)
   const refunds = useLedger((s) => s.refunds)
+  const splitGroups = useLedger((s) => s.splitGroups)
+  const splitMembers = useLedger((s) => s.splitMembers)
+  const splitExpenses = useLedger((s) => s.splitExpenses)
   const currencies = useLedger((s) => s.currencies)
   const defaultCurrency = useLedger((s) => s.defaultCurrency)
   const allTags = useLedger((s) => s.tags)
@@ -357,11 +361,20 @@ function BillDetail({ bill, me, onClose, onEdit }: {
           <div className="damt">{isIncome ? '+' : '-'}{money(isIncome ? bill.cost : billNetAmount(bill, refunds))}</div>
         </div>
 
-        {bill.billShares?.length ? (
-          <Row label="AA 分摊">
-            {bill.billShares.map((x) => `${x.name} ${money(x.amount)}`).join(' · ')}
-          </Row>
-        ) : null}
+        {(() => {
+          const shares = parseShares(bill.billShareInfo)
+          if (!shares.length) return null
+          const group = splitGroups.find((g) => g.splitGroupId === bill.splitGroupId)
+          const members = splitMembers.filter((m) => m.splitGroupId === bill.splitGroupId)
+          const expense = splitExpenses.find((x) => x.sourceBillId === Number(bill.billId))
+          const { amounts } = splitAmounts(bill.cost, members, expense?.splitType ?? 0,
+            Object.fromEntries(shares.map((x) => [x.memberId, x.value])))
+          return (
+            <Row label={`AA 分摊${group ? '（' + group.name + '）' : ''}`}>
+              {members.map((m) => `${m.name}${m.self ? '（我）' : ''} ${money(amounts[m.splitMemberId] ?? 0)}`).join(' · ')}
+            </Row>
+          )
+        })()}
         <Row label="账单分类">{p?.name}{bill.childCategoryId && !c ? ' - 子分类待核对' : c ? ` - ${c.name}` : ''}</Row>
         <Row label="账单日期">{dayOf(bill.time)} {hhmm(bill.time)}</Row>
         <Row label="收支账户">{a?.assetName ?? '无'}</Row>
@@ -458,7 +471,14 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
   const isExpense = parents.find((p) => p.id === bill.parentCategoryId)?.kind !== 'income'
 
   const [cost, setCost] = useState(String(bill.cost))
-  const [shareCount, setShareCount] = useState(String((bill.billShares?.length ?? 0) || ''))
+  const groups = useLedger((s) => s.splitGroups)
+  const allSplitMembers = useLedger((s) => s.splitMembers)
+  const applySplit = useLedger((s) => s.applySplit)
+  const [splitGroupId, setSplitGroupId] = useState(Number(bill.splitGroupId ?? 0))
+  const [splitType, setSplitType] = useState<0 | 1 | 2>(0)
+  const [splitValues, setSplitValues] = useState<Record<number, string>>({})
+  const groupMembers = allSplitMembers.filter((m) => m.splitGroupId === splitGroupId)
+  const payerMemberId = groupMembers.find((m) => m.self)?.splitMemberId
   const [discount, setDiscount] = useState(bill.discountNumber != null ? String(bill.discountNumber) : '')
   const [pid, setPid] = useState(bill.parentCategoryId)
   const [cid, setCid] = useState(() => resolveBillChild(bill, children)?.id ?? 0)
@@ -536,13 +556,47 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
           onChange={(e) => setDiscount(e.target.value.replace(/[^\d.]/g, ''))} />
         <p className="hint">优惠只做记录与展示，实付金额仍按上面的金额计算。</p>
 
-        <div className="label">AA 分摊（几人均分，留空表示不分摊）</div>
-        <input aria-label="分摊人数" value={shareCount} inputMode="numeric" placeholder="例如 2"
-          onChange={(e) => setShareCount(e.target.value.replace(/\D/g, '').slice(0, 2))} />
-        {Number(shareCount) > 1 && (
-          <p className="hint">
-            合计 {money(Number(cost) || 0)}，每人 {money(+((Number(cost) || 0) / Number(shareCount)).toFixed(2))}
-          </p>
+        <div className="label">AA 分摊（一木：群组 + 均分/按金额/按份额）</div>
+        {groups.length === 0 ? (
+          <p className="hint">还没有 AA 群组，去「我的 → AA 群组」先建一个。</p>
+        ) : (
+          <>
+            <div className="row2">
+              <select aria-label="AA 群组" value={splitGroupId}
+                onChange={(e) => setSplitGroupId(Number(e.target.value))}>
+                <option value={0}>不分摊</option>
+                {groups.map((g) => <option key={g.splitGroupId} value={g.splitGroupId}>{g.name}</option>)}
+              </select>
+              <select aria-label="分摊方式" value={splitType}
+                onChange={(e) => setSplitType(Number(e.target.value) as 0 | 1 | 2)}>
+                <option value={0}>均分</option>
+                <option value={1}>按金额</option>
+                <option value={2}>按份额</option>
+              </select>
+            </div>
+            {splitGroupId > 0 && (
+              <>
+                <div className="hint">成员：{groupMembers.map((m) => m.name).join('、')}</div>
+                {splitType !== 0 && groupMembers.map((m) => (
+                  <div key={m.splitMemberId} className="cat-child">
+                    <span className="grow">{m.name}</span>
+                    <input aria-label={`${m.name} 的${splitType === 1 ? '金额' : '份额'}`} inputMode="decimal"
+                      value={splitValues[m.splitMemberId] ?? ''}
+                      onChange={(e) => setSplitValues({ ...splitValues, [m.splitMemberId]: e.target.value.replace(/[^\d.]/g, '') })} />
+                  </div>
+                ))}
+                <button className="ghost wide" onClick={() => {
+                  const values: Record<number, number> = {}
+                  for (const m of groupMembers) values[m.splitMemberId] = Number(splitValues[m.splitMemberId]) || 0
+                  if (!applySplit(bill.billId, splitGroupId, splitType, values, payerMemberId)) {
+                    alert(splitType === 1 ? '按金额分摊时，各人金额合计必须等于账单金额' : '请填写有效的份额')
+                    return
+                  }
+                  onSave({ splitGroupId })
+                }}>应用分摊</button>
+              </>
+            )}
+          </>
         )}
         {isExpense && (
           <>
@@ -633,17 +687,8 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
             assetId: aid,
             remark,
             time: new Date(time).getTime(),
-            // 这两个必须真的提交，否则用户填了等于没填
-            discountNumber: discount.trim() === '' ? undefined : Number(discount),
-            billShares: (() => {
-              const n = Number(shareCount)
-              const total = Number(cost) || bill.cost
-              if (!(n > 1)) return undefined
-              const each = +(total / n).toFixed(2)
-              const shares = Array.from({ length: n - 1 }, (_, i) => ({ name: `分摊人${i + 1}`, amount: each }))
-              shares.push({ name: '我', amount: +(total - each * (n - 1)).toFixed(2) })
-              return shares
-            })()
+            // 优惠金额必须真的提交，否则用户填了等于没填
+            discountNumber: discount.trim() === '' ? undefined : Number(discount)
           })}>保存</button>
         </div>
     </Modal>

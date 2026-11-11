@@ -11,6 +11,51 @@ export const ASSET_TYPE: Record<number, string> = {
 /** 信用卡余额以负数表示 */
 export const CREDIT_CARD = 2
 
+/** 一木：AA 群组 */
+export interface SplitGroup {
+  splitGroupId: number
+  name: string
+  userId?: number
+  createTime?: number
+  updateTime?: number
+}
+
+/** 一木：群组成员，self 标记「我」 */
+export interface SplitMember {
+  splitMemberId: number
+  splitGroupId: number
+  name: string
+  self?: boolean
+  userId?: number
+  updateTime?: number
+}
+
+/** 一木：AA 支出（按 sourceBillId 关联账单） */
+export interface SplitExpense {
+  splitExpenseId: number
+  splitGroupId: number
+  /** 关联的账单 id；独立 AA 支出为 0 */
+  sourceBillId: number
+  title: string
+  amount: number
+  /** 谁付的钱 */
+  payerMemberId: number
+  /** 0 均分 / 1 按金额 / 2 按份额 */
+  splitType: 0 | 1 | 2
+  /** 是否已结算 */
+  settlement: boolean
+  time: number
+  userId?: number
+  updateTime?: number
+}
+
+/** 一木：分摊明细，JSON 存进账单的 billShareInfo */
+export interface SplitShareEntry {
+  memberId: number
+  /** 均分时固定 1；按金额时是金额；按份额时是份数 */
+  value: number
+}
+
 export interface BillShare {
   /** 参与人名称（对方不在本账本时只有名字） */
   name: string
@@ -56,10 +101,12 @@ export interface Bill {
   updateTime: number
   /** 分类/账户名称快照（原 billShareInfo，语义正名） */
   billSnapshot?: { parentCategoryName: string; childCategoryName: string; assetName: string }
-  /** @deprecated 旧字段名，仅用于读取历史数据 */
-  billShareInfo?: { parentCategoryName: string; childCategoryName: string; assetName: string }
+  /** 一木语义：AA 分摊明细 JSON 字符串 [{memberId, value}] */
+  billShareInfo?: string | { parentCategoryName: string; childCategoryName: string; assetName: string }
   /** AA 分摊：谁一起承担这笔支出，金额之和应等于 cost */
   billShares?: BillShare[]
+  /** 使用的 AA 群组（一木 splitExpense 反查用） */
+  splitGroupId?: number
   /** 一木导出里的「其他」列：不计入收支 / 不计入预算 */
   notIntoTotal?: boolean
   notIntoBudget?: boolean

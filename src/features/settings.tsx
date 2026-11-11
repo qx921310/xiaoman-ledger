@@ -153,6 +153,17 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
   const moveCategory = useLedger((s) => s.moveCategory)
   const parentCategories = useLedger((s) => s.parentCategories)
   const childCategories = useLedger((s) => s.childCategories)
+  const splitGroups = useLedger((s) => s.splitGroups)
+  const splitMembers = useLedger((s) => s.splitMembers)
+  const splitExpenses = useLedger((s) => s.splitExpenses)
+  const addSplitGroup = useLedger((s) => s.addSplitGroup)
+  const deleteSplitGroup = useLedger((s) => s.deleteSplitGroup)
+  const addSplitMember = useLedger((s) => s.addSplitMember)
+  const deleteSplitMember = useLedger((s) => s.deleteSplitMember)
+  const updateSplitMember = useLedger((s) => s.updateSplitMember)
+  const settleSplit = useLedger((s) => s.settleSplit)
+  const [newGroup, setNewGroup] = useState('')
+  const [newMember, setNewMember] = useState<Record<number, string>>({})
   const [newCat, setNewCat] = useState<{ parentId: number; kind: 'expense' | 'income'; name: string; icon: string } | null>(null)
   const addCycle = useLedger((s) => s.addCycle)
   const deleteCycle = useLedger((s) => s.deleteCycle)
@@ -776,6 +787,68 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
           </div>
         </Modal>
       )}
+
+      <h3>AA 群组</h3>
+      <p className="hint">建群组、加成员，记账时选「AA 分摊」即按一木的均分/按金额/按份额计算，支出会进待结算列表。</p>
+      <div className="row2">
+        <input aria-label="新群组名称" value={newGroup} placeholder="群组名，如 周末聚餐"
+          onChange={(e) => setNewGroup(e.target.value)} />
+        <button className="ghost" onClick={() => {
+          if (!newGroup.trim()) return notify('请填写群组名')
+          addSplitGroup({ name: newGroup.trim(), members: ['我'] })
+          setNewGroup('')
+          notify('群组已创建')
+        }}>新建群组</button>
+      </div>
+      {splitGroups.length === 0 && <p className="hint">还没有 AA 群组。</p>}
+      {splitGroups.map((g) => {
+        const members = splitMembers.filter((m) => m.splitGroupId === g.splitGroupId)
+        const expenses = splitExpenses.filter((x) => x.splitGroupId === g.splitGroupId)
+        const pending = expenses.filter((x) => !x.settlement)
+        return (
+          <div key={g.splitGroupId} className="cat-block">
+            <div className="row">
+              <div className="grow">
+                <b>{g.name}</b>
+                <small>{members.length} 位成员 · {pending.length} 笔待结算</small>
+              </div>
+              <button className="del" aria-label={`删除群组 ${g.name}`} onClick={() => deleteSplitGroup(g.splitGroupId)}>删</button>
+            </div>
+            <div className="cat-children">
+              {members.map((m) => (
+                <div key={m.splitMemberId} className="cat-child">
+                  <span className="grow">{m.name}{m.self ? '（我）' : ''}</span>
+                  {!m.self && (
+                    <button className="link" onClick={() => {
+                      members.forEach((x) => updateSplitMember(x.splitMemberId, { self: false }))
+                      updateSplitMember(m.splitMemberId, { self: true })
+                    }}>设为我</button>
+                  )}
+                  <button className="del" onClick={() => deleteSplitMember(m.splitMemberId)}>删</button>
+                </div>
+              ))}
+              <div className="row2">
+                <input aria-label={`${g.name} 新成员`} value={newMember[g.splitGroupId] ?? ''} placeholder="成员名"
+                  onChange={(e) => setNewMember({ ...newMember, [g.splitGroupId]: e.target.value })} />
+                <button className="ghost" onClick={() => {
+                  const name = (newMember[g.splitGroupId] ?? '').trim()
+                  if (!name) return
+                  addSplitMember(g.splitGroupId, name)
+                  setNewMember({ ...newMember, [g.splitGroupId]: '' })
+                }}>加成员</button>
+              </div>
+              {expenses.map((x) => (
+                <div key={x.splitExpenseId} className="cat-child">
+                  <span className="grow">{x.title} · {money(x.amount)} · {['均分', '按金额', '按份额'][x.splitType]}</span>
+                  <button className="link" onClick={() => settleSplit(x.splitExpenseId, !x.settlement)}>
+                    {x.settlement ? '已结算' : '标记已结算'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })}
 
       <h3>标签</h3>
       <p className="hint">标签可着色、可嵌套；记账时按名字自动关联。</p>

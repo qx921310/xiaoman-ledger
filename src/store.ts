@@ -11,6 +11,7 @@ import { mergeRemote, type MergeableState } from './domain/sync-merge'
 import { planCycles } from './domain/cycles'
 import { dedupeCycleBills as dedupeBills } from './domain/cycle-dedupe'
 import { mergeTaxonomyState } from './domain/taxonomy-merge'
+import { serializeShares, splitAmounts } from './domain/split'
 import { fromBase, toBase } from './money'
 import { validateBackup } from './backup'
 import { addRefundChanges, deleteRefundChanges } from './refund-operations'
@@ -61,6 +62,9 @@ interface LedgerState {
   cycles: Cycle[]
   /** 币种表；默认币种固定为 CNY，其余按 rate 折算 */
   tags: Tag[]
+  splitGroups: import('./types').SplitGroup[]
+  splitMembers: import('./types').SplitMember[]
+  splitExpenses: import('./types').SplitExpense[]
   currencies: Currency[]
   defaultCurrency: string
   /** 删除墓碑：同步时要把删除动作也推上去，否则别的设备会把数据拉回来 */
@@ -100,6 +104,15 @@ interface LedgerState {
   restoreBill: (bill: Bill) => void
   duplicateBill: (billId: string | number) => void
   setBillShares: (billId: string | number, shares: import('./types').BillShare[]) => void
+  addSplitGroup: (patch: { name: string; members?: string[] }) => import('./types').SplitGroup
+  updateSplitGroup: (splitGroupId: number, patch: { name?: string }) => void
+  deleteSplitGroup: (splitGroupId: number) => void
+  addSplitMember: (splitGroupId: number, name: string, self?: boolean) => import('./types').SplitMember
+  updateSplitMember: (splitMemberId: number, patch: { name?: string; self?: boolean }) => void
+  deleteSplitMember: (splitMemberId: number) => void
+  /** 按一木规则生成分摊并落库到 SplitExpense + 账单 billShareInfo */
+  applySplit: (billId: string | number, splitGroupId: number, splitType: 0 | 1 | 2, values?: Record<number, number>, payerMemberId?: number) => boolean
+  settleSplit: (splitExpenseId: number, settlement: boolean) => void
   updateBill: (billId: string | number, patch: Partial<Bill>) => void
   addTransfer: (patch: { fromAssetId: number; toAssetId: number; cost: number; toCost?: number; serviceCharge?: number; time?: number; remark?: string }) => Transfer
   updateTransfer: (transferId: number, patch: Partial<Pick<Transfer, 'fromAssetId' | 'toAssetId' | 'cost' | 'toCost' | 'serviceCharge' | 'time' | 'remark'>>) => void
@@ -173,6 +186,9 @@ export const useLedger = create<LedgerState>()(
       lends: [],
       cycles: [],
       tags: [],
+      splitGroups: [],
+      splitMembers: [],
+      splitExpenses: [],
       currencies: [
         { code: 'CNY', name: '人民币', symbol: '¥', rate: 1, positionWeight: 100 },
         { code: 'USD', name: '美元', symbol: '$', rate: 7.2, positionWeight: 90 },
@@ -320,6 +336,83 @@ export const useLedger = create<LedgerState>()(
       }),
 
       // AA 分摊：只改「谁承担多少」，不影响账户余额与统计总额
+      // AA 群组（一木模型）：群组 → 成员 → 支出，分摊明细存账单 billShareInfo
+      addSplitGroup: (patch) => {
+        const s = get()
+        let splitGroupId = Date.now()
+        while (s.splitGroups.some((g) => g.splitGroupId === splitGroupId)) splitGroupId++
+        const group: import('./types').SplitGroup = {
+          splitGroupId, name: patch.name.trim() || 'AA 群组',
+          userId: s.userId, createTime: NOW(), updateTime: NOW()
+        }
+        const members: import('./types').SplitMember[] = (patch.members ?? ['我']).map((name, i) => ({
+          splitMemberId: splitGroupId * 100 + i, splitGroupId, name,
+          self: i === 0, userId: s.userId, updateTime: NOW()
+        }))
+        set((st) => ({ splitGroups: [...st.splitGroups, group], splitMembers: [...st.splitMembers, ...members] }))
+        return group
+      },
+
+      updateSplitGroup: (splitGroupId, patch) => set((s) => ({
+        splitGroups: s.splitGroups.map((g) => g.splitGroupId === splitGroupId ? { ...g, ...patch, updateTime: NOW() } : g)
+      })),
+
+      deleteSplitGroup: (splitGroupId) => set((s) => ({
+        splitGroups: s.splitGroups.filter((g) => g.splitGroupId !== splitGroupId),
+        splitMembers: s.splitMembers.filter((m) => m.splitGroupId !== splitGroupId)
+      })),
+
+      addSplitMember: (splitGroupId, name, self) => {
+        const s = get()
+        let splitMemberId = Date.now()
+        while (s.splitMembers.some((m) => m.splitMemberId === splitMemberId)) splitMemberId++
+        const member: import('./types').SplitMember = {
+          splitMemberId, splitGroupId, name: name.trim() || '成员',
+          self: self || false, userId: s.userId, updateTime: NOW()
+        }
+        set((st) => ({ splitMembers: [...st.splitMembers, member] }))
+        return member
+      },
+
+      updateSplitMember: (splitMemberId, patch) => set((s) => ({
+        splitMembers: s.splitMembers.map((m) => m.splitMemberId === splitMemberId ? { ...m, ...patch, updateTime: NOW() } : m)
+      })),
+
+      deleteSplitMember: (splitMemberId) => set((s) => ({
+        splitMembers: s.splitMembers.filter((m) => m.splitMemberId !== splitMemberId)
+      })),
+
+      applySplit: (billId, splitGroupId, splitType, values, payerMemberId) => {
+        const s = get()
+        const bill = s.bills.find((b) => b.billId === billId)
+        const members = s.splitMembers.filter((m) => m.splitGroupId === splitGroupId)
+        if (!bill || !members.length) return false
+        const { shares, amounts } = splitAmounts(bill.cost, members, splitType, values ?? {})
+        const sum = members.reduce((acc, m) => acc + (amounts[m.splitMemberId] ?? 0), 0)
+        if (!shares.length || Math.abs(sum - bill.cost) > 0.011) return false
+        let splitExpenseId = Date.now()
+        while (s.splitExpenses.some((x) => x.splitExpenseId === splitExpenseId)) splitExpenseId++
+        const expense: import('./types').SplitExpense = {
+          splitExpenseId, splitGroupId,
+          sourceBillId: Number(bill.billId) || 0,
+          title: bill.remark || 'AA 支出', amount: bill.cost,
+          payerMemberId: payerMemberId ?? members.find((m) => m.self)?.splitMemberId ?? members[0].splitMemberId,
+          splitType, settlement: false, time: bill.time,
+          userId: s.userId, updateTime: NOW()
+        }
+        set((st) => ({
+          bills: st.bills.map((b) => b.billId === billId
+            ? { ...b, billShareInfo: serializeShares(shares), splitGroupId, updateTime: NOW() } : b),
+          splitExpenses: [...st.splitExpenses.filter((x) => x.sourceBillId !== expense.sourceBillId), expense]
+        }))
+        return true
+      },
+
+      settleSplit: (splitExpenseId, settlement) => set((s) => ({
+        splitExpenses: s.splitExpenses.map((x) => x.splitExpenseId === splitExpenseId
+          ? { ...x, settlement, updateTime: NOW() } : x)
+      })),
+
       setBillShares: (billId, shares) => set((s) => ({
         bills: s.bills.map((b) => b.billId === billId
           ? { ...b, billShares: shares.length ? shares : undefined, updateTime: NOW() }
@@ -358,7 +451,7 @@ export const useLedger = create<LedgerState>()(
         const asset = s.assets.find((a) => a.assetId === next.assetId)
         next.billSnapshot = {
           parentCategoryName: parent?.name ?? '',
-          childCategoryName: next.childCategoryId ? (resolveBillChild(next, s.childCategories)?.name ?? (old.billSnapshot ?? old.billShareInfo)?.childCategoryName ?? '') : '',
+          childCategoryName: next.childCategoryId ? (resolveBillChild(next, s.childCategories)?.name ?? old.billSnapshot?.childCategoryName ?? '') : '',
           assetName: asset?.assetName ?? ''
         }
 
@@ -1136,7 +1229,8 @@ export const useLedger = create<LedgerState>()(
         snapshot.childCategories = snapshot.childCategories.map(normalizeBuiltInChild)
         // 历史数据：billShareInfo 是快照，正名为 billSnapshot
         snapshot.bills = (snapshot.bills ?? []).map((b) => {
-          if (b.billSnapshot || !b.billShareInfo) return b
+          // 只有旧版对象形态的快照才迁移；JSON 字符串是一木的 AA 分摊，保持原样
+          if (b.billSnapshot || !b.billShareInfo || typeof b.billShareInfo === 'string') return b
           const { billShareInfo, ...rest } = b
           return { ...rest, billSnapshot: billShareInfo }
         })
