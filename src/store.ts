@@ -129,8 +129,8 @@ interface LedgerState {
   applyRemote: (records: SyncIncoming[]) => void
   setLastSync: (t: number) => void
   setSessionSyncAt: (t: number) => void
-  /** 丢弃本地候选账单（服务端判定期号冲突时使用） */
-  dropCandidates: (syncIds: string[]) => void
+  /** 处理期号冲突：内容一致才作废本地候选，被改过或有业务关联的保留并标待核对 */
+  resolvePeriodConflicts: (entries: Array<{ id: string; winnerId: string }>) => { dropped: number; kept: number }
   tombstone: (kind: string, id: string | number) => void
 }
 
@@ -855,18 +855,37 @@ export const useLedger = create<LedgerState>()(
       setLastSync: (t) => set({ lastSync: t }),
       setSessionSyncAt: (t) => set({ sessionSyncAt: t }),
 
-      // 服务端已裁决：本地这条候选作废，并记墓碑避免下次又推上去
-      dropCandidates: (syncIds) => set((s) => {
-        const keys = new Set(syncIds.map(String))
-        const dropped = s.bills.filter((b) => keys.has(String(b.syncId ?? b.billId)))
-        if (!dropped.length) return {}
-        return {
-          bills: s.bills.filter((b) => !dropped.includes(b)),
-          tombstones: [...s.tombstones, ...dropped.map((b) => ({
-            kind: 'bill' as const, id: String(b.syncId ?? b.billId), bookId: b.bookId, updatedAt: NOW()
-          }))]
+      // 期号冲突：只有「与胜出记录内容一致」的本地候选才作废；
+      // 用户改过金额/备注/分类，或被退款报销引用的，一律保留并标待核对
+      resolvePeriodConflicts: (entries) => {
+        const s = get()
+        const keyOf = (b: Bill) => String(b.syncId ?? b.billId)
+        const sameContent = (a: Bill, b: Bill) => a.cost === b.cost && a.time === b.time
+          && a.parentCategoryId === b.parentCategoryId
+          && (a.childCategoryId ?? 0) === (b.childCategoryId ?? 0)
+          && (a.remark ?? '') === (b.remark ?? '')
+        const linked = (b: Bill) => s.refunds.some((r) => String(r.billId) === keyOf(b))
+          || s.reimbursements.some((r) => String(r.billId) === keyOf(b))
+        const drop: Bill[] = []
+        const keep: Bill[] = []
+        for (const e of entries) {
+          const local = s.bills.find((b) => keyOf(b) === String(e.id))
+          if (!local) continue
+          const winner = s.bills.find((b) => keyOf(b) === String(e.winnerId))
+          if (!linked(local) && winner && sameContent(local, winner)) drop.push(local)
+          else keep.push(local)
         }
-      }),
+        if (!drop.length && !keep.length) return { dropped: 0, kept: 0 }
+        set((st) => ({
+          bills: st.bills
+            .filter((b) => !drop.includes(b))
+            .map((b) => keep.includes(b) ? { ...b, conflict: true } : b),
+          tombstones: [...st.tombstones, ...drop.map((b) => ({
+            kind: 'bill' as const, id: keyOf(b), bookId: b.bookId, updatedAt: NOW()
+          }))]
+        }))
+        return { dropped: drop.length, kept: keep.length }
+      },
 
       addTag: (patch) => {
         const parent = patch.parentTagId != null ? get().tags.find((t) => t.tagId === patch.parentTagId) : undefined

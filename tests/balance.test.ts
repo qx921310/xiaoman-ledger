@@ -888,7 +888,7 @@ state().reset()
 state().addAsset({ assetId: 99, assetName: '周期账户', assetNumber: 1000 })
 const cand = state().addBill({ assetId: 99, parentCategoryId: 7, cost: 50, cycleId: 'rule-x' })
 const syncId = String(cand.syncId ?? cand.billId)
-state().dropCandidates([syncId])
+state().resolvePeriodConflicts([{ id: syncId, winnerId: syncId }])
 assert.equal(state().bills.some((b) => String(b.syncId ?? b.billId) === syncId), false, '本地候选已移除')
 assert.ok(state().tombstones.some((t) => t.kind === 'bill' && t.id === syncId), '留下墓碑避免重推')
 
@@ -910,3 +910,18 @@ state().addAsset({ assetId: 90, assetName: '分类测试账户', assetNumber: 10
 state().addBill({ assetId: 90, parentCategoryId: newParent.id, cost: 10 })
 assert.equal(state().deleteCategory(newParent.id), false, '被引用时拒绝删除')
 assert.ok(state().parentCategories.some((c) => c.id === newParent.id))
+
+// 期号冲突：内容相同才作废候选；改过的或被引用的保留并标待核对
+state().reset()
+state().addAsset({ assetId: 88, assetName: '冲突账户', assetNumber: 1000 })
+const win = state().addBill({ assetId: 88, parentCategoryId: 7, cost: 50, cycleId: 'rule-c', time: new Date(2026, 5, 1, 9).getTime() })
+const cand1 = state().addBill({ assetId: 88, parentCategoryId: 7, cost: 50, cycleId: 'rule-c', time: new Date(2026, 5, 1, 9).getTime() })
+const r1 = state().resolvePeriodConflicts([{ id: String(cand1.syncId ?? cand1.billId), winnerId: String(win.syncId ?? win.billId) }])
+assert.equal(r1.dropped, 1, '内容一致的重复候选作废')
+assert.equal(state().bills.filter((b) => b.cycleId === 'rule-c').length, 1)
+
+const cand2 = state().addBill({ assetId: 88, parentCategoryId: 7, cost: 80, cycleId: 'rule-c', time: new Date(2026, 5, 1, 9).getTime() })
+const r2 = state().resolvePeriodConflicts([{ id: String(cand2.syncId ?? cand2.billId), winnerId: String(win.syncId ?? win.billId) }])
+assert.equal(r2.kept, 1, '改过金额的候选保留')
+const keptConflict = state().bills.find((b) => String(b.syncId ?? b.billId) === String(cand2.syncId ?? cand2.billId))
+assert.equal(keptConflict?.conflict, true, '保留项标记待核对')

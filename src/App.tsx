@@ -42,7 +42,8 @@ export default function App() {
   const autoSyncOnce = async () => {
     try {
       const r = await syncNow()
-      setSyncWarning(r.denied ? `${r.denied} 条记录未能推送，请到设置页检查同步结果。` : '')
+      const warn = r.denied ? `${r.denied} 条记录未能推送，请到设置页检查同步结果。` : ''
+      setSyncWarning(warn || (r.conflictsKept ? `有 ${r.conflictsKept} 笔同期账单内容不同，已保留并在列表里标为待核对。` : ''))
       console.log('[sync] 自动同步完成', r)
     } catch (e) {
       console.warn('[sync] 自动同步失败（可手动重试）', e)

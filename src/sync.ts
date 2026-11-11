@@ -87,14 +87,16 @@ export async function syncNow() {
 async function runSync(records: ReturnType<typeof collectRecords>) {
   const pushed = await call('/data/push', { method: 'POST', body: JSON.stringify({ records }) })
 
-  // 服务端权威：期号冲突的本地候选要作废（不能靠排序猜谁留下）
+  // 服务端权威：期号冲突要先拉回胜出记录，才能判断本地候选是「重复」还是「被改过」
   const authoritative = (pushed.authoritative ?? []) as Array<{ id: string; winnerId: string; reason: string }>
-  if (authoritative.length) {
-    useLedger.getState().dropCandidates(authoritative.map((a) => a.id))
-  }
 
   const pulled = await call('/data/pull')
   useLedger.getState().applyRemote(pulled.records || [])
+  let conflictsKept = 0
+  if (authoritative.length) {
+    const r = useLedger.getState().resolvePeriodConflicts(authoritative.map((a) => ({ id: a.id, winnerId: a.winnerId })))
+    conflictsKept = r.kept
+  }
   // 云端记录会带回旧分类，合并后再跑一次规范/去重
   useLedger.getState().mergeTaxonomy()
   // 多设备可能各自补生成了同一期周期账单：交回 store 去重（会重算余额并排墓碑）
@@ -106,6 +108,7 @@ async function runSync(records: ReturnType<typeof collectRecords>) {
     skipped: pushed.skipped as number,
     denied: pushed.denied as number,
     duplicates: (pushed.duplicates ?? 0) as number,
+    conflictsKept,
     pulled: (pulled.records || []).length as number
   }
 }
