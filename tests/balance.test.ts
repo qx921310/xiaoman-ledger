@@ -7,6 +7,7 @@ import { lendRemaining, lendTotals } from '../src/lend'
 import { mergeRemote } from '../src/domain/sync-merge'
 import { leaksPrivateAccount, visibleAssets } from '../src/domain/asset-scope'
 import { dedupeCycleBills as dedupeBills } from '../src/domain/cycle-dedupe'
+import { planCycles } from '../src/domain/cycles'
 import { dateKey, pendingDates } from '../src/cycle-dates'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -649,6 +650,23 @@ state().addReimbursement({ billId: reimbBill.billId, assetId: 93, number: 20 })
 assert.equal(state().reimbursements[0].status, 'pending')
 state().endReimbursement(reimbBill.billId)
 assert.equal(state().reimbursements[0].status, 'ended', '待报销应被收口')
+
+// 周期结束方式：记满 N 次 / 到某天为止
+const makeCycle = (patch: any) => ({
+  cycleId: 'c-' + Math.random(), bookId: 'book-a', name: '房租', kind: 'expense',
+  parentCategoryId: 7, childCategoryId: 0, assetId: 1, cost: 100, dayOfMonth: 1,
+  startTime: new Date(2026, 0, 1).getTime(), enabled: true, generated: [], ...patch
+})
+const cycleBase = {
+  bills: [], assets: [{ assetId: 1, assetName: 'A', assetType: 1, assetNumber: 0, currency: 'CNY', positionWeight: 0, remark: '', userId: 1, updateTime: 1 }],
+  parentCategories: state().parentCategories, childCategories: state().childCategories,
+  currencies: [{ code: 'CNY', name: '人民币', symbol: '¥', rate: 1 }], defaultCurrency: 'CNY',
+  userId: 1, currentBookId: 'book-a'
+}
+const timesPlan = planCycles({ ...cycleBase, cycles: [makeCycle({ endMode: 'times', times: 2 })] }, new Date(2026, 5, 1))
+assert.equal(timesPlan.count, 2, '记满 2 次后不再生成')
+const datePlan = planCycles({ ...cycleBase, cycles: [makeCycle({ endMode: 'date', endDate: new Date(2026, 2, 15).getTime() })] }, new Date(2026, 5, 1))
+assert.equal(datePlan.count, 3, '截止到 3 月 15 日应生成 1/2/3 三期')
 assert.equal(state().bills.find((b) => b.billId === reimbBill.billId)?.reimbursementEnd, true)
 assert.equal(balance(93), 50, '已结束的报销不进账户')
 

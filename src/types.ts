@@ -171,6 +171,12 @@ export interface Cycle {
   /** 生效起始月（时间戳，取当月即可） */
   startTime: number
   /** 已生成过的日期，格式 YYYY-MM-DD，保证不重复 */
+  /** 结束方式：不限 / 记满 N 次 / 到某天为止 */
+  endMode?: 'never' | 'times' | 'date'
+  /** endMode=times 时的总次数 */
+  times?: number
+  /** endMode=date 时的截止日（含当天） */
+  endDate?: number
   /** 手动跳过的日期键（这期不记，也不影响后续） */
   skipDates?: string[]
   generated: string[]

@@ -140,6 +140,9 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
   const toggleCycle = useLedger((s) => s.toggleCycle)
   const runCycles = useLedger((s) => s.runCycles)
   const [cycleForm, setCycleForm] = useState<{
+    endMode?: 'never' | 'times' | 'date'
+    times?: string
+    endDate?: string
     name: string; kind: 'expense' | 'income'; parentCategoryId: number; childCategoryId: number
     assetId: number; cost: string; dayOfMonth: number; remark: string
     cycleType: 'month' | 'week' | 'year'; weekdays: number[]; extraDays: string
@@ -346,6 +349,8 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
               </div>
               <small>
                 {p?.name ?? '分类'} · {a?.assetName ?? '账户'} · {money(c.cost)} · {c.enabled ? '启用中' : '已暂停'}
+                {c.endMode === 'times' && c.times ? ` · 已记 ${(c.generated ?? []).length}/${c.times} 次` : ''}
+                {c.endMode === 'date' && c.endDate ? ` · 至 ${new Date(c.endDate).toISOString().slice(0, 10)}` : ''}
                 {c.bookId == null ? ' · ⚠️ 账本待确认' : ''}
               </small>
             </div>
@@ -462,7 +467,24 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
             <input aria-label="周期备注" value={cycleForm.remark} onChange={(e) => setCycleForm({ ...cycleForm, remark: e.target.value })} />
             <p className="hint">保存后立即补生成当月已到期的账单。</p>
             <div className="modal-btns">
-              <button className="ghost" onClick={() => setCycleForm(null)}>取消</button>
+              <div className="label">结束方式</div>
+            <div className="row2">
+              <select aria-label="结束方式" value={cycleForm.endMode ?? 'never'}
+                onChange={(e) => setCycleForm({ ...cycleForm, endMode: e.target.value as 'never' | 'times' | 'date' })}>
+                <option value="never">一直重复</option>
+                <option value="times">记满次数</option>
+                <option value="date">到某天为止</option>
+              </select>
+              {cycleForm.endMode === 'times' && (
+                <input aria-label="总次数" value={cycleForm.times ?? ''} inputMode="numeric" placeholder="总次数，如 12"
+                  onChange={(e) => setCycleForm({ ...cycleForm, times: e.target.value.replace(/\D/g, '') })} />
+              )}
+              {cycleForm.endMode === 'date' && (
+                <input aria-label="结束日期" type="date" value={cycleForm.endDate ?? ''}
+                  onChange={(e) => setCycleForm({ ...cycleForm, endDate: e.target.value })} />
+              )}
+            </div>
+            <button className="ghost" onClick={() => setCycleForm(null)}>取消</button>
               <button className="primary" onClick={() => {
                 const extra = cycleForm.extraDays
                   .split(/[,，]/).map((x) => Number(x.trim())).filter((x) => x >= 1 && x <= 28)

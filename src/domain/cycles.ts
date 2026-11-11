@@ -41,7 +41,16 @@ export function planCycles(input: CyclePlanInput, now = new Date()): CyclePlan {
   // 未确认所属账本的旧规则暂不自动生成，避免多设备各记到不同账本
   for (const c of input.cycles.filter((x) => x.enabled && x.bookId != null)) {
     const done = handledDates(c)
-    const fresh = cycleDueDates(c, now).filter((d) => !done.has(dateKey(d)))
+    let fresh = cycleDueDates(c, now).filter((d) => !done.has(dateKey(d)))
+    // 结束方式：到某天为止 / 记满 N 次
+    if (c.endMode === 'date' && c.endDate) {
+      fresh = fresh.filter((d) => d.getTime() <= c.endDate!)
+    }
+    if (c.endMode === 'times' && c.times && c.times > 0) {
+      const already = handledDates(c).size
+      const left = Math.max(0, c.times - already)
+      fresh = fresh.slice(0, left)
+    }
     if (!fresh.length) continue
 
     for (const d of fresh) {
