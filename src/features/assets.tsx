@@ -51,11 +51,20 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
         <div key={a.assetId} className="row">
           <span className="asset-badge"><AssetIcon type={a.assetType} name={a.assetName} size={16} /></span>
           <div className="grow">
+
             <div>
               {a.assetName}
               {a.cardCode && <span className="tag">尾号 {a.cardCode}</span>}
             </div>
-            <small>{ASSET_TYPE[a.assetType]}{a.groupName ? ' · ' + a.groupName : ''}</small>
+            <small>
+              {ASSET_TYPE[a.assetType]}{a.groupName ? ' · ' + a.groupName : ''}
+              {a.inAccountDate ? ` · 账单日 ${a.inAccountDate}` : ''}
+              {a.outAccountDate ? ` · 还款日 ${a.outAccountDate}` : ''}
+              {a.assetType === 2 && a.totalQuota ? ` · 额度 ${accountMoney(a.totalQuota, a.currency, currencies, defaultCurrency)}` : ''}
+            </small>
+            {a.assetType === 2 && dueHint(a.outAccountDate) && (
+              <span className="tag due">{dueHint(a.outAccountDate)}</span>
+            )}
           </div>
           <b className={a.assetNumber < 0 ? 'out' : ''}>{accountMoney(a.assetNumber, a.currency, currencies, defaultCurrency)}</b>
           <button className="link" aria-label={`编辑账户 ${a.assetName}`} onClick={() => setEditingAsset(a)}>改</button>
@@ -164,6 +173,19 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
 }
 
 
+/** 信用卡还款提醒：仅在未来 3 天内提示 */
+function dueHint(day?: number): string | null {
+  if (!day) return null
+  const today = new Date()
+  const target = new Date(today.getFullYear(), today.getMonth(), day)
+  if (target.getDate() !== day) return null            // 该月没有这一天
+  if (target < new Date(today.getFullYear(), today.getMonth(), today.getDate())) target.setMonth(target.getMonth() + 1)
+  const diff = Math.round((target.getTime() - new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()) / 86400000)
+  if (diff === 0) return '今天还款'
+  if (diff <= 3) return `${diff} 天后还款`
+  return null
+}
+
 function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => void; onSave: (a: Asset) => void }) {
   const currencies = useLedger((s) => s.currencies)
   const defaultCurrency = useLedger((s) => s.defaultCurrency)
@@ -176,6 +198,8 @@ function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => 
   const [currency, setCurrency] = useState(asset.currency ?? defaultCurrency)
   const [quota, setQuota] = useState(asset.totalQuota ? String(asset.totalQuota) : '')
   const [cardCode, setCardCode] = useState(asset.cardCode ?? '')
+  const [inDay, setInDay] = useState(asset.inAccountDate ? String(asset.inAccountDate) : '')
+  const [outDay, setOutDay] = useState(asset.outAccountDate ? String(asset.outAccountDate) : '')
   const [name, setName] = useState(asset.assetName)
   const [type, setType] = useState(asset.assetType)
   // 留空＝保持原余额；填入即覆盖（避免把新值追加在旧值后面）
@@ -207,6 +231,18 @@ function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => 
               onChange={(e) => setCardCode(e.target.value.replace(/\D/g, ''))} />
           </div>
         </div>
+        <div className="row2">
+          <div>
+            <div className="label">账单日（1–28）</div>
+            <input aria-label="账单日" value={inDay} inputMode="numeric" placeholder="可留空"
+              onChange={(e) => setInDay(e.target.value.replace(/\D/g, '').slice(0, 2))} />
+          </div>
+          <div>
+            <div className="label">还款日（1–28）</div>
+            <input aria-label="还款日" value={outDay} inputMode="numeric" placeholder="可留空"
+              onChange={(e) => setOutDay(e.target.value.replace(/\D/g, '').slice(0, 2))} />
+          </div>
+        </div>
         <div className="label">设为实际余额（当前 {accountMoney(asset.assetNumber, asset.currency, currencies, defaultCurrency)}，信用卡填负数）</div>
         <input
           aria-label="账户实际余额"
@@ -218,13 +254,23 @@ function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => 
         />
         <div className="modal-btns">
           <button className="ghost" onClick={onClose}>取消</button>
-          <button className="primary" onClick={() => onSave({
-            ...asset,
-            assetName: name.trim() || asset.assetName,
-            assetType: type,
-            currency,
-            assetNumber: num.trim() === '' ? asset.assetNumber : (Number(num) || 0)
-          })}>保存</button>
+          <button className="primary" onClick={() => {
+            const day = (v: string) => {
+              const n = Number(v)
+              return Number.isFinite(n) && n >= 1 && n <= 28 ? n : undefined
+            }
+            onSave({
+              ...asset,
+              assetName: name.trim() || asset.assetName,
+              assetType: type,
+              currency,
+              totalQuota: quota.trim() === '' ? undefined : Number(quota),
+              cardCode: cardCode.trim() || undefined,
+              inAccountDate: day(inDay),
+              outAccountDate: day(outDay),
+              assetNumber: num.trim() === '' ? asset.assetNumber : (Number(num) || 0)
+            })
+          }}>保存</button>
         </div>
     </Modal>
   )

@@ -519,3 +519,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   box-shadow: var(--shadow-2); font-size: var(--font-sm);
 }
 .undo-bar span { flex: 1; color: var(--muted); }
+
+/* 还款提醒标签 */
+.tag.due { background: var(--accent-soft); color: var(--accent); margin-top: 2px; }
