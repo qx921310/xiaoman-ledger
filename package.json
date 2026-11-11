@@ -36,5 +36,8 @@
       "esbuild"
     ]
   },
-  "description": "小满记账 · 个人记账 Web 应用（React + SQLite，本地优先）"
+  "description": "小满记账 · 个人记账 Web 应用（React + SQLite，本地优先）",
+  "engines": {
+    "node": ">=22.5"
+  }
 }

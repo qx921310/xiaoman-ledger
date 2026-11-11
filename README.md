@@ -1,5 +1,8 @@
 # 小满记账 · 个人记账（自建版）
 
+[![CI](https://github.com/qx921310/xiaoman-ledger/actions/workflows/ci.yml/badge.svg)](https://github.com/qx921310/xiaoman-ledger/actions/workflows/ci.yml)
+
+
 > 线上地址：https://ledger.yele.win
 
 参考市面个人记账产品的**功能结构**自行实现，不复用任何第三方的品牌、文案、图标或样式资源。
