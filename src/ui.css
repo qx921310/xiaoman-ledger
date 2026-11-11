@@ -566,3 +566,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .cal-cell em { font-style: normal; color: var(--ink); }
 .cal-cell i { font-style: normal; font-size: var(--font-xs); white-space: nowrap; }
 .cal-list { margin-top: 14px; }
+
+/* 按日趋势（纯 CSS 柱状） */
+.trend { display: flex; align-items: flex-end; gap: 4px; height: 96px; padding: 6px 0; overflow-x: auto; }
+.trend-col { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 18px; flex: 1; }
+.trend-bars { display: flex; align-items: flex-end; gap: 2px; height: 72px; }
+.trend-bars i { width: 6px; border-radius: var(--r-sm); display: block; min-height: 2px; }
+.trend-bars .exp { background: var(--accent); }
+.trend-bars .inc { background: var(--accent-soft); }
+.trend-col span { font-size: var(--font-xs); color: var(--muted); }

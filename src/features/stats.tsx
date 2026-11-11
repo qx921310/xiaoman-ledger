@@ -3,6 +3,7 @@ import { useLedger } from '../store'
 import { money, monthOf } from '../ui-format'
 import { CatIcon } from '../ui/icons'
 import { summarizeBills } from '../bill-summary'
+import { byAsset, byTag, dailyTrend } from '../domain/stats-breakdown'
 import { Modal } from '../ui/modal'
 import { IMPORTED_CATEGORY_COLOR } from '../default-colors'
 
@@ -12,6 +13,8 @@ export function Stats() {
   const currentBookId = useLedger((s) => s.currentBookId)
   const parents = useLedger((s) => s.parentCategories)
   const budgets = useLedger((s) => s.budgets)
+  const assets = useLedger((s) => s.assets)
+  const tags = useLedger((s) => s.tags)
   const setBudget = useLedger((s) => s.setBudget)
   const removeBudget = useLedger((s) => s.removeBudget)
   const [month, setMonth] = useState(monthOf(Date.now()))
@@ -61,6 +64,11 @@ export function Stats() {
     const s2 = summarizeBills(inRange, parents, refunds)
     return b.categoryId === 0 ? s2.budget : (s2.budgetByCategory.get(b.categoryId) ?? 0)
   }
+
+  const trend = useMemo(() => dailyTrend(monthBills, parents, refunds, month), [monthBills, parents, refunds, month])
+  const assetRows = useMemo(() => byAsset(monthBills, assets, parents, refunds), [monthBills, assets, parents, refunds])
+  const tagRows = useMemo(() => byTag(monthBills, tags, parents, refunds), [monthBills, tags, parents, refunds])
+  const trendMax = Math.max(1, ...trend.map((d) => Math.max(d.income, d.expense)))
 
   return (
     <section className="card">
@@ -174,6 +182,52 @@ export function Stats() {
           <span className="bar-pct">{(total ? (r.v / total) * 100 : 0).toFixed(0)}%</span>
         </div>
       ))}
+
+      {trend.length > 0 && (
+        <>
+          <div className="label">按日收支</div>
+          <div className="trend">
+            {trend.map((d) => (
+              <div key={d.day} className="trend-col" title={`${d.day} 支出 ${money(d.expense)} / 收入 ${money(d.income)}`}>
+                <div className="trend-bars">
+                  <i className="exp" style={{ height: `${(d.expense / trendMax) * 100}%` }} />
+                  <i className="inc" style={{ height: `${(d.income / trendMax) * 100}%` }} />
+                </div>
+                <span>{d.day.slice(-2)}</span>
+              </div>
+            ))}
+          </div>
+          <p className="hint">深色为支出，浅色为收入；悬停看具体金额。</p>
+        </>
+      )}
+
+      {assetRows.length > 0 && (
+        <>
+          <div className="label">按账户</div>
+          {assetRows.map((r) => (
+            <div key={r.assetId} className="bar-row">
+              <span className="bar-name">{r.name}</span>
+              <div className="bar-track"><div className="bar" style={{ width: `${(r.expense / Math.max(1, assetRows[0].expense)) * 100}%`, background: 'var(--accent)' }} /></div>
+              <span className="bar-val">{money(r.expense)}</span>
+              <span className="bar-pct">{r.income ? '+' + money(r.income) : ''}</span>
+            </div>
+          ))}
+        </>
+      )}
+
+      {tagRows.length > 0 && (
+        <>
+          <div className="label">按标签</div>
+          {tagRows.map((r) => (
+            <div key={r.name} className="bar-row">
+              <span className="bar-name">#{r.name}</span>
+              <div className="bar-track"><div className="bar" style={{ width: `${(r.amount / Math.max(1, tagRows[0].amount)) * 100}%`, background: 'var(--accent-soft)' }} /></div>
+              <span className="bar-val">{money(r.amount)}</span>
+              <span className="bar-pct" />
+            </div>
+          ))}
+        </>
+      )}
 
       {editing && (
         <Modal label="设置预算" onClose={() => setEditing(null)}>

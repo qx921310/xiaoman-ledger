@@ -9,6 +9,7 @@ import { leaksPrivateAccount, visibleAssets } from '../src/domain/asset-scope'
 import { dedupeCycleBills as dedupeBills } from '../src/domain/cycle-dedupe'
 import { planCycles } from '../src/domain/cycles'
 import { accountHistory } from '../src/domain/account-history'
+import { byAsset, byTag, dailyTrend } from '../src/domain/stats-breakdown'
 import { dateKey, pendingDates } from '../src/cycle-dates'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -825,3 +826,24 @@ const h = accountHistory({
 assert.equal(h.entries.length, 2)
 assert.equal(h.closing, flowAsset.assetNumber, '逐笔累加应与余额一致')
 assert.equal(h.entries[h.entries.length - 1].time >= h.entries[0].time, true, '按时间排序')
+
+// 统计三维度：按日 / 按账户 / 按标签
+state().reset()
+state().addAsset({ assetId: 96, assetName: '统计账户', assetNumber: 0 })
+const t1 = new Date(2026, 5, 2, 10).getTime()
+const t2 = new Date(2026, 5, 3, 10).getTime()
+const sBill = state().addBill({ assetId: 96, parentCategoryId: 7, cost: 30, time: t1, tags: ['出差'] })
+state().addBill({ assetId: 96, parentCategoryId: 903, cost: 100, time: t2 })
+const trend = dailyTrend(state().bills, state().parentCategories, state().refunds, '2026-06')
+assert.equal(trend.length, 2, '两天各一条')
+assert.equal(trend[0].expense, 30)
+assert.equal(trend[1].income, 100)
+const assetRows = byAsset(state().bills, state().assets, state().parentCategories, state().refunds)
+assert.equal(assetRows[0].expense, 30, '账户维度只统计支出')
+assert.equal(assetRows[0].income, 100)
+state().ensureTags(['出差'])
+const tagRows = byTag(state().bills, state().tags, state().parentCategories, state().refunds)
+assert.equal(tagRows.length, 1, '只有被标签标记的支出进入标签统计')
+assert.equal(tagRows[0].name, '出差')
+assert.equal(tagRows[0].amount, 30)
+assert.equal(sBill.time, t1)
