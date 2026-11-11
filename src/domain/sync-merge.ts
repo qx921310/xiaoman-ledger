@@ -76,8 +76,13 @@ export function mergeRemote(s: MergeableState, records: SyncIncoming[], now = Da
     if (deleted && deleted.updatedAt >= (r.updatedAt ?? 0)) continue
     if (r.ownerId != null && r.payload.ownerId == null) r.payload = { ...r.payload, ownerId: r.ownerId }
 
-    const idx = arr.findIndex((x) => idOf(r.kind, x) === String(r.id))
     const ownerOf = (x: Record<string, unknown>) => (x?.ownerId ?? x?.userId ?? 0)
+    // 之前因属主不同被顺位改号的记录，用原始身份认回，避免每次合并都再改一次号
+    const originOf = (x: Record<string, unknown>) =>
+      x.__originOwner != null && String(x.__originId) === String(r.id) && Number(x.__originOwner) === Number(ownerOf(r.payload ?? {}))
+    // 优先用原始身份认回（否则会反复命中本地同名记录、每次合并都再造一条）
+    const originIdx = arr.findIndex(originOf)
+    const idx = originIdx >= 0 ? originIdx : arr.findIndex((x) => idOf(r.kind, x) === String(r.id))
     const localRow = idx >= 0 ? arr[idx] : undefined
     const sameBuiltInChild = r.kind === 'child' &&
       TAXONOMY_CHILDREN.some((c) => c.id === r.payload!.id && c.parentId === r.payload!.parentId && c.name === r.payload!.name) &&
@@ -87,9 +92,15 @@ export function mergeRemote(s: MergeableState, records: SyncIncoming[], now = Da
       // 同 ID 但属主不同：不覆盖，顺位换一个空闲 ID，两条并存
       const idField = k[1]
       const taken = new Set(arr.map((x) => String(x[idField])))
-      let nextId = (Number(r.id) || 0) + 1
+      const baseId = Number(r.id)
+      const salt = Number(ownerOf(r.payload)) || 0
+      // 由 (原 id, 属主) 推导，保证多次合并得到同一个号
+      let nextId = Number.isFinite(baseId) ? baseId * 1000 + (salt % 1000) : now
       while (taken.has(String(nextId))) nextId++
-      arr.push({ ...r.payload, [idField]: nextId })
+      arr.push({
+        ...r.payload, [idField]: nextId,
+        __originId: String(r.id), __originOwner: salt
+      })
       next[k[0]] = arr
       continue
     }

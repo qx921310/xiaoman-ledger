@@ -34,6 +34,8 @@ export interface Bill {
   bookId: string | number
   remark: string
   billType: number
+  /** 由哪条周期规则生成（跨设备去重用） */
+  cycleId?: number
   tags: string[]
   /** 附件引用 */
   files: BillFile[]
@@ -118,6 +120,8 @@ export interface Currency {
 /** 周期记账规则：每月固定日期自动生成账单 */
 export interface Cycle {
   cycleId: number
+  /** 所属账本：周期规则固定在创建时的账本，避免切换账本后记错位置 */
+  bookId?: string | number
   name: string
   kind: 'expense' | 'income'
   parentCategoryId: number

@@ -24,6 +24,8 @@ export interface Budget {
   categoryId: number
   /** 基础额度 */
   amount: number
+  /** 修改时间，用于跨设备比较版本 */
+  updateTime?: number
   /** 追加额度（叠加在基础额度上） */
   addNum?: number
   /** 预算周期：month 按月 / year 按年 */
@@ -499,6 +501,7 @@ export const useLedger = create<LedgerState>()(
       addCycle: (patch) => set((s) => ({
         cycles: [...s.cycles, {
           ...patch,
+          bookId: s.currentBookId || 1,
           cycleId: NOW(),
           enabled: patch.enabled ?? true,
           generated: [],
@@ -529,7 +532,8 @@ export const useLedger = create<LedgerState>()(
         const plan = planCycles({
           cycles: s.cycles, bills: s.bills, assets: s.assets,
           parentCategories: s.parentCategories, childCategories: s.childCategories,
-          currentBookId: s.currentBookId, userId: s.userId, uid: getCurrentUid() || undefined
+          currentBookId: s.currentBookId, currencies: s.currencies, defaultCurrency: s.defaultCurrency,
+          userId: s.userId, uid: getCurrentUid() || undefined
         })
         if (!plan.count) return 0
         const cycleMap = new Map(plan.cycles.map((c) => [c.cycleId, c]))
@@ -617,7 +621,7 @@ export const useLedger = create<LedgerState>()(
 
       setBudget: (budget) => set((s) => {
         const rest = s.budgets.filter((b) => !(b.month === budget.month && b.categoryId === budget.categoryId))
-        return { budgets: budget.amount > 0 ? [...rest, budget] : rest }
+        return { budgets: budget.amount > 0 ? [...rest, { ...budget, updateTime: NOW() }] : rest }
       }),
 
       removeBudget: (month, categoryId) => set((s) => ({

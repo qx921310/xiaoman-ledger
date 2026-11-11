@@ -1,4 +1,5 @@
 import { useLedger } from './store'
+import { dedupeCycleBills } from './domain/cycle-dedupe'
 
 export interface SyncRecord {
   kind: string
@@ -71,6 +72,12 @@ export async function syncNow() {
   useLedger.getState().applyRemote(pulled.records || [])
   // 云端记录会带回旧分类，合并后再跑一次规范/去重
   useLedger.getState().mergeTaxonomy()
+  // 多设备可能各自补生成了同一期周期账单：收敛到一条，其余写墓碑
+  const st = useLedger.getState()
+  const { bills: kept, removed } = dedupeCycleBills(st.bills)
+  if (removed.length) {
+    useLedger.setState({ bills: kept, tombstones: [...st.tombstones, ...removed.map((b) => ({ kind: 'bill', id: String(b.syncId ?? b.billId), bookId: b.bookId, updatedAt: Date.now() }))] })
+  }
   if (!pushed.denied) useLedger.getState().setLastSync(Date.now())
   return {
     pushed: pushed.accepted as number,

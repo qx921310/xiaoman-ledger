@@ -1,7 +1,8 @@
 import { cycleDueDates, dateKey, handledDates } from '../cycle-dates'
 import { newBillIdentity } from '../identity'
 import { resolveBillChild } from '../taxonomy'
-import type { Asset, Bill, Category, Cycle } from '../types'
+import { fromBase } from '../money'
+import type { Asset, Bill, Category, Currency, Cycle } from '../types'
 
 export interface CyclePlanInput {
   cycles: Cycle[]
@@ -10,6 +11,8 @@ export interface CyclePlanInput {
   parentCategories: Category[]
   childCategories: Category[]
   currentBookId?: string | number
+  currencies: Currency[]
+  defaultCurrency: string
   userId: number
   uid?: number
   now?: Date
@@ -29,7 +32,7 @@ export interface CyclePlan {
  * 计算本次要补生成的周期账单。纯函数：不改状态，由 store 应用结果。
  */
 export function planCycles(input: CyclePlanInput, now = new Date()): CyclePlan {
-  const { bills: existing, assets, parentCategories, childCategories, userId } = input
+  const { bills: existing, assets, parentCategories, childCategories, userId, currencies, defaultCurrency } = input
   const created: Bill[] = []
   const assetDelta = new Map<number, number>()
   const usedIds = new Set(existing.map((b) => String(b.billId)))
@@ -48,11 +51,19 @@ export function planCycles(input: CyclePlanInput, now = new Date()): CyclePlan {
 
       const parent = parentCategories.find((p) => p.id === c.parentCategoryId)
       const asset = assets.find((a) => a.assetId === c.assetId)
+      const accountCurrency = asset?.currency ?? defaultCurrency
+      const accountAmount = accountCurrency === defaultCurrency
+        ? c.cost
+        : +fromBase(c.cost, accountCurrency, currencies, defaultCurrency).toFixed(2)
       created.push({
         billId: identity.billId, syncId: identity.syncId, time, cost: c.cost,
+        accountAmount, accountCurrency,
+        currencyInfo: accountCurrency === defaultCurrency ? undefined : accountCurrency,
+        currencyAssetNumber: accountCurrency === defaultCurrency ? undefined : accountAmount,
         parentCategoryId: c.parentCategoryId, childCategoryId: c.childCategoryId,
         childCategoryIdentityVersion: c.childCategoryIdentityVersion,
-        assetId: c.assetId, bookId: input.currentBookId || 1,
+        assetId: c.assetId, bookId: c.bookId ?? input.currentBookId ?? 1,
+        cycleId: c.cycleId,
         remark: c.remark || c.name, billType: 4,
         tags: [], files: [], userId: input.uid || userId, updateTime: Date.now(),
         billShareInfo: {
@@ -61,8 +72,9 @@ export function planCycles(input: CyclePlanInput, now = new Date()): CyclePlan {
           assetName: asset?.assetName ?? ''
         }
       })
+      // 账户按自身币种扣款：外币账户扣 accountAmount，不是本币 cost
       const sign = parent?.kind === 'income' ? 1 : -1
-      assetDelta.set(c.assetId, (assetDelta.get(c.assetId) ?? 0) + sign * c.cost)
+      assetDelta.set(c.assetId, (assetDelta.get(c.assetId) ?? 0) + sign * accountAmount)
       done.add(dateKey(d))
     }
     updatedCycles.push({ ...c, generated: [...done], updateTime: Date.now() })
