@@ -667,6 +667,8 @@ const timesPlan = planCycles({ ...cycleBase, cycles: [makeCycle({ endMode: 'time
 assert.equal(timesPlan.count, 2, '记满 2 次后不再生成')
 const datePlan = planCycles({ ...cycleBase, cycles: [makeCycle({ endMode: 'date', endDate: new Date(2026, 2, 15).getTime() })] }, new Date(2026, 5, 1))
 assert.equal(datePlan.count, 3, '截止到 3 月 15 日应生成 1/2/3 三期')
+
+
 assert.equal(state().bills.find((b) => b.billId === reimbBill.billId)?.reimbursementEnd, true)
 assert.equal(balance(93), 50, '已结束的报销不进账户')
 
@@ -774,3 +776,20 @@ assert.equal(state().childCategories.length, beforeChildCount)
 assert.equal(state().childCategories.filter((c) => c.name === '蔬菜' && c.parentId === 7).length, 1)
 assert.equal(state().childCategories.find((c) => c.name === '蔬菜' && c.parentId === 7)!.id, vegetable.id)
 console.log('balance and synthetic CSV tests passed')
+
+// 账本展示属性：重载服务端列表时要保留本地图标/颜色/排序
+state().reset()
+state().setAccountBooks([
+  { accountBookId: 0, accountBookName: '家庭', userId: 0, createTime: 0, bookId: 'book-x' },
+  { accountBookId: 0, accountBookName: '工作', userId: 0, createTime: 0, bookId: 'book-y' }
+])
+state().updateBookMeta('book-x', { color: '#ff0000', icon: 'ic_asset_wallet', positionWeight: 2 })
+assert.equal(state().accountBooks.find((b) => b.bookId === 'book-x')?.color, '#ff0000')
+// 模拟一次重新拉取（服务端不带这些字段）
+state().setAccountBooks([
+  { accountBookId: 0, accountBookName: '家庭', userId: 0, createTime: 0, bookId: 'book-x' },
+  { accountBookId: 0, accountBookName: '工作', userId: 0, createTime: 0, bookId: 'book-y' }
+])
+const kept = state().accountBooks.find((b) => b.bookId === 'book-x')
+assert.equal(kept?.color, '#ff0000', '重载后颜色应保留')
+assert.equal(kept?.positionWeight, 2, '重载后排序应保留')

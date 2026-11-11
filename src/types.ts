@@ -311,6 +311,14 @@ export interface AccountBook {
   role?: 'silent' | 'peer' | 'admin'
   accountBookId: number
   accountBookName: string
+  /** 账本图标键（public/icons 下选一个） */
+  icon?: string
+  /** 账本颜色，用于切换器与列表标识 */
+  color?: string
+  /** 排序权重，小的靠前 */
+  positionWeight?: number
+  /** 该账本当前使用的预算 id（一木 currentBudgetId 语义） */
+  currentBudgetId?: number
   userId: number
   createTime: number
 }

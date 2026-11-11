@@ -103,6 +103,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
   const [newTag, setNewTag] = useState('')
   const [newTagParent, setNewTagParent] = useState('')
   const setBook = useLedger((s) => s.setBook)
+  const updateBookMeta = useLedger((s) => s.updateBookMeta)
   const [members, setMembers] = useState<{ userId: number; role: string; email: string }[]>([])
   const [invite, setInvite] = useState<{ code: string; expiresAt: number } | null>(null)
   const currentBook = accountBooks.find((b) => b.bookId && String(b.bookId) === String(currentBookId))
@@ -534,6 +535,18 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
                 {active && <span className="tag ok">当前</span>}
               </div>
               <small>{b.ownerId === me?.id ? '我创建的' : `创建者 #${b.ownerId}`}</small>
+              <div className="row2" style={{ marginTop: 6 }}>
+                <input aria-label={`${b.accountBookName} 颜色`} className="color" type="color"
+                  value={b.color ?? '#e0a53c'}
+                  onChange={(e) => updateBookMeta(String(b.bookId), { color: e.target.value })} />
+                <select aria-label={`${b.accountBookName} 图标`} value={b.icon ?? ''}
+                  onChange={(e) => updateBookMeta(String(b.bookId), { icon: e.target.value || undefined })}>
+                  <option value="">默认图标</option>
+                  {['ic_asset_wallet','ic_asset_savings_card','ic_asset_cash','ic_asset_investment','ic_asset_fixed_deposit'].map((k) => (
+                    <option key={k} value={k}>{k.replace('ic_asset_', '')}</option>
+                  ))}
+                </select>
+              </div>
             </div>
             <button className="link" onClick={() => { setBook(String(b.bookId)); localStorage.setItem('xm-current-book', String(b.bookId)) }}>进入</button>
           </div>

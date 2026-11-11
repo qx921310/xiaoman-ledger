@@ -95,6 +95,7 @@ interface LedgerState {
   updateAsset: (asset: Asset) => void
   setBook: (id: string | number) => void
   setAccountBooks: (list: AccountBook[]) => void
+  updateBookMeta: (bookId: string | number, patch: Partial<AccountBook>) => void
   migrateBookIds: (targetBookId: string) => number
   seed: () => void
   reset: () => void
@@ -723,10 +724,24 @@ export const useLedger = create<LedgerState>()(
         return n
       },
 
+      // 账本的图标/颜色/排序是本地展示属性，服务端不存；重载时按 bookId 保留
+      updateBookMeta: (bookId, patch) => set((s) => ({
+        accountBooks: s.accountBooks.map((b) =>
+          String(b.bookId) === String(bookId) ? { ...b, ...patch } : b)
+      })),
+
       setAccountBooks: (list) => set((s) => {
-        // 保留本地账本（数字 id），替换服务端账本
+        // 保留本地账本（数字 id），替换服务端账本；
+        // 图标/颜色/排序/关联预算是本地展示属性，按 bookId 从旧数据带过来
+        const meta = new Map(s.accountBooks.filter((b) => b.bookId).map((b) => [String(b.bookId), b]))
+        const merged = list.map((b) => {
+          const old = meta.get(String(b.bookId))
+          return old
+            ? { ...b, icon: old.icon, color: old.color, positionWeight: old.positionWeight, currentBudgetId: old.currentBudgetId }
+            : b
+        })
         const local = s.accountBooks.filter((b) => !b.bookId)
-        return { accountBooks: [...local, ...list] }
+        return { accountBooks: [...local, ...merged] }
       }),
 
       seed: () => {
