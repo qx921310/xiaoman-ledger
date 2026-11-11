@@ -633,6 +633,13 @@ assert.deepEqual(visibleAssets(scopeAssets, 'book-a', 7).map((a) => a.assetId), 
 assert.deepEqual(visibleAssets(scopeAssets, 'book-b', 8).map((a) => a.assetId), [3], '看不到别人的私有账户')
 assert.equal(leaksPrivateAccount(scopeAssets[0] as any, 'book-a'), true, '私有账户用于共享账本会泄露')
 assert.equal(leaksPrivateAccount(scopeAssets[1] as any, 'book-a'), false, '共享账户不泄露')
+
+// showBook 显式指定可见账本时优先于 bookId
+const showBookAssets: any[] = [
+  { assetId: 11, assetName: '多账本卡', assetType: 1, assetNumber: 0, ownerId: 7, bookId: 'book-a', showBook: ['book-a', 'book-b'], positionWeight: 0, remark: '', userId: 7, updateTime: 1 }
+]
+assert.equal(visibleAssets(showBookAssets, 'book-b', 7).length, 1, 'showBook 里有的账本可见')
+assert.equal(visibleAssets(showBookAssets, 'book-c', 7).length, 0, 'showBook 里没有的账本不可见')
 const unmigratedBackup = JSON.parse(JSON.stringify(backup))
 delete unmigratedBackup.assets[0].openingBalance
 state().importAll(unmigratedBackup)

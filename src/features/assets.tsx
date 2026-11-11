@@ -58,11 +58,11 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
 
       {assets.map((a) => (
         <div key={a.assetId} className="row">
-          <span className="asset-badge"><AssetIcon type={a.assetType} name={a.assetName} size={16} /></span>
+          <span className="asset-badge"><AssetIcon type={a.assetType} name={a.assetName} size={16} icon={a.assetIcon} /></span>
           <div className="grow">
 
             <div>
-              {a.assetName}
+              {a.simpleName || a.assetName}
               {a.cardCode && <span className="tag">尾号 {a.cardCode}</span>}
             </div>
             <small>
@@ -70,6 +70,9 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
               {a.inAccountDate ? ` · 账单日 ${a.inAccountDate}` : ''}
               {a.outAccountDate ? ` · 还款日 ${a.outAccountDate}` : ''}
               {a.assetType === 2 && a.totalQuota ? ` · 额度 ${accountMoney(a.totalQuota, a.currency, currencies, defaultCurrency)}` : ''}
+              {a.reimAssetNumber ? ` · 报销额度 ${money(a.reimAssetNumber)}` : ''}
+              {a.shareQuotaAsset ? ` · 额度共享自 ${allAssets.find((x) => x.assetId === a.shareQuotaAsset)?.assetName ?? '已删除账户'}` : ''}
+              {a.outDayNotNext && a.outAccountDate ? ' · 还款顺延' : ''}
             </small>
             {a.assetType === 2 && dueHint(a.outAccountDate) && (
               <span className="tag due">{dueHint(a.outAccountDate)}</span>
@@ -254,7 +257,13 @@ function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => 
   const [cardCode, setCardCode] = useState(asset.cardCode ?? '')
   const [inDay, setInDay] = useState(asset.inAccountDate ? String(asset.inAccountDate) : '')
   const accountBooks = useLedger((s) => s.accountBooks)
+  const allAssetsForEditor = useLedger((s) => s.assets)
   const [bookId, setBookId] = useState(asset.bookId == null ? '' : String(asset.bookId))
+  const [simpleName, setSimpleName] = useState(asset.simpleName ?? '')
+  const [icon, setIcon] = useState(asset.assetIcon ?? '')
+  const [outNotNext, setOutNotNext] = useState(Boolean(asset.outDayNotNext))
+  const [reimQuota, setReimQuota] = useState(asset.reimAssetNumber != null ? String(asset.reimAssetNumber) : '')
+  const [shareQuota, setShareQuota] = useState(asset.shareQuotaAsset != null ? String(asset.shareQuotaAsset) : '')
   const [outDay, setOutDay] = useState(asset.outAccountDate ? String(asset.outAccountDate) : '')
   const [name, setName] = useState(asset.assetName)
   const [type, setType] = useState(asset.assetType)
@@ -299,6 +308,43 @@ function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => 
               onChange={(e) => setOutDay(e.target.value.replace(/\D/g, '').slice(0, 2))} />
           </div>
         </div>
+        <div className="row2">
+          <div>
+            <div className="label">简称（可选）</div>
+            <input aria-label="账户简称" value={simpleName} placeholder="列表里优先显示" maxLength={8}
+              onChange={(e) => setSimpleName(e.target.value)} />
+          </div>
+          <div>
+            <div className="label">图标</div>
+            <select aria-label="账户图标" value={icon} onChange={(e) => setIcon(e.target.value)}>
+              <option value="">按类型默认</option>
+              {['ic_asset_wallet','ic_asset_credit_card','ic_asset_savings_card','ic_asset_cash','ic_asset_investment','ic_asset_deposit','ic_asset_fixed_deposit','ic_asset_insurance'].map((k) => (
+                <option key={k} value={k}>{k.replace('ic_asset_', '')}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="row2">
+          <div>
+            <div className="label">报销额度（可选）</div>
+            <input aria-label="报销额度" value={reimQuota} inputMode="decimal" placeholder="用于提示"
+              onChange={(e) => setReimQuota(e.target.value.replace(/[^\d.]/g, ''))} />
+          </div>
+          <div>
+            <div className="label">额度共享自</div>
+            <select aria-label="额度共享自" value={shareQuota} onChange={(e) => setShareQuota(e.target.value)}>
+              <option value="">不共享</option>
+              {allAssetsForEditor.filter((a) => a.assetId !== asset.assetId).map((a) => (
+                <option key={a.assetId} value={a.assetId}>{a.assetName}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <label className="hint" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <input type="checkbox" checked={outNotNext} onChange={(e) => setOutNotNext(e.target.checked)} />
+          还款日顺延到下月（账单日之后还款）
+        </label>
+
         <div className="label">归属</div>
         <select aria-label="账户归属" value={bookId} onChange={(e) => setBookId(e.target.value)}>
           <option value="">私有（只有我可见）</option>
@@ -332,6 +378,11 @@ function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => 
               totalQuota: quota.trim() === '' ? undefined : Number(quota),
               cardCode: cardCode.trim() || undefined,
               bookId: bookId === '' ? undefined : bookId,
+              simpleName: simpleName.trim() || undefined,
+              assetIcon: icon || undefined,
+              outDayNotNext: outNotNext || undefined,
+              reimAssetNumber: reimQuota.trim() === '' ? undefined : Number(reimQuota),
+              shareQuotaAsset: shareQuota === '' ? undefined : Number(shareQuota),
               inAccountDate: day(inDay),
               outAccountDate: day(outDay),
               assetNumber: num.trim() === '' ? asset.assetNumber : (Number(num) || 0)

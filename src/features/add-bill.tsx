@@ -135,7 +135,7 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
           onContextMenu={(e) => e.preventDefault()}
         ><svg className="entry-key-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9L3 12l6-7Z"/><path d="m12 9 4 6m0-6-4 6"/></svg></button>
       : <button type="button" aria-label={label} className={extra} onClick={() => setKey(label)}>{label === '退格' ? <svg className="entry-key-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9L3 12l6-7Z"/><path d="m12 9 4 6m0-6-4 6"/></svg> : label}</button>
-    const assetOptions = [{ value: '0', label: '请选择账户' }, ...assets.map((a) => ({ value: String(a.assetId), label: a.assetName, detail: accountMoney(a.assetNumber, a.currency, currencies, defaultCurrency), assetType: a.assetType }))]
+    const assetOptions = [{ value: '0', label: '请选择账户' }, ...assets.map((a) => ({ value: String(a.assetId), label: a.simpleName || a.assetName, detail: accountMoney(a.assetNumber, a.currency, currencies, defaultCurrency), assetType: a.assetType, icon: a.assetIcon }))]
     return (
       <section className="mobile-entry" aria-label="记账">
         <div className="entry-toolbar">

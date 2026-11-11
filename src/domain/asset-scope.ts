@@ -10,6 +10,12 @@ const sameBook = (a: string | number | undefined, b: string | number) =>
  */
 export function visibleAssets(assets: Asset[], bookId: string | number, me?: number): Asset[] {
   return assets.filter((a) => {
+    // 显式指定了显示账本时，以它为准（一木的 showBook 语义）
+    if (a.showBook?.length) {
+      if (Number(bookId) === 0) return true
+      if (!a.showBook.some((b) => String(b) === String(bookId))) return false
+      return a.bookId != null || me == null || a.ownerId == null || Number(a.ownerId) === Number(me)
+    }
     if (a.bookId == null) return me == null || a.ownerId == null || Number(a.ownerId) === Number(me)
     if (Number(bookId) === 0) return true          // 「全部账本」视图
     return sameBook(a.bookId, bookId)

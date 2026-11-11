@@ -31,7 +31,7 @@ const ASSET_NAME_ICONS: [RegExp, string][] = [
   [/理财|投资/i, 'ic_asset_investment']
 ]
 
-export function AssetIcon({ type, size = 18, name }: { type: number; size?: number; name?: string }) {
+export function AssetIcon({ type, size = 18, name, icon }: { type: number; size?: number; name?: string; icon?: string }) {
   const k = ASSET_NAME_ICONS.find(([pattern]) => pattern.test(name ?? ''))?.[1] ?? ASSET_TYPE_ICONS[type] ?? 'ic_asset_default'
   const url = `/icons/assets/${k}.svg`
   return <span className="asset-ico" title={name} style={{ width: size, height: size, WebkitMaskImage: `url(${url})`, maskImage: `url(${url})` } as React.CSSProperties} />

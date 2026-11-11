@@ -236,6 +236,18 @@ export interface Asset {
   totalQuota?: number
   /** 卡号后四位 */
   cardCode?: string
+  /** 自定义图标键（public/icons/assets 下的文件名，不含扩展名） */
+  assetIcon?: string
+  /** 简称：列表和选择器优先显示 */
+  simpleName?: string
+  /** 还款日是否顺延到下月（账单日之后还款） */
+  outDayNotNext?: boolean
+  /** 报销额度（该账户可报销上限，仅作提示与统计） */
+  reimAssetNumber?: number
+  /** 额度共享自哪个账户（副卡共享主卡额度） */
+  shareQuotaAsset?: number
+  /** 在哪些账本显示；为空表示按 bookId/私有规则 */
+  showBook?: Array<string | number>
   /** 账单日 / 还款日（1-28） */
   inAccountDate?: number
   outAccountDate?: number
