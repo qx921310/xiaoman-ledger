@@ -502,7 +502,8 @@ const server = createServer(async (req, res) => {
       if (!user) return fail(res, '请先登录')
       const mine = db.prepare('SELECT book_id FROM book_members WHERE user_id = ?').all(user.id).map((r) => r.book_id)
       const placeholders = mine.length ? `OR r.book_id IN (${mine.map(() => '?').join(',')})` : ''
-      const rows = db.prepare(`SELECT r.kind, r.rid, r.payload, r.updated_at, r.deleted, r.user_id
+      // 带上记录作用域：客户端靠 bookId/ownerId 判断「同一条记录」，墓碑也需要
+      const rows = db.prepare(`SELECT r.kind, r.rid, r.payload, r.updated_at, r.deleted, r.user_id, r.book_id
         FROM records r WHERE (r.user_id = ? ${placeholders})`).all(user.id, ...mine)
       const records = rows.map((r) => ({
         kind: r.kind,
@@ -510,7 +511,8 @@ const server = createServer(async (req, res) => {
         payload: r.payload ? JSON.parse(r.payload) : null,
         updatedAt: r.updated_at,
         deleted: r.deleted === 1,
-        ownerId: r.user_id
+        ownerId: r.user_id,
+        bookId: r.book_id ?? undefined
       }))
       return ok(res, { records, lastSync: getKv(`lastSync:${user.id}`) })
     }

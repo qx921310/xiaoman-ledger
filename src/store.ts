@@ -447,7 +447,7 @@ export const useLedger = create<LedgerState>()(
           tombstones: [
             ...s.tombstones.filter((x) => !(t.billId && x.kind === 'bill' && x.id === feeIdentity)
               && !(x.kind === 'transfer' && x.id === String(transferId))),
-            { kind: 'transfer', id: String(transferId), updatedAt: NOW() },
+            { kind: 'transfer', id: String(transferId), bookId: feeBill?.bookId, updatedAt: NOW() },
             ...(t.billId ? [{ kind: 'bill', id: feeIdentity, bookId: feeBill?.bookId, updatedAt: NOW() }] : [])
           ],
           assets: s.assets.map((a) => {
@@ -522,7 +522,11 @@ export const useLedger = create<LedgerState>()(
 
       deleteCycle: (cycleId) => set((s) => ({
         cycles: s.cycles.filter((c) => c.cycleId !== cycleId),
-        tombstones: [...s.tombstones, { kind: 'cycle', id: String(cycleId), updatedAt: NOW() }]
+        tombstones: [...s.tombstones, {
+          kind: 'cycle', id: String(cycleId),
+          bookId: s.cycles.find((c) => c.cycleId === cycleId)?.bookId,
+          updatedAt: NOW()
+        }]
       })),
 
       toggleCycle: (cycleId) => set((s) => ({

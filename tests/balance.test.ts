@@ -591,6 +591,18 @@ orderB = { ...orderB, ...mergeRemote(orderB, [valid]) }
 orderB = { ...orderB, ...mergeRemote(orderB, [blocked]) }
 assert.equal(orderB.assets.length, 1, '墓碑后到也不能误删')
 
+// 不同账本的同编号记录：墓碑只作用于自己账本
+let crossBookScope: any = emptyMergeState()
+crossBookScope = { ...crossBookScope, assets: [
+  { assetId: 20, assetName: '账本A', assetNumber: 10, bookId: 'book-a', ownerId: 1, userId: 1, updateTime: 10 },
+  { assetId: 20, assetName: '账本B', assetNumber: 20, bookId: 'book-b', ownerId: 1, userId: 1, updateTime: 10 }
+] }
+crossBookScope = { ...crossBookScope, ...mergeRemote(crossBookScope, [
+  { kind: 'asset', id: '20', bookId: 'book-a', ownerId: 1, updatedAt: 30, deleted: true, payload: null }
+]) }
+assert.deepEqual(crossBookScope.assets.map((a: any) => a.assetName), ['账本B'], '只删本账本那条')
+assert.equal(crossBookScope.tombstones[0].bookId, 'book-a', '墓碑要记住作用域')
+
 // 去重比较必须覆盖标签与不计收支等业务字段
 const tagged = { ...mkCycleBill('g1', 'book-a'), tags: ['出差'], notIntoTotal: true }
 const plain = mkCycleBill('g2', 'book-a')

@@ -77,9 +77,18 @@ export function mergeRemote(s: MergeableState, records: SyncIncoming[], now = Da
         && sameIdentityOf(r.kind, t as unknown as Record<string, unknown>, r as unknown as Record<string, unknown>) !== false)
       const tombTime = r.updatedAt || now
       if (existingTomb < 0) {
-        tombstones.push({ kind: r.kind, id: String(r.id), ownerId: sameOwner ?? undefined, updatedAt: tombTime })
+        tombstones.push({
+          kind: r.kind, id: String(r.id),
+          ownerId: sameOwner ?? undefined,
+          bookId: (r as unknown as Record<string, unknown>).bookId as string | number | undefined,
+          updatedAt: tombTime
+        })
       } else if (tombTime > tombstones[existingTomb].updatedAt) {
-        tombstones[existingTomb] = { ...tombstones[existingTomb], updatedAt: tombTime }
+        tombstones[existingTomb] = {
+          ...tombstones[existingTomb],
+          bookId: tombstones[existingTomb].bookId ?? ((r as unknown as Record<string, unknown>).bookId as string | number | undefined),
+          updatedAt: tombTime
+        }
       }
       continue
     }
