@@ -59,7 +59,7 @@ export interface Bill {
   /** 一木导出里的「其他」列：不计入收支 / 不计入预算 */
   notIntoTotal?: boolean
   notIntoBudget?: boolean
-  /** 优惠金额 */
+  /** 优惠金额（本币）；仅作记录与展示，cost 仍是实付 */
   discountNumber?: number
   /** 退款金额 */
   refundNum?: number
@@ -71,8 +71,10 @@ export interface Bill {
   accountAmount?: number
   /** Currency of accountAmount at the time of posting. */
   accountCurrency?: string
-  /** 外币优惠金额 */
+  /** 外币优惠金额（原币） */
   currencyDiscountNumber?: number
+  /** 报销流程结束标记（不再等待报销） */
+  reimbursementEnd?: boolean
   /** 地点名（POI） */
   poiAddress?: string
   /** 完整地址 */

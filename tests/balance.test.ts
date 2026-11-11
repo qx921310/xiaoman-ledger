@@ -623,6 +623,16 @@ assert.equal(balance(91), 400, '分摊不改余额')
 assert.equal(state().bills.find((b) => b.billId === aaBill.billId)?.billShares?.length, 2)
 assert.equal(summarizeBills(state().bills, state().parentCategories, state().refunds).expense, 100, '统计仍按总额')
 
+// 优惠金额只展示，不改变实付与统计
+state().reset()
+state().addAsset({ assetId: 92, assetName: '优惠账户', assetNumber: 200 })
+const disc = state().addBill({ assetId: 92, parentCategoryId: 7, cost: 90, discountNumber: 10 })
+assert.equal(balance(92), 110, '余额按实付 90 扣')
+assert.equal(summarizeBills(state().bills, state().parentCategories, state().refunds).expense, 90, '统计按实付')
+assert.equal(state().bills.find((b) => b.billId === disc.billId)?.discountNumber, 10)
+state().updateBill(disc.billId, { reimbursementEnd: true })
+assert.equal(state().bills.find((b) => b.billId === disc.billId)?.reimbursementEnd, true)
+
 // 账户可见性：私有只对本人可见，共享只对本账本可见
 const scopeAssets: any[] = [
   { assetId: 1, assetName: '我的私卡', assetType: 1, assetNumber: 0, ownerId: 7, positionWeight: 0, remark: '', userId: 7, updateTime: 1 },

@@ -303,6 +303,8 @@ function BillDetail({ bill, me, onClose, onEdit }: {
           const refundAsset = assets.find((x) => x.assetId === (refund.assetId ?? bill.assetId))
           return <Row key={refund.refundId} label="已退款">{refund.baseAmount != null ? money(refund.baseAmount) : accountMoney(refund.number, refund.currency ?? refundAsset?.currency, currencies, defaultCurrency)} · {refundAsset?.assetName ?? '账户'}</Row>
         })}
+        {bill.discountNumber ? <Row label="优惠">{money(bill.discountNumber)}</Row> : null}
+        {bill.reimbursementEnd ? <Row label="报销">已结束</Row> : null}
         <Row label="备注">{bill.remark || '无'}</Row>
         <Row label="标签">
           {(bill.tags && bill.tags.length)
@@ -382,6 +384,7 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
 
   const [cost, setCost] = useState(String(bill.cost))
   const [shareCount, setShareCount] = useState(String((bill.billShares?.length ?? 0) || ''))
+  const [discount, setDiscount] = useState(bill.discountNumber != null ? String(bill.discountNumber) : '')
   const [pid, setPid] = useState(bill.parentCategoryId)
   const [cid, setCid] = useState(() => resolveBillChild(bill, children)?.id ?? 0)
   const [categoryConfirmed, setCategoryConfirmed] = useState(() => !bill.childCategoryId || !!resolveBillChild(bill, children))
@@ -427,6 +430,11 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
         <input aria-label="账单时间" type="datetime-local" value={time} onChange={(e) => setTime(e.target.value)} />
         <div className="label">备注</div>
         <input aria-label="账单备注" value={remark} onChange={(e) => setRemark(e.target.value)} />
+        <div className="label">优惠金额（可选，本币）</div>
+        <input aria-label="优惠金额" value={discount} inputMode="decimal" placeholder="例如商家满减 10"
+          onChange={(e) => setDiscount(e.target.value.replace(/[^\d.]/g, ''))} />
+        <p className="hint">优惠只做记录与展示，实付金额仍按上面的金额计算。</p>
+
         <div className="label">AA 分摊（几人均分，留空表示不分摊）</div>
         <input aria-label="分摊人数" value={shareCount} inputMode="numeric" placeholder="例如 2"
           onChange={(e) => setShareCount(e.target.value.replace(/\D/g, '').slice(0, 2))} />
@@ -464,6 +472,13 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
                 </select>
                 <input value={rAmount} onChange={(e) => setRAmount(e.target.value.replace(/[^\d.]/g, ''))} placeholder={`本次报销（${reimbursementCurrency}，最多 ${claimRemaining}）`} aria-label={`报销金额（${reimbursementCurrency}）`} inputMode="decimal" />
               </div>
+            )}
+            {bill.reimbursementEnd ? (
+              <p className="hint">报销流程已结束（不再等待报销）。</p>
+            ) : (
+              <button className="ghost wide" onClick={() => onSave({ reimbursementEnd: true })}>
+                结束报销（不再等待）
+              </button>
             )}
             {claimRemaining > 0 && (
               <button className="ghost wide" disabled={!rAsset || !Number.isFinite(Number(rAmount)) || Number(rAmount) <= 0 || Number(rAmount) > claimRemaining} onClick={() => { addReimbursement({
