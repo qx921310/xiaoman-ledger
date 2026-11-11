@@ -3,6 +3,9 @@ import { deriveAssets } from '../src/balances'
 import { buildExportTable, buildImportPlan, parseLedgerFile } from '../src/importer'
 import * as XLSX from 'xlsx'
 import { editAmount, evaluateAmount } from '../src/ui/keypad'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { AssetIcon } from '../src/ui/icons'
 import { useLedger } from '../src/store'
 import { collectRecords } from '../src/sync'
 import { billNetAmount } from '../src/bill-amount'
@@ -440,4 +443,9 @@ assert.equal(evaluateAmount('3+2×4'), 11)
 assert.equal(evaluateAmount('10-6÷2'), 7)
 assert.equal(evaluateAmount('1÷0'), null)
 assert.equal(evaluateAmount('3+'), null)
+for (const name of ['支付宝', '微信', '招商银行']) {
+  const icon = renderToStaticMarkup(createElement(AssetIcon, { type: 1, name }))
+  assert.match(icon, /\/icons\/assets\//)
+  assert.doesNotMatch(icon, /\/icons\/(brands|banks|wallets)\//)
+}
 console.log('balance and synthetic CSV tests passed')

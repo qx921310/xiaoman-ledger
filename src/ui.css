@@ -279,39 +279,32 @@ input.color { width: 34px; height: 30px; padding: 2px; flex: none; border-radius
 
 .foreign { color: #C2410C; font-weight: 700; margin-left: 2px; }
 
-.asset-letter {
-  display: inline-grid; place-items: center; border-radius: 8px;
-  color: #fff; font-weight: 700; line-height: 1; flex: none;
-  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
-}
-
-.asset-bank { object-fit: contain; border-radius: 6px; flex: none; }
-
 /* 手机记账：分类可滚动，输入与键盘保持在下方。 */
 .mobile-entry { display: none; }
 @media (max-width: 600px) {
   html, body, .app * { scrollbar-width: none; -ms-overflow-style: none; }
   html::-webkit-scrollbar, body::-webkit-scrollbar, .app *::-webkit-scrollbar { display: none; }
-  .mobile-entry { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; background: #f8f4ee; color: var(--ink); }
-  .entry-toolbar { height: 54px; flex: none; display: flex; align-items: center; gap: 7px; padding: 7px 9px; background: var(--card); }
-  .entry-back { width: 34px; height: 38px; border: 0; background: transparent; color: var(--ink); font-size: 28px; line-height: 1; }
-  .entry-tabs { flex: 1; display: flex; background: #f2ebe1; border-radius: 9px; padding: 3px; min-width: 0; }
-  .entry-tabs button { flex: 1; border: 0; border-radius: 7px; padding: 6px 2px; background: transparent; color: var(--muted); }
-  .entry-tabs button.on { background: var(--card); color: var(--ink); font-weight: 700; box-shadow: 0 1px 4px #00000010; }
-  .entry-book { width: 88px; flex: none; padding: 7px 4px; border: 0; background: #f2ebe1; font-size: 11px; text-overflow: ellipsis; }
-  .entry-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: 5px; border-radius: 12px; background: var(--card); padding: 12px 9px; }
+  .mobile-entry { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; background: #fbf4e9; color: var(--ink); }
+  .entry-toolbar { height: 58px; flex: none; display: flex; align-items: center; gap: 7px; padding: 7px 10px; background: #fffaf2; }
+  .entry-back { width: 34px; height: 38px; border: 0; background: transparent; color: #a66b3a; font-size: 28px; line-height: 1; }
+  .entry-tabs { flex: 1; display: flex; background: #f7ead7; border-radius: 14px; padding: 4px; min-width: 0; }
+  .entry-tabs button { flex: 1; border: 0; border-radius: 11px; padding: 6px 2px; background: transparent; color: var(--muted); }
+  .entry-tabs button.on { background: #fffdf8; color: #9d602d; font-weight: 700; box-shadow: 0 2px 0 #e9d7bd; }
+  .entry-book { width: 94px; flex: none; }
+  .entry-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: 6px; border-radius: 19px; background: #fffdf8; padding: 12px 9px; }
   .entry-categories { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px 2px; }
   .entry-category { min-width: 0; border: 0; background: transparent; color: var(--ink); display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 3px 0; font-size: 11px; line-height: 1.25; }
   .entry-category > span:last-child { width: 100%; overflow-wrap: anywhere; text-align: center; }
   .entry-category-icon { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; color: var(--category-color, #9a7247); background: var(--category-bg, #f4ede4); }
-  .entry-category.on .entry-category-icon { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .entry-category.on .entry-category-icon { outline: 2px solid #e7ac4c; outline-offset: 2px; box-shadow: 0 3px 0 #ecd9bd; }
+  .entry-category.on > span:last-child { color: #a25d30; font-weight: 700; }
   .entry-category.child .entry-category-icon { width: 36px; height: 36px; background: #f6f0e7; color: #8a694b; }
   .entry-subsection { border-top: 1px solid var(--line); margin-top: 15px; padding-top: 10px; }
   .entry-subtitle { color: var(--muted); font-size: 12px; margin: 0 3px 10px; }
   .entry-transfer { display: grid; gap: 12px; padding: 8px; }
-  .entry-transfer label { display: grid; gap: 5px; color: var(--muted); font-size: 12px; }
+  .entry-transfer label, .entry-transfer-field { display: grid; gap: 5px; color: var(--muted); font-size: 12px; }
   .entry-transfer-arrow { text-align: center; color: var(--accent); font-size: 22px; line-height: 1; }
-  .entry-bottom { flex: none; background: var(--card); border-top: 1px solid var(--line); }
+  .entry-bottom { flex: none; background: #fffaf2; border-radius: 18px 18px 0 0; box-shadow: 0 -3px 16px #b77d3710; }
   .entry-amount-row { height: 49px; display: flex; align-items: center; gap: 4px; padding: 4px 10px; }
   .entry-remark { flex: 1; min-width: 0; border: 0; background: transparent; padding: 7px 3px; }
   .entry-currency { width: 55px; padding: 4px 1px; border: 0; font-size: 11px; background: transparent; color: var(--muted); }
@@ -319,17 +312,45 @@ input.color { width: 34px; height: 30px; padding: 2px; flex: none; border-radius
   .entry-fx { text-align: right; padding: 0 10px 4px; color: var(--muted); font-size: 11px; }
   .entry-symbol { font-weight: 700; color: var(--accent); }
   .entry-value { width: 90px; padding: 4px 0; border: 0; background: transparent; text-align: right; font-size: 20px; font-weight: 700; color: var(--ink); }
-  .entry-options { height: 42px; display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--line); padding: 3px 10px; }
-  .entry-options label { min-width: 0; flex: 1; display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 11px; white-space: nowrap; }
-  .entry-options input, .entry-options select { min-width: 0; padding: 4px; border: 0; background: transparent; color: var(--ink); font-size: 11px; }
-  .entry-options button { border: 0; background: transparent; color: var(--accent); font-size: 12px; }
-  .entry-keypad { height: calc(220px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(4, 1fr); gap: 4px; background: #f2ece3; padding: 5px 5px calc(5px + env(safe-area-inset-bottom)); }
-  .entry-keypad button { min-width: 0; border: 0; border-radius: 7px; background: var(--card); color: var(--ink); font-size: 19px; font-weight: 600; }
-  .entry-keypad .key-control, .entry-operators button { background: #e9e2d8; font-size: 14px; }
-  .entry-operators { display: flex; gap: 4px; min-width: 0; }
+  .entry-options { height: 42px; display: flex; align-items: center; gap: 8px; border-top: 1px solid #f4e8d9; padding: 3px 10px; }
+  .entry-date, .entry-account { min-width: 0; flex: 1; display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; white-space: nowrap; }
+  .entry-date { position: relative; height: 34px; cursor: pointer; }
+  .entry-date strong { color: #825133; font-weight: 600; }
+  .entry-date svg { width: 15px; height: 15px; fill: none; stroke: #bd8855; stroke-width: 1.8; stroke-linecap: round; }
+  .entry-date input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+  .entry-options > button { border: 0; background: transparent; color: var(--accent); font-size: 12px; }
+  .entry-keypad { height: calc(220px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(4, 1fr); gap: 6px; background: #f8ecdb; padding: 8px 8px calc(9px + env(safe-area-inset-bottom)); border-radius: 18px 18px 0 0; }
+  .entry-keypad button { min-width: 0; border: 0; border-radius: 14px; background: #fffdf8; color: #71452f; font-size: 19px; font-weight: 700; box-shadow: 0 2px 0 #e9d8c2; transition: transform .12s, box-shadow .12s; }
+  .entry-keypad button:active { transform: translateY(2px); box-shadow: 0 0 0 #e9d8c2; }
+  .entry-keypad button:focus-visible, .mobile-picker-trigger:focus-visible, .mobile-picker-sheet button:focus-visible { outline: 2px solid #bd732f; outline-offset: 2px; }
+  .entry-keypad .key-control, .entry-operators button { background: #f9ddc7; color: #995b36; box-shadow: 0 2px 0 #e9c3a6; font-size: 14px; }
+  .entry-key-icon { width: 23px; height: 23px; vertical-align: middle; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .entry-operators { display: flex; gap: 6px; min-width: 0; }
   .entry-operators button { flex: 1; font-size: 19px; }
-  .entry-keypad .key-finish { background: var(--accent); color: #fff; font-size: 15px; }
+  .entry-keypad .key-finish { background: #ffc559; color: #75441f; box-shadow: 0 2px 0 #e4a647; font-size: 15px; }
   .entry-keypad button:disabled { opacity: .45; }
+  .mobile-picker-trigger { display: inline-flex; align-items: center; justify-content: space-between; gap: 3px; min-width: 0; border: 0; border-radius: 11px; background: #f8ead7; color: #86552f; padding: 8px 9px; font-size: 11px; font-weight: 600; }
+  .mobile-picker-trigger > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mobile-picker-trigger svg { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .entry-currency.mobile-picker-trigger { width: 56px; padding: 6px 3px 6px 5px; background: transparent; }
+  .entry-options .entry-account-picker { min-width: 0; flex: 1; padding: 6px 8px; background: #fff1dc; color: #875535; }
+  .entry-transfer-field .mobile-picker-trigger { width: 100%; min-height: 42px; font-size: 13px; }
+  .mobile-picker-scrim { position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-end; background: #50341e66; }
+  .mobile-picker-sheet { width: 100%; max-height: min(70dvh, 570px); display: flex; flex-direction: column; overflow: hidden; border-radius: 24px 24px 0 0; background: #fffaf2; padding: 8px 15px calc(14px + env(safe-area-inset-bottom)); box-shadow: 0 -8px 32px #5a341e26; }
+  .mobile-picker-handle { width: 36px; height: 4px; margin: 1px auto 10px; background: #e7cfb4; border-radius: 99px; }
+  .mobile-picker-sheet header { display: flex; justify-content: space-between; align-items: center; padding: 0 3px 11px; }
+  .mobile-picker-sheet header small { display: block; color: #b18c6c; font-size: 10px; }
+  .mobile-picker-sheet h2 { margin: 0; font-size: 17px; color: #70452c; }
+  .mobile-picker-close { width: 34px; height: 34px; border: 0; border-radius: 50%; background: #f6e9d8; color: #9d6a46; font-size: 22px; line-height: 1; }
+  .mobile-picker-options { min-height: 0; overflow-y: auto; display: grid; gap: 7px; padding: 2px 2px 4px; }
+  .mobile-picker-options > button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 55px; padding: 8px 10px; border: 1px solid transparent; border-radius: 14px; background: #fffdf9; color: var(--ink); text-align: left; }
+  .mobile-picker-options > button[aria-checked="true"] { border-color: #e9b35d; background: #fff3da; }
+  .mobile-picker-option-icon { width: 35px; height: 35px; display: grid; place-items: center; flex: none; border-radius: 12px; background: #ffe4c8; color: #b46b38; }
+  .mobile-picker-option-icon svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .mobile-picker-option-copy { flex: 1; min-width: 0; display: grid; gap: 1px; }
+  .mobile-picker-option-copy strong { font-size: 13px; overflow-wrap: anywhere; }
+  .mobile-picker-option-copy small, .mobile-picker-empty { color: var(--muted); font-size: 11px; }
+  .mobile-picker-check { color: #b47133; font-weight: 700; }
 }
 
 .mobile-keypad { display: none; }
@@ -351,3 +372,103 @@ input.color { width: 34px; height: 30px; padding: 2px; flex: none; border-radius
   .mobile-keypad .keypad-submit { grid-row: span 2; background: var(--accent); color: white; font-size: 15px; }
   .mobile-keypad .keypad-hide { grid-column: 1 / -1; background: transparent; color: var(--muted); font-size: 12px; }
 }
+
+/* ============================================================
+   设计语言：控件层（select / 日期 / 复选 / 焦点环）
+   目标：所有可交互控件同一套圆角、高度、边框、焦点与禁用语言
+   ============================================================ */
+:root {
+  --r-sm: 8px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --h-control: 38px;
+  --ring: 0 0 0 3px rgba(224, 165, 60, .28);
+  --shadow-1: 0 1px 2px rgba(90, 58, 30, .06);
+  --shadow-2: 0 8px 24px rgba(90, 58, 30, .12);
+}
+
+/* 下拉：去掉系统外观，改用统一的暖色箭头 */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  height: var(--h-control);
+  padding: 0 34px 0 12px;
+  border-radius: var(--r-md);
+  background-color: var(--card);
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238a6a50' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+}
+select:hover { border-color: #e4d3bd; }
+select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+
+/* 输入：统一高度与焦点环 */
+input:not([type="checkbox"]):not([type="radio"]):not(.rate) {
+  height: var(--h-control);
+  border-radius: var(--r-md);
+  transition: border-color .15s, box-shadow .15s;
+}
+input:not([type="checkbox"]):not([type="radio"]):focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+
+/* 日期/时间：把系统图标调成暖色并统一占位文字色 */
+input[type="date"], input[type="month"], input[type="datetime-local"] {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  opacity: .55;
+  cursor: pointer;
+  filter: sepia(1) saturate(3) hue-rotate(-8deg) brightness(.75);
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="month"]::-webkit-calendar-picker-indicator:hover,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover { opacity: .95; }
+
+/* 复选框：统一成暖色方框 */
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px; height: 18px;
+  border: 1.5px solid var(--line);
+  border-radius: 5px;
+  background: var(--card);
+  cursor: pointer;
+  position: relative;
+  transition: background .15s, border-color .15s;
+  vertical-align: -3px;
+}
+input[type="checkbox"]:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute; left: 5px; top: 1.5px;
+  width: 4px; height: 9px;
+  border: solid #4a2f16; border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+input[type="checkbox"]:focus-visible { box-shadow: var(--ring); outline: none; }
+
+/* 统一禁用态 */
+input:disabled, select:disabled, textarea:disabled {
+  opacity: .55; cursor: not-allowed; background: #faf5ec;
+}
+
+/* 统一按钮族的高度与圆角 */
+.btns button, .ghost, .filebtn { border-radius: var(--r-md); min-height: 34px; }
+.primary { border-radius: var(--r-md); }
+.chip { border-radius: 999px; }
+.modal { border-radius: var(--r-lg); box-shadow: var(--shadow-2); }

@@ -4,6 +4,7 @@ import { accountMoney, currencySymbol, findCurrency, hasCurrencyRate, toBase } f
 import { money, toLocalInput } from '../ui-format'
 import { CatIcon } from '../ui/icons'
 import { editAmount, evaluateAmount } from '../ui/keypad'
+import { MobilePicker } from '../ui/mobile-picker'
 
 export function AddBill({ notify, onClose }: { notify: (m: string) => void; onClose?: () => void }) {
   const accountBooks = useLedger((s) => s.accountBooks)
@@ -112,7 +113,8 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
       const setter = keypadField === 'fee' ? setFee : keypadField === 'toCost' ? setToCost : setCost
       setter((value) => editAmount(value, key))
     }
-    const key = (label: string, extra = '') => <button type="button" className={extra} onClick={() => setKey(label)}>{label}</button>
+    const key = (label: string, extra = '') => <button type="button" aria-label={label} className={extra} onClick={() => setKey(label)}>{label === '退格' ? <svg className="entry-key-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9L3 12l6-7Z"/><path d="m12 9 4 6m0-6-4 6"/></svg> : label}</button>
+    const assetOptions = [{ value: '0', label: '请选择账户' }, ...assets.map((a) => ({ value: String(a.assetId), label: a.assetName, detail: accountMoney(a.assetNumber, a.currency, currencies, defaultCurrency), assetType: a.assetType }))]
     return (
       <section className="mobile-entry" aria-label="记账">
         <div className="entry-toolbar">
@@ -120,19 +122,16 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
           <div className="entry-tabs">
             {(['expense', 'income', 'transfer'] as const).map((item, index) => <button key={item} type="button" className={mode === item ? 'on' : ''} onClick={() => switchMode(item)}>{['支出', '收入', '转账'][index]}</button>)}
           </div>
-          <select className="entry-book" aria-label="选择账本" value={String(curBookId)} onChange={(e) => {
-            const value = e.target.value; localStorage.setItem('xm-current-book', value); setBook(/^\d+$/.test(value) ? Number(value) : value)
-          }}>
-            <option value="0">全部账本</option>
-            {accountBooks.map((b) => <option key={String(b.bookId ?? b.accountBookId)} value={String(b.bookId ?? b.accountBookId)}>{b.accountBookName}</option>)}
-          </select>
+          <MobilePicker className="entry-book" label="选择账本" value={String(curBookId)} options={[
+            { value: '0', label: '全部账本' }, ...accountBooks.map((b) => ({ value: String(b.bookId ?? b.accountBookId), label: b.accountBookName }))
+          ]} onChange={(value) => { localStorage.setItem('xm-current-book', value); setBook(/^\d+$/.test(value) ? Number(value) : value) }} />
         </div>
 
         <div className="entry-scroll">
           {mode === 'transfer' ? <div className="entry-transfer">
-            <label>转出账户<select value={aid} onChange={(e) => setAid(Number(e.target.value))}><option value={0}>请选择账户</option>{assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName} · {accountMoney(a.assetNumber, a.currency, currencies, defaultCurrency)}</option>)}</select></label>
+            <div className="entry-transfer-field"><span>转出账户</span><MobilePicker label="选择转出账户" value={String(aid)} options={assetOptions} onChange={(value) => setAid(Number(value))} /></div>
             <div className="entry-transfer-arrow">↓</div>
-            <label>转入账户<select value={toAid} onChange={(e) => setToAid(Number(e.target.value))}><option value={0}>请选择账户</option>{assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}</select></label>
+            <div className="entry-transfer-field"><span>转入账户</span><MobilePicker label="选择转入账户" value={String(toAid)} options={assetOptions} onChange={(value) => setToAid(Number(value))} /></div>
             <label>到账金额<input value={toCost} placeholder="留空与转出相同" inputMode="none" onFocus={() => { setKeypadField('toCost'); setKeypadOpen(true) }} onChange={(e) => setToCost(e.target.value.replace(/[^\d.]/g, ''))} /></label>
             <label>手续费<input value={fee} placeholder="0.00" inputMode="none" onFocus={() => { setKeypadField('fee'); setKeypadOpen(true) }} onChange={(e) => setFee(e.target.value.replace(/[^\d.]/g, ''))} /></label>
           </div> : <>
@@ -154,14 +153,14 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
         <div className="entry-bottom">
           <div className="entry-amount-row">
             <input className="entry-remark" value={remark} placeholder="写备注…" onFocus={() => setKeypadOpen(false)} onBlur={() => setKeypadOpen(true)} onChange={(e) => setRemark(e.target.value)} />
-            {mode === 'transfer' ? <span className="entry-currency-code">{displayCurrency}</span> : <select aria-label="记账币种" className="entry-currency" value={currency} onChange={(e) => setCurrency(e.target.value)}>{currencies.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}</select>}
+            {mode === 'transfer' ? <span className="entry-currency-code">{displayCurrency}</span> : <MobilePicker className="entry-currency" label="选择币种" value={currency} options={currencies.map((c) => ({ value: c.code, label: c.code, detail: c.name, icon: c.symbol }))} onChange={setCurrency} />}
             <span className="entry-symbol">{currencySymbol(currencies, displayCurrency, defaultCurrency)}</span>
             <input className="entry-value" aria-label="记账金额" value={cost} placeholder="0.00" inputMode="none" onFocus={() => { setKeypadField('cost'); setKeypadOpen(true) }} onChange={(e) => setCost(e.target.value.replace(/[^\d.]/g, ''))} />
           </div>
           {mode !== 'transfer' && currency !== defaultCurrency && evaluatedCost != null && evaluatedCost > 0 && <div className="entry-fx">{hasCurrencyRate(currency, currencies, defaultCurrency) ? `折合 ${currencySymbol(currencies, defaultCurrency, defaultCurrency)}${toBase(evaluatedCost, currency, currencies, defaultCurrency).toFixed(2)}` : '请先设置汇率'}</div>}
           <div className="entry-options">
-            <label>日期<input type="datetime-local" value={time} onChange={(e) => setTime(e.target.value)} /></label>
-            {mode !== 'transfer' && <label>账户<select value={aid} onChange={(e) => setAid(Number(e.target.value))}><option value={0}>请选择账户</option>{assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}</select></label>}
+            <label className="entry-date"><span>日期</span><strong>{time.slice(0, 10) === toLocalInput(Date.now()).slice(0, 10) ? '今天' : time.slice(5, 10).replace('-', '/')}</strong><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="6" width="16" height="14" rx="3"/><path d="M8 3v6m8-6v6M4 10h16"/></svg><input aria-label="日期" type="datetime-local" value={time} onChange={(e) => setTime(e.target.value)} /></label>
+            {mode !== 'transfer' && <div className="entry-account"><span>账户</span><MobilePicker className="entry-account-picker" label="选择账户" value={String(aid)} options={assetOptions} onChange={(value) => setAid(Number(value))} /></div>}
             {!keypadOpen && <button type="button" onClick={() => { setKeypadField('cost'); setKeypadOpen(true) }}>数字键盘</button>}
           </div>
           {keypadOpen && <div className="entry-keypad" aria-label="数字键盘">

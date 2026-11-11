@@ -15,8 +15,7 @@
 ## 图标来源
 
 - 分类与账户：Codex 绘制（基于 Lucide 1.69，ISC），`public/icons/{categories,assets}`
-- 第三方钱包/卡组织：**Simple Icons（CC0）**，`public/icons/brands`，按账户名匹配（支付宝/微信/Apple Pay/PayPal/Visa…），用 CSS mask 上品牌色
-- 银行图标暂用类型图标兜底；如需彩色行徽，从银行官网品牌资源下载后放 `public/icons/brands/` 并加规则即可
+- 账户界面统一使用项目内的通用资产 SVG；账户名称保留用于区分，不再按名称展示第三方品牌图形。仓库中仍保留历史品牌和银行素材，但当前账户图标组件不引用它们。
 
 ## 账号
 
