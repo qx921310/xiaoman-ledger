@@ -16,6 +16,7 @@ import type { BackupFile } from '../backup'
 import { errorMessage } from '../errors'
 import { visibleAssets } from '../domain/asset-scope'
 import { validateOcrDraft, type OcrDraft } from '../domain/ocr-confirm'
+import { sortCategories } from '../domain/category-order'
 
 function RateInput({ value, onCommit, label }: { value: number; onCommit: (v: number) => void; label: string }) {
   const [draft, setDraft] = useState<string | null>(null)
@@ -153,6 +154,28 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
   const updateCategory = useLedger((s) => s.updateCategory)
   const deleteCategory = useLedger((s) => s.deleteCategory)
   const moveCategory = useLedger((s) => s.moveCategory)
+  const moveVisibleCategory = (id: number, dir: -1 | 1) => {
+    const state = useLedger.getState()
+    const target = [...state.parentCategories, ...state.childCategories].find(c => c.id === id)
+    if (!target) return
+    const siblings = sortCategories(target.parentId === 0
+      ? state.parentCategories.filter(c => c.kind === target.kind)
+      : state.childCategories.filter(c => c.parentId === target.parentId))
+    const index = siblings.findIndex(c => c.id === id)
+    if (index + dir < 0 || index + dir >= siblings.length) return
+    // Normalize through the existing store action, so its ordering and the visible
+    // default order agree before applying the user's requested move.
+    const current = [...siblings].sort((a, b) => (a.positionWeight ?? 0) - (b.positionWeight ?? 0) || a.id - b.id)
+    siblings.forEach((c, i) => {
+      let at = current.findIndex(item => item.id === c.id)
+      while (at > i) {
+        moveCategory(c.id, -1)
+        ;[current[at - 1], current[at]] = [current[at], current[at - 1]]
+        at--
+      }
+    })
+    moveCategory(id, dir)
+  }
   const parentCategories = useLedger((s) => s.parentCategories)
   const childCategories = useLedger((s) => s.childCategories)
   const templates = useLedger((s) => s.templates)
@@ -844,7 +867,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
       {(['expense', 'income'] as const).map((kind) => (
         <div key={kind}>
           <div className="label">{kind === 'expense' ? '支出分类' : '收入分类'}</div>
-          {parentCategories.filter((p) => p.kind === kind).sort((a, b) => (a.positionWeight ?? 0) - (b.positionWeight ?? 0)).map((p) => (
+          {sortCategories(parentCategories.filter((p) => p.kind === kind)).map((p) => (
             <div key={p.id} className="cat-block">
               <div className="row">
                 <span className="tag-dot" style={{ background: p.color }} />
@@ -862,14 +885,14 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
                 </select>
                 <input aria-label={`${p.name} 颜色`} className="color" type="color" value={p.color}
                   onChange={(e) => updateCategory(p.id, { color: e.target.value })} />
-                <button className="link" aria-label={`${p.name} 上移`} onClick={() => moveCategory(p.id, -1)}>↑</button>
-                <button className="link" aria-label={`${p.name} 下移`} onClick={() => moveCategory(p.id, 1)}>↓</button>
+                <button className="link" aria-label={`${p.name} 上移`} onClick={() => moveVisibleCategory(p.id, -1)}>↑</button>
+                <button className="link" aria-label={`${p.name} 下移`} onClick={() => moveVisibleCategory(p.id, 1)}>↓</button>
                 <button className="del" aria-label={`删除分类 ${p.name}`} onClick={() => {
                   if (!deleteCategory(p.id)) notify('这个分类已有账单在用，不能删除')
                 }}>删</button>
               </div>
               <div className="cat-children">
-                {childCategories.filter((c) => c.parentId === p.id).sort((a, b) => (a.positionWeight ?? 0) - (b.positionWeight ?? 0)).map((c) => (
+                {sortCategories(childCategories.filter((c) => c.parentId === p.id)).map((c) => (
                   <div key={c.id} className="cat-child">
                     <input aria-label={`${c.name} 子分类名称`} value={c.name}
                       onChange={(e) => updateCategory(c.id, { name: e.target.value })} />
@@ -878,8 +901,8 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
                       <option value="">默认</option>
                       {CHILD_ICONS.map((k) => <option key={k} value={k}>{k.replace('ic_', '')}</option>)}
                     </select>
-                    <button className="link" aria-label={`${c.name} 上移`} onClick={() => moveCategory(c.id, -1)}>↑</button>
-                    <button className="link" aria-label={`${c.name} 下移`} onClick={() => moveCategory(c.id, 1)}>↓</button>
+                    <button className="link" aria-label={`${c.name} 上移`} onClick={() => moveVisibleCategory(c.id, -1)}>↑</button>
+                    <button className="link" aria-label={`${c.name} 下移`} onClick={() => moveVisibleCategory(c.id, 1)}>↓</button>
                     <button className="del" aria-label={`删除子分类 ${c.name}`} onClick={() => {
                       if (!deleteCategory(c.id)) notify('这个子分类已有账单在用，不能删除')
                     }}>删</button>

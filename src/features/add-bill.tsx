@@ -6,6 +6,7 @@ import { CatIcon } from '../ui/icons'
 import { editAmount, evaluateAmount, formatAmount } from '../ui/keypad'
 import { MobilePicker } from '../ui/mobile-picker'
 import { leaksPrivateAccount, visibleAssets } from '../domain/asset-scope'
+import { sortCategories } from '../domain/category-order'
 
 export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) => void; onClose?: () => void; onNeedAsset?: () => void }) {
   const accountBooks = useLedger((s) => s.accountBooks)
@@ -68,18 +69,17 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
   }, [assets, aid, toAid])
 
   const catKind = mode === 'income' ? 'income' : 'expense'
-  const list = parents.filter((p) => p.kind === catKind)
+  const list = sortCategories(parents.filter((p) => p.kind === catKind))
   const cur = list.some((p) => p.id === pid) ? pid : (list[0]?.id ?? 7)
-  const subs = children.filter((c) => c.parentId === cur)
+  const subs = sortCategories(children.filter((c) => c.parentId === cur))
 
   const switchMode = (m: 'expense' | 'income' | 'transfer') => {
     setMode(m)
     setKeypadField('cost')
     // 切到支出/收入时，父分类跟着换，并自动选中它的第一个子分类
-    const nextPid = m === 'income' ? 903 : m === 'expense' ? 7 : pid
+    const nextPid = m === 'income' ? (sortCategories(parents.filter((p) => p.kind === 'income'))[0]?.id ?? 901) : m === 'expense' ? 7 : pid
     setPid(nextPid)
-    const first = children.filter((c) => c.parentId === nextPid)
-      .sort((a, b) => (a.positionWeight ?? 0) - (b.positionWeight ?? 0))[0]
+    const first = sortCategories(children.filter((c) => c.parentId === nextPid))[0]
     setCid(m === 'transfer' ? 0 : (first?.id ?? 0))
   }
 
@@ -188,8 +188,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
             <div className="entry-categories" aria-label="大类">
               {list.map((p) => <button key={p.id} type="button" aria-pressed={p.id === cur} className={'entry-category' + (p.id === cur ? ' on' : '')} onClick={() => {
                   setPid(p.id)
-                  const first = children.filter((c) => c.parentId === p.id)
-                    .sort((a, b) => (a.positionWeight ?? 0) - (b.positionWeight ?? 0))[0]
+                  const first = sortCategories(children.filter((c) => c.parentId === p.id))[0]
                   setCid(first ? first.id : 0)
                 }}>
                 <span className="entry-category-icon" style={{ '--category-color': p.color, '--category-bg': p.bg ?? 'var(--accent-soft)' } as React.CSSProperties}><CatIcon k={p.icon} size={22} /></span><span>{p.name}</span>
@@ -308,8 +307,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
             {list.map((p) => (
                 <button key={p.id} aria-pressed={p.id === cur} className={'chip' + (p.id === cur ? ' on' : '')} onClick={() => {
                   setPid(p.id)
-                  const first = children.filter((c) => c.parentId === p.id)
-                    .sort((a, b) => (a.positionWeight ?? 0) - (b.positionWeight ?? 0))[0]
+                  const first = sortCategories(children.filter((c) => c.parentId === p.id))[0]
                   setCid(first ? first.id : 0)
                 }}>
                 <CatIcon k={p.icon} size={16} />{p.name}
