@@ -29,8 +29,19 @@ export interface Budget {
   updateTime?: number
   /** 追加额度（叠加在基础额度上） */
   addNum?: number
-  /** 预算周期：month 按月 / year 按年 */
-  type?: 'month' | 'year'
+  /** 预算周期：month 按月 / year 按年 / custom 自定义起止 */
+  type?: 'month' | 'year' | 'custom'
+  /** 稳定 id（自定义预算用） */
+  budgetId?: number
+  /** 预算名称，便于区分多个自定义预算 */
+  budgetName?: string
+  /** 自定义区间（含首尾） */
+  startTime?: number
+  endTime?: number
+  /** 排序权重 */
+  positionWeight?: number
+  /** 归属账本；为空表示全账本生效 */
+  bookId?: string | number
 }
 
 interface LedgerState {

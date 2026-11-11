@@ -793,3 +793,20 @@ state().setAccountBooks([
 const kept = state().accountBooks.find((b) => b.bookId === 'book-x')
 assert.equal(kept?.color, '#ff0000', '重载后颜色应保留')
 assert.equal(kept?.positionWeight, 2, '重载后排序应保留')
+
+// 预算：年/自定义区间与追加额度
+state().reset()
+const bMonth = { month: 'all', categoryId: 0, amount: 1000, type: 'month' as const }
+const bYear = { month: 'all', categoryId: 0, amount: 12000, type: 'year' as const }
+state().setBudget(bMonth as any)
+state().setBudget(bYear as any)
+assert.equal(state().budgets.filter((b) => b.type === 'year').length, 1, '年预算与月预算并存')
+const bCustom = {
+  month: 'all', categoryId: 0, amount: 500, addNum: 100, type: 'custom' as const,
+  budgetId: 1, budgetName: '装修',
+  startTime: new Date(2026, 0, 1).getTime(), endTime: new Date(2026, 2, 31).getTime()
+}
+state().setBudget(bCustom as any)
+const custom = state().budgets.find((b) => b.type === 'custom')
+assert.equal(custom?.budgetName, '装修')
+assert.equal((custom?.amount ?? 0) + (custom?.addNum ?? 0), 600, '额度含追加')

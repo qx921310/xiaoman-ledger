@@ -15,7 +15,11 @@ export function Stats() {
   const setBudget = useLedger((s) => s.setBudget)
   const removeBudget = useLedger((s) => s.removeBudget)
   const [month, setMonth] = useState(monthOf(Date.now()))
-  const [editing, setEditing] = useState<{ categoryId: number; amount: string; addNum?: string; type?: 'month' | 'year' } | null>(null)
+  const [editing, setEditing] = useState<{
+    categoryId: number; amount: string; addNum?: string
+    type?: 'month' | 'year' | 'custom'
+    budgetName?: string; startDate?: string; endDate?: string
+  } | null>(null)
 
   const monthBills = useMemo(
     () => bills.filter((b) => monthOf(b.time) === month && (currentBookId === 0 || b.bookId === currentBookId)),
@@ -46,6 +50,17 @@ export function Stats() {
     return summarizeBills(yearBills, parents, refunds).budget
   }, [bills, parents, month, refunds, currentBookId])
   const totalYearBudget = limitOf(yearBudgets.find((b) => b.categoryId === 0) ?? { amount: 0 })
+
+  // 自定义区间预算：按起止日期统计区间内支出
+  const customBudgets = budgets.filter((b) => b.type === 'custom' && b.startTime && b.endTime)
+  const customSpend = (b: { startTime?: number; endTime?: number; categoryId: number }) => {
+    const from = b.startTime ?? 0
+    const to = b.endTime ?? Number.MAX_SAFE_INTEGER
+    const inRange = bills.filter((x) => x.time >= from && x.time <= to
+      && (currentBookId === 0 || x.bookId === currentBookId))
+    const s2 = summarizeBills(inRange, parents, refunds)
+    return b.categoryId === 0 ? s2.budget : (s2.budgetByCategory.get(b.categoryId) ?? 0)
+  }
 
   return (
     <section className="card">
@@ -91,6 +106,30 @@ export function Stats() {
           </div>
         </div>
       )}
+
+      {customBudgets.map((b) => {
+        const used = customSpend(b)
+        const limit = limitOf(b)
+        const p = parents.find((x) => x.id === b.categoryId)
+        return (
+          <div key={String(b.budgetId ?? b.budgetName)} className="budget-box small">
+            <div className="budget-line">
+              <span>{b.budgetName || '自定义预算'}（{b.startTime ? new Date(b.startTime).toISOString().slice(0, 10) : ''} ~ {b.endTime ? new Date(b.endTime).toISOString().slice(0, 10) : ''}）</span>
+              <b>{money(used)} / {money(limit)}</b>
+            </div>
+            <div className="bar-track">
+              <div className="bar" style={{
+                width: `${Math.min(100, (used / Math.max(1, limit)) * 100)}%`,
+                background: used > limit ? 'var(--out)' : 'var(--accent)'
+              }} />
+            </div>
+            <div className="budget-foot">
+              <span>{p ? p.name : '全部支出'} · 剩余 {money(limit - used)}</span>
+              <button className="del" aria-label="删除预算" onClick={() => removeBudget(b.month, b.categoryId)}>删</button>
+            </div>
+          </div>
+        )
+      })}
 
       {catBudgets.map((b) => {
         const p = parents.find((x) => x.id === b.categoryId)
@@ -148,10 +187,30 @@ export function Stats() {
             </select>
             <div className="label">周期</div>
             <select aria-label="预算周期" value={editing.type ?? 'month'}
-              onChange={(e) => setEditing({ ...editing, type: e.target.value as 'month' | 'year' })}>
+              onChange={(e) => setEditing({ ...editing, type: e.target.value as 'month' | 'year' | 'custom' })}>
               <option value="month">按月</option>
               <option value="year">按年</option>
+              <option value="custom">自定义区间</option>
             </select>
+            {editing.type === 'custom' && (
+              <>
+                <div className="label">预算名称</div>
+                <input aria-label="预算名称" value={editing.budgetName ?? ''} placeholder="例如：装修、旅行"
+                  onChange={(e) => setEditing({ ...editing, budgetName: e.target.value })} />
+                <div className="row2">
+                  <div>
+                    <div className="label">开始日期</div>
+                    <input aria-label="开始日期" type="date" value={editing.startDate ?? ''}
+                      onChange={(e) => setEditing({ ...editing, startDate: e.target.value })} />
+                  </div>
+                  <div>
+                    <div className="label">结束日期</div>
+                    <input aria-label="结束日期" type="date" value={editing.endDate ?? ''}
+                      onChange={(e) => setEditing({ ...editing, endDate: e.target.value })} />
+                  </div>
+                </div>
+              </>
+            )}
             <div className="label">追加额度（可选）</div>
             <input aria-label="追加额度" value={editing.addNum ?? ''} inputMode="decimal" placeholder="在原额度上叠加"
               onChange={(e) => setEditing({ ...editing, addNum: e.target.value.replace(/[^\d.]/g, '') })} />
@@ -168,11 +227,18 @@ export function Stats() {
             <div className="modal-btns">
               <button className="ghost" onClick={() => setEditing(null)}>取消</button>
               <button className="primary" onClick={() => {
+                const type = editing.type ?? 'month'
                 setBudget({
                   month: 'all', categoryId: editing.categoryId,
                   amount: Number(editing.amount) || 0,
                   addNum: Number(editing.addNum) || 0,
-                  type: editing.type ?? 'month'
+                  type,
+                  ...(type === 'custom' ? {
+                    budgetId: Date.now(),
+                    budgetName: editing.budgetName || '自定义预算',
+                    startTime: editing.startDate ? new Date(editing.startDate).getTime() : undefined,
+                    endTime: editing.endDate ? new Date(editing.endDate).getTime() + 86399999 : undefined
+                  } : {})
                 })
                 setEditing(null)
               }}>保存</button>
