@@ -7,6 +7,7 @@ import { syncNow } from '../sync'
 import { money } from '../ui-format'
 import { ROLE_LABEL } from '../ui/roles'
 import { validateBackup } from '../backup'
+import { DEFAULT_BOOK_COLOR } from '../default-colors'
 import { dateKey, pendingDates } from '../cycle-dates'
 import { Modal } from '../ui/modal'
 import { DEFAULT_TAG_COLOR } from '../default-colors'
@@ -537,7 +538,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
               <small>{b.ownerId === me?.id ? '我创建的' : `创建者 #${b.ownerId}`}</small>
               <div className="row2" style={{ marginTop: 6 }}>
                 <input aria-label={`${b.accountBookName} 颜色`} className="color" type="color"
-                  value={b.color ?? '#e0a53c'}
+                  value={b.color ?? DEFAULT_BOOK_COLOR}
                   onChange={(e) => updateBookMeta(String(b.bookId), { color: e.target.value })} />
                 <select aria-label={`${b.accountBookName} 图标`} value={b.icon ?? ''}
                   onChange={(e) => updateBookMeta(String(b.bookId), { icon: e.target.value || undefined })}>
