@@ -3,6 +3,7 @@ import { deriveAssets } from '../src/balances'
 import { buildExportTable, buildImportPlan, parseLedgerFile } from '../src/importer'
 import * as XLSX from 'xlsx'
 import { editAmount, evaluateAmount } from '../src/ui/keypad'
+import { lendRemaining, lendTotals } from '../src/lend'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { AssetIcon } from '../src/ui/icons'
@@ -171,6 +172,27 @@ assert.equal(balance(31), 105)
 state().deleteReimbursement(state().reimbursements[0].reimbursementId)
 assert.equal(balance(31), 100)
 assert.equal(state().bills.find((b) => b.billId === refundedBill.billId)?.reimbursementNum, 5)
+
+// 借贷：支持部分还款，累计不得超过应还金额
+state().reset()
+state().addAsset({ assetId: 51, assetName: '借出账户', assetNumber: 1000, currency: 'CNY' })
+state().addLend({ type: 1, assetId: 51, counterparty: '张三', number: 1000 })
+const lend = state().lends[0]
+assert.equal(balance(51), 0)
+assert.equal(lendRemaining(lend, state().lends), 1000)
+state().repayLend({ lendId: lend.lendId, amount: 300 })
+assert.equal(balance(51), 300)
+assert.equal(lendRemaining(state().lends.find((l) => l.lendId === lend.lendId)!, state().lends), 700)
+// 超额应被拒绝
+state().repayLend({ lendId: lend.lendId, amount: 800 })
+assert.equal(balance(51), 300)
+assert.equal(lendRemaining(state().lends.find((l) => l.lendId === lend.lendId)!, state().lends), 700)
+// 还清
+state().repayLend({ lendId: lend.lendId, amount: 700 })
+assert.equal(balance(51), 1000)
+const totals = lendTotals(state().lends)
+assert.equal(totals.receivable, 0)
+assert.equal(totals.payable, 0)
 
 // A refund reduces the existing bill rather than creating another bill.
 state().reset()

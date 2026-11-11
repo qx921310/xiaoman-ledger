@@ -6,6 +6,7 @@ import { money, dayOf } from '../ui-format'
 import { AssetIcon } from '../ui/icons'
 import { Modal } from '../ui/modal'
 import { accountMoney, toBase } from '../money'
+import { lendRemaining, lendTotals } from '../lend'
 
 export function Assets({ notify }: { notify: (m: string) => void }) {
   const assets = useLedger((s) => s.assets)
@@ -15,14 +16,13 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
   const addAsset = useLedger((s) => s.addAsset)
   const updateAsset = useLedger((s) => s.updateAsset)
   const lends = useLedger((s) => s.lends)
+  const repayLend = useLedger((s) => s.repayLend)
   const addLend = useLedger((s) => s.addLend)
   const deleteLend = useLedger((s) => s.deleteLend)
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null)
+  const [repayForm, setRepayForm] = useState<{ lendId: number; remaining: number; amount: string; assetId: number } | null>(null)
   const [lendForm, setLendForm] = useState<{ type: 1 | 2 | 3 | 4; assetId: number; counterparty: string; number: string; interest: string; repaymentAssetId: number; remark: string } | null>(null)
-  const receivable = lends.filter((l) => l.type === 1).reduce((s, l) => s + l.number + (l.interest ?? 0), 0)
-    - lends.filter((l) => l.type === 2).reduce((s, l) => s + l.number, 0)
-  const payable = lends.filter((l) => l.type === 3).reduce((s, l) => s + l.number + (l.interest ?? 0), 0)
-    - lends.filter((l) => l.type === 4).reduce((s, l) => s + l.number, 0)
+  const { receivable, payable } = lendTotals(lends)
 
   const [name, setName] = useState('')
   const [type, setType] = useState(1)
@@ -91,10 +91,19 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
             <small>
               {assets.find((a) => a.assetId === l.assetId)?.assetName ?? '账户'} · {dayOf(l.time)}
               {l.interest ? ` · 利息 ${money(l.interest)}` : ''}
+              {(l.type === 1 || l.type === 3) && l.parentLendId == null && lendRemaining(l, lends) > 0
+                ? ` · ${l.type === 1 ? '未收' : '未还'} ${money(lendRemaining(l, lends))}` : ''}
               {l.remark ? ' · ' + l.remark : ''}
             </small>
           </div>
           <b className={l.type === 2 || l.type === 4 ? 'neutral' : ''}>{money(l.number)}</b>
+          {(l.type === 1 || l.type === 3) && lendRemaining(l, lends) > 0 && (
+            <button className="link" aria-label={`${l.type === 1 ? '收款' : '还款'} ${l.counterparty}`}
+              onClick={() => setRepayForm({
+                lendId: l.lendId, remaining: lendRemaining(l, lends), amount: '',
+                assetId: l.repaymentAssetId ?? l.assetId
+              })}>{l.type === 1 ? '收' : '还'}</button>
+          )}
           <button className="del" aria-label={`删除${LEND_TYPE[l.type]}记录`} onClick={() => deleteLend(l.lendId)}>删</button>
         </div>
       ))}
@@ -102,6 +111,28 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
         type: 1, assetId: assets[0]?.assetId ?? 0, counterparty: '', number: '',
         interest: '', repaymentAssetId: 0, remark: ''
       })}>记一笔借贷</button>
+
+      {repayForm && (
+        <Modal label="部分还款" onClose={() => setRepayForm(null)}>
+          <h3>{lends.find((x) => x.lendId === repayForm.lendId)?.type === 1 ? '收回' : '还款'}</h3>
+          <p className="hint">剩余 {money(repayForm.remaining)}</p>
+          <div className="label">本次金额</div>
+          <input aria-label="本次还款金额" autoFocus inputMode="decimal" value={repayForm.amount}
+            placeholder={`最多 ${repayForm.remaining}`}
+            onChange={(e) => setRepayForm({ ...repayForm, amount: e.target.value.replace(/[^\d.]/g, '') })} />
+          <div className="label">进哪个账户</div>
+          <select aria-label="还款账户" value={repayForm.assetId}
+            onChange={(e) => setRepayForm({ ...repayForm, assetId: Number(e.target.value) })}>
+            {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
+          </select>
+          <div className="modal-btns">
+            <button className="ghost" onClick={() => setRepayForm(null)}>取消</button>
+            <button className="primary"
+              disabled={!(Number(repayForm.amount) > 0) || Number(repayForm.amount) > repayForm.remaining}
+              onClick={() => { repayLend({ lendId: repayForm.lendId, amount: Number(repayForm.amount), repaymentAssetId: repayForm.assetId }); setRepayForm(null) }}>确认</button>
+          </div>
+        </Modal>
+      )}
 
       {lendForm && (
         <Modal label="借入借出" onClose={() => setLendForm(null)}>

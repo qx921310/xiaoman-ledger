@@ -6,6 +6,7 @@ import { childCategoryNeedsReview, normalizeBuiltInChild, resolveBillChild, TAXO
 import { getCurrentUid, userStorage } from './auth'
 import { deriveAssets } from './balances'
 import { newBillIdentity } from './identity'
+import { lendRemaining } from './lend'
 import { fromBase, toBase } from './money'
 import { validateBackup } from './backup'
 import { addRefundChanges, deleteRefundChanges } from './refund-operations'
@@ -63,7 +64,8 @@ interface LedgerState {
   deleteCycle: (cycleId: number) => void
   toggleCycle: (cycleId: number) => void
   runCycles: () => number
-  addLend: (patch: { type: 1 | 2 | 3 | 4; assetId: number; counterparty: string; number: number; interest?: number; repaymentAssetId?: number; time?: number; remark?: string }) => void
+  addLend: (patch: { type: 1 | 2 | 3 | 4; assetId: number; counterparty: string; number: number; interest?: number; repaymentAssetId?: number; time?: number; remark?: string; parentLendId?: number }) => void
+  repayLend: (patch: { lendId: number; amount: number; repaymentAssetId?: number; time?: number }) => void
   deleteLend: (lendId: number) => void
   addRefund: (patch: { billId: string | number; number: number; assetId?: number; baseAmount?: number }) => void
   deleteRefund: (refundId: number) => void
@@ -597,7 +599,7 @@ export const useLedger = create<LedgerState>()(
       },
 
       // 借出 -、借入 +、收回 +、还款 -；删除则反向冲正
-      addLend: ({ type, assetId, counterparty, number, interest, repaymentAssetId, time, remark }) => set((s) => {
+      addLend: ({ type, assetId, counterparty, number, interest, repaymentAssetId, time, remark, parentLendId }) => set((s) => {
         const amt = Number(number) || 0
         if (amt <= 0 || !assetId) return {}
         // 借出/借入走 assetId；收回/还款优先走 repaymentAssetId
@@ -609,6 +611,7 @@ export const useLedger = create<LedgerState>()(
           interest: Number(interest) || 0,
           repaymentAssetId: repaymentAssetId || undefined,
           time: time ?? NOW(), remark: remark ?? '',
+          parentLendId: parentLendId || undefined,
           userId: s.userId, updateTime: NOW()
         }
         return {
@@ -617,6 +620,26 @@ export const useLedger = create<LedgerState>()(
             ? { ...a, assetNumber: +(a.assetNumber + sign * amt).toFixed(2), updateTime: NOW() } : a)
         }
       }),
+
+      // 部分还款/收款：生成一条关联记录，剩余额度由 lend.ts 派生
+      repayLend: ({ lendId, amount, repaymentAssetId, time }) => {
+        const s = get()
+        const parent = s.lends.find((l) => l.lendId === lendId)
+        if (!parent || (parent.type !== 1 && parent.type !== 3)) return
+        const amt = Number(amount) || 0
+        const remaining = lendRemaining(parent, s.lends)
+        if (amt <= 0 || amt > remaining) return
+        s.addLend({
+          type: parent.type === 1 ? 2 : 4,
+          assetId: parent.repaymentAssetId ?? parent.assetId,
+          counterparty: parent.counterparty,
+          number: amt,
+          repaymentAssetId: repaymentAssetId ?? parent.repaymentAssetId ?? parent.assetId,
+          parentLendId: parent.lendId,
+          time,
+          remark: parent.remark
+        })
+      },
 
       deleteLend: (lendId) => set((s) => {
         const rec = s.lends.find((x) => x.lendId === lendId)

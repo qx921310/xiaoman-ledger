@@ -153,6 +153,8 @@ export interface Lend {
   number: number
   /** 利息（应收/应付，不计入本金流水） */
   interest?: number
+  /** 收回/还款记录指向的原借贷（用于计算剩余） */
+  parentLendId?: number
   /** 还款/收款账户；缺省沿用 assetId */
   repaymentAssetId?: number
   time: number
