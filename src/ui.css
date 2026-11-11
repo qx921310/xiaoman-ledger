@@ -508,3 +508,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 @media (pointer: coarse) {
   .btns button, .ghost, .filebtn { min-height: 44px; }
 }
+
+/* 撤销删除提示条 */
+.undo-bar {
+  position: sticky; bottom: 12px; z-index: 20;
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 12px; padding: 10px 12px;
+  background: var(--card);
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  box-shadow: var(--shadow-2); font-size: var(--font-sm);
+}
+.undo-bar span { flex: 1; color: var(--muted); }

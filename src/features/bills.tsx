@@ -21,6 +21,10 @@ export function Bills({ me, onAdd }: { me?: { id: number; email: string }; onAdd
   const currencies = useLedger((s) => s.currencies)
   const defaultCurrency = useLedger((s) => s.defaultCurrency)
   const del = useLedger((s) => s.deleteBill)
+  const duplicate = useLedger((s) => s.duplicateBill)
+  const restore = useLedger((s) => s.restoreBill)
+  const [undoBill, setUndoBill] = useState<Bill | null>(null)
+  const removeWithUndo = (bill: Bill) => { del(bill.billId); setUndoBill(bill) }
   const delTransfer = useLedger((s) => s.deleteTransfer)
   const updateBill = useLedger((s) => s.updateBill)
   const reimbursements = useLedger((s) => s.reimbursements)
@@ -186,12 +190,21 @@ export function Bills({ me, onAdd }: { me?: { id: number; email: string }; onAdd
                 <b className={inc ? 'in' : 'out'}>{inc ? '+' : '-'}{money(inc ? b.cost : billNetAmount(b, refunds))}</b>
                 <button className="link" aria-label={`查看${p?.name ?? '账单'}明细`} onClick={() => setDetail(b)}>明细</button>
                 {!readOnly && <button className="link" aria-label={`编辑${p?.name ?? '账单'}`} onClick={() => setEditing(b)}>改</button>}
-                {!readOnly && <button className="del" aria-label={`删除${p?.name ?? '账单'}`} onClick={() => del(b.billId)}>删</button>}
+                {!readOnly && <button className="link" aria-label={`复制${p?.name ?? '账单'}`} onClick={() => duplicate(b.billId)}>复制</button>}
+                {!readOnly && <button className="del" aria-label={`删除${p?.name ?? '账单'}`} onClick={() => removeWithUndo(b)}>删</button>}
               </div>
             )
           })}
         </div>
       ))}
+
+      {undoBill && (
+        <div className="undo-bar" role="status">
+          <span>已删除 1 笔</span>
+          <button className="link" onClick={() => { restore(undoBill); setUndoBill(null) }}>撤销</button>
+          <button className="del" aria-label="关闭提示" onClick={() => setUndoBill(null)}>×</button>
+        </div>
+      )}
 
       {detail && bills.some((b) => b.billId === detail.billId) && (
         <BillDetail

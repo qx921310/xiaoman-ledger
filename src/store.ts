@@ -70,6 +70,8 @@ interface LedgerState {
   setBudget: (budget: Budget) => void
   removeBudget: (month: string, categoryId: number) => void
   deleteBill: (billId: string | number) => void
+  restoreBill: (bill: Bill) => void
+  duplicateBill: (billId: string | number) => void
   updateBill: (billId: string | number, patch: Partial<Bill>) => void
   addTransfer: (patch: { fromAssetId: number; toAssetId: number; cost: number; toCost?: number; serviceCharge?: number; time?: number; remark?: string }) => Transfer
   updateTransfer: (transferId: number, patch: Partial<Pick<Transfer, 'fromAssetId' | 'toAssetId' | 'cost' | 'toCost' | 'serviceCharge' | 'time' | 'remark'>>) => void
@@ -233,6 +235,32 @@ export const useLedger = create<LedgerState>()(
             : a),
           tombstones: [...s.tombstones, tomb]
         }
+      }),
+
+      // 撤销删除：把账单放回，并去掉对应墓碑
+      restoreBill: (bill) => set((s) => ({
+        bills: s.tombstones.some((t) => t.kind === 'bill' && t.id === (bill.syncId ?? String(bill.billId)))
+          ? [...s.bills, bill]
+          : s.bills.some((b) => b.billId === bill.billId) ? s.bills : [...s.bills, bill],
+        tombstones: s.tombstones.filter((t) => !(t.kind === 'bill' && t.id === (bill.syncId ?? String(bill.billId))))
+      })),
+
+      // 复制一笔：内容照搬，时间取当下，编号重新生成
+      duplicateBill: (billId) => set((s) => {
+        const old = s.bills.find((b) => b.billId === billId)
+        if (!old) return {}
+        const { syncId, billId: newId } = newBillIdentity()
+        const copy: Bill = {
+          ...old,
+          billId: newId as any,
+          syncId,
+          displayId: undefined,
+          memberNo: undefined,
+          sequenceNo: undefined,
+          time: NOW(),
+          updateTime: NOW()
+        }
+        return { bills: [...s.bills, copy] }
       }),
 
       // 改单：先把旧账单对账户的影响撤回，再按新值重新记一次
