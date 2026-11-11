@@ -1,4 +1,5 @@
 import { normalizeBuiltInChild, TAXONOMY_CHILDREN } from '../taxonomy'
+import { OWNERLESS, sameIdentity as sameIdentityOf, tombstoneMatches } from './identity'
 import type {
   AccountBook, Asset, Bill, Category, Cycle, Lend, Refund, Reimbursement, SyncIncoming, Tag, TombstoneV1, Transfer
 } from '../types'
@@ -19,8 +20,6 @@ export interface MergeableState {
   tombstones: TombstoneV1[]
 }
 
-// 这些类型没有「属主」语义：服务端回填 ownerId 时不应被当成他人记录而改号
-const OWNERLESS = new Set(['tag', 'budget', 'parent', 'child', 'book'])
 
 const KIND_SPEC: Record<string, [string, string]> = {
   bill: ['bills', 'billId'], asset: ['assets', 'assetId'], transfer: ['transfers', 'transferId'],
@@ -30,16 +29,6 @@ const KIND_SPEC: Record<string, [string, string]> = {
   reimbursement: ['reimbursements', 'reimbursementId'], refund: ['refunds', 'refundId'],
   budget: ['budgets', 'month'],
   tag: ['tags', 'tagId']
-}
-
-/**
- * 统一身份比较：普通记录合并、墓碑删除、墓碑查找都必须走这一套，
- * 否则会出现「一处按属主、一处只按编号」的分裂。
- */
-const sameIdentity = (kind: string, ownerA: unknown, ownerB: unknown): boolean => {
-  if (OWNERLESS.has(kind)) return true          // 无属主语义，只按业务 ID
-  if (ownerA == null || ownerB == null) return true
-  return Number(ownerA) === Number(ownerB)
 }
 
 const idOf = (kind: string, item: Record<string, unknown>) =>
@@ -72,17 +61,20 @@ export function mergeRemote(s: MergeableState, records: SyncIncoming[], now = Da
     if (r.deleted) {
       // 身份规则：无属主概念的类型只按业务 ID 匹配；其余要求属主一致
       const sameOwner = OWNERLESS.has(r.kind) || r.ownerId == null ? null : Number(r.ownerId)
+      // 作用域判定统一走 identity 模块（见下方 tombstoneMatches）
       const delIdx = arr.findIndex((x) => {
         if (sameOwner != null && Number(ownerOf(x)) !== sameOwner) return false
         if (x.__originId != null && String(x.__originId) === String(r.id)) return true
         return idOf(r.kind, x) === String(r.id)
       })
+      // 作用域判定不了时不删除（历史数据宁留重复也不丢）
+      if (delIdx >= 0 && !tombstoneMatches(r.kind, r as unknown as Record<string, unknown>, arr[delIdx])) continue
       // 本地记录比墓碑新 → 墓碑已过期，保留本地记录
       if (delIdx >= 0 && Number(arr[delIdx].updateTime ?? 0) > Number(r.updatedAt ?? 0)) continue
       if (delIdx >= 0) next[k[0]] = arr.filter((_, i) => i !== delIdx)
       // 墓碑时间必须取较新的一次，否则更早的记录会被误判为更新而复活
       const existingTomb = tombstones.findIndex((t) => t.kind === r.kind && t.id === String(r.id)
-        && sameIdentity(r.kind, t.ownerId, r.ownerId))
+        && sameIdentityOf(r.kind, t as unknown as Record<string, unknown>, r as unknown as Record<string, unknown>) !== false)
       const tombTime = r.updatedAt || now
       if (existingTomb < 0) {
         tombstones.push({ kind: r.kind, id: String(r.id), ownerId: sameOwner ?? undefined, updatedAt: tombTime })
@@ -93,8 +85,10 @@ export function mergeRemote(s: MergeableState, records: SyncIncoming[], now = Da
     }
     if (!r.payload) continue
 
+    // 墓碑「阻挡旧记录复活」可以宽松：作用域不同才排除，作用域未知时按时间判断
+    // （删除已有记录必须严格，见上面的 tombstoneMatches）
     const deleted = tombstones.find((t) => t.kind === r.kind && t.id === String(r.id)
-      && sameIdentity(r.kind, t.ownerId, r.ownerId))
+      && sameIdentityOf(r.kind, t as unknown as Record<string, unknown>, r.payload as Record<string, unknown>) !== false)
     if (deleted && deleted.updatedAt >= (r.updatedAt ?? 0)) continue
     if (r.ownerId != null && r.payload.ownerId == null) r.payload = { ...r.payload, ownerId: r.ownerId }
 

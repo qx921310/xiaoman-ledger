@@ -71,7 +71,8 @@ state().applyRemote([{ kind: 'bill', id: remoteBill.syncId, payload: remoteBill,
 const kind = state().parentCategories.find(c => c.id === remoteBill.parentCategoryId)?.kind
 assert.equal(state().assets[0].assetNumber, before + (kind === 'income' ? 10 : -10))
 const afterRemote = state().assets[0].assetNumber
-state().applyRemote([{ kind: 'bill', id: remoteBill.syncId, payload: null, deleted: true, updatedAt: remoteBill.updateTime + 10 }])
+// 真实同步的墓碑会带 bookId；作用域缺失时按 A1 策略不会删除
+state().applyRemote([{ kind: 'bill', id: remoteBill.syncId, bookId: remoteBill.bookId, payload: null, deleted: true, updatedAt: remoteBill.updateTime + 10 }])
 assert.equal(state().assets[0].assetNumber, before)
 assert.notEqual(afterRemote, before)
 
