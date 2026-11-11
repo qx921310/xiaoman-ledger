@@ -641,6 +641,17 @@ assert.equal(state().tags.find((t) => t.tagId === subTag.tagId)?.parentName, '�
 state().updateTag(subTag.tagId, { parentTagId: undefined })
 assert.equal(state().tags.find((t) => t.tagId === subTag.tagId)?.parentName, undefined)
 
+// 结束报销：待报销记录收口为 ended，且不计入余额
+state().reset()
+state().addAsset({ assetId: 93, assetName: '报销账户', assetNumber: 100 })
+const reimbBill = state().addBill({ assetId: 93, parentCategoryId: 7, cost: 50 })
+state().addReimbursement({ billId: reimbBill.billId, assetId: 93, number: 20 })
+assert.equal(state().reimbursements[0].status, 'pending')
+state().endReimbursement(reimbBill.billId)
+assert.equal(state().reimbursements[0].status, 'ended', '待报销应被收口')
+assert.equal(state().bills.find((b) => b.billId === reimbBill.billId)?.reimbursementEnd, true)
+assert.equal(balance(93), 50, '已结束的报销不进账户')
+
 // 账户可见性：私有只对本人可见，共享只对本账本可见
 const scopeAssets: any[] = [
   { assetId: 1, assetName: '我的私卡', assetType: 1, assetNumber: 0, ownerId: 7, positionWeight: 0, remark: '', userId: 7, updateTime: 1 },

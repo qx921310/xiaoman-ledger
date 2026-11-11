@@ -180,7 +180,7 @@ export function Bills({ me, onAdd, embedded = false }: { me?: { id: number; emai
                     <div className="tags">
                       {reimbursements.filter((r) => r.billId === b.billId).map((r) => (
                         <span key={r.reimbursementId} className={'tag' + (r.status === 'done' ? ' ok' : '')}>
-                          报销 {accountMoney(r.number, assets.find((asset) => asset.assetId === r.assetId)?.currency, currencies, defaultCurrency)} · {r.status === 'done' ? '已到账' : '待报销'}
+                          报销 {accountMoney(r.number, assets.find((asset) => asset.assetId === r.assetId)?.currency, currencies, defaultCurrency)} · {r.status === 'done' ? '已到账' : r.status === 'ended' ? '已结束' : '待报销'}
                         </span>
                       ))}
                       {(b.refundNum ?? 0) > 0 && <span className="tag">已退 {money(b.refundNum!)}</span>}
@@ -359,6 +359,7 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
   const addReimbursement = useLedger((s) => s.addReimbursement)
   const settleReimbursement = useLedger((s) => s.settleReimbursement)
   const deleteReimbursement = useLedger((s) => s.deleteReimbursement)
+  const endReimbursement = useLedger((s) => s.endReimbursement)
   const addRefund = useLedger((s) => s.addRefund)
   const deleteRefund = useLedger((s) => s.deleteRefund)
 
@@ -457,10 +458,10 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
             {myReimbs.map((r) => (
               <div key={r.reimbursementId} className="attach-line">
                 <span>
-                  {r.status === 'done' ? '✅ 已到账' : '⏳ 待报销'} {accountMoney(r.number, assets.find((a) => a.assetId === r.assetId)?.currency, currencies, defaultCurrency)}
+                  {r.status === 'done' ? '✅ 已到账' : r.status === 'ended' ? '⏹ 已结束' : '⏳ 待报销'} {accountMoney(r.number, assets.find((a) => a.assetId === r.assetId)?.currency, currencies, defaultCurrency)}
                   {r.assetId ? ' → ' + (assets.find((a) => a.assetId === r.assetId)?.assetName ?? '报销账户') : ''}
                 </span>
-                {r.status !== 'done' && (
+                {r.status === 'pending' && (
                   <button className="link" onClick={() => settleReimbursement(r.reimbursementId)}>确认到账</button>
                 )}
                 <button className="del" onClick={() => deleteReimbursement(r.reimbursementId)}>撤销</button>
@@ -478,7 +479,7 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
             {bill.reimbursementEnd ? (
               <p className="hint">报销流程已结束（不再等待报销）。</p>
             ) : (
-              <button className="ghost wide" onClick={() => onSave({ reimbursementEnd: true })}>
+              <button className="ghost wide" onClick={() => { endReimbursement(bill.billId); onSave({ reimbursementEnd: true }) }}>
                 结束报销（不再等待）
               </button>
             )}

@@ -113,8 +113,11 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
             <small>
               {assets.find((a) => a.assetId === l.assetId)?.assetName ?? '账户'} · {dayOf(l.time)}
               {l.interest ? ` · 利息 ${money(l.interest)}` : ''}
-              {(l.type === 1 || l.type === 3) && l.parentLendId == null && lendRemaining(l, lends) > 0
-                ? ` · ${l.type === 1 ? '未收' : '未还'} ${money(lendRemaining(l, lends))}` : ''}
+              {(l.type === 1 || l.type === 3) && l.parentLendId == null
+                ? (lendRemaining(l, lends) > 0
+                  ? ` · ${l.type === 1 ? '未收' : '未还'} ${money(lendRemaining(l, lends))}`
+                  : ' · ✅ 已结清')
+                : ''}
               {l.remark ? ' · ' + l.remark : ''}
             </small>
           </div>

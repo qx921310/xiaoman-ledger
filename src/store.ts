@@ -68,6 +68,7 @@ interface LedgerState {
   addReimbursement: (patch: { billId: string | number; assetId: number; number: number; detail?: string }) => void
   settleReimbursement: (reimbursementId: number) => void
   deleteReimbursement: (reimbursementId: number) => void
+  endReimbursement: (billId: string | number) => void
   addCycle: (patch: Omit<Cycle, 'cycleId' | 'generated' | 'userId' | 'updateTime' | 'enabled'> & { enabled?: boolean }) => void
   deleteCycle: (cycleId: number | string) => void
   toggleCycle: (cycleId: number | string) => void
@@ -511,6 +512,13 @@ export const useLedger = create<LedgerState>()(
             ? { ...a, assetNumber: +(a.assetNumber + rec.number).toFixed(2), updateTime: NOW() } : a)
         }
       }),
+
+      // 结束报销：账单标记结束，同时把待报销记录收口，避免待办列表残留
+      endReimbursement: (billId) => set((s) => ({
+        bills: s.bills.map((b) => b.billId === billId ? { ...b, reimbursementEnd: true, updateTime: NOW() } : b),
+        reimbursements: s.reimbursements.map((r) => r.billId === billId && r.status === 'pending'
+          ? { ...r, status: 'ended' as const, updateTime: NOW() } : r)
+      })),
 
       deleteReimbursement: (reimbursementId) => set((s) => {
         const rec = s.reimbursements.find((r) => r.reimbursementId === reimbursementId)

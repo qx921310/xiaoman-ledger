@@ -107,8 +107,8 @@ export interface Reimbursement {
   bookId?: string | number
   number: number
   detail: string
-  /** pending=登记待报销，done=已到账（钱已进报销账户） */
-  status: 'pending' | 'done'
+  /** pending=登记待报销，done=已到账（钱已进报销账户），ended=用户主动结束 */
+  status: 'pending' | 'done' | 'ended'
   settledAt?: number
   userId: number
   updateTime: number
