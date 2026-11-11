@@ -5,6 +5,7 @@ import { money, toLocalInput } from '../ui-format'
 import { CatIcon } from '../ui/icons'
 import { editAmount, evaluateAmount, formatAmount } from '../ui/keypad'
 import { MobilePicker } from '../ui/mobile-picker'
+import { leaksPrivateAccount, visibleAssets } from '../domain/asset-scope'
 
 export function AddBill({ notify, onClose }: { notify: (m: string) => void; onClose?: () => void }) {
   const accountBooks = useLedger((s) => s.accountBooks)
@@ -14,7 +15,11 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
   const readOnly = myRole === 'silent'
   const parents = useLedger((s) => s.parentCategories)
   const children = useLedger((s) => s.childCategories)
-  const assets = useLedger((s) => s.assets)
+  const allAssets = useLedger((s) => s.assets)
+  const meId = useLedger((s) => s.userId)
+  const assets = visibleAssets(allAssets, curBookId, meId)
+  const pickedAsset = assets.find((a) => a.assetId === aid)
+  const privacyBlocked = leaksPrivateAccount(pickedAsset, curBookId)
   const addBill = useLedger((s) => s.addBill)
   const addTransfer = useLedger((s) => s.addTransfer)
 
@@ -180,12 +185,18 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
             {mode !== 'transfer' && <div className="entry-account"><span>账户</span><MobilePicker className="entry-account-picker" label="选择账户" value={String(aid)} options={assetOptions} onChange={(value) => setAid(Number(value))} /></div>}
             {!keypadOpen && <button type="button" onClick={() => { setKeypadField('cost'); setKeypadOpen(true) }}>数字键盘</button>}
           </div>
+          {privacyBlocked && (
+            <p className="hint due-hint">
+              「{pickedAsset?.assetName}」是私有账户，记到共享账本会让成员看到它的名字。
+              请先把该账户设为共享到本账本，或换用共享账户。
+            </p>
+          )}
           {keypadOpen && <div className="entry-keypad" aria-label="数字键盘">
             {key('1')}{key('2')}{key('3')}{key('退格', 'key-control')}
             {key('4')}{key('5')}{key('6')}<div className="entry-operators">{key('+')}{key('-')}</div>
             {key('7')}{key('8')}{key('9')}<div className="entry-operators">{key('×')}{key('÷')}</div>
             <button type="button" className="key-control" disabled={readOnly} onClick={() => { submit() }}>再记</button>{key('0')}{key('.')}
-            <button type="button" className="key-finish" disabled={readOnly} onClick={() => { if (submit()) onClose?.() }}>完成</button>
+            <button type="button" className="key-finish" disabled={readOnly || privacyBlocked} onClick={() => { if (submit()) onClose?.() }}>完成</button>
           </div>}
         </div>
       </section>

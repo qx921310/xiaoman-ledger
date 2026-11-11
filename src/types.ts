@@ -215,6 +215,13 @@ export interface Refund {
 
 export interface Asset {
   assetId: number
+  /**
+   * 归属账本：为空 = 私有账户，只有本人可见；
+   * 有值 = 共享到该账本，成员可见。
+   */
+  bookId?: string | number
+  /** 创建者，用于判断私有账户归属 */
+  ownerId?: number
   assetName: string
   assetType: number
   assetNumber: number

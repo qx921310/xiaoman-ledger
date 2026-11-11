@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx'
 import { editAmount, evaluateAmount, formatAmount } from '../src/ui/keypad'
 import { lendRemaining, lendTotals } from '../src/lend'
 import { mergeRemote } from '../src/domain/sync-merge'
+import { leaksPrivateAccount, visibleAssets } from '../src/domain/asset-scope'
 import { dedupeCycleBills as dedupeBills } from '../src/domain/cycle-dedupe'
 import { dateKey, pendingDates } from '../src/cycle-dates'
 import { createElement } from 'react'
@@ -621,6 +622,17 @@ state().setBillShares(aaBill.billId, [
 assert.equal(balance(91), 400, '分摊不改余额')
 assert.equal(state().bills.find((b) => b.billId === aaBill.billId)?.billShares?.length, 2)
 assert.equal(summarizeBills(state().bills, state().parentCategories, state().refunds).expense, 100, '统计仍按总额')
+
+// 账户可见性：私有只对本人可见，共享只对本账本可见
+const scopeAssets: any[] = [
+  { assetId: 1, assetName: '我的私卡', assetType: 1, assetNumber: 0, ownerId: 7, positionWeight: 0, remark: '', userId: 7, updateTime: 1 },
+  { assetId: 2, assetName: '共享卡', assetType: 1, assetNumber: 0, ownerId: 7, bookId: 'book-a', positionWeight: 0, remark: '', userId: 7, updateTime: 1 },
+  { assetId: 3, assetName: '别人私卡', assetType: 1, assetNumber: 0, ownerId: 8, positionWeight: 0, remark: '', userId: 8, updateTime: 1 }
+]
+assert.deepEqual(visibleAssets(scopeAssets, 'book-a', 7).map((a) => a.assetId), [1, 2], '私有本人 + 本账本共享')
+assert.deepEqual(visibleAssets(scopeAssets, 'book-b', 8).map((a) => a.assetId), [3], '看不到别人的私有账户')
+assert.equal(leaksPrivateAccount(scopeAssets[0] as any, 'book-a'), true, '私有账户用于共享账本会泄露')
+assert.equal(leaksPrivateAccount(scopeAssets[1] as any, 'book-a'), false, '共享账户不泄露')
 const unmigratedBackup = JSON.parse(JSON.stringify(backup))
 delete unmigratedBackup.assets[0].openingBalance
 state().importAll(unmigratedBackup)

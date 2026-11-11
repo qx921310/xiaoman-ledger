@@ -431,6 +431,7 @@ export const useLedger = create<LedgerState>()(
       })),
 
       addAsset: (patch) => set((s) => {
+        patch = { ...patch, ownerId: patch.ownerId ?? s.userId }
         const id = patch.assetId ?? NOW()
         const asset: Asset = {
           assetId: id,

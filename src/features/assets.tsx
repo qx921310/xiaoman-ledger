@@ -6,10 +6,14 @@ import { money, dayOf } from '../ui-format'
 import { AssetIcon } from '../ui/icons'
 import { Modal } from '../ui/modal'
 import { accountMoney, toBase } from '../money'
+import { visibleAssets } from '../domain/asset-scope'
 import { lendRemaining, lendTotals } from '../lend'
 
 export function Assets({ notify }: { notify: (m: string) => void }) {
-  const assets = useLedger((s) => s.assets)
+  const allAssets = useLedger((s) => s.assets)
+  const currentBookId = useLedger((s) => s.currentBookId)
+  const meId = useLedger((s) => s.userId)
+  const assets = visibleAssets(allAssets, currentBookId, meId)
   const currencies = useLedger((s) => s.currencies)
   const defaultCurrency = useLedger((s) => s.defaultCurrency)
   const total = useTotalAssets()
@@ -249,6 +253,8 @@ function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => 
   const [quota, setQuota] = useState(asset.totalQuota ? String(asset.totalQuota) : '')
   const [cardCode, setCardCode] = useState(asset.cardCode ?? '')
   const [inDay, setInDay] = useState(asset.inAccountDate ? String(asset.inAccountDate) : '')
+  const accountBooks = useLedger((s) => s.accountBooks)
+  const [bookId, setBookId] = useState(asset.bookId == null ? '' : String(asset.bookId))
   const [outDay, setOutDay] = useState(asset.outAccountDate ? String(asset.outAccountDate) : '')
   const [name, setName] = useState(asset.assetName)
   const [type, setType] = useState(asset.assetType)
@@ -293,6 +299,15 @@ function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => 
               onChange={(e) => setOutDay(e.target.value.replace(/\D/g, '').slice(0, 2))} />
           </div>
         </div>
+        <div className="label">归属</div>
+        <select aria-label="账户归属" value={bookId} onChange={(e) => setBookId(e.target.value)}>
+          <option value="">私有（只有我可见）</option>
+          {accountBooks.filter((b) => b.bookId != null).map((b) => (
+            <option key={String(b.bookId)} value={String(b.bookId)}>共享到「{b.accountBookName}」</option>
+          ))}
+        </select>
+        <p className="hint">私有账户不会出现在共享账本的账单里；共享后该账本成员都能看到这个账户。</p>
+
         <div className="label">设为实际余额（当前 {accountMoney(asset.assetNumber, asset.currency, currencies, defaultCurrency)}，信用卡填负数）</div>
         <input
           aria-label="账户实际余额"
@@ -316,6 +331,7 @@ function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => 
               currency,
               totalQuota: quota.trim() === '' ? undefined : Number(quota),
               cardCode: cardCode.trim() || undefined,
+              bookId: bookId === '' ? undefined : bookId,
               inAccountDate: day(inDay),
               outAccountDate: day(outDay),
               assetNumber: num.trim() === '' ? asset.assetNumber : (Number(num) || 0)
