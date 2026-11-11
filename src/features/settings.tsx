@@ -101,6 +101,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
   const updateTag = useLedger((s) => s.updateTag)
   const deleteTag = useLedger((s) => s.deleteTag)
   const [newTag, setNewTag] = useState('')
+  const [newTagParent, setNewTagParent] = useState('')
   const setBook = useLedger((s) => s.setBook)
   const [members, setMembers] = useState<{ userId: number; role: string; email: string }[]>([])
   const [invite, setInvite] = useState<{ code: string; expiresAt: number } | null>(null)
@@ -632,6 +633,17 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
           <span className="tag-dot" style={{ background: t.color }} />
           <div className="grow">
             <div>{t.name}{t.parentName ? <span className="tag">属于 {t.parentName}</span> : null}</div>
+            <select aria-label={`${t.name} 的父标签`} value={t.parentTagId ?? ''}
+              onChange={(e) => updateTag(t.tagId, { parentTagId: e.target.value ? Number(e.target.value) : undefined })}>
+              <option value="">顶层标签</option>
+              {tags.filter((x) => x.tagId !== t.tagId && x.parentTagId == null).map((x) => (
+                <option key={x.tagId} value={x.tagId}>属于 {x.name}</option>
+              ))}
+            </select>
+            <label className="hint" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+              <input type="checkbox" checked={Boolean(t.hide)} onChange={(e) => updateTag(t.tagId, { hide: e.target.checked })} />
+              记账时不显示
+            </label>
           </div>
           <input
             aria-label={`${t.name} 标签颜色`}
@@ -645,10 +657,17 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
       ))}
       <div className="row2">
         <input aria-label="新标签名" value={newTag} placeholder="新标签名" onChange={(e) => setNewTag(e.target.value)} />
+        <select aria-label="新标签的父标签" value={newTagParent} onChange={(e) => setNewTagParent(e.target.value)}>
+          <option value="">顶层标签</option>
+          {tags.filter((x) => x.parentTagId == null).map((x) => (
+            <option key={x.tagId} value={x.tagId}>属于 {x.name}</option>
+          ))}
+        </select>
         <button className="ghost" onClick={() => {
           if (!newTag.trim()) return
-          addTag({ name: newTag.trim(), color: DEFAULT_TAG_COLOR })
+          addTag({ name: newTag.trim(), color: DEFAULT_TAG_COLOR, parentTagId: newTagParent ? Number(newTagParent) : undefined })
           setNewTag('')
+          setNewTagParent('')
           notify('标签已添加')
         }}>添加标签</button>
       </div>

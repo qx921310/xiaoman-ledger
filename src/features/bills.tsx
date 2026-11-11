@@ -30,7 +30,8 @@ export function Bills({ me, onAdd, embedded = false }: { me?: { id: number; emai
   const reimbursements = useLedger((s) => s.reimbursements)
   const refunds = useLedger((s) => s.refunds)
   const currentBookId = useLedger((s) => s.currentBookId)
-  const tags = useLedger((s) => s.tags)
+  const allTags = useLedger((s) => s.tags)
+  const tags = allTags.filter((t) => !t.hide)
   const tagsByName = useMemo(() => new Map(tags.map((t) => [t.name, t])), [tags])
   const accountBooks = useLedger((s) => s.accountBooks)
   const myRole = accountBooks.find((b) => b.bookId && String(b.bookId) === String(currentBookId))?.role
@@ -258,7 +259,8 @@ function BillDetail({ bill, me, onClose, onEdit }: {
   const refunds = useLedger((s) => s.refunds)
   const currencies = useLedger((s) => s.currencies)
   const defaultCurrency = useLedger((s) => s.defaultCurrency)
-  const tags = useLedger((s) => s.tags)
+  const allTags = useLedger((s) => s.tags)
+  const tags = allTags.filter((t) => !t.hide)
   const updateBill = useLedger((s) => s.updateBill)
   const del = useLedger((s) => s.deleteBill)
 

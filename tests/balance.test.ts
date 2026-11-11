@@ -633,6 +633,14 @@ assert.equal(state().bills.find((b) => b.billId === disc.billId)?.discountNumber
 state().updateBill(disc.billId, { reimbursementEnd: true })
 assert.equal(state().bills.find((b) => b.billId === disc.billId)?.reimbursementEnd, true)
 
+// 标签嵌套：parentTagId 保存时派生 parentName，两套表示保持一致
+state().reset()
+const rootTag = state().addTag({ name: '出差' })
+const subTag = state().addTag({ name: '机票', parentTagId: rootTag.tagId })
+assert.equal(state().tags.find((t) => t.tagId === subTag.tagId)?.parentName, '出差')
+state().updateTag(subTag.tagId, { parentTagId: undefined })
+assert.equal(state().tags.find((t) => t.tagId === subTag.tagId)?.parentName, undefined)
+
 // 账户可见性：私有只对本人可见，共享只对本账本可见
 const scopeAssets: any[] = [
   { assetId: 1, assetName: '我的私卡', assetType: 1, assetNumber: 0, ownerId: 7, positionWeight: 0, remark: '', userId: 7, updateTime: 1 },

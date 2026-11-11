@@ -119,8 +119,14 @@ export interface Tag {
   tagId: number
   name: string
   color: string
-  /** 父标签名（空表示顶层） */
+  /** 父标签名（空表示顶层）；由 parentTagId 派生，兼容旧数据 */
   parentName?: string
+  /** 父标签 id（真实的嵌套关系） */
+  parentTagId?: number
+  /** 不在选择器里显示 */
+  hide?: boolean
+  /** 指定在哪些账本隐藏 */
+  hideBook?: Array<string | number>
   positionWeight: number
   /** 修改时间，用于跨设备比较版本 */
   updateTime?: number

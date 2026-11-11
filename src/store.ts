@@ -778,11 +778,13 @@ export const useLedger = create<LedgerState>()(
       setSessionSyncAt: (t) => set({ sessionSyncAt: t }),
 
       addTag: (patch) => {
+        const parent = patch.parentTagId != null ? get().tags.find((t) => t.tagId === patch.parentTagId) : undefined
         const tag: Tag = {
           tagId: NOW() + Math.floor(Math.random() * 1000),
           name: patch.name,
           color: patch.color || DEFAULT_TAG_COLOR,
-          parentName: patch.parentName || undefined,
+          parentTagId: patch.parentTagId,
+          parentName: parent?.name ?? patch.parentName ?? undefined,
           positionWeight: patch.positionWeight ?? 0,
           updateTime: NOW()
         }
@@ -791,7 +793,17 @@ export const useLedger = create<LedgerState>()(
       },
 
       updateTag: (tagId, patch) => set((s) => ({
-        tags: s.tags.map((t) => t.tagId === tagId ? { ...t, ...patch, updateTime: NOW() } : t)
+        tags: s.tags.map((t) => {
+          if (t.tagId !== tagId) return t
+          const next = { ...t, ...patch, updateTime: NOW() }
+          // 父标签变更时同步派生 parentName，保证两套表示一致
+          if ('parentTagId' in patch) {
+            next.parentName = patch.parentTagId != null
+              ? s.tags.find((x) => x.tagId === patch.parentTagId)?.name
+              : undefined
+          }
+          return next
+        })
       })),
 
       deleteTag: (tagId) => set((s) => ({
