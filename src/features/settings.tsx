@@ -262,6 +262,12 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
             <p className="hint">需要核对 {plan.warnings.length} 条：例如第 {plan.warnings[0].row} 行，{plan.warnings[0].reason}。</p>
           )}
           {plan.duplicates > 0 && <p className="hint">疑似重复记录也会全部导入。若重复导入同一文件，请先核对，避免多记。</p>}
+          {plan.skippedRows > 0 && (
+            <p className="hint due-hint">
+              有 {plan.skippedRows} 行因账本无法匹配被跳过（{plan.unresolvedBooks.join('、')}）。
+              请先把这些账本在设置里建好，或在导出时去掉账本列，再重新导入。
+            </p>
+          )}
           <button className="primary" onClick={confirmImport} disabled={plan.bills.length + plan.transfers.length === 0}>
             确认导入 {plan.bills.length + plan.transfers.length} 条
           </button>
@@ -331,7 +337,19 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
               ) : null
             })()}
             {c.bookId == null && (
-              <button className="link" onClick={() => bindCycleBook(c.cycleId, currentBookId || 1)}>绑定当前账本</button>
+              <select aria-label={`为 ${c.name} 选择账本`} value="" onChange={(e) => {
+                const value = e.target.value
+                if (!value) return
+                bindCycleBook(c.cycleId, value)
+                // 绑定后立即补齐到期账单，用户不用等下次打开
+                const generated = runCycles()
+                notify(generated > 0 ? `已绑定账本并补生成 ${generated} 笔` : '已绑定账本')
+              }}>
+                <option value="">选择账本…</option>
+                {accountBooks.filter((b) => b.bookId != null).map((b) => (
+                  <option key={String(b.bookId)} value={String(b.bookId)}>{b.accountBookName}</option>
+                ))}
+              </select>
             )}
             <button className="link" onClick={() => toggleCycle(c.cycleId)}>{c.enabled ? '暂停' : '启用'}</button>
             <button className="del" onClick={() => deleteCycle(c.cycleId)}>删</button>

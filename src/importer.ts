@@ -73,6 +73,10 @@ export interface ImportPlan {
   newBooks: AccountBook[]
   reimbursements: Reimbursement[]
   refunds: Refund[]
+  /** 账本列里出现、但无法匹配到现有账本的名称（这些行不会导入） */
+  unresolvedBooks: string[]
+  /** 因账本无法归属而跳过的行数 */
+  skippedRows: number
   /** Rows matching an earlier or existing bill; they are retained for review. */
   duplicates: number
   skipped: { row: number; reason: string }[]
@@ -137,6 +141,8 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
   const newChildren: Category[] = []
   const newAssets: Asset[] = []
   const newBooks: AccountBook[] = []
+  const unresolvedBooks = new Set<string>()
+  let skippedRows = 0
   const reimbursements: Reimbursement[] = []
   const refunds: Refund[] = []
 
@@ -234,6 +240,7 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
     return {
       format, headers: table.headers, total: table.rows.length, bills, transfers,
       newParents, newChildren, newAssets, newBooks, reimbursements, refunds,
+    unresolvedBooks: [...unresolvedBooks], skippedRows,
       duplicates, skipped, warnings, income, expense, columnCoverage
     }
   }
@@ -326,8 +333,16 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
     const parentCategoryId = ensureParent(parentName, isIncome ? 'income' : 'expense')
     const childCategoryId = ensureChild(childName, parentCategoryId)
     const remark = str(r[col('备注')])
-    // 账本列匹配不到时退回调用方传入的当前账本，绝不写入 null
-    const bookIdOfRow: string | number = (col('账本') >= 0 ? ensureBook(str(r[col('账本')])) : null) ?? bookId
+    // 账本列匹配不到时不能猜：跳过该行并在预览里列出，由用户确认归属
+    let bookIdOfRow: string | number = bookId
+    if (col('账本') >= 0) {
+      const name = str(r[col('账本')])
+      if (name) {
+        const matched = ensureBook(name)
+        if (matched == null) { unresolvedBooks.add(name); skippedRows++; return }
+        bookIdOfRow = matched
+      }
+    }
 
     const key = `${time}|${cost.toFixed(2)}|${assetId}|${remark}`
     if (seen.has(key)) duplicates++
@@ -434,6 +449,7 @@ export function buildImportPlan(args: BuildArgs): ImportPlan {
   return {
     format, headers: table.headers, total: table.rows.length, bills, transfers,
     newParents, newChildren, newAssets, newBooks, reimbursements, refunds,
+    unresolvedBooks: [...unresolvedBooks], skippedRows,
     duplicates, skipped, warnings, income, expense, columnCoverage
   }
 }

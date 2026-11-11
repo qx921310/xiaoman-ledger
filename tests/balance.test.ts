@@ -577,6 +577,24 @@ const mixed = dedupeBills([edited, identical])
 assert.equal(mixed.removed.length, 0, '有内容差异时保留并待核对')
 const twins = dedupeBills([mkCycleBill('t1', 'book-a'), mkCycleBill('t2', 'book-a')])
 assert.equal(twins.removed.length, 1, '完全一致时才自动收敛')
+
+// 属主 2 的墓碑不能挡住属主 1 的有效记录（两种顺序都要成立）
+const blocked = { kind: 'asset', id: '7', ownerId: 2, updatedAt: 10, deleted: true, payload: null }
+const valid = { kind: 'asset', id: '7', ownerId: 1, updatedAt: 20, payload: { assetId: 7, assetName: '属主1', assetNumber: 5, ownerId: 1, userId: 1, updateTime: 20 } }
+let orderA: any = emptyMergeState()
+orderA = { ...orderA, ...mergeRemote(orderA, [blocked]) }
+orderA = { ...orderA, ...mergeRemote(orderA, [valid]) }
+assert.equal(orderA.assets.length, 1, '墓碑先到不影响另一属主')
+let orderB: any = emptyMergeState()
+orderB = { ...orderB, ...mergeRemote(orderB, [valid]) }
+orderB = { ...orderB, ...mergeRemote(orderB, [blocked]) }
+assert.equal(orderB.assets.length, 1, '墓碑后到也不能误删')
+
+// 去重比较必须覆盖标签与不计收支等业务字段
+const tagged = { ...mkCycleBill('g1', 'book-a'), tags: ['出差'], notIntoTotal: true }
+const plain = mkCycleBill('g2', 'book-a')
+const contentDiff = dedupeBills([tagged, plain])
+assert.equal(contentDiff.removed.length, 0, '标签/不计收支不同不能自动删')
 const unmigratedBackup = JSON.parse(JSON.stringify(backup))
 delete unmigratedBackup.assets[0].openingBalance
 state().importAll(unmigratedBackup)

@@ -32,6 +32,16 @@ const KIND_SPEC: Record<string, [string, string]> = {
   tag: ['tags', 'tagId']
 }
 
+/**
+ * 统一身份比较：普通记录合并、墓碑删除、墓碑查找都必须走这一套，
+ * 否则会出现「一处按属主、一处只按编号」的分裂。
+ */
+const sameIdentity = (kind: string, ownerA: unknown, ownerB: unknown): boolean => {
+  if (OWNERLESS.has(kind)) return true          // 无属主语义，只按业务 ID
+  if (ownerA == null || ownerB == null) return true
+  return Number(ownerA) === Number(ownerB)
+}
+
 const idOf = (kind: string, item: Record<string, unknown>) =>
   kind === 'budget' ? `${item.month}:${item.categoryId}`
     : kind === 'bill' ? String(item.syncId ?? item.billId)
@@ -71,12 +81,11 @@ export function mergeRemote(s: MergeableState, records: SyncIncoming[], now = Da
       if (delIdx >= 0 && Number(arr[delIdx].updateTime ?? 0) > Number(r.updatedAt ?? 0)) continue
       if (delIdx >= 0) next[k[0]] = arr.filter((_, i) => i !== delIdx)
       // 墓碑时间必须取较新的一次，否则更早的记录会被误判为更新而复活
-      const ownerKey = sameOwner
       const existingTomb = tombstones.findIndex((t) => t.kind === r.kind && t.id === String(r.id)
-        && (ownerKey == null || Number(t.ownerId ?? 0) === ownerKey))
+        && sameIdentity(r.kind, t.ownerId, r.ownerId))
       const tombTime = r.updatedAt || now
       if (existingTomb < 0) {
-        tombstones.push({ kind: r.kind, id: String(r.id), ownerId: ownerKey ?? undefined, updatedAt: tombTime })
+        tombstones.push({ kind: r.kind, id: String(r.id), ownerId: sameOwner ?? undefined, updatedAt: tombTime })
       } else if (tombTime > tombstones[existingTomb].updatedAt) {
         tombstones[existingTomb] = { ...tombstones[existingTomb], updatedAt: tombTime }
       }
@@ -84,7 +93,8 @@ export function mergeRemote(s: MergeableState, records: SyncIncoming[], now = Da
     }
     if (!r.payload) continue
 
-    const deleted = tombstones.find((t) => t.kind === r.kind && t.id === String(r.id))
+    const deleted = tombstones.find((t) => t.kind === r.kind && t.id === String(r.id)
+      && sameIdentity(r.kind, t.ownerId, r.ownerId))
     if (deleted && deleted.updatedAt >= (r.updatedAt ?? 0)) continue
     if (r.ownerId != null && r.payload.ownerId == null) r.payload = { ...r.payload, ownerId: r.ownerId }
 

@@ -9,15 +9,28 @@ export function cycleBillKey(bill: Bill): string | null {
   return `${bill.bookId ?? ''}|${bill.cycleId}|${day}`
 }
 
-/** 内容是否完全一致（用于判断能否安全自动去重） */
+/** 同步元数据：这些字段不同不代表用户改过内容 */
+const META_KEYS = new Set([
+  'billId', 'syncId', 'displayId', 'memberNo', 'sequenceNo',
+  'updateTime', 'ownerId', 'userId', 'bookId', 'cycleId'
+])
+
+/**
+ * 内容是否完全一致（用于判断能否安全自动去重）。
+ * 除同步元数据外的所有字段都比对：标签、附件、不计收支、币种快照等
+ * 任何影响展示/统计/资金的差异都会阻止自动删除。
+ */
 function sameContent(a: Bill, b: Bill): boolean {
-  return a.cost === b.cost
-    && a.time === b.time
-    && a.parentCategoryId === b.parentCategoryId
-    && (a.childCategoryId ?? 0) === (b.childCategoryId ?? 0)
-    && a.assetId === b.assetId
-    && (a.remark ?? '') === (b.remark ?? '')
-    && (a.accountAmount ?? a.cost) === (b.accountAmount ?? b.cost)
+  const strip = (bill: Bill) => {
+    const out: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(bill)) {
+      if (META_KEYS.has(k)) continue
+      if (v === undefined) continue
+      out[k] = v
+    }
+    return out
+  }
+  return JSON.stringify(strip(a)) === JSON.stringify(strip(b))
 }
 
 export interface CycleDedupeResult {
