@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useLedger } from '../store'
-import { money, monthOf } from '../ui-format'
+import { money, monthOf, toLocalInput } from '../ui-format'
 import { CatIcon } from '../ui/icons'
 import { summarizeBills } from '../bill-summary'
-import { byAsset, byTag, dailyTrend } from '../domain/stats-breakdown'
+import { byAsset, byTag } from '../domain/stats-breakdown'
+import { statisticsBounds, chartTrend, categoryDistribution } from '../domain/statistics-charts'
+import { CategoryChart, TrendChart } from './statistics-charts'
 import { AssetSankey } from './asset-sankey'
-import type { Bill } from '../types'
 import { Modal } from '../ui/modal'
 import { IMPORTED_CATEGORY_COLOR } from '../default-colors'
 
@@ -22,7 +23,7 @@ export function Stats() {
   const removeBudgetById = useLedger((s) => s.removeBudgetById)
   const [month, setMonth] = useState(monthOf(Date.now()))
   const [rangeMode, setRangeMode] = useState<'month' | 'week' | 'year' | 'custom'>('month')
-  const [flow, setFlow] = useState<'expense' | 'income'>('expense')
+  const [weekDay, setWeekDay] = useState(toLocalInput(Date.now()).slice(0, 10))
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
   const [editing, setEditing] = useState<{
@@ -32,41 +33,15 @@ export function Stats() {
   } | null>(null)
 
   const monthBills = useMemo(
-    () => bills.filter((b) => monthOf(b.time) === month && (currentBookId === 0 || b.bookId === currentBookId)),
+    () => bills.filter((b) => monthOf(b.time) === month && (currentBookId === 0 || String(b.bookId) === String(currentBookId))),
     [bills, month, currentBookId]
   )
 
   const monthSummary = useMemo(() => summarizeBills(monthBills, parents, refunds), [monthBills, parents, refunds])
 
-  // 时间范围：周 / 年 / 自定义（一木的日常·月·年·自定义）
-  const rangeBills = useMemo(() => {
-    const inBook = (b: Bill) => currentBookId === 0 || b.bookId === currentBookId
-    if (rangeMode === 'month') return monthBills
-    if (rangeMode === 'year') {
-      const y = month.slice(0, 4)
-      return bills.filter((b) => inBook(b) && String(monthOf(b.time)).slice(0, 4) === y)
-    }
-    if (rangeMode === 'week') {
-      // 以所选月份 1 号为锚点，取包含它的那一周（周一为一周开始）
-      const base = new Date(`${month}-01T00:00:00`).getTime()
-      const d = new Date(base)
-      const shift = (d.getDay() + 6) % 7
-      const start = new Date(d.getFullYear(), d.getMonth(), d.getDate() - shift).getTime()
-      const end = start + 7 * 86400000 - 1
-      return bills.filter((b) => inBook(b) && b.time >= start && b.time <= end)
-    }
-    const from = customFrom ? new Date(customFrom + 'T00:00:00').getTime() : 0
-    const to = customTo ? new Date(customTo + 'T23:59:59').getTime() : Number.MAX_SAFE_INTEGER
-    return bills.filter((b) => inBook(b) && b.time >= from && b.time <= to)
-  }, [rangeMode, monthBills, bills, currentBookId, month, customFrom, customTo])
-  const rows = useMemo(() => {
-    return [...monthSummary.expenseByCategory.entries()]
-      .map(([id, v]) => ({ p: parents.find((x) => x.id === id)!, v }))
-      .sort((a, b) => b.v - a.v)
-  }, [monthSummary, parents])
-
-  const max = rows[0]?.v || 1
-  const total = rows.reduce((s, r) => s + r.v, 0)
+  const bounds = useMemo(() => statisticsBounds(rangeMode, month, weekDay, customFrom, customTo), [rangeMode, month, weekDay, customFrom, customTo])
+  const rangeBills = useMemo(() => bounds ? bills.filter((b) =>
+    (currentBookId === 0 || String(b.bookId) === String(currentBookId)) && b.time >= bounds.start.getTime() && b.time < bounds.end.getTime()) : [], [bills, currentBookId, bounds])
   const spentOf = (cid: number) => cid === 0 ? monthSummary.budget : (monthSummary.budgetByCategory.get(cid) ?? 0)
   const limitOf = (b: { amount: number; addNum?: number }) => (b.amount ?? 0) + (b.addNum ?? 0)
   const monthBudgets = budgets.filter((b) => b.month === 'all' && (b.type ?? 'month') === 'month')
@@ -78,7 +53,7 @@ export function Stats() {
   const yearSpend = useMemo(() => {
     const y = month.slice(0, 4)
     const yearBills = bills.filter((b) => String(monthOf(b.time)).slice(0, 4) === y
-      && (currentBookId === 0 || b.bookId === currentBookId))
+      && (currentBookId === 0 || String(b.bookId) === String(currentBookId)))
     return summarizeBills(yearBills, parents, refunds).budget
   }, [bills, parents, month, refunds, currentBookId])
   const totalYearBudget = limitOf(yearBudgets.find((b) => b.categoryId === 0) ?? { amount: 0 })
@@ -89,24 +64,17 @@ export function Stats() {
     const from = b.startTime ?? 0
     const to = b.endTime ?? Number.MAX_SAFE_INTEGER
     const inRange = bills.filter((x) => x.time >= from && x.time <= to
-      && (currentBookId === 0 || x.bookId === currentBookId))
+      && (currentBookId === 0 || String(x.bookId) === String(currentBookId)))
     const s2 = summarizeBills(inRange, parents, refunds)
     return b.categoryId === 0 ? s2.budget : (s2.budgetByCategory.get(b.categoryId) ?? 0)
   }
 
-  const trend = useMemo(() => {
-    const byMonth = new Map<string, Bill[]>()
-    for (const b of rangeBills) {
-      const k = monthOf(b.time)
-      byMonth.set(k, [...(byMonth.get(k) ?? []), b])
-    }
-    return [...byMonth.entries()].flatMap(([m, list]) => dailyTrend(list, parents, refunds, m))
-      .sort((a, b) => (a.day < b.day ? -1 : 1))
-  }, [rangeBills, parents, refunds])
+  const trend = useMemo(() => bounds ? chartTrend(rangeBills, parents, refunds, bounds) : [], [rangeBills, parents, refunds, bounds])
+  const expenseRows = useMemo(() => categoryDistribution(rangeBills, parents, refunds, 'expense'), [rangeBills, parents, refunds])
+  const incomeRows = useMemo(() => categoryDistribution(rangeBills, parents, refunds, 'income'), [rangeBills, parents, refunds])
   const assetRows = useMemo(() => byAsset(rangeBills, assets, parents, refunds), [rangeBills, assets, parents, refunds])
   const tagRows = useMemo(() => byTag(rangeBills, tags, parents, refunds), [rangeBills, tags, parents, refunds])
   const rangeSummary = useMemo(() => summarizeBills(rangeBills, parents, refunds), [rangeBills, parents, refunds])
-  const trendMax = Math.max(1, ...trend.map((d) => Math.max(d.income, d.expense)))
 
   return (
     <section className="card">
@@ -118,7 +86,8 @@ export function Stats() {
           <option value="year">按年</option>
           <option value="custom">自定义</option>
         </select>
-        {rangeMode !== 'custom' && (
+        {rangeMode === 'week' && <input aria-label="统计周内日期" type="date" value={weekDay} onChange={(e) => setWeekDay(e.target.value)} />}
+        {rangeMode !== 'custom' && rangeMode !== 'week' && (
           <input aria-label="统计月份" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
         )}
       </div>
@@ -128,9 +97,14 @@ export function Stats() {
           <input aria-label="统计结束日期" type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} />
         </div>
       )}
+      {!bounds && <p className="hint">请选择有效的开始和结束日期。</p>}
       <p className="hint">
         范围合计：支出 {money(rangeSummary.expense)} · 收入 {money(rangeSummary.income)} · 结余 {money(rangeSummary.income - rangeSummary.expense)}（{rangeBills.length} 笔）
       </p>
+
+      <TrendChart points={trend} />
+      <CategoryChart title="支出分类" rows={expenseRows} />
+      <CategoryChart title="收入分类" rows={incomeRows} />
 
       <div className="label">预算</div>
       {totalBudget > 0 ? (
@@ -227,83 +201,10 @@ export function Stats() {
         添加分类预算
       </button>
 
-      <div className="label">支出构成（合计 {money(total)}）</div>
-      {rows.length === 0 && <p className="empty">暂无数据</p>}
-      {rows.map((r) => (
-        <div key={r.p.id} className="bar-row">
-          <span className="bar-name"><CatIcon k={r.p.icon} size={15} /> {r.p.name}</span>
-          <div className="bar-track">
-            <div className="bar" style={{ width: `${(r.v / max) * 100}%`, background: r.p.color }} />
-          </div>
-          <span className="bar-val">{money(r.v)}</span>
-          <span className="bar-pct">{(total ? (r.v / total) * 100 : 0).toFixed(0)}%</span>
-        </div>
-      ))}
-
-      <div className="label">资产构成</div>
-      <AssetSankey />
-
-      <div className="label">收支构成</div>
-      <div className="row2">
-        <select aria-label="收支切换" value={flow} onChange={(e) => setFlow(e.target.value as 'expense' | 'income')}>
-          <option value="expense">支出</option>
-          <option value="income">收入</option>
-        </select>
-      </div>
-      {(() => {
-        const byCat = flow === 'expense' ? rangeSummary.expenseByCategory : new Map<number, number>()
-        const rows2 = [...byCat.entries()]
-          .map(([pid, v]) => ({ p: parents.find((x) => x.id === pid), v }))
-          .filter((r) => r.p)
-          .sort((a, b) => b.v - a.v)
-        if (flow === 'income') {
-          const incomeRows = [...rangeBills.reduce((m, b) => {
-            const kind = parents.find((p) => p.id === b.parentCategoryId)?.kind
-            if (kind !== 'income') return m
-            m.set(b.parentCategoryId, (m.get(b.parentCategoryId) ?? 0) + b.cost)
-            return m
-          }, new Map<number, number>()).entries()]
-            .map(([pid, v]) => ({ p: parents.find((x) => x.id === pid), v }))
-            .filter((r) => r.p)
-            .sort((a, b) => b.v - a.v)
-          if (!incomeRows.length) return <p className="hint">这个范围没有收入。</p>
-          return incomeRows.map((r) => (
-            <div key={r.p!.id} className="bar-row">
-              <span className="bar-name"><CatIcon k={r.p!.icon} size={15} /> {r.p!.name}</span>
-              <div className="bar-track"><div className="bar" style={{ width: `${(r.v / Math.max(1, incomeRows[0].v)) * 100}%`, background: 'var(--in)' }} /></div>
-              <span className="bar-val">{money(r.v)}</span>
-              <span className="bar-pct" />
-            </div>
-          ))
-        }
-        if (!rows2.length) return <p className="hint">这个范围没有支出。</p>
-        return rows2.map((r) => (
-          <div key={r.p!.id} className="bar-row">
-            <span className="bar-name"><CatIcon k={r.p!.icon} size={15} /> {r.p!.name}</span>
-            <div className="bar-track"><div className="bar" style={{ width: `${(r.v / Math.max(1, rows2[0].v)) * 100}%`, background: r.p!.color }} /></div>
-            <span className="bar-val">{money(r.v)}</span>
-            <span className="bar-pct" />
-          </div>
-        ))
-      })()}
-
-      {trend.length > 0 && (
-        <>
-          <div className="label">按日收支</div>
-          <div className="trend">
-            {trend.map((d) => (
-              <div key={d.day} className="trend-col" title={`${d.day} 支出 ${money(d.expense)} / 收入 ${money(d.income)}`}>
-                <div className="trend-bars">
-                  <i className="exp" style={{ height: `${(d.expense / trendMax) * 100}%` }} />
-                  <i className="inc" style={{ height: `${(d.income / trendMax) * 100}%` }} />
-                </div>
-                <span>{d.day.slice(-2)}</span>
-              </div>
-            ))}
-          </div>
-          <p className="hint">深色为支出，浅色为收入；悬停看具体金额。</p>
-        </>
-      )}
+      <details className="stats-extra">
+        <summary>查看资产构成</summary>
+        <AssetSankey />
+      </details>
 
       {assetRows.length > 0 && (
         <>

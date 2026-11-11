@@ -584,6 +584,40 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .trend-bars .inc { background: var(--accent-soft); }
 .trend-col span { font-size: var(--font-xs); color: var(--muted); }
 
+/* 统计图表：移动端纵向展示，数值始终有文字对应。 */
+.stats-panel { margin: 16px 0; padding: 16px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--card); }
+.stats-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: var(--font-xs); }
+.stats-panel-head h3 { margin: 0; color: var(--ink); font-size: var(--font-md); }
+.stats-distribution { display: flex; align-items: center; gap: 16px; margin-top: 16px; }
+.stats-donut { position: relative; width: 144px; flex: none; }
+.stats-donut svg { display: block; width: 100%; }
+.stats-donut-center { position: absolute; inset: 25%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.stats-donut-center small, .stats-category small { display: block; color: var(--muted); font-size: var(--font-xs); }
+.stats-donut-center strong { max-width: 100%; font-size: var(--font-xs); overflow-wrap: anywhere; }
+.stats-legend { min-width: 0; flex: 1; display: grid; gap: 10px; }
+.stats-category { display: flex; align-items: center; gap: 8px; font-size: var(--font-sm); min-width: 0; }
+.stats-dot, .stats-key { display: inline-block; width: 9px; height: 9px; border-radius: var(--r-pill); flex: none; }
+.stats-category-name { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.stats-category-value { text-align: right; font-variant-numeric: tabular-nums; }
+.stats-category-value strong { font-size: var(--font-xs); }
+.stats-key { margin: 0 4px 0 8px; }
+.stats-key.expense { background: var(--out); }
+.stats-key.income { background: var(--in); }
+.stats-line-chart { display: block; width: 100%; height: auto; margin-top: 12px; }
+.stats-trend-detail { display: flex; align-items: center; gap: 8px; justify-content: space-between; flex-wrap: wrap; font-size: var(--font-xs); color: var(--muted); }
+.stats-trend-detail select { width: auto; max-width: 100%; }
+.stats-report, .stats-extra { margin-top: 12px; font-size: var(--font-sm); color: var(--muted); }
+.stats-report summary, .stats-extra summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
+.stats-report summary::after, .stats-extra summary::after { content: '＋'; margin-left: auto; }
+.stats-report[open] summary::after, .stats-extra[open] summary::after { content: '－'; }
+.stats-report-scroll { max-height: 280px; overflow: auto; }
+.stats-report table { width: 100%; border-collapse: collapse; font-size: var(--font-xs); font-variant-numeric: tabular-nums; }
+.stats-report th, .stats-report td { padding: 8px 4px; text-align: right; border-bottom: 1px solid var(--line); }
+.stats-report th:first-child, .stats-report td:first-child { text-align: left; }
+.stats-empty { text-align: center; color: var(--muted); padding: 24px 0; font-size: var(--font-sm); }
+@media (max-width: 380px) { .stats-distribution { flex-direction: column; } .stats-legend { width: 100%; } }
+@media (max-width: 380px) { .topbar { gap: 4px; } .brand { gap: 4px; } .brand small { display: none; } .userbox { gap: 4px; min-width: 0; } .book { max-width: 112px; } }
+
 /* 记账页属性开关（一木「属性」入口） */
 .entry-attrs { display: flex; gap: 16px; align-items: center; font-size: var(--font-sm); color: var(--muted); }
 .entry-attrs label { display: inline-flex; gap: 4px; align-items: center; }

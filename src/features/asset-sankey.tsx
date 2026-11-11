@@ -55,11 +55,9 @@ export function AssetSankey() {
           )
         })}
         <rect x={rightX} y={top} width={nodeW} height={usable} fill="var(--accent)" rx={2} />
-        <text x={rightX + nodeW + 4} y={top + usable / 2} fontSize="12" fill="var(--ink)">
-          总资产 {money(total)}
-        </text>
       </svg>
       <div className="sankey-legend">
+        <span className="tag">总资产 {money(total)}</span>
         {groups.map((g) => (
           <span key={g.group} className="tag">{g.group} {money(g.amount)}</span>
         ))}
