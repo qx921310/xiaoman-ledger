@@ -13,14 +13,20 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
   const setBook = useLedger((s) => s.setBook)
   const myRole = accountBooks.find((b) => b.bookId && String(b.bookId) === String(curBookId))?.role
   const readOnly = myRole === 'silent'
-  const parents = useLedger((s) => s.parentCategories)
-  const children = useLedger((s) => s.childCategories)
+  const allParents = useLedger((s) => s.parentCategories)
+  const allChildren = useLedger((s) => s.childCategories)
+  // 隐藏分类：记账时不显示（一木 hide / hideBook）
+  const parents = allParents.filter((p) => !p.hide || (p.hideBook?.length
+    ? !p.hideBook.some((b) => String(b) === String(curBookId)) : false))
+  const children = allChildren.filter((c) => !c.hide)
   const allAssets = useLedger((s) => s.assets)
   const meId = useLedger((s) => s.userId)
   const assets = visibleAssets(allAssets, curBookId, meId)
   const pickedAsset = assets.find((a) => a.assetId === aid)
   const privacyBlocked = leaksPrivateAccount(pickedAsset, curBookId)
   const addBill = useLedger((s) => s.addBill)
+  const [notIntoTotal, setNotIntoTotal] = useState(false)
+  const [notIntoBudget, setNotIntoBudget] = useState(false)
   const addTransfer = useLedger((s) => s.addTransfer)
 
   const lastParentId = useLedger((s) => s.lastParentId)
@@ -104,7 +110,8 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
       currencyInfo: foreign ? currency : undefined,
       currencyAssetNumber: foreign ? v : undefined,
       parentCategoryId: cur, childCategoryId: cid,
-      assetId: aid, remark, time: new Date(time).getTime(), billType: 2
+      assetId: aid, remark, time: new Date(time).getTime(), billType: 2,
+      notIntoTotal, notIntoBudget
     })
     setCost(''); setRemark(''); setCid(0); setCurrency(defaultCurrency)
     notify(`${mode === 'expense' ? '支出' : '收入'} ${money(v)} 已记录`)
@@ -184,6 +191,16 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
             <label className="entry-date"><span>日期</span><strong>{time.slice(0, 10) === toLocalInput(Date.now()).slice(0, 10) ? '今天' : time.slice(5, 10).replace('-', '/')}</strong><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="6" width="16" height="14" rx="3"/><path d="M8 3v6m8-6v6M4 10h16"/></svg><input aria-label="日期" type="datetime-local" value={time} onChange={(e) => setTime(e.target.value)} /></label>
             {mode !== 'transfer' && <div className="entry-account"><span>账户</span><MobilePicker className="entry-account-picker" label="选择账户" value={String(aid)} options={assetOptions} onChange={(value) => setAid(Number(value))} /></div>}
             {!keypadOpen && <button type="button" onClick={() => { setKeypadField('cost'); setKeypadOpen(true) }}>数字键盘</button>}
+          </div>
+          <div className="entry-attrs">
+            <label>
+              <input type="checkbox" checked={notIntoTotal} onChange={(e) => setNotIntoTotal(e.target.checked)} />
+              不计收支
+            </label>
+            <label>
+              <input type="checkbox" checked={notIntoBudget} onChange={(e) => setNotIntoBudget(e.target.checked)} />
+              不计预算
+            </label>
           </div>
           {privacyBlocked && (
             <p className="hint due-hint">

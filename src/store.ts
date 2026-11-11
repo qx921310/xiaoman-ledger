@@ -987,6 +987,11 @@ export const useTotalAssets = () =>
       const c = s.currencies.find((x) => x.code === code)
       return c && c.rate ? c.rate : 1
     }
+    // 账本设了「不计入总资产」时，归属它的账户也不参与汇总
+    const hiddenBooks = new Set(
+      s.accountBooks.filter((b) => b.notShowStock).map((b) => String(b.bookId ?? ''))
+    )
     return s.assets.filter((a) => !a.hide && a.intoTotalAsset)
+      .filter((a) => a.bookId == null || !hiddenBooks.has(String(a.bookId)))
       .reduce((sum, a) => sum + a.assetNumber * rateOf(a.currency), 0)
   })

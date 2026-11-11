@@ -75,6 +75,10 @@ export function planCycles(input: CyclePlanInput, now = new Date()): CyclePlan {
         assetId: c.assetId, bookId: c.bookId ?? input.currentBookId ?? 1,
         cycleId: c.cycleId,
         remark: c.remark || c.name, billType: 4,
+        // 周期规则可配置：不计收支 / 不计预算 / 待报销
+        notIntoTotal: c.notIntoTotal ?? false,
+        notIntoBudget: c.notIntoBudget ?? false,
+        isReimbursement: c.reimbursement ? 1 : 0,
         tags: [], files: [], userId: input.uid || userId, updateTime: Date.now(),
         billSnapshot: {
           parentCategoryName: parent?.name ?? '',

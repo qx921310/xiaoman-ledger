@@ -21,6 +21,10 @@ export interface BillShare {
 }
 
 export interface BillFile {
+  fileId?: number
+  billId?: string | number
+  fileName?: string
+  fileSize?: number
   name: string
   remotePath: string
 }
@@ -123,6 +127,8 @@ export interface Tag {
   parentName?: string
   /** 父标签 id（真实的嵌套关系） */
   parentTagId?: number
+  /** 选择器里默认勾选 */
+  check?: boolean
   /** 不在选择器里显示 */
   hide?: boolean
   /** 指定在哪些账本隐藏 */
@@ -171,6 +177,14 @@ export interface Cycle {
   /** 生效起始月（时间戳，取当月即可） */
   startTime: number
   /** 已生成过的日期，格式 YYYY-MM-DD，保证不重复 */
+  /** 生成的账单不计入收支 */
+  notIntoTotal?: boolean
+  /** 生成的账单不计入预算 */
+  notIntoBudget?: boolean
+  /** 生成的账单标记为待报销 */
+  reimbursement?: boolean
+  /** 报销账户（reimbursement 为真时使用） */
+  reimbursementAssetId?: number
   /** 结束方式：不限 / 记满 N 次 / 到某天为止 */
   endMode?: 'never' | 'times' | 'date'
   /** endMode=times 时的总次数 */
@@ -272,6 +286,10 @@ export interface Asset {
 }
 
 export interface Category {
+  /** 记账选择器里不显示 */
+  hide?: boolean
+  /** 在指定账本隐藏 */
+  hideBook?: Array<string | number>
   id: number
   name: string
   parentId: number
@@ -317,6 +335,12 @@ export interface AccountBook {
   color?: string
   /** 排序权重，小的靠前 */
   positionWeight?: number
+  /** 从账本切换器隐藏 */
+  hide?: boolean
+  /** 该账本不计入总资产统计 */
+  notShowStock?: boolean
+  /** 该账本不计转账 */
+  notShowTransfer?: boolean
   /** 该账本当前使用的预算 id（一木 currentBudgetId 语义） */
   currentBudgetId?: number
   userId: number

@@ -183,7 +183,7 @@ function BookSwitch() {
       }}
       className="book">
       <option value="0">全部账本</option>
-      {[...books].sort((a, b) => (a.positionWeight ?? 0) - (b.positionWeight ?? 0)).map((b) => {
+      {[...books].filter((b) => !b.hide).sort((a, b) => (a.positionWeight ?? 0) - (b.positionWeight ?? 0)).map((b) => {
         const k = keyOf(b)
         return (
           <option key={k} value={k}>{b.color ? '● ' : ''}

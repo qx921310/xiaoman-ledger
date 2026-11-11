@@ -575,3 +575,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .trend-bars .exp { background: var(--accent); }
 .trend-bars .inc { background: var(--accent-soft); }
 .trend-col span { font-size: var(--font-xs); color: var(--muted); }
+
+/* 记账页属性开关（一木「属性」入口） */
+.entry-attrs { display: flex; gap: 16px; align-items: center; font-size: var(--font-sm); color: var(--muted); }
+.entry-attrs label { display: inline-flex; gap: 4px; align-items: center; }

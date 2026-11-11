@@ -17,3 +17,16 @@ export const toLocalInput = (t: number) => {
   const d = new Date(t - new Date().getTimezoneOffset() * 60000)
   return d.toISOString().slice(0, 16)
 }
+
+/** 日期分组标题：今天 / 昨天 / 2026年11月9日 周日（一木的日期头写法） */
+export function humanDay(day: string): string {
+  const [y, m, d] = day.split('-').map(Number)
+  const date = new Date(y, (m ?? 1) - 1, d ?? 1)
+  const today = new Date()
+  const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1)
+  if (sameDay(date, today)) return '今天'
+  if (sameDay(date, yesterday)) return '昨天'
+  const week = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()]
+  return `${y}年${m}月${d}日 ${week}`
+}

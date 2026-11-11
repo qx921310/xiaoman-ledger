@@ -3,7 +3,7 @@ import { useLedger } from '../store'
 import { BILL_TYPE } from '../types'
 import type { Bill, Transfer } from '../types'
 import { books as bookApi } from '../auth'
-import { money, dayOf, hhmm, monthOf, toLocalInput } from '../ui-format'
+import { money, dayOf, hhmm, monthOf, toLocalInput , humanDay} from '../ui-format'
 import { CatIcon } from '../ui/icons'
 import { TransferEditor } from './transfer-editor'
 import { Modal } from '../ui/modal'
@@ -162,9 +162,20 @@ export function Bills({ me, onAdd, embedded = false }: { me?: { id: number; emai
           : <><p>本月还没有账单</p>{onAdd && <button className="ghost" onClick={onAdd}>记第一笔</button>}</>}
       </div>}
 
-      {groups.map(([day, rows]) => (
+      {groups.map(([day, rows]) => {
+        const dayBills = rows.filter((it) => it.kind === 'bill').map((it) => (it as { b: Bill }).b)
+        const daySum = summarizeBills(dayBills, parents, refunds)
+        const label = humanDay(day)
+        return (
         <div key={day} className="group">
-          <div className="day">{day}</div>
+          <div className="day">
+            <span>{label}</span>
+            <small>
+              {daySum.income ? `收 ${money(daySum.income)}` : ''}
+              {daySum.income && daySum.expense ? ' · ' : ''}
+              {daySum.expense ? `支 ${money(daySum.expense)}` : ''}
+            </small>
+          </div>
           {rows.map((it) => {
             if (it.kind === 'transfer') {
               const t = it.t
@@ -236,7 +247,8 @@ export function Bills({ me, onAdd, embedded = false }: { me?: { id: number; emai
             )
           })}
         </div>
-      ))}
+        )
+      })}
 
       {undoBill && (
         <div className="undo-bar" role="status">
@@ -488,7 +500,16 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
               })
               const data = await res.json()
               if (data.code !== 0) throw new Error(data.msg || '上传失败')
-              onSave({ files: [...(bill.files ?? []), { name: data.result.name, remotePath: data.result.url }] })
+              onSave({
+                files: [...(bill.files ?? []), {
+                  fileId: Date.now(),
+                  billId: bill.billId,
+                  fileName: data.result.name,
+                  name: data.result.name,
+                  fileSize: f.size,
+                  remotePath: data.result.url
+                }]
+              })
             } catch (err) { alert((err as Error).message) }
           }} />
         {bill.files?.length ? <p className="hint">已有 {bill.files.length} 个附件</p> : null}

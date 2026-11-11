@@ -142,6 +142,9 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
   const toggleCycle = useLedger((s) => s.toggleCycle)
   const runCycles = useLedger((s) => s.runCycles)
   const [cycleForm, setCycleForm] = useState<{
+    notIntoTotal?: boolean
+    notIntoBudget?: boolean
+    reimbursement?: boolean
     endMode?: 'never' | 'times' | 'date'
     times?: string
     endDate?: string
@@ -469,7 +472,23 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
             <input aria-label="周期备注" value={cycleForm.remark} onChange={(e) => setCycleForm({ ...cycleForm, remark: e.target.value })} />
             <p className="hint">保存后立即补生成当月已到期的账单。</p>
             <div className="modal-btns">
-              <div className="label">结束方式</div>
+              <label className="hint" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input type="checkbox" checked={Boolean(cycleForm.notIntoTotal)}
+                onChange={(e) => setCycleForm({ ...cycleForm, notIntoTotal: e.target.checked })} />
+              生成的账单不计入收支
+            </label>
+            <label className="hint" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input type="checkbox" checked={Boolean(cycleForm.notIntoBudget)}
+                onChange={(e) => setCycleForm({ ...cycleForm, notIntoBudget: e.target.checked })} />
+              不计入预算
+            </label>
+            <label className="hint" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input type="checkbox" checked={Boolean(cycleForm.reimbursement)}
+                onChange={(e) => setCycleForm({ ...cycleForm, reimbursement: e.target.checked })} />
+              生成的账单标记为待报销
+            </label>
+
+            <div className="label">结束方式</div>
             <div className="row2">
               <select aria-label="结束方式" value={cycleForm.endMode ?? 'never'}
                 onChange={(e) => setCycleForm({ ...cycleForm, endMode: e.target.value as 'never' | 'times' | 'date' })}>
