@@ -11,6 +11,7 @@ import { planCycles } from '../src/domain/cycles'
 import { fullDay, humanDay } from '../src/ui-format'
 import { accountHistory } from '../src/domain/account-history'
 import { parseShares, splitAmounts } from '../src/domain/split'
+import { buildAssetSankey, sankeyGroupOf } from '../src/domain/asset-sankey'
 import { byAsset, byTag, dailyTrend } from '../src/domain/stats-breakdown'
 import { dateKey, pendingDates } from '../src/cycle-dates'
 import { createElement } from 'react'
@@ -1005,3 +1006,33 @@ assert.equal(state().linkBills(l1.billId, l1.billId), false, '不能自关联')
 state().unlinkBills(state().billRelated[0].relatedId)
 assert.equal(state().billRelated.length, 0, '解除关联')
 assert.equal(balance(84), 870, '合并与关联不改变余额')
+
+// 资产桑基：五大类映射、负数与隐藏账户不参与、外币折算
+state().reset()
+state().addAsset({ assetId: 81, assetName: '储蓄卡', assetType: 1, assetNumber: 1000 })
+state().addAsset({ assetId: 82, assetName: '基金', assetType: 4, assetNumber: 500 })
+state().addAsset({ assetId: 83, assetName: '信用卡', assetType: 2, assetNumber: -300 })
+state().addAsset({ assetId: 84, assetName: '隐藏账户', assetType: 1, assetNumber: 999, hide: true })
+const sk = buildAssetSankey(state().assets, state().currencies, state().defaultCurrency)
+assert.equal(sk.total, 1500, '信用卡负数与隐藏账户不计入')
+assert.equal(sk.groups.find((g) => g.group === '流动资产')?.amount, 1000)
+assert.equal(sk.groups.find((g) => g.group === '投资资产')?.amount, 500)
+assert.equal(sankeyGroupOf(6), '应收款')
+assert.equal(sankeyGroupOf(5), '固定资产')
+assert.equal(sankeyGroupOf(9), '无形资产')
+
+// 新增账户不能丢掉额度、卡号、账单日、隐藏标记等字段
+state().reset()
+state().addAsset({
+  assetId: 80, assetName: '招行信用卡', assetType: 2, assetNumber: -1200,
+  totalQuota: 20000, cardCode: '1234', inAccountDate: 5, outAccountDate: 20,
+  hide: true, intoTotalAsset: false, simpleName: '招行', bookId: 'book-x'
+})
+const made = state().assets.find((a) => a.assetId === 80)!
+assert.equal(made.totalQuota, 20000, '额度保留')
+assert.equal(made.cardCode, '1234', '卡号保留')
+assert.equal(made.outAccountDate, 20, '还款日保留')
+assert.equal(made.hide, true, '隐藏标记保留')
+assert.equal(made.intoTotalAsset, false, '不计总资产保留')
+assert.equal(made.simpleName, '招行', '简称保留')
+assert.equal(made.bookId, 'book-x', '归属账本保留')

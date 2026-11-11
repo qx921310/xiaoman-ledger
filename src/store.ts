@@ -632,18 +632,19 @@ export const useLedger = create<LedgerState>()(
       addAsset: (patch) => set((s) => {
         patch = { ...patch, ownerId: patch.ownerId ?? s.userId }
         const id = patch.assetId ?? NOW()
+        // 用展开而不是逐字段硬编码：新增字段不会再被静默丢掉
         const asset: Asset = {
+          ...patch,
           assetId: id,
           assetName: patch.assetName ?? '未命名账户',
           assetType: patch.assetType ?? 1,
-          assetIcon: patch.assetIcon,
           currency: patch.currency ?? s.defaultCurrency,
           assetNumber: Number(patch.assetNumber ?? 0),
           openingBalance: Number(patch.openingBalance ?? patch.assetNumber ?? 0),
           groupName: patch.groupName ?? '',
-          hide: false,
-          intoTotalAsset: true,
-          positionWeight: s.assets.length,
+          hide: patch.hide ?? false,
+          intoTotalAsset: patch.intoTotalAsset ?? true,
+          positionWeight: patch.positionWeight ?? s.assets.length,
           remark: patch.remark ?? '',
           userId: s.userId,
           updateTime: NOW()

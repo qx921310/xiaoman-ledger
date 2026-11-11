@@ -4,6 +4,7 @@ import { money, monthOf } from '../ui-format'
 import { CatIcon } from '../ui/icons'
 import { summarizeBills } from '../bill-summary'
 import { byAsset, byTag, dailyTrend } from '../domain/stats-breakdown'
+import { AssetSankey } from './asset-sankey'
 import type { Bill } from '../types'
 import { Modal } from '../ui/modal'
 import { IMPORTED_CATEGORY_COLOR } from '../default-colors'
@@ -237,6 +238,9 @@ export function Stats() {
           <span className="bar-pct">{(total ? (r.v / total) * 100 : 0).toFixed(0)}%</span>
         </div>
       ))}
+
+      <div className="label">资产构成</div>
+      <AssetSankey />
 
       {trend.length > 0 && (
         <>

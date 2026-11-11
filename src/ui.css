@@ -588,3 +588,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .cat-child { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .cat-child input { flex: 1 1 96px; min-width: 96px; }
 .cat-child select { flex: 0 1 130px; }
+
+/* 资产桑基图 */
+.sankey { margin: 6px 0 14px; }
+.sankey-svg { width: 100%; height: auto; display: block; }
+.sankey-legend { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
