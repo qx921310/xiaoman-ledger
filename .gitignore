@@ -12,3 +12,6 @@ server/data/
 
 # 服务端私密环境文件（vision key 等），永不入库
 server/.env
+
+# 临时分析产物
+.tmp-*
