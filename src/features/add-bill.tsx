@@ -347,6 +347,18 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
           </label>
         </div>
       )}
+      {mode === 'transfer' && (
+        <button className="ghost wide" onClick={() => {
+          const v = evaluateAmount(cost) ?? 0
+          if (!(v > 0) || !aid || !toAid) return notify('先把金额、转出和转入账户填好')
+          addTemplate({
+            name: `${assets.find((a) => a.assetId === aid)?.assetName ?? '转出'} → ${assets.find((a) => a.assetId === toAid)?.assetName ?? '转入'}`,
+            mode: 'transfer',
+            transfer: { fromAssetId: aid, toAssetId: toAid, cost: v, serviceCharge: Number(fee) || 0, remark }
+          })
+          notify('已存为转账模板')
+        }}>存为转账模板</button>
+      )}
       {mode !== 'transfer' && (
         <button className="ghost wide" onClick={() => {
           const costNum = evaluateAmount(cost) ?? 0
