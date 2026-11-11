@@ -605,8 +605,11 @@ export const useLedger = create<LedgerState>()(
         // 借出/借入走 assetId；收回/还款优先走 repaymentAssetId
         const cashAsset = (type === 2 || type === 4) && repaymentAssetId ? repaymentAssetId : assetId
         const sign = type === 1 || type === 4 ? -1 : 1
+        // 同一毫秒内连续登记会撞 id，顺延保证唯一（父记录与还款记录常在同一次点击内创建）
+        let lendId = Date.now()
+        while (s.lends.some((l) => l.lendId === lendId)) lendId++
         const rec: Lend = {
-          lendId: Date.now(), type, assetId, counterparty: counterparty ?? '',
+          lendId, type, assetId, counterparty: counterparty ?? '',
           number: amt,
           interest: Number(interest) || 0,
           repaymentAssetId: repaymentAssetId || undefined,
