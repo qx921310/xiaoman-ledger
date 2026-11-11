@@ -62,6 +62,8 @@ interface LedgerState {
   cycles: Cycle[]
   /** 币种表；默认币种固定为 CNY，其余按 rate 折算 */
   tags: Tag[]
+  billGroups: import('./types').BillGroup[]
+  billRelated: import('./types').BillRelated[]
   splitGroups: import('./types').SplitGroup[]
   splitMembers: import('./types').SplitMember[]
   splitExpenses: import('./types').SplitExpense[]
@@ -113,6 +115,13 @@ interface LedgerState {
   /** 按一木规则生成分摊并落库到 SplitExpense + 账单 billShareInfo */
   applySplit: (billId: string | number, splitGroupId: number, splitType: 0 | 1 | 2, values?: Record<number, number>, payerMemberId?: number) => boolean
   settleSplit: (splitExpenseId: number, settlement: boolean) => void
+  /** 账单组：把多条账单合并成一条展示（一木 BillGroup） */
+  createBillGroup: (billIds: Array<string | number>) => boolean
+  dissolveBillGroup: (billGroupId: number) => void
+  removeFromBillGroup: (billGroupId: number, billId: string | number) => void
+  /** 账单关联：两两关联（一木 BillRelated） */
+  linkBills: (a: string | number, b: string | number) => boolean
+  unlinkBills: (relatedId: number) => void
   updateBill: (billId: string | number, patch: Partial<Bill>) => void
   addTransfer: (patch: { fromAssetId: number; toAssetId: number; cost: number; toCost?: number; serviceCharge?: number; time?: number; remark?: string }) => Transfer
   updateTransfer: (transferId: number, patch: Partial<Pick<Transfer, 'fromAssetId' | 'toAssetId' | 'cost' | 'toCost' | 'serviceCharge' | 'time' | 'remark'>>) => void
@@ -186,6 +195,8 @@ export const useLedger = create<LedgerState>()(
       lends: [],
       cycles: [],
       tags: [],
+      billGroups: [],
+      billRelated: [],
       splitGroups: [],
       splitMembers: [],
       splitExpenses: [],
@@ -411,6 +422,65 @@ export const useLedger = create<LedgerState>()(
       settleSplit: (splitExpenseId, settlement) => set((s) => ({
         splitExpenses: s.splitExpenses.map((x) => x.splitExpenseId === splitExpenseId
           ? { ...x, settlement, updateTime: NOW() } : x)
+      })),
+
+      // 账单组（一木 BillGroup）：要求同一账本、至少两条且不重复
+      createBillGroup: (billIds) => {
+        const s = get()
+        const key = (b: { billId: string | number }) => String(b.billId)
+        const raw = billIds.map(String)
+        const ids = [...new Set(raw)].filter((id) => s.bills.some((b) => key(b) === id))
+        if (ids.length < 2) return false
+        const picked = s.bills.filter((b) => ids.includes(key(b)))
+        const bookIds = new Set(picked.map((b) => String(b.bookId ?? '')))
+        if (bookIds.size > 1) return false
+        // 已经在别的组里的账单不能再入组
+        if (ids.some((id) => s.billGroups.some((g) => g.billList.map(String).includes(id)))) return false
+        let billGroupId = Date.now()
+        while (s.billGroups.some((g) => g.billGroupId === billGroupId)) billGroupId++
+        const group: import('./types').BillGroup = {
+          billGroupId,
+          bookId: picked[0]?.bookId,
+          firstBillId: ids[0],
+          billList: ids,
+          totalNumber: +picked.reduce((sum, b) => sum + b.cost, 0).toFixed(2),
+          parentCategoryId: picked[0]?.parentCategoryId,
+          remark: picked[0]?.remark,
+          updateTime: NOW()
+        }
+        set((st) => ({ billGroups: [...st.billGroups, group] }))
+        return true
+      },
+
+      dissolveBillGroup: (billGroupId) => set((s) => ({
+        billGroups: s.billGroups.filter((g) => g.billGroupId !== billGroupId)
+      })),
+
+      removeFromBillGroup: (billGroupId, billId) => set((s) => ({
+        billGroups: s.billGroups
+          .map((g) => g.billGroupId === billGroupId
+            ? { ...g, billList: g.billList.filter((x) => String(x) !== String(billId)) } : g)
+          .filter((g) => g.billList.length >= 2)
+      })),
+
+      // 账单关联：同一对账单只保留一条关联，且不能自关联
+      linkBills: (a, b) => {
+        const s = get()
+        const one = String(a), two = String(b)
+        if (!one || !two || one === two) return false
+        if (!s.bills.some((x) => String(x.billId) === one) || !s.bills.some((x) => String(x.billId) === two)) return false
+        const exists = s.billRelated.some((r) =>
+          (String(r.oneBillId) === one && String(r.twoBillId) === two)
+          || (String(r.oneBillId) === two && String(r.twoBillId) === one))
+        if (exists) return false
+        let relatedId = Date.now()
+        while (s.billRelated.some((r) => r.relatedId === relatedId)) relatedId++
+        set((st) => ({ billRelated: [...st.billRelated, { relatedId, oneBillId: one, twoBillId: two, updateTime: NOW() }] }))
+        return true
+      },
+
+      unlinkBills: (relatedId) => set((s) => ({
+        billRelated: s.billRelated.filter((r) => r.relatedId !== relatedId)
       })),
 
       setBillShares: (billId, shares) => set((s) => ({

@@ -41,6 +41,8 @@ export function Bills({ me, onAdd, embedded = false }: { me?: { id: number; emai
   const [editingTransfer, setEditingTransfer] = useState<Transfer | null>(null)
 
   const [month, setMonth] = useState(monthOf(Date.now()))
+  const billGroups = useLedger((s) => s.billGroups)
+  const dissolveBillGroup = useLedger((s) => s.dissolveBillGroup)
   const [kw, setKw] = useState('')
   const [fPid, setFPid] = useState(0)
   const [fAid, setFAid] = useState(0)
@@ -88,7 +90,12 @@ export function Bills({ me, onAdd, embedded = false }: { me?: { id: number; emai
     return true
   }
 
-  const list = useMemo(() => bills.filter(match).sort((a, b) => b.time - a.time), [bills, month, kw, fPid, fAid, parents, currentBookId, fMin, fMax, fTag, fFrom, fTo, dateRangeActive])
+  const groupsInList = useMemo(() => {
+    const inBook = billGroups.filter((g) => currentBookId === 0 || String(g.bookId ?? '') === String(currentBookId))
+    return inBook.filter((g) => g.billList.some((id) => bills.some((b) => String(b.billId) === String(id) && match(b))))
+  }, [billGroups, bills, currentBookId])
+  const groupedIds = useMemo(() => new Set(groupsInList.flatMap((g) => g.billList.map(String))), [groupsInList])
+  const list = useMemo(() => bills.filter((b) => !groupedIds.has(String(b.billId))).filter(match).sort((a, b) => b.time - a.time), [bills, month, kw, fPid, fAid, parents, currentBookId, fMin, fMax, fTag, fFrom, fTo, dateRangeActive])
 
   const tList = useMemo(() => transfers.filter((t) => {
     if (!dateRangeActive && monthOf(t.time) !== month) return false
@@ -179,6 +186,30 @@ export function Bills({ me, onAdd, embedded = false }: { me?: { id: number; emai
           : <><p>本月还没有账单</p>{onAdd && <button className="ghost" onClick={onAdd}>记第一笔</button>}</>}
       </div>}
 
+      {groupsInList.map((g) => {
+        const members = g.billList.map((id) => bills.find((b) => String(b.billId) === String(id))).filter(Boolean) as Bill[]
+        const first = members[0]
+        if (!first) return null
+        return (
+          <div key={'g' + g.billGroupId} className="group">
+            <div className="day"><span>账单组</span><small>{members.length} 笔 · 合计 {money(g.totalNumber)}</small></div>
+            {members.map((m) => (
+              <div key={'gm' + String(m.billId)} className="row">
+                <i className="dot">·</i>
+                <div className="grow">
+                  <div>{parents.find((p) => p.id === m.parentCategoryId)?.name ?? '未分类'}{m.remark ? ` · ${m.remark}` : ''}</div>
+                  <small>{dayOf(m.time)} · 组内明细</small>
+                </div>
+                <b className="out">{money(m.cost)}</b>
+                <button className="link" onClick={() => setDetail(m)}>明细</button>
+              </div>
+            ))}
+            <div className="row">
+              <button className="link" onClick={() => dissolveBillGroup(g.billGroupId)}>解散账单组</button>
+            </div>
+          </div>
+        )
+      })}
       {groups.map(([day, rows]) => {
         const dayBills = rows.filter((it) => it.kind === 'bill').map((it) => (it as { b: Bill }).b)
         const daySum = summarizeBills(dayBills, parents, refunds)
@@ -331,6 +362,13 @@ function BillDetail({ bill, me, onClose, onEdit }: {
   const tags = allTags.filter((t) => !t.hide)
   const updateBill = useLedger((s) => s.updateBill)
   const del = useLedger((s) => s.deleteBill)
+  const bills = useLedger((s) => s.bills)
+  const billRelated = useLedger((s) => s.billRelated)
+  const unlinkBills = useLedger((s) => s.unlinkBills)
+  const linkBills = useLedger((s) => s.linkBills)
+  const createBillGroup = useLedger((s) => s.createBillGroup)
+  const billGroupsAll = useLedger((s) => s.billGroups)
+  const [linkTarget, setLinkTarget] = useState('')
 
   const p = parents.find((x) => x.id === bill.parentCategoryId)
   const c = resolveBillChild(bill, children)
@@ -391,6 +429,25 @@ function BillDetail({ bill, me, onClose, onEdit }: {
             ))}
           </Row>
         ) : null}
+        {(() => {
+          const links = billRelated.filter((r) =>
+            String(r.oneBillId) === String(bill.billId) || String(r.twoBillId) === String(bill.billId))
+          if (!links.length) return null
+          return (
+            <Row label="关联账单">
+              {links.map((r) => {
+                const otherId = String(r.oneBillId) === String(bill.billId) ? r.twoBillId : r.oneBillId
+                const other = bills.find((b) => String(b.billId) === String(otherId))
+                return (
+                  <span key={r.relatedId} className="tag">
+                    {other ? `${parents.find((p) => p.id === other.parentCategoryId)?.name ?? '未分类'} ${money(other.cost)}` : '已删除账单'}
+                    <button className="link" onClick={() => unlinkBills(r.relatedId)}>解除</button>
+                  </span>
+                )
+              })}
+            </Row>
+          )
+        })()}
         <Row label="备注">{bill.remark || '无'}</Row>
         <Row label="标签">
           {(bill.tags && bill.tags.length)
@@ -404,6 +461,32 @@ function BillDetail({ bill, me, onClose, onEdit }: {
         <DetailToggle label="不计入预算" on={!!bill.notIntoBudget} onToggle={() => updateBill(bill.billId, { notIntoBudget: !bill.notIntoBudget })} />
         <Row label="所属账本">{bk?.accountBookName ?? '默认账本'}</Row>
         <Row label="记录时间">{dayOf(bill.recordTime ?? bill.time)} {hhmm(bill.recordTime ?? bill.time)}</Row>
+        <Row label="关联与合并">
+          <div className="row2">
+            <select aria-label="选择要关联的账单" value={linkTarget} onChange={(e) => setLinkTarget(e.target.value)}>
+              <option value="">选择另一笔账单…</option>
+              {bills.filter((b) => Number(b.billId) !== Number(bill.billId) && String(b.bookId ?? '') === String(bill.bookId ?? ''))
+                .slice(0, 50)
+                .map((b) => <option key={String(b.billId)} value={String(b.billId)}>
+                  {dayOf(b.time)} {parents.find((p) => p.id === b.parentCategoryId)?.name ?? ''} {money(b.cost)}
+                </option>)}
+            </select>
+            <button className="ghost" disabled={!linkTarget} onClick={() => {
+              if (linkBills(bill.billId, linkTarget)) { onClose(); return }
+              alert('这笔账单已在关联中或无法关联')
+            }}>关联</button>
+          </div>
+          <button className="ghost wide" onClick={() => {
+            const list: Array<string | number> = [bill.billId, ...billRelated
+              .filter((r) => String(r.oneBillId) === String(bill.billId) || String(r.twoBillId) === String(bill.billId))
+              .map((r) => (String(r.oneBillId) === String(bill.billId) ? r.twoBillId : r.oneBillId))]
+            if (createBillGroup(list)) { onClose(); return }
+            alert('合并需要至少两笔同账本账单，且不能已属于其他账单组')
+          }}>合并为一组（含已关联的账单）</button>
+          {billGroupsAll.some((g) => g.billList.map(String).includes(String(bill.billId))) && (
+            <p className="hint">这笔账单已在某个账单组里，在列表可解散。</p>
+          )}
+        </Row>
         <Row label="记录方式">{BILL_TYPE[bill.billType] ?? '手动记账'}</Row>
         {bill.currencyInfo && (
           <Row label="币种">

@@ -982,3 +982,26 @@ state().settleSplit(aaExpense.splitExpenseId, true)
 assert.equal(state().splitExpenses[0].settlement, true)
 // 分摊不影响余额
 assert.equal(balance(85), 700, 'AA 分摊不改变账户余额')
+
+// 账单组与关联（一木 BillGroup / BillRelated）
+state().reset()
+state().addAsset({ assetId: 84, assetName: '组账户', assetNumber: 1000 })
+const gb1 = state().addBill({ assetId: 84, parentCategoryId: 7, cost: 40 })
+const gb2 = state().addBill({ assetId: 84, parentCategoryId: 7, cost: 60 })
+assert.equal(state().createBillGroup([gb1.billId, gb2.billId]), true, '两条同账本账单可合并')
+const grp = state().billGroups[0]
+assert.equal(grp.billList.length, 2)
+assert.equal(grp.totalNumber, 100, '组内合计')
+assert.equal(state().createBillGroup([gb1.billId, gb2.billId]), false, '重复合并被拒')
+assert.equal(state().createBillGroup([gb1.billId]), false, '单条不能成组')
+state().dissolveBillGroup(grp.billGroupId)
+assert.equal(state().billGroups.length, 0, '解散后不残留')
+// 关联
+const l1 = state().addBill({ assetId: 84, parentCategoryId: 7, cost: 10 })
+const l2 = state().addBill({ assetId: 84, parentCategoryId: 7, cost: 20 })
+assert.equal(state().linkBills(l1.billId, l2.billId), true)
+assert.equal(state().linkBills(l1.billId, l2.billId), false, '重复关联被拒')
+assert.equal(state().linkBills(l1.billId, l1.billId), false, '不能自关联')
+state().unlinkBills(state().billRelated[0].relatedId)
+assert.equal(state().billRelated.length, 0, '解除关联')
+assert.equal(balance(84), 870, '合并与关联不改变余额')

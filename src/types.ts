@@ -11,6 +11,35 @@ export const ASSET_TYPE: Record<number, string> = {
 /** 信用卡余额以负数表示 */
 export const CREDIT_CARD = 2
 
+/** 一木：账单组（把多条账单合成一条展示） */
+export interface BillGroup {
+  billGroupId: number
+  bookId?: string | number
+  /** 组内第一条账单 id（列表定位用；我们账单 id 是 UUID 字符串） */
+  firstBillId: string | number
+  /** 组内账单 id 列表 */
+  billList: Array<string | number>
+  totalNumber: number
+  parentCategoryId?: number
+  childCategoryId?: number
+  remark?: string
+  currency?: string
+  discountNum?: number
+  refundNum?: number
+  reimbursementNum?: number
+  assetList?: number[]
+  tagList?: number[]
+  updateTime?: number
+}
+
+/** 一木：账单关联（两两关联） */
+export interface BillRelated {
+  relatedId: number
+  oneBillId: string | number
+  twoBillId: string | number
+  updateTime?: number
+}
+
 /** 一木：AA 群组 */
 export interface SplitGroup {
   splitGroupId: number
