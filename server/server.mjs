@@ -1,8 +1,8 @@
 import { createServer } from 'node:http'
 import { DatabaseSync } from 'node:sqlite'
-import { mkdirSync, createReadStream, existsSync, statSync } from 'node:fs'
+import { mkdirSync, writeFileSync, createReadStream, existsSync, statSync } from 'node:fs'
 import { scryptSync, randomBytes, timingSafeEqual, createHash } from 'node:crypto'
-import { dirname, join, extname } from 'node:path'
+import { dirname, join, extname, basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -244,6 +244,22 @@ const readBody = (req) => new Promise((resolve) => {
   })
 })
 
+const UPLOAD_DIR = join(dataDir, 'uploads')
+mkdirSync(UPLOAD_DIR, { recursive: true })
+
+/** 二进制请求体（附件上传用），带体积上限 */
+const readRaw = (req, maxBytes = 8 * 1024 * 1024) => new Promise((resolve, reject) => {
+  const chunks = []
+  let size = 0
+  req.on('data', (c) => {
+    size += c.length
+    if (size > maxBytes) { req.destroy(); reject(new Error('文件过大（上限 8MB）')); return }
+    chunks.push(c)
+  })
+  req.on('end', () => resolve(Buffer.concat(chunks)))
+  req.on('error', reject)
+})
+
 const upsertKv = (k, v) => {
   db.prepare('INSERT INTO kv (k, v, updated_at) VALUES (?,?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v, updated_at=excluded.updated_at')
     .run(k, JSON.stringify(v), Date.now())
@@ -265,7 +281,7 @@ const server = createServer(async (req, res) => {
     // 账号相关接口例外：注册/登录本身就是写操作，且必须对公网开放
     // 账号与数据接口走会话鉴权，不再需要写令牌
     // 白名单式：走会话鉴权的接口都在这里，新增一组记得加进来
-    const isSessionPath = ['/api/auth/', '/api/data/', '/api/books/'].some((p) => path.startsWith(p))
+    const isSessionPath = ['/api/auth/', '/api/data/', '/api/books/', '/api/files'].some((p) => path.startsWith(p))
     if (req.method === 'POST' && path.startsWith('/api/') && !isSessionPath) {
       if (!WRITE_TOKEN || req.headers['x-write-token'] !== WRITE_TOKEN) {
         return send(res, 403, { code: 1, msg: '服务端只读：写接口需要 x-write-token，且必须与 LEDGER_WRITE_TOKEN 一致' })
@@ -538,6 +554,32 @@ const server = createServer(async (req, res) => {
 
     // 旧版 REST/sync 接口已移除：客户端只用 /api/data/*、/api/auth/*、/api/books/*
     // 这些接口曾用请求头 user-id 识别用户，无法安全鉴权，保留即是越权入口。
+
+    // 附件上传：鉴权后写入 server/data/uploads，返回可访问路径
+    if (path === '/api/files' && req.method === 'POST') {
+      const u = currentUser(req)
+      if (!u) return fail(res, '请先登录', 401)
+      const raw = String(url.searchParams.get('name') || 'file')
+      const ext = (raw.includes('.') ? raw.split('.').pop() : '').toLowerCase()
+      if (!['png', 'jpg', 'jpeg', 'webp', 'gif', 'pdf'].includes(ext)) return fail(res, '只支持图片或 PDF')
+      const buf = await readRaw(req)
+      if (!buf.length) return fail(res, '空文件')
+      const file = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+      writeFileSync(join(UPLOAD_DIR, file), buf)
+      return ok(res, { url: `/uploads/${file}`, name: raw })
+    }
+
+    // 附件访问：必须登录，避免附件被公开抓取
+    if (path.startsWith('/uploads/')) {
+      // 附件用标准状态码，浏览器才能正确识别未授权/不存在
+      if (!currentUser(req)) return send(res, 401, { code: 1, msg: '请先登录' })
+      const file = basename(decodeURIComponent(path.slice('/uploads/'.length)))
+      const full = join(UPLOAD_DIR, file)
+      if (!existsSync(full)) return send(res, 404, { code: 1, msg: '文件不存在' })
+      res.writeHead(200, { 'Content-Type': MIME[extname(full)] || 'application/octet-stream', 'Cache-Control': 'private,max-age=86400' })
+      createReadStream(full).pipe(res)
+      return
+    }
 
     if (path.startsWith('/api/')) return fail(res, 'not found: ' + path)
     if (serveStatic(url, res)) return

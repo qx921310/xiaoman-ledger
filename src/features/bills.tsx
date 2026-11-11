@@ -343,6 +343,13 @@ function BillDetail({ bill, me, onClose, onEdit }: {
         })}
         {bill.discountNumber ? <Row label="优惠">{money(bill.discountNumber)}</Row> : null}
         {bill.reimbursementEnd ? <Row label="报销">已结束</Row> : null}
+        {bill.files?.length ? (
+          <Row label="附件">
+            {bill.files.map((f) => (
+              <a key={f.remotePath} href={f.remotePath} target="_blank" rel="noreferrer" className="tag">{f.name}</a>
+            ))}
+          </Row>
+        ) : null}
         <Row label="备注">{bill.remark || '无'}</Row>
         <Row label="标签">
           {(bill.tags && bill.tags.length)
@@ -469,6 +476,23 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
         <input aria-label="账单时间" type="datetime-local" value={time} onChange={(e) => setTime(e.target.value)} />
         <div className="label">备注</div>
         <input aria-label="账单备注" value={remark} onChange={(e) => setRemark(e.target.value)} />
+        <div className="label">附件（图片或 PDF，可选）</div>
+        <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf" aria-label="添加附件"
+          onChange={async (e) => {
+            const f = e.target.files?.[0]
+            if (!f) return
+            try {
+              const res = await fetch(`/api/files?name=${encodeURIComponent(f.name)}`, {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/octet-stream' }, body: f
+              })
+              const data = await res.json()
+              if (data.code !== 0) throw new Error(data.msg || '上传失败')
+              onSave({ files: [...(bill.files ?? []), { name: data.result.name, remotePath: data.result.url }] })
+            } catch (err) { alert((err as Error).message) }
+          }} />
+        {bill.files?.length ? <p className="hint">已有 {bill.files.length} 个附件</p> : null}
+
         <div className="label">优惠金额（可选，本币）</div>
         <input aria-label="优惠金额" value={discount} inputMode="decimal" placeholder="例如商家满减 10"
           onChange={(e) => setDiscount(e.target.value.replace(/[^\d.]/g, ''))} />
