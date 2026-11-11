@@ -63,6 +63,7 @@ interface LedgerState {
   cycles: Cycle[]
   /** 币种表；默认币种固定为 CNY，其余按 rate 折算 */
   tags: Tag[]
+  templates: import('./types').Template[]
   homeLoans: import('./types').HomeLoan[]
   instalments: import('./types').Instalment[]
   billGroups: import('./types').BillGroup[]
@@ -123,6 +124,10 @@ interface LedgerState {
   dissolveBillGroup: (billGroupId: number) => void
   removeFromBillGroup: (billGroupId: number, billId: string | number) => void
   /** 账单关联：两两关联（一木 BillRelated） */
+  addTemplate: (patch: Omit<import('./types').Template, 'templateId' | 'updateTime'>) => import('./types').Template
+  deleteTemplate: (templateId: number) => void
+  /** 套用模板：直接记一笔 */
+  applyTemplate: (templateId: number) => boolean
   addHomeLoan: (patch: Omit<import('./types').HomeLoan, 'loanId' | 'updateTime'>) => import('./types').HomeLoan
   deleteHomeLoan: (loanId: number) => void
   addInstalment: (patch: Omit<import('./types').Instalment, 'instalmentId' | 'updateTime'>) => import('./types').Instalment
@@ -204,6 +209,7 @@ export const useLedger = create<LedgerState>()(
       lends: [],
       cycles: [],
       tags: [],
+      templates: [],
       homeLoans: [],
       instalments: [],
       billGroups: [],
@@ -434,6 +440,42 @@ export const useLedger = create<LedgerState>()(
         splitExpenses: s.splitExpenses.map((x) => x.splitExpenseId === splitExpenseId
           ? { ...x, settlement, updateTime: NOW() } : x)
       })),
+
+      addTemplate: (patch) => {
+        const s = get()
+        let templateId = Date.now()
+        while (s.templates.some((t) => t.templateId === templateId)) templateId++
+        const tpl: import('./types').Template = { ...patch, templateId, updateTime: NOW() }
+        set((st) => ({ templates: [...st.templates, tpl] }))
+        return tpl
+      },
+
+      deleteTemplate: (templateId) => set((s) => ({ templates: s.templates.filter((t) => t.templateId !== templateId) })),
+
+      applyTemplate: (templateId) => {
+        const s = get()
+        const tpl = s.templates.find((t) => t.templateId === templateId)
+        if (!tpl) return false
+        if (tpl.mode === 'transfer' && tpl.transfer) {
+          get().addTransfer({ ...tpl.transfer, time: Date.now() })
+          return true
+        }
+        if (tpl.mode === 'bill' && tpl.bill) {
+          const b = tpl.bill
+          get().addBill({
+            assetId: b.assetId ?? s.assets[0]?.assetId ?? 0,
+            parentCategoryId: b.parentCategoryId ?? 7,
+            childCategoryId: b.childCategoryId ?? 0,
+            cost: Number(b.cost) || 0,
+            remark: b.remark ?? '',
+            time: Date.now(),
+            notIntoTotal: b.notIntoTotal,
+            notIntoBudget: b.notIntoBudget
+          })
+          return true
+        }
+        return false
+      },
 
       addHomeLoan: (patch) => {
         const s = get()

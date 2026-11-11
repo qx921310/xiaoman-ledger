@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx'
-import type { AccountBook, Asset, Bill, Category, Refund, Reimbursement, Transfer } from './types'
+import type { AccountBook, Asset, Bill, Category, Refund, Reimbursement, Transfer, Lend } from './types'
 import { newBillIdentity } from './identity'
 import { childCategoryNeedsReview, resolveBillChild } from './taxonomy'
 import { IMPORTED_CATEGORY_COLOR } from './default-colors'
@@ -532,12 +532,50 @@ export function buildExportTable(
 
 export function exportXlsx(
   bills: Bill[], parents: Category[], children: Category[], assets: Asset[],
-  books: AccountBook[] = [], reimbursements: Reimbursement[] = [], refunds: Refund[] = []
+  books: AccountBook[] = [], reimbursements: Reimbursement[] = [], refunds: Refund[] = [],
+  extra: { transfers?: Transfer[]; lends?: Lend[]; lendTotals?: (l: Lend) => number } = {}
 ) {
   const { headers, rows } = buildExportTable(bills, parents, children, assets, books, reimbursements, refunds)
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
   const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, '账单')
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers, ...rows]), '账单')
+
+  // 一木的 ExportAssetActivity：账户分表
+  const assetRows = assets.map((a) => [
+    a.assetName, a.simpleName ?? '', a.assetType, a.currency ?? '', a.assetNumber,
+    a.totalQuota ?? '', a.cardCode ?? '', a.inAccountDate ?? '', a.outAccountDate ?? '',
+    a.intoTotalAsset === false ? '否' : '是', a.hide ? '是' : '', a.remark ?? ''
+  ])
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    ['账户名', '简称', '类型', '币种', '余额', '额度', '卡号后四位', '账单日', '还款日', '计入总资产', '隐藏', '备注'],
+    ...assetRows
+  ]), '账户')
+
+  // 一木的 ExportTransferActivity：转账分表
+  if (extra.transfers?.length) {
+    const nameOf = new Map(assets.map((a) => [a.assetId, a.assetName]))
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+      ['时间', '转出账户', '转入账户', '金额', '到账金额', '手续费', '备注'],
+      ...extra.transfers.map((t) => [
+        fmtTime(t.time), nameOf.get(t.fromAssetId) ?? '', nameOf.get(t.toAssetId) ?? '',
+        t.cost, t.toCost ?? t.cost, t.serviceCharge ?? 0, t.remark ?? ''
+      ])
+    ]), '转账')
+  }
+
+  // 一木的 ExportLendActivity：借贷分表
+  if (extra.lends?.length) {
+    const nameOf = new Map(assets.map((a) => [a.assetId, a.assetName]))
+    const typeName: Record<number, string> = { 1: '借出', 2: '收回', 3: '借入', 4: '还款' }
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+      ['时间', '类型', '对方', '金额', '利息', '账户', '剩余', '备注'],
+      ...extra.lends.map((l) => [
+        fmtTime(l.time), typeName[l.type] ?? '', l.counterparty ?? '', l.number,
+        l.interest ?? 0, nameOf.get(l.assetId) ?? '',
+        extra.lendTotals ? extra.lendTotals(l) : '', l.remark ?? ''
+      ])
+    ]), '借贷')
+  }
+
   XLSX.writeFile(wb, `小满记账导出_${new Date().toISOString().slice(0, 10)}.xlsx`)
 }
 

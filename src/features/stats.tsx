@@ -22,6 +22,7 @@ export function Stats() {
   const removeBudgetById = useLedger((s) => s.removeBudgetById)
   const [month, setMonth] = useState(monthOf(Date.now()))
   const [rangeMode, setRangeMode] = useState<'month' | 'week' | 'year' | 'custom'>('month')
+  const [flow, setFlow] = useState<'expense' | 'income'>('expense')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
   const [editing, setEditing] = useState<{
@@ -241,6 +242,50 @@ export function Stats() {
 
       <div className="label">资产构成</div>
       <AssetSankey />
+
+      <div className="label">收支构成</div>
+      <div className="row2">
+        <select aria-label="收支切换" value={flow} onChange={(e) => setFlow(e.target.value as 'expense' | 'income')}>
+          <option value="expense">支出</option>
+          <option value="income">收入</option>
+        </select>
+      </div>
+      {(() => {
+        const byCat = flow === 'expense' ? rangeSummary.expenseByCategory : new Map<number, number>()
+        const rows2 = [...byCat.entries()]
+          .map(([pid, v]) => ({ p: parents.find((x) => x.id === pid), v }))
+          .filter((r) => r.p)
+          .sort((a, b) => b.v - a.v)
+        if (flow === 'income') {
+          const incomeRows = [...rangeBills.reduce((m, b) => {
+            const kind = parents.find((p) => p.id === b.parentCategoryId)?.kind
+            if (kind !== 'income') return m
+            m.set(b.parentCategoryId, (m.get(b.parentCategoryId) ?? 0) + b.cost)
+            return m
+          }, new Map<number, number>()).entries()]
+            .map(([pid, v]) => ({ p: parents.find((x) => x.id === pid), v }))
+            .filter((r) => r.p)
+            .sort((a, b) => b.v - a.v)
+          if (!incomeRows.length) return <p className="hint">这个范围没有收入。</p>
+          return incomeRows.map((r) => (
+            <div key={r.p!.id} className="bar-row">
+              <span className="bar-name"><CatIcon k={r.p!.icon} size={15} /> {r.p!.name}</span>
+              <div className="bar-track"><div className="bar" style={{ width: `${(r.v / Math.max(1, incomeRows[0].v)) * 100}%`, background: 'var(--in)' }} /></div>
+              <span className="bar-val">{money(r.v)}</span>
+              <span className="bar-pct" />
+            </div>
+          ))
+        }
+        if (!rows2.length) return <p className="hint">这个范围没有支出。</p>
+        return rows2.map((r) => (
+          <div key={r.p!.id} className="bar-row">
+            <span className="bar-name"><CatIcon k={r.p!.icon} size={15} /> {r.p!.name}</span>
+            <div className="bar-track"><div className="bar" style={{ width: `${(r.v / Math.max(1, rows2[0].v)) * 100}%`, background: r.p!.color }} /></div>
+            <span className="bar-val">{money(r.v)}</span>
+            <span className="bar-pct" />
+          </div>
+        ))
+      })()}
 
       {trend.length > 0 && (
         <>

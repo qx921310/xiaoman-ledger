@@ -1120,3 +1120,18 @@ assert.equal(state().bills.filter((b) => b.assetId === 79).length, 6)
 state().deleteInstalment(insRec.instalmentId)
 state().deleteHomeLoan(loanRec.loanId)
 assert.equal(state().instalments.length + state().homeLoans.length, 0)
+
+// 模板：存为模板后一键记账，金额与分类一致
+state().reset()
+state().addAsset({ assetId: 78, assetName: '模板账户', assetNumber: 500 })
+const tpl = state().addTemplate({
+  name: '早餐', mode: 'bill',
+  bill: { assetId: 78, parentCategoryId: 7, childCategoryId: 0, cost: 12, remark: '包子' }
+})
+assert.equal(state().templates.length, 1)
+assert.equal(state().applyTemplate(tpl.templateId), true, '套用模板记账')
+assert.equal(state().bills.length, 1)
+assert.equal(state().bills[0].cost, 12, '模板金额')
+assert.equal(balance(78), 488)
+state().deleteTemplate(tpl.templateId)
+assert.equal(state().templates.length, 0)

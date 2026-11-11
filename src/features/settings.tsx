@@ -153,6 +153,9 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
   const moveCategory = useLedger((s) => s.moveCategory)
   const parentCategories = useLedger((s) => s.parentCategories)
   const childCategories = useLedger((s) => s.childCategories)
+  const templates = useLedger((s) => s.templates)
+  const applyTemplate = useLedger((s) => s.applyTemplate)
+  const deleteTemplate = useLedger((s) => s.deleteTemplate)
   const splitGroups = useLedger((s) => s.splitGroups)
   const splitMembers = useLedger((s) => s.splitMembers)
   const splitExpenses = useLedger((s) => s.splitExpenses)
@@ -253,7 +256,13 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
     if (bills.length === 0) return notify('还没有账单可导出')
     try {
       const { exportXlsx } = await import('../importer')
-      exportXlsx(bills, parents, children, assets, accountBooks, reimbursements, refunds)
+      const { lendRemaining } = await import('../lend')
+      const allLends = useLedger.getState().lends
+      exportXlsx(bills, parents, children, assets, accountBooks, reimbursements, refunds, {
+        transfers: useLedger.getState().transfers,
+        lends: allLends,
+        lendTotals: (l) => lendRemaining(l, allLends)
+      })
       notify(`已导出 ${bills.length} 条为 Excel`)
     } catch (e) {
       notify('导出失败：' + (errorMessage(e, '请检查账户信息')))
@@ -814,6 +823,26 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
           </div>
         </Modal>
       )}
+
+      <h3>模板</h3>
+      <p className="hint">在记账页点「存为模板」保存常用记账；这里可以一键再记一笔。</p>
+      {templates.length === 0 && <p className="hint">还没有模板。</p>}
+      {templates.map((t) => (
+        <div key={t.templateId} className="row">
+          <div className="grow">
+            <div>{t.name}</div>
+            <small>
+              {t.mode === 'transfer'
+                ? `转账 ${money(t.transfer?.cost ?? 0)}`
+                : `${parents.find((p) => p.id === t.bill?.parentCategoryId)?.name ?? '未分类'} ${money(t.bill?.cost ?? 0)}`}
+            </small>
+          </div>
+          <button className="link" onClick={() => {
+            if (applyTemplate(t.templateId)) notify('已按模板记一笔')
+          }}>记账</button>
+          <button className="del" onClick={() => deleteTemplate(t.templateId)}>删</button>
+        </div>
+      ))}
 
       <h3>AA 群组</h3>
       <p className="hint">建群组、加成员，记账时选「AA 分摊」即按一木的均分/按金额/按份额计算，支出会进待结算列表。</p>

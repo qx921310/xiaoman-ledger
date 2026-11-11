@@ -23,6 +23,7 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
   const meId = useLedger((s) => s.userId)
   const assets = visibleAssets(allAssets, curBookId, meId)
   const addBill = useLedger((s) => s.addBill)
+  const addTemplate = useLedger((s) => s.addTemplate)
   // Hook 必须在组件顶层，不能放在条件分支里
   const holdRef = useRef<{ delay?: ReturnType<typeof setTimeout>; timer?: ReturnType<typeof setInterval> }>({})
   const [notIntoTotal, setNotIntoTotal] = useState(false)
@@ -345,6 +346,21 @@ export function AddBill({ notify, onClose }: { notify: (m: string) => void; onCl
             不计预算
           </label>
         </div>
+      )}
+      {mode !== 'transfer' && (
+        <button className="ghost wide" onClick={() => {
+          const costNum = evaluateAmount(cost) ?? 0
+          if (!(costNum > 0) || !aid || !cur) return notify('先把金额、分类和账户填好')
+          addTemplate({
+            name: remark.trim() || (parents.find((p) => p.id === cur)?.name ?? '模板'),
+            mode: 'bill',
+            bill: {
+              assetId: aid, parentCategoryId: cur, childCategoryId: cid,
+              cost: costNum, remark, notIntoTotal, notIntoBudget
+            }
+          })
+          notify('已存为模板')
+        }}>存为模板</button>
       )}
       <button className="primary" disabled={readOnly} onClick={() => { submit() }}>{mode === 'transfer' ? '确认转账' : '记一笔'}</button>
     </section>

@@ -50,6 +50,18 @@ export interface Instalment {
   updateTime?: number
 }
 
+/** 一木：模板（ModuleManagerActivity / AddModuleTransferActivity） */
+export interface Template {
+  templateId: number
+  name: string
+  mode: 'bill' | 'transfer'
+  /** 账单模板存档 */
+  bill?: Partial<Bill>
+  /** 转账模板存档 */
+  transfer?: { fromAssetId: number; toAssetId: number; cost: number; serviceCharge?: number; remark?: string }
+  updateTime?: number
+}
+
 /** 一木：账单组（把多条账单合成一条展示） */
 export interface BillGroup {
   billGroupId: number
