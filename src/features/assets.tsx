@@ -115,12 +115,14 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
   const subpageTitle = useRef<HTMLHeadingElement>(null)
   // 只记录「从哪个卡片进来的」，不持有 DOM 节点（返回时卡片是重新渲染的，旧节点已卸载）
   const cameFrom = useRef<'reimburse' | 'lend' | 'stock'>('reimburse')
+  const prevScreen = useRef<'assets' | 'reimburse' | 'lend' | 'stock'>('assets')
 
   /** 进入子页：压一条历史记录（去重，避免连点双压）；系统返回键可退回 */
   const goto = (next: 'reimburse' | 'lend' | 'stock') => {
     cameFrom.current = next
     try {
-      if (history.state?.assetsScreen !== next) history.pushState({ assetsScreen: next }, '')
+      // 合并原 state，避免覆盖宿主或其他模块写进去的 history 字段
+      if (history.state?.assetsScreen !== next) history.pushState({ ...(history.state ?? {}), assetsScreen: next }, '')
     } catch { /* file:// 等环境忽略 */ }
     setScreen(next)
   }
@@ -132,16 +134,22 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
   useEffect(() => {
     if (typeof window === 'undefined') return
     const onPop = (e: PopStateEvent) => {
+      // 组件已卸载或用户切到别的标签页时不响应，避免在后台抢状态/焦点
+      if (document.visibilityState === 'hidden') return
       const next = e.state?.assetsScreen
-      // 前进/后退都按 history 的 state 恢复，保证双向可用
-      setScreen(next === 'reimburse' || next === 'lend' || next === 'stock' ? next : 'assets')
+      const target = next === 'reimburse' || next === 'lend' || next === 'stock' ? next : 'assets'
+      if (target !== 'assets') cameFrom.current = target
+      setScreen(target)
     }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
   }, [])
   useEffect(() => {
+    const was = prevScreen.current
+    prevScreen.current = screen
+    // 首次挂载不抢焦点：只有「从子页回到主页面」才把焦点还给对应卡片
     if (screen !== 'assets') { subpageTitle.current?.focus(); return }
-    // 返回主页面：按 id 重新查找卡片再聚焦，不用可能已卸载的旧节点
+    if (was === 'assets') return
     const back = document.querySelector<HTMLElement>(`[data-asset-card="${cameFrom.current}"]`)
     back?.focus()
   }, [screen])
