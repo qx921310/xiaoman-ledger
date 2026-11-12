@@ -12,6 +12,7 @@ import { HiddenPage } from './hidden-page'
 import { DreamList } from './dream'
 import { AiTypeManager } from './ai-type'
 import { Guide } from './guide'
+import { TemplateList } from './templates'
 import { usePullRefresh } from '../ui/use-pull-refresh'
 import { ROLE_LABEL } from '../ui/roles'
 import { validateBackup } from '../backup'
@@ -120,6 +121,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [dreamOpen, setDreamOpen] = useState(false)
   const [aiTypeOpen, setAiTypeOpen] = useState(false)
   const [guideOpen, setGuideOpen] = useState(false)
+  const [tplOpen, setTplOpen] = useState(false)
   const [backupOpen, setBackupOpen] = useState(false)
   // 一木 UserInfoActivity：昵称与头像可改（本地保存，账号维度）
   const profileKey = `xiaoman-profile:${me?.id ?? 0}`
@@ -476,6 +478,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       {dreamOpen && <DreamList onBack={() => setDreamOpen(false)} />}
       {aiTypeOpen && <AiTypeManager onBack={() => setAiTypeOpen(false)} notify={notify} />}
       {guideOpen && <Guide onBack={() => setGuideOpen(false)} />}
+      {tplOpen && <TemplateList onBack={() => setTplOpen(false)} onAdd={() => { setTplOpen(false); notify('请到记账页点「存为模板」') }} notify={notify} />}
 
       {profileOpen && (
         <Modal label="个人资料" onClose={() => setProfileOpen(false)}>
@@ -520,6 +523,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
           ['智能分类', 'ai'],
           ['周期记账', 'cycle'],
           ['账本管理', 'book'],
+          ['模板记账', 'tpl'],
           ['标签管理', 'tag'],
           ['分类管理', 'cat'],
           ['数据备份', 'backup'],
@@ -543,6 +547,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
             if (key === 'dream') { setDreamOpen(true); return }
             if (key === 'ai') { setAiTypeOpen(true); return }
             if (key === 'guide') { setGuideOpen(true); return }
+            if (key === 'tpl') { setTplOpen(true); return }
             if (key === 'theme') { notify('敬请期待：主题设置'); return }
             notify('敬请期待')
           }}>{label}</button>
