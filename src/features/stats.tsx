@@ -19,6 +19,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
   const bills = useLedger((s) => s.bills)
   const refunds = useLedger((s) => s.refunds)
   const lends = useLedger((s) => s.lends)
+  const userId = useLedger((s) => s.userId)
   const currentBookId = useLedger((s) => s.currentBookId)
   const parents = useLedger((s) => s.parentCategories)
   const budgets = useLedger((s) => s.budgets)
@@ -390,6 +391,54 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
             <div className="row"><span className="grow">应付/借入明细</span><b>{money(lendIn)}</b></div>
             <div className="row"><span className="grow">收款明细</span><b>{money(repaySum)}</b></div>
           </div>
+        )
+      })()}
+
+      {mods['报表统计'] && (
+        <>
+          <div className="label">报表统计</div>
+          <div className="stats-report">
+            {(() => {
+              const days = new Set(rangeBills.map((b) => new Date(b.time).getDate())).size || 1
+              const maxBill = rangeBills.reduce((m, b) => (b.cost > m.cost ? b : m), rangeBills[0] ?? { cost: 0 })
+              const catCount = new Set(rangeBills.map((b) => b.parentCategoryId)).size
+              const accCount = new Set(rangeBills.map((b) => b.assetId)).size
+              return [
+                ['笔数', `${rangeBills.length} 笔`],
+                ['记账天数', `${days} 天`],
+                ['日均支出', money(+(rangeSummary.expense / days).toFixed(2))],
+                ['最大单笔', money(maxBill.cost ?? 0)],
+                ['涉及分类', `${catCount} 个`],
+                ['涉及账户', `${accCount} 个`]
+              ].map(([k, v]) => <div key={k} className="row"><span className="grow">{k}</span><b>{v}</b></div>)
+            })()}
+          </div>
+        </>
+      )}
+
+      {mods['成员收支'] && (() => {
+        const byOwner = new Map<string, { income: number; expense: number }>()
+        for (const b of rangeBills) {
+          if (b.notIntoTotal) continue
+          const key = String(b.ownerId ?? b.userId ?? 0)
+          const row = byOwner.get(key) ?? { income: 0, expense: 0 }
+          if (parents.find((p) => p.id === b.parentCategoryId)?.kind === 'income') row.income += b.cost
+          else row.expense += billNetAmount(b, refunds)
+          byOwner.set(key, row)
+        }
+        if (byOwner.size <= 1) return null
+        return (
+          <>
+            <div className="label">成员收支</div>
+            <div className="stats-report">
+              {[...byOwner.entries()].map(([uid, r]) => (
+                <div key={uid} className="row">
+                  <span className="grow">成员 {uid === String(userId) ? '（我）' : uid}</span>
+                  <span className="muted">收 {money(+r.income.toFixed(2))} · 支 {money(+r.expense.toFixed(2))}</span>
+                </div>
+              ))}
+            </div>
+          </>
         )
       })()}
 

@@ -1086,3 +1086,6 @@ button.my-user {
   padding: 10px; font-size: var(--font-sm); font-family: inherit; color: var(--ink);
   background: var(--surface-2); resize: vertical;
 }
+
+/* 统计：报表统计 / 成员收支 */
+.stats-report { display: grid; gap: 2px; padding: var(--sp-2) 0; border-bottom: 1px solid var(--line); }
