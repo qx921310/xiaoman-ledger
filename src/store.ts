@@ -533,7 +533,7 @@ export const useLedger = create<LedgerState>()(
             ? { ...x, primeNum: next.num, primeCost: next.cost, historyIncome: next.realized, lots: next.lots, updateTime: NOW() }
             : x),
           stockInfos: [...st.stockInfos, {
-            stockInfoId, stockAssetId, type, num, cost: amount,
+            stockInfoId, stockAssetId, bookId: rec.bookId ?? s.currentBookId, type, num, cost: amount,
             serviceCharge: fee || undefined, doTime: time ?? Date.now(), updateTime: NOW()
           }]
         }))
@@ -694,7 +694,11 @@ export const useLedger = create<LedgerState>()(
         if (exists) return false
         let relatedId = Date.now()
         while (s.billRelated.some((r) => r.relatedId === relatedId)) relatedId++
-        set((st) => ({ billRelated: [...st.billRelated, { relatedId, oneBillId: one, twoBillId: two, updateTime: NOW() }] }))
+        set((st) => ({ billRelated: [...st.billRelated, {
+          relatedId, oneBillId: one, twoBillId: two,
+          bookId: s.bills.find((b) => String(b.billId) === one)?.bookId ?? s.currentBookId,
+          updateTime: NOW()
+        }] }))
         return true
       },
 

@@ -183,6 +183,46 @@ export async function keepLocalConflict(key: string, preview: Awaited<ReturnType
   return run
 }
 
+/** 放弃本机版本，改用云端版本（保留双方内容到归档，便于回溯）。 */
+export async function acceptRemoteConflict(key: string, preview: Awaited<ReturnType<typeof previewVersionedConflict>>) {
+  const session = captureSessionEpoch()
+  const uid = getCurrentUid()
+  const ensure = () => {
+    session.assertCurrent()
+    if (getCurrentUid() !== uid) throw new DOMException('登录会话已变更', 'AbortError')
+  }
+  const active = inFlight.get(session.signal)
+  if (active) await active
+  ensure()
+  const raw = localStorage.getItem(`xiaoman-sync-v2:${uid}`)
+  if (!raw) throw new Error('同步状态不存在，请先同步')
+  const meta = JSON.parse(raw) as VersionedMeta
+  if (!meta.conflicts[key]) throw new Error('该记录已不在待核对列表')
+  if (!preview.remote) throw new Error('云端没有这条记录，无法使用云端版本')
+  const local = collectRecords().filter(r => recordKey(r) === key)
+  if (local.length !== 1) throw new Error('本地记录身份不明确，请先导出备份')
+  if (fingerprint(local[0]) !== fingerprint(preview.local)) throw new Error('本机记录已变化，请重新核对')
+  // 双方内容先归档，再覆盖
+  meta.archives ??= []
+  meta.archives.push({
+    at: Date.now(), key,
+    local: structuredClone(local[0]),
+    remote: structuredClone(preview.remote)
+  })
+  beginRemote()
+  try {
+    useLedger.getState().applyRemote([{ ...preview.remote, versionAuthoritative: true } as never])
+  } finally {
+    endRemote()
+  }
+  ensure()
+  delete meta.conflicts[key]
+  delete meta.pending[key]
+  meta.bases[key] = { version: preview.remote.version, fingerprint: fingerprint(preview.remote) }
+  localStorage.setItem(`xiaoman-sync-v2:${uid}`, JSON.stringify(meta))
+  return { key }
+}
+
 /** All startup, manual and automatic syncs share one queue per account session. */
 export function syncNow(): ReturnType<typeof runVersionedSync> {
   const session = captureSessionEpoch()

@@ -26,10 +26,13 @@ function groups(meta: VersionedMeta, local: VersionedRecord[]): Array<Array<[str
   const nodes = [...all.entries()]
   const refs = (r: VersionedRecord) => {
     const result = new Set<string>([String(r.id)])
-    for (const [key, value] of Object.entries(r.payload ?? {})) {
-      if (key === 'bookId' || key === 'userId' || key === 'ownerId') continue
-      if (/Id$/.test(key) && (typeof value === 'string' || typeof value === 'number')) result.add(String(value))
-      if (key === 'billList' && Array.isArray(value)) for (const id of value) result.add(String(id))
+    // 只有「删一个就必须一起处理另一个」的关系才绑定成同批。
+    // 以前把所有 *Id 字段都当强关联：资产一旦冲突，引用它的全部账单都被连带停发。
+    const fields = HARD_RELATIONS[r.kind] ?? []
+    for (const key of fields) {
+      const value = (r.payload ?? {})[key]
+      if (typeof value === 'string' || typeof value === 'number') result.add(String(value))
+      if (Array.isArray(value)) for (const id of value) result.add(String(id))
     }
     return result
   }
@@ -50,6 +53,19 @@ function groups(meta: VersionedMeta, local: VersionedRecord[]): Array<Array<[str
     .map(b => [...b.keys].filter(k => meta.pending[k]).map(k => [k, meta.pending[k]] as [string, PendingOperation]))
     .filter(b => b.length > 0)
 }
+/** 必须原子提交的父子关系：父被阻塞时子也不动（其余引用不绑定） */
+const HARD_RELATIONS: Record<string, string[]> = {
+  splitMember: ['splitGroupId'],
+  splitExpense: ['splitGroupId', 'sourceBillId'],
+  stockInfo: ['stockAssetId'],
+  billGroup: ['firstBillId', 'billList'],
+  billRelated: ['oneBillId', 'twoBillId'],
+  refund: ['billId'],
+  reimbursement: ['billId'],
+  transfer: [],
+  bill: []
+}
+
 export interface VersionedAdapter {
   read(): VersionedRecord[]
   apply(records: RemoteRecord[]): void

@@ -3,7 +3,7 @@ import { useLedger } from '../store'
 import type { Cycle } from '../types'
 import type { ImportPlan } from '../importer'
 import { books as bookApi, type BookInfo } from '../auth'
-import { syncNow, getVersionedConflicts, getVersionedRecovery, keepLocalConflict, previewVersionedConflict } from '../sync'
+import { syncNow, getVersionedConflicts, getVersionedRecovery, keepLocalConflict, acceptRemoteConflict, previewVersionedConflict } from '../sync'
 import { syncNowImmediate, getLastSyncResult, subscribeAutoSync } from '../sync-auto'
 import { money } from '../ui-format'
 import { ROLE_LABEL } from '../ui/roles'
@@ -1161,6 +1161,18 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
             } catch (error) { setSyncMsg(errorMessage(error, '处理失败，本机数据已保留')) }
             finally { setSyncing(false) }
           }}>使用本机版本</button>
+          <button className="ghost" disabled={syncing || !conflictPreview.remote} onClick={async () => {
+            if (!confirm('确定使用云端版本吗？本机版本会先保存在同步备份中，可导出后回溯。')) return
+            setSyncing(true)
+            try {
+              await acceptRemoteConflict(item.key, conflictPreview)
+              setConflictPreview(null)
+              setSyncMsg('已改用云端版本')
+              setSyncConflicts(getVersionedConflicts())
+              await syncNowImmediate()
+            } catch (error) { setSyncMsg(errorMessage(error, '处理失败，本机数据已保留')) }
+            finally { setSyncing(false) }
+          }}>使用云端版本</button>
           </div>}
         </div>)}
       </div>}

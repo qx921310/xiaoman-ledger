@@ -125,7 +125,7 @@ try {
 let lastReceiptCleanup = 0
 function cleanupSyncReceipts(now) {
   if (now - lastReceiptCleanup < 60 * 60 * 1000) return
-  db.prepare('DELETE FROM sync_operations WHERE created_at < ?').run(now - 180 * 24 * 60 * 60 * 1000)
+  db.prepare('DELETE FROM sync_operations WHERE created_at < ?').run(now - 30 * 24 * 60 * 60 * 1000)
   lastReceiptCleanup = now
 }
 
@@ -622,7 +622,9 @@ const server = createServer(async (req, res) => {
             SELECT book_id FROM book_members WHERE user_id = ?))`)
           .all(r.kind, rid, user.id, user.id)
         if (!bookId && existing.length) bookId = existing[0].book_id || null
-        if (v2 && !bookId && ['bill', 'transfer', 'lend', 'refund', 'reimbursement', 'cycle'].includes(r.kind)) { reject('book-required'); continue }
+        if (v2 && !bookId && ['bill', 'transfer', 'lend', 'refund', 'reimbursement', 'cycle',
+          'splitGroup', 'splitMember', 'splitExpense', 'template', 'homeLoan', 'instalment',
+          'stockAsset', 'stockInfo', 'billGroup', 'billRelated'].includes(r.kind)) { reject('book-required'); continue }
         if (existing.some(e => e.book_id && bookId && e.book_id !== String(bookId))) { reject('scope-conflict'); continue }
         // 记录存在于别人的账本里、而我不是成员 → 直接拒绝，避免写出一条无意义的私有墓碑
         if (!bookId && existing.some((e) => e.user_id !== user.id && e.book_id)) { reject('permission-denied'); continue }
