@@ -281,7 +281,7 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
                       : (b.currencyInfo ? ' · ' + b.currencyInfo : '')}
                     {b.files?.length ? ` · ${b.files.length} 个附件` : ''}
                   </small>
-                  {(reimbursements.some((r) => r.billId === b.billId) || (b.refundNum ?? 0) > 0) && (
+                  {(reimbursements.some((r) => r.billId === b.billId) || (b.refundNum ?? 0) > 0 || (b.tags?.length ?? 0) > 0 || (b.files?.length ?? 0) > 0) && (
                     <div className="tags">
                       {reimbursements.filter((r) => r.billId === b.billId).map((r) => (
                         <span key={r.reimbursementId} className={'tag' + (r.status === 'done' ? ' ok' : '')}>
@@ -289,6 +289,7 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
                         </span>
                       ))}
                       {(b.refundNum ?? 0) > 0 && <span className="tag">已退 {money(b.refundNum!)}</span>}
+                      {(b.files?.length ?? 0) > 0 && <span className="tag" title={b.files!.map((f) => f.name).join('、')}>附件 {b.files!.length}</span>}
                       {(b.tags || []).map((name) => {
                         const t = tagsByName.get(name)
                         return <span key={name} className="tag" style={t ? { background: t.color, color: 'var(--ink)' } : undefined}>{name}</span>
@@ -296,7 +297,12 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
                     </div>
                   )}
                 </div>
-                <b className={inc ? 'in' : 'out'}>{inc ? '+' : '-'}{money(inc ? b.cost : billNetAmount(b, refunds))}</b>
+                <span className="cost-cell">
+                  {(b.discountNumber ?? 0) > 0 && (
+                    <s className="old-cost">{money(+(b.cost + (b.discountNumber ?? 0)).toFixed(2))}</s>
+                  )}
+                  <b className={inc ? 'in' : 'out'}>{inc ? '+' : '-'}{money(inc ? b.cost : billNetAmount(b, refunds))}</b>
+                </span>
                 <div className="ledger-actions">
                   <button className="link" aria-label={`查看${p?.name ?? '账单'}明细`} onClick={() => setDetail(b)}>明细</button>
                   {!readOnly && <button className="link" aria-label={`编辑${p?.name ?? '账单'}`} onClick={() => setEditing(b)}>编辑</button>}
