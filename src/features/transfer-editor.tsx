@@ -53,7 +53,7 @@ export function TransferEditor({ transfer, onClose, onSave }: {
         <input aria-label="转账时间" type="datetime-local" value={time} onChange={(e) => setTime(e.target.value)} />
         <div className="label">备注</div>
         <input aria-label="转账备注" value={remark} onChange={(e) => setRemark(e.target.value)} />
-        <p className="hint">保存会先撤销原转账（含手续费账单），再按新值重记。</p>
+        <p className="hint">保存会按新值重记这笔转账。</p>
         <div className="modal-btns">
           <button className="ghost" onClick={onClose}>取消</button>
           <button className="primary" onClick={() => onSave({

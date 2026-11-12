@@ -134,7 +134,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
     return (
       <section className="card">
         <h3>还没有账户</h3>
-        <p className="hint">记账必须先选一个账户（现金、银行卡、支付宝都算）。先去「资产」建一个，再回来记账。</p>
+        <p className="hint">先在「资产」建一个账户。</p>
         <button className="primary" onClick={() => onNeedAsset?.()}>去添加账户</button>
         {onClose && <button className="ghost" onClick={onClose}>稍后再说</button>}
       </section>

@@ -456,7 +456,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
           {plan.warnings.length > 0 && (
             <p className="hint">需要核对 {plan.warnings.length} 条：例如第 {plan.warnings[0].row} 行，{plan.warnings[0].reason}。</p>
           )}
-          {plan.duplicates > 0 && <p className="hint">疑似重复记录也会全部导入。若重复导入同一文件，请先核对，避免多记。</p>}
+          {plan.duplicates > 0 && <p className="hint">重复记录也会导入，请先核对。</p>}
           {plan.skippedRows > 0 && (
             <p className="hint due-hint">
               有 {plan.skippedRows} 行因账本无法匹配被跳过（{plan.unresolvedBooks.join('、')}）。
@@ -505,7 +505,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       {ocrBusy && <p className="hint">识别中…</p>}
       {ocrResult && (
         <div className="budget-box small">
-          <p className="hint">请核对并修改识别结果，确认后才会记账。</p>
+          <p className="hint"></p>
           <div className="label">日期</div>
           <input aria-label="识别账单日期" type="date" value={ocrResult.date} onChange={(e) => setOcrResult({ ...ocrResult, date: e.target.value })} />
           <div className="label">金额（{defaultCurrency}）</div>
@@ -559,7 +559,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       )}
 
       <h3>导出</h3>
-      <p className="hint">Excel 用于账单交换；完整备份和恢复账户余额请使用 JSON。</p>
+      <p className="hint">Excel 用于交换，完整备份用 JSON。</p>
       <div className="btns">
         <button onClick={doExportXlsx}>导出 Excel</button>
         <button onClick={doExportJson}>导出 JSON</button>
@@ -573,7 +573,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
             <h3>恢复 JSON 备份</h3>
             <p>{restorePreview.name}</p>
             <p>备份包含 {restorePreview.data.bills.length} 条账单、{restorePreview.data.assets.length} 个账户和 {restorePreview.data.refunds.length} 条退款。</p>
-            <p className="hint">恢复会替换当前设备上的本地数据。建议先导出当前 JSON 备份；云端及其他设备的数据不会随此操作回滚，同步后可能重新出现。</p>
+            <p className="hint">恢复前请先导出 JSON 备份。</p>
             {restorePreview.data.version === 1 && <p className="hint">旧版备份不含币种、汇率、标签。</p>}
             <div className="modal-btns">
               <button className="ghost" onClick={() => setRestorePreview(null)}>取消</button>
@@ -586,7 +586,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       )}
 
       <h3>周期记账</h3>
-      <p className="hint">每月固定日期自动生成账单；打开应用时补生成，不会重复。</p>
+      <p className="hint"></p>
       {(() => {
         const pending = cycles.filter((c) => c.enabled).flatMap((c) => pendingDates(c).map((d) => ({ c, key: dateKey(d) })))
         return pending.length > 0 ? (
@@ -726,7 +726,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
             </select>
             <div className="label">备注</div>
             <input aria-label="周期备注" value={cycleForm.remark} onChange={(e) => setCycleForm({ ...cycleForm, remark: e.target.value })} />
-            <p className="hint">保存后立即补生成当月已到期的账单。</p>
+            <p className="hint"></p>
             <div className="modal-btns">
               <label className="hint" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <input type="checkbox" checked={Boolean(cycleForm.notIntoTotal)}
@@ -1046,7 +1046,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       )}
 
       <h3>模板</h3>
-      <p className="hint">在记账页点「存为模板」保存常用记账；这里可以一键再记一笔。</p>
+      <p className="hint"></p>
       {templates.length === 0 && <p className="hint">还没有模板。</p>}
       {templates.map((t) => (
         <div key={t.templateId} className="row">
@@ -1128,8 +1128,8 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       })}
 
       <h3>标签</h3>
-      <p className="hint">标签可着色、可嵌套；记账时按名字自动关联。</p>
-      {tags.length === 0 && <p className="hint">还没有标签。下面可以新建，或在记账备注里写 #标签。</p>}
+      <p className="hint"></p>
+      {tags.length === 0 && <p className="hint"></p>}
       {tags.map((t) => (
         <div key={t.tagId} className="row">
           <span className="tag-dot" style={{ background: t.color }} />

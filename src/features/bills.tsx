@@ -483,7 +483,7 @@ function BillDetail({ bill, me, onClose, onEdit }: {
         <Row label="记录时间">{dayOf(bill.recordTime ?? bill.time)} {hhmm(bill.recordTime ?? bill.time)}</Row>
         <details className="detail-related">
           <summary>关联与合并账单</summary>
-          <p className="hint">关联相关账单，或将已关联的账单归为一组。</p>
+          <p className="hint"></p>
           <div className="row2">
             <select aria-label="选择要关联的账单" value={linkTarget} onChange={(e) => setLinkTarget(e.target.value)}>
               <option value="">选择另一笔账单…</option>
@@ -506,7 +506,7 @@ function BillDetail({ bill, me, onClose, onEdit }: {
             alert('合并需要至少两笔同账本账单，且不能已属于其他账单组')
           }}>合并为一组（含已关联的账单）</button>
           {billGroupsAll.some((g) => g.billList.map(String).includes(String(bill.billId))) && (
-            <p className="hint">这笔账单已在某个账单组里，在列表可解散。</p>
+            <p className="hint"></p>
           )}
         </details>
         <Row label="记录方式">{BILL_TYPE[bill.billType] ?? '手动记账'}</Row>
@@ -664,7 +664,7 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
         <div className="label">优惠金额（可选，本币）</div>
         <input aria-label="优惠金额" value={discount} inputMode="decimal" placeholder="例如商家满减 10"
           onChange={(e) => setDiscount(e.target.value.replace(/[^\d.]/g, ''))} />
-        <p className="hint">优惠只做记录与展示，实付金额仍按上面的金额计算。</p>
+        <p className="hint"></p>
 
         <div className="label">AA 分摊（一木：群组 + 均分/按金额/按份额）</div>
         {groups.length === 0 ? (
@@ -771,7 +771,7 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
                 <button className="del" onClick={() => deleteRefund(r.refundId)}>撤销</button>
               </div>
             ))}
-            {hasLegacyRefund && <p className="hint">旧退款缺少本币金额，请先核对并处理旧退款，再登记新的退款。</p>}
+            {hasLegacyRefund && <p className="hint">旧退款缺本币金额，请先核对。</p>}
             {!hasLegacyRefund && refundRemaining > 0 && (
               <>
                 <input value={fAmount} onChange={(e) => setFAmount(e.target.value.replace(/[^\d.]/g, ''))} placeholder={`本次退款金额（${defaultCurrency}，最多 ${refundRemaining}）`} aria-label={`本次退款金额（${defaultCurrency}）`} inputMode="decimal" />

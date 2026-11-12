@@ -378,7 +378,7 @@ export function Stats() {
               onChange={(e) => setEditing({ ...editing, amount: e.target.value.replace(/[^\d.]/g, '') })}
               inputMode="decimal"
             />
-            <p className="hint">预算按「每月固定」生效，不需要每月重设。</p>
+            <p className="hint"></p>
             <div className="modal-btns">
               <button className="ghost" onClick={() => setEditing(null)}>取消</button>
               <button className="primary" onClick={() => {

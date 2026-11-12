@@ -13,7 +13,7 @@ export function AssetSankey() {
     [assets, currencies, defaultCurrency]
   )
 
-  if (!total) return <p className="hint">还没有可统计的资产（隐藏或不计入总资产的账户不会出现在这里）。</p>
+  if (!total) return <p className="hint"></p>
 
   const W = 640, H = Math.max(220, nodes.length * 26 + 40)
   const leftX = 8, nodeW = 10, rightX = W - 18

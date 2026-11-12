@@ -666,7 +666,7 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
             </div>
             <div className="label">备注</div>
             <input aria-label="借贷备注" value={lendForm.remark} onChange={(e) => setLendForm({ ...lendForm, remark: e.target.value })} />
-            <p className="hint">借出减少账户余额，收回与借入增加，归还减少；不计入收支。</p>
+            <p className="hint"></p>
             <div className="modal-btns">
               <button className="ghost" onClick={() => setLendForm(null)}>取消</button>
               <button className="primary" onClick={() => {
@@ -880,7 +880,7 @@ function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => 
         <select aria-label="账户币种" value={currency} disabled={hasActivity} onChange={(e) => setCurrency(e.target.value)}>
           {currencies.map((c) => <option key={c.code} value={c.code}>{c.code} · {c.name}</option>)}
         </select>
-        {hasActivity && <p className="hint">已有流水的账户不能直接更改币种，避免改变历史金额的含义。</p>}
+        {hasActivity && <p className="hint">有流水的账户不能改币种。</p>}
         <div className="label">类型</div>
         <select aria-label="账户类型" value={type} onChange={(e) => setType(Number(e.target.value))}>
           {Object.entries(ASSET_TYPE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
