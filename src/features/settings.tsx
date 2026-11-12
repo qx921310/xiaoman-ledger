@@ -84,7 +84,7 @@ function describeCycle(c: Cycle): string {
 
 
 
-export function Settings({ notify, me }: { notify: (m: string) => void; me?: { id: number; email: string } }) {
+export function Settings({ notify, me, onLogout }: { notify: (m: string) => void; me?: { id: number; email: string }; onLogout?: () => void }) {
   const seed = useLedger((s) => s.seed)
   const reset = useLedger((s) => s.reset)
   const exportAll = useLedger((s) => s.exportAll)
@@ -1183,6 +1183,10 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
           </div>}
         </div>)}
       </div>}
+
+      <h3>账号</h3>
+      {me && <p className="hint">当前登录：{me.email}</p>}
+      {onLogout && <button className="ghost wide" onClick={() => { if (confirm('确定退出登录吗？本机数据会保留。')) onLogout() }}>退出登录</button>}
 
       <h3>关于</h3>
       <p className="hint">

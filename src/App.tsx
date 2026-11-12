@@ -3,7 +3,7 @@ import { useLedger } from './store'
 import { auth, books as bookApi, setCurrentUid, type BookInfo, type User } from './auth'
 import { loadAccountData } from './account-session'
 import { syncNow } from './sync'
-import { startAutoSync, stopAutoSync, subscribeAutoSync, syncNowImmediate, getAutoSyncState, type AutoSyncState } from './sync-auto'
+import { startAutoSync, stopAutoSync, getAutoSyncState } from './sync-auto'
 import { startMultiTab } from './multi-tab'
 import { advanceSessionEpoch, captureSessionEpoch } from './domain/session-epoch'
 
@@ -14,8 +14,6 @@ import { CalendarPage } from './features/calendar'
 import { Assets } from './features/assets'
 import { Stats } from './features/stats'
 import { Settings } from './features/settings'
-import { ROLE_LABEL } from './ui/roles'
-import type { AccountBook } from './types'
 
 type Tab = 'home' | 'calendar' | 'assets' | 'stats' | 'me' | 'add'
 
@@ -162,8 +160,6 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User
       runCycles()
     }
   }, [sessionSyncAt, syncGrace, runCycles])
-  const [autoSync, setAutoSync] = useState<AutoSyncState | null>(null)
-  useEffect(() => subscribeAutoSync(setAutoSync), [])
   const [toast, setToast] = useState('')
   const notify = (m: string) => {
     setToast(m)
@@ -172,21 +168,6 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User
 
   return (
     <div className="app">
-      <header className="topbar">
-        <div className="brand">
-          <img className="logo-img" src="/icons/brand/logo-mark.svg" alt="小满记账" />
-          <div>
-            <strong>小满记账</strong>
-            <small>小有盈余，日子清楚</small>
-          </div>
-        </div>
-        <div className="userbox">
-          <SyncBadge state={autoSync} onRetry={() => { void syncNowImmediate() }} />
-          <BookSwitch />
-          <span className="uemail" title={user.email}>{user.email}</span>
-          <button className="ghost tiny" onClick={onLogout}>退出</button>
-        </div>
-      </header>
 
       <nav className="nav">
         {([['home', '首页'], ['calendar', '日历'], ['assets', '资产'], ['stats', '统计'], ['me', '我的']] as [Tab, string][]).map(([k, label]) => (
@@ -200,7 +181,7 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User
         {tab === 'calendar' && <CalendarPage onAddBill={() => setTab('add')} />}
         {tab === 'assets' && <Assets notify={notify} onOpenSettings={() => setTab('me')} />}
         {tab === 'stats' && <Stats />}
-        {tab === 'me' && <Settings notify={notify} me={user} />}
+        {tab === 'me' && <Settings notify={notify} me={user} onLogout={onLogout} />}
         {tab === 'add' && <AddBill notify={notify} onClose={() => setTab('home')} onNeedAsset={() => setTab('assets')} />}
       </main>
 
@@ -209,58 +190,4 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User
   )
 }
 
-function BookSwitch() {
-  const books = useLedger((s) => s.accountBooks)
-  const current = useLedger((s) => s.currentBookId)
-  const setBook = useLedger((s) => s.setBook)
-  const keyOf = (b: AccountBook) => String(b.bookId ?? b.accountBookId)
-  return (
-    <select aria-label="切换账本"
-      value={String(current)}
-      onChange={(e) => {
-        const v = e.target.value
-        localStorage.setItem('xm-current-book', v)
-        setBook(/^\d+$/.test(v) ? Number(v) : v)
-      }}
-      className="book">
-      <option value="0">全部账本</option>
-      {[...books].filter((b) => !b.hide).sort((a, b) => (a.positionWeight ?? 0) - (b.positionWeight ?? 0)).map((b) => {
-        const k = keyOf(b)
-        return (
-          <option key={k} value={k}>{b.color ? '● ' : ''}
-            {b.accountBookName}{b.role ? ` · ${ROLE_LABEL[b.role] ?? b.role}` : ''}
-          </option>
-        )
-      })}
-    </select>
-  )
-}
 
-/** 同步状态徽标：待同步 / 同步中 / 失败可重试 / 上次同步时间 */
-function SyncBadge({ state, onRetry }: { state: AutoSyncState | null; onRetry: () => void }) {
-  if (!state) return null
-  if (state.running) return <span className="sync-badge sync-running" title="正在同步">同步中…</span>
-  if (state.lastError) {
-    return (
-      <button type="button" className="sync-badge sync-failed" title={state.lastError} onClick={onRetry}>
-        同步失败 · 重试
-      </button>
-    )
-  }
-  if (state.pending) return <span className="sync-badge sync-pending" title="有本地改动待推送">待同步</span>
-  if (state.incomplete > 0) {
-    return (
-      <button type="button" className="sync-badge sync-failed"
-        title={`${state.incomplete} 条记录未被服务端接受（冲突或拒绝），请到设置页查看`} onClick={onRetry}>
-        {state.incomplete} 条待处理
-      </button>
-    )
-  }
-  if (state.lastOkAt) {
-    const t = new Date(state.lastOkAt)
-    const hh = String(t.getHours()).padStart(2, '0')
-    const mm = String(t.getMinutes()).padStart(2, '0')
-    return <span className="sync-badge sync-ok" title="已与服务端一致">{hh}:{mm} 已同步</span>
-  }
-  return null
-}
