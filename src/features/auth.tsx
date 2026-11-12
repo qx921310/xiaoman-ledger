@@ -57,7 +57,7 @@ export function AuthScreen({ onAuthed }: { onAuthed: (u: User) => void }) {
         {err && <p className="warn" role="alert">{err}</p>}
 
         <button className="primary" onClick={submit} disabled={busy}>{busy ? '处理中…' : (mode === 'login' ? '登录' : '注册并登录')}</button>
-        <p className="hint">只支持邮箱注册，不接手机号和第三方登录。数据存在你自己的账号下。</p>
+        <p className="hint">仅支持邮箱注册。</p>
       </div>
     </div>
   )

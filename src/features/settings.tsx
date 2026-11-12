@@ -470,7 +470,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       )}
 
       <h3>截图识别</h3>
-      <p className="hint">截图支付账单 → 自动识别金额、商户与分类 → 确认后直接入账（对应一木的截图记账）。</p>
+      <p className="hint">识别截图后可直接入账。</p>
       <label className="filebtn">
         选择账单截图
         <input type="file" accept="image/*" hidden onChange={async (e) => {
@@ -574,7 +574,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
             <p>{restorePreview.name}</p>
             <p>备份包含 {restorePreview.data.bills.length} 条账单、{restorePreview.data.assets.length} 个账户和 {restorePreview.data.refunds.length} 条退款。</p>
             <p className="hint">恢复会替换当前设备上的本地数据。建议先导出当前 JSON 备份；云端及其他设备的数据不会随此操作回滚，同步后可能重新出现。</p>
-            {restorePreview.data.version === 1 && <p className="hint">旧版备份不含币种、汇率、标签和删除记录，将保留当前设备上的这些设置。</p>}
+            {restorePreview.data.version === 1 && <p className="hint">旧版备份不含币种、汇率、标签。</p>}
             <div className="modal-btns">
               <button className="ghost" onClick={() => setRestorePreview(null)}>取消</button>
               <button className="primary" onClick={() => {
@@ -966,7 +966,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       )}
 
       <h3>分类</h3>
-      <p className="hint">可以新增、改名、换图标、调顺序；已有账单用到的分类不能删除。</p>
+      <p className="hint">已有账单使用的分类不能删除。</p>
       {(['expense', 'income'] as const).map((kind) => (
         <div key={kind}>
           <div className="label">{kind === 'expense' ? '支出分类' : '收入分类'}</div>
@@ -1066,7 +1066,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       ))}
 
       <h3>AA 群组</h3>
-      <p className="hint">建群组、加成员，记账时选「AA 分摊」即按一木的均分/按金额/按份额计算，支出会进待结算列表。</p>
+      <p className="hint">建群组后，记账时可选择 AA 分摊。</p>
       <div className="row2">
         <input aria-label="新群组名称" value={newGroup} placeholder="群组名，如 周末聚餐"
           onChange={(e) => setNewGroup(e.target.value)} />
@@ -1216,7 +1216,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
 
       <h3>云端同步</h3>
       <p className="hint">
-        数据存在你自己的账号下。同步会核对记录版本；发生冲突时保留本地内容并提示核对。
+        同步冲突时保留本地内容并提示。
       </p>
       <div className="btns">
         <button onClick={runSync} disabled={syncing}>{syncing ? '同步中…' : '立即同步'}</button>
@@ -1273,7 +1273,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
 
       <h3>关于</h3>
       <p className="hint">
-        数据保存在当前设备；登录后打开应用会尝试自动同步，也可手动同步。同步数据保存在服务端，供账号和共享账本成员使用。
+        数据存在你自己的账号下，登录后自动同步。
       </p>
     </section>
   )

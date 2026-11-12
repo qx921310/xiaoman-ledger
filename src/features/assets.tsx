@@ -247,7 +247,7 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
         </button>
       </div>
 
-      <p className="hint">余额会随记账自动变动；点账户名看流水，点「改」可填实际余额。</p>
+      
 
       {grouped.map(([typeKey, list]) => (
         <div key={typeKey} className="asset-group">
@@ -341,7 +341,7 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
         <div><small>总市值</small><b>{mask(stockValue)}</b></div>
         <div><small>收益</small><b className={stockProfit < 0 ? 'out' : 'in'}>{mask(stockProfit)}</b></div>
       </div>
-      <p className="hint">按一木的持仓模型记录：买入/卖出自动算移动加权成本与已实现盈亏，填当前价看浮动盈亏。</p>
+      
       <div className="row2">
         <input aria-label="持仓名称" value={stockForm.name} placeholder="名称，如 沪深300ETF"
           onChange={(e) => setStockForm({ ...stockForm, name: e.target.value })} />
@@ -426,7 +426,7 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
       {screen === 'assets' && (<>
       <details className="fold">
         <summary>房贷计划</summary>
-      <p className="hint">组合贷：商业贷款 + 公积金贷款，支持等额本息/等额本金与 LPR 加点。</p>
+      
       <div className="row2">
         <input aria-label="商业贷款金额" placeholder="商贷金额" value={loanForm.commercial} inputMode="decimal"
           onChange={(e) => setLoanForm({ ...loanForm, commercial: e.target.value.replace(/[^\d.]/g, '') })} />
@@ -954,7 +954,7 @@ function AssetEditor({ asset, onClose, onSave }: { asset: Asset; onClose: () => 
             <option key={String(b.bookId)} value={String(b.bookId)}>共享到「{b.accountBookName}」</option>
           ))}
         </select>
-        <p className="hint">私有账户不会出现在共享账本的账单里；共享后该账本成员都能看到这个账户。</p>
+        
 
         <div className="label">设为实际余额（当前 {accountMoney(asset.assetNumber, asset.currency, currencies, defaultCurrency)}，信用卡填负数）</div>
         <input
