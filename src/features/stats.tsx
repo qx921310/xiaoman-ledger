@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { billNetAmount } from '../bill-amount'
 import { useLedger } from '../store'
 import { money, monthOf, toLocalInput } from '../ui-format'
 import { CatIcon } from '../ui/icons'
@@ -60,14 +61,15 @@ export function Stats() {
       if (parents.find((p) => p.id === b.parentCategoryId)?.kind === 'income') continue
       const d = new Date(b.time)
       const key = `${d.getMonth() + 1}/${d.getDate()}`
-      map.set(key, +((map.get(key) ?? 0) + b.cost).toFixed(2))
+      // 与 summarizeBills 同口径：支出扣掉退款后的净额
+      map.set(key, +((map.get(key) ?? 0) + billNetAmount(b, refunds)).toFixed(2))
     }
     return [...map.entries()].sort((a, b) => {
       const [am, ad] = a[0].split('/').map(Number)
       const [bm, bd] = b[0].split('/').map(Number)
       return am - bm || ad - bd
     }).map(([label, expense]) => ({ label, expense }))
-  }, [monthBills, parents])
+  }, [monthBills, parents, refunds])
 
   // 年度支出（当年）
   const yearSpend = useMemo(() => {
