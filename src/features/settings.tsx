@@ -114,7 +114,8 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const budgets = useLedger((s2) => s2.budgets)
   const setBudget = useLedger((s2) => s2.setBudget)
   const pull = usePullRefresh(async () => setHiddenOpen(true), 64,
-    { pulling: '下拉进入隐藏内容', released: '松开进入隐藏内容', busy: '正在打开…' })
+    { pulling: '下拉进入隐藏内容', released: '松开进入隐藏内容', busy: '正在打开…' },
+    !hiddenOpen)
   useEffect(() => subscribeAutoSync(setAutoSync), [])
   const [conflictPreview, setConflictPreview] = useState<Awaited<ReturnType<typeof previewVersionedConflict>> | null>(null)
   useEffect(() => subscribeAutoSync(() => setSyncConflicts(getVersionedConflicts())), [])
@@ -366,12 +367,18 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
                   key: `budget-${b.month}-${b.categoryId}-${b.type ?? 'month'}`,
                   name: `${b.budgetName || (b.categoryId === 0 ? '总预算' : `分类 ${b.categoryId}`)} · ${b.month}`,
                   value: money(b.amount),
-                  onRestore: () => { setBudget({ ...b, hide: false }); notify('已恢复显示') }
+                  onRestore: () => {
+                    // 一木语义：恢复显示 = 移除隐藏标记，而不是写入 hide:false，
+                    // 这样老客户端（无该字段）与本端 payload 一致，不会产生伪冲突
+                    const { hide: _hidden, ...rest } = b
+                    setBudget(rest)
+                    notify('已恢复显示')
+                  }
                 }))
               },
               {
                 key: 'tags', label: '标签',
-                rows: (useLedger.getState().tags ?? []).filter((t) => t.hide).map((t) => ({
+                rows: (tags ?? []).filter((t) => t.hide).map((t) => ({
                   key: String(t.tagId), name: t.name, value: '',
                   onRestore: () => { updateTag(t.tagId, { hide: false }); notify('已恢复显示') }
                 }))

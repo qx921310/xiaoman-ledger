@@ -8,7 +8,9 @@ import { useEffect, useRef, useState } from 'react'
 export function usePullRefresh(
   onRefresh: () => Promise<void> | void,
   threshold = 64,
-  labels: { pulling?: string; released?: string; busy?: string } = {}
+  labels: { pulling?: string; released?: string; busy?: string } = {},
+  /** 只有 enabled 为真时才注册触摸监听：多个页面可能同时挂载，避免手势串扰 */
+  enabled = true
 ) {
   const text = {
     pulling: labels.pulling ?? '下拉同步数据',
@@ -20,6 +22,7 @@ export function usePullRefresh(
   const startY = useRef<number | null>(null)
 
   useEffect(() => {
+    if (!enabled) return
     const atTop = () => (window.scrollY || document.documentElement.scrollTop || 0) <= 0
 
     const onStart = (e: TouchEvent) => {
@@ -52,7 +55,7 @@ export function usePullRefresh(
       window.removeEventListener('touchend', onEnd)
       window.removeEventListener('touchcancel', onEnd)
     }
-  }, [onRefresh, threshold, progress, busy])
+  }, [onRefresh, threshold, progress, busy, enabled])
 
   return { progress, busy, text }
 }

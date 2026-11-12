@@ -162,7 +162,8 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
   const hiddenPull = usePullRefresh(
     async () => { setScreen('hidden') },
     64,
-    { pulling: '下拉进入资产隐藏页面', released: '松开进入资产隐藏页面', busy: '正在打开…' }
+    { pulling: '下拉进入资产隐藏页面', released: '松开进入资产隐藏页面', busy: '正在打开…' },
+    screen === 'assets' && !composition
   )
   const openComposition = (title: string, rows: CompRow[], note?: string) =>
     setComposition({ title, note, rows: [...rows].sort((x, y) => Math.abs(y.amount) - Math.abs(x.amount)) })
