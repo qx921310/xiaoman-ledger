@@ -9,9 +9,12 @@ export function CalendarPage({ onAddBill }: { onAddBill?: () => void } = {}) {
   const bills = useLedger((s) => s.bills)
   const parents = useLedger((s) => s.parentCategories)
   const refunds = useLedger((s) => s.refunds)
+  const assets = useLedger((s) => s.assets)
   const bookId = useLedger((s) => s.currentBookId)
   const [cursor, setCursor] = useState(() => new Date())
   const [picked, setPicked] = useState<string | null>(null)
+  // 一木 CalendarLayout 支持月/周切换
+  const [mode, setMode] = useState<'month' | 'week'>('month')
 
   const kindOf = useMemo(() => new Map(parents.map((p) => [p.id, p.kind])), [parents])
 
@@ -50,16 +53,19 @@ export function CalendarPage({ onAddBill }: { onAddBill?: () => void } = {}) {
 
   // 一木用开源库 com.haibin.calendarview 渲染格子，农历/节气/节日由库提供。
   // Web 端用同源的 lunar-typescript（6tail，成熟库），不再自己解析 Intl 字符串。
-  const lunarOf = (day: number) => {
-    try {
-      const solar = Solar.fromDate(new Date(year, monthIdx, day))
-      const lunar = solar.getLunar()
-      // 一木格子第二行优先显示节日/节气，其次农历日
-      const festival = solar.getFestivals()[0] ?? lunar.getFestivals()[0] ?? lunar.getJieQi()
-      if (festival) return festival
-      return lunar.getDayInChinese()
-    } catch { return '' }
-  }
+  // 一木格子第二行：节日/节气优先，其次农历日。按月一次性算好，避免每格重复建对象。
+  const lunarMap = useMemo(() => {
+    const out = new Map<number, string>()
+    for (let d = 1; d <= new Date(year, monthIdx + 1, 0).getDate(); d++) {
+      try {
+        const solar = Solar.fromDate(new Date(year, monthIdx, d))
+        const lunar = solar.getLunar()
+        out.set(d, solar.getFestivals()[0] ?? lunar.getFestivals()[0] ?? lunar.getJieQi() ?? lunar.getDayInChinese())
+      } catch { out.set(d, '') }
+    }
+    return out
+  }, [year, monthIdx])
+  const lunarOf = (day: number) => lunarMap.get(day) ?? ''
 
   // 一木 tool_bar：月收入 / 月支出 / 月结余
   const monthTotals = useMemo(() => {
@@ -75,10 +81,22 @@ export function CalendarPage({ onAddBill }: { onAddBill?: () => void } = {}) {
       const [y, m, d] = key.split('-').map(Number)
       const solar = Solar.fromDate(new Date(y, m - 1, d))
       const lunar = solar.getLunar()
-      return (solar.getFestivals()[0] ?? lunar.getFestivals()[0] ?? lunar.getJieQi()
-        ?? `${lunar.getMonthInChinese()}月${lunar.getDayInChinese()}`)
+      // 一木头部是「日期 + 农历」，这里固定给农历月日，节日只作补充
+      const solarFestival = solar.getFestivals()[0] ?? lunar.getFestivals()[0] ?? lunar.getJieQi()
+      const lunarText = `${lunar.getMonthInChinese()}月${lunar.getDayInChinese()}`
+      return solarFestival ? `${lunarText} · ${solarFestival}` : lunarText
     } catch { return '' }
   }
+
+  // 一木日历详情区顶部有「还款提醒」列表（repayment_list）：当天到期的信用卡还款
+  const repayReminders = useMemo(() => {
+    if (!picked) return []
+    const dayNum = Number(picked.slice(8, 10))
+    const list = assets
+      .filter((a) => a.assetType === 2 && a.outAccountDate === dayNum)
+      .map((a) => ({ key: 'card-' + a.assetId, name: a.simpleName || a.assetName, due: Math.abs(a.assetNumber) }))
+    return list
+  }, [picked, assets])
 
   const pickedBills = picked
     ? bills.filter((b) => (bookId === 0 || String(b.bookId) === String(bookId)) && fullDay(b.time) === picked)
@@ -99,6 +117,8 @@ export function CalendarPage({ onAddBill }: { onAddBill?: () => void } = {}) {
           <div><small>结余</small><b>{money(monthTotals.balance)}</b></div>
         </div>
         <div className="cal-actions">
+          <button type="button" className={'cal-today' + (mode === 'month' ? ' on' : '')} onClick={() => setMode('month')}>月</button>
+          <button type="button" className={'cal-today' + (mode === 'week' ? ' on' : '')} onClick={() => { if (!picked) setPicked(fullDay(Date.now())); setMode('week') }}>周</button>
           <button type="button" className="cal-today" onClick={() => { const t = new Date(); setCursor(t); setPicked(fullDay(t.getTime())) }}>返回今天</button>
           {onAddBill && <button type="button" className="cal-add" onClick={onAddBill}>记一笔</button>}
         </div>
@@ -106,8 +126,18 @@ export function CalendarPage({ onAddBill }: { onAddBill?: () => void } = {}) {
       <div className="cal-grid cal-weekdays">
         {['日', '一', '二', '三', '四', '五', '六'].map((w) => <span key={w}>{w}</span>)}
       </div>
+      {mode === 'week' && picked && <p className="hint">周视图：只显示 {picked} 所在的一周</p>}
       <div className="cal-grid">
-        {cells.map((day, i) => {
+        {(mode === 'week' && picked
+          ? cells.filter((d) => {
+            if (d == null) return false
+            const base = new Date(`${picked}T00:00:00`)
+            const weekStart = new Date(base)
+            weekStart.setDate(base.getDate() - base.getDay())
+            const cur = new Date(year, monthIdx, d)
+            return cur >= weekStart && cur <= new Date(weekStart.getTime() + 6 * 86400000)
+          }).map((d) => d)
+          : cells).map((day, i) => {
           if (day == null) return <span key={'e' + i} className="cal-cell empty" />
           const stat = daily.get(keyOf(day))
           return (
@@ -134,6 +164,17 @@ export function CalendarPage({ onAddBill }: { onAddBill?: () => void } = {}) {
             </span>
             <span>共 {pickedBills.length} 笔</span>
           </div>
+          {repayReminders.length > 0 && (
+            <div className="cal-repay">
+              <b>还款提醒</b>
+              {repayReminders.map((r) => (
+                <div key={r.key} className="row">
+                  <span className="grow">{r.name}</span>
+                  <b className="out">{money(r.due)}</b>
+                </div>
+              ))}
+            </div>
+          )}
           {pickedBills.length === 0 && <p className="hint">这天没有记账。</p>}
           {pickedBills.map((b) => (
             <div key={String(b.billId)} className="row">
