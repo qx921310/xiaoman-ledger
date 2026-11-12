@@ -173,6 +173,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
   const [assetKw, setAssetKw] = useState('')
   const [remindOpen, setRemindOpen] = useState(false)
   const [bookScopeOpen, setBookScopeOpen] = useState(false)
+  const [moreDataOpen, setMoreDataOpen] = useState(false)
   const currentBookIdForScope = useLedger((st) => st.currentBookId)
   // 私有资产（无 bookId）只属于本人，生效账本按当前账本判断
   const bookScopeId = currentBookIdForScope === 0 ? (accountBooks[0]?.bookId ?? '') : currentBookIdForScope
@@ -836,7 +837,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
               <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); setAssetSearchOpen(true) }}>搜索账户</button>
               <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); setBookScopeOpen(true) }}>生效账本</button>
               <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); setDepositOpen(true) }}>定期存款</button>
-              <button type="button" className="hm-item muted" disabled>更多数据（敬请期待）</button>
+              <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); setMoreDataOpen(true) }}>更多数据</button>
             </div>
             <button type="button" className="ghost wide" onClick={() => setSettingOpen(false)}>关闭</button>
           </div>
@@ -850,6 +851,21 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
           <div className="modal-btns"><button type="button" className="ghost" onClick={() => setSankeyOpen(false)}>关闭</button></div>
         </Modal>
       )}
+
+      {moreDataOpen && (() => {
+        const cards = assets.filter((a) => a.assetType === 2)
+        const monthDebt = cards.reduce((n, a) => n + Math.max(0, -a.assetNumber), 0)
+        const cash = assets.filter((a) => a.assetType !== 2).reduce((n, a) => n + Math.max(0, a.assetNumber), 0)
+        return (
+          <Modal label="资产数据" onClose={() => setMoreDataOpen(false)}>
+            <h3>资产数据</h3>
+            <div className="row"><span className="grow">本月总还款</span><b>{mask(monthDebt)}</b></div>
+            <div className="row"><span className="grow">本月剩余待还</span><b>{mask(monthDebt)}</b></div>
+            <div className="row"><span className="grow">可使用资金</span><b>{mask(cash)}</b></div>
+            <div className="modal-btns"><button type="button" className="ghost" onClick={() => setMoreDataOpen(false)}>关闭</button></div>
+          </Modal>
+        )
+      })()}
 
       {bookScopeOpen && (
         <Modal label="生效账本" onClose={() => setBookScopeOpen(false)}>

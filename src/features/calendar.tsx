@@ -20,6 +20,8 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
   const [mode, setMode] = useState<'month' | 'week'>('month')
   // 一木 popup_calendar_menu：本月账单 / 多选账本 / 显示热力背景 / 热力图指标 / 更多设置
   const [menuOpen, setMenuOpen] = useState(false)
+  const [showLunar, setShowLunar] = useState(true)
+  const [showAmount, setShowAmount] = useState(true)
   const [tipClosed, setTipClosed] = useState(() => {
     try { return localStorage.getItem('xiaoman-cal-tip') === 'off' } catch { return true }
   })
@@ -210,6 +212,11 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
           <div className="home-menu" role="dialog" aria-label="日历更多" onClick={(e) => e.stopPropagation()}>
             <div className="hm-group">
               <button type="button" className="hm-item" onClick={() => { setMenuOpen(false); onOpenMonthBills?.() }}>本月账单</button>
+            <div className="hm-label">日历设置</div>
+            <div className="hm-seg">
+              <button type="button" className={showLunar ? 'on' : ''} onClick={() => setShowLunar(!showLunar)}>农历{showLunar ? '开' : '关'}</button>
+              <button type="button" className={showAmount ? 'on' : ''} onClick={() => setShowAmount(!showAmount)}>收支{showAmount ? '开' : '关'}</button>
+            </div>
               <button type="button" className="hm-item muted" disabled>多选账本（暂未实现）</button>
             </div>
             <div className="hm-group">
@@ -243,7 +250,7 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
               style={heat ? { background: heatStyle(stat) } : undefined}
                 onClick={() => setPicked(key)} aria-label={`${date.getMonth() + 1}月${date.getDate()}日`}>
                 <em>{key === todayKey ? '今' : date.getDate()}</em>
-                <i className="cal-lunar">{lunarOfDate(date)}</i>
+                {showLunar && <i className="cal-lunar">{lunarOfDate(date)}</i>}
                 {stat.expense ? <i className="out">{'-'}{money(stat.expense).replace('¥', '')}</i> : null}
                 {stat.income ? <i className="in">+{money(stat.income).replace('¥', '')}</i> : null}
               </button>
@@ -261,9 +268,9 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
               style={heat ? { background: heatStyle(daily.get(keyOf(day))) } : undefined}
               onClick={() => setPicked(keyOf(day))} aria-label={`${monthIdx + 1}月${day}日`}>
               <em>{isToday(day) ? '今' : day}</em>
-              <i className="cal-lunar">{lunarOf(day)}</i>
-              {stat?.expense ? <i className="out">{'-'}{money(stat.expense).replace('¥', '')}</i> : null}
-              {stat?.income ? <i className="in">+{money(stat.income).replace('¥', '')}</i> : null}
+              {showLunar && <i className="cal-lunar">{lunarOf(day)}</i>}
+              {showAmount && stat?.expense ? <i className="out">{'-'}{money(stat.expense).replace('¥', '')}</i> : null}
+              {showAmount && stat?.income ? <i className="in">+{money(stat.income).replace('¥', '')}</i> : null}
             </button>
           )
         })}
