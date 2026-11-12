@@ -382,11 +382,11 @@ export const useLedger = create<LedgerState>()(
         while (s.splitGroups.some((g) => g.splitGroupId === splitGroupId)) splitGroupId++
         const group: import('./types').SplitGroup = {
           splitGroupId, name: patch.name.trim() || 'AA 群组',
-          userId: s.userId, createTime: NOW(), updateTime: NOW()
+          userId: s.userId, bookId: s.currentBookId, createTime: NOW(), updateTime: NOW()
         }
         const members: import('./types').SplitMember[] = (patch.members ?? ['我']).map((name, i) => ({
           splitMemberId: splitGroupId * 100 + i, splitGroupId, name,
-          self: i === 0, userId: s.userId, updateTime: NOW()
+          self: i === 0, userId: s.userId, bookId: s.currentBookId, updateTime: NOW()
         }))
         set((st) => ({ splitGroups: [...st.splitGroups, group], splitMembers: [...st.splitMembers, ...members] }))
         return group
@@ -438,7 +438,7 @@ export const useLedger = create<LedgerState>()(
           title: bill.remark || 'AA 支出', amount: bill.cost,
           payerMemberId: payerMemberId ?? members.find((m) => m.self)?.splitMemberId ?? members[0].splitMemberId,
           splitType, settlement: false, time: bill.time,
-          userId: s.userId, updateTime: NOW()
+          userId: s.userId, bookId: bill.bookId ?? s.currentBookId, updateTime: NOW()
         }
         set((st) => ({
           bills: st.bills.map((b) => b.billId === billId
@@ -466,6 +466,7 @@ export const useLedger = create<LedgerState>()(
           primeCost: Number(patch.cost) || 0,
           historyIncome: 0,
           price: patch.price,
+          bookId: s.currentBookId,
           intoTotalAsset: true,
           addBill: patch.addBill ?? false,
           updateTime: NOW()
@@ -525,7 +526,7 @@ export const useLedger = create<LedgerState>()(
         const s = get()
         let templateId = Date.now()
         while (s.templates.some((t) => t.templateId === templateId)) templateId++
-        const tpl: import('./types').Template = { ...patch, templateId, updateTime: NOW() }
+        const tpl: import('./types').Template = { ...patch, templateId, bookId: patch.bookId ?? s.currentBookId, updateTime: NOW() }
         set((st) => ({ templates: [...st.templates, tpl] }))
         return tpl
       },
@@ -561,7 +562,7 @@ export const useLedger = create<LedgerState>()(
         const s = get()
         let loanId = Date.now()
         while (s.homeLoans.some((x) => x.loanId === loanId)) loanId++
-        const loan: import('./types').HomeLoan = { ...patch, loanId, updateTime: NOW() }
+        const loan: import('./types').HomeLoan = { ...patch, loanId, bookId: patch.bookId ?? s.currentBookId, updateTime: NOW() }
         set((st) => ({ homeLoans: [...st.homeLoans, loan] }))
         return loan
       },
@@ -572,7 +573,7 @@ export const useLedger = create<LedgerState>()(
         const s = get()
         let instalmentId = Date.now()
         while (s.instalments.some((x) => x.instalmentId === instalmentId)) instalmentId++
-        const rec: import('./types').Instalment = { ...patch, instalmentId, updateTime: NOW() }
+        const rec: import('./types').Instalment = { ...patch, instalmentId, bookId: patch.bookId ?? s.currentBookId, updateTime: NOW() }
         set((st) => ({ instalments: [...st.instalments, rec] }))
         return rec
       },

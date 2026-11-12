@@ -30,6 +30,8 @@ export interface HomeLoan {
   /** 关联的贷款账户 */
   assetId?: number
   updateTime?: number
+  /** 归属账本（共享账本按此作用域同步） */
+  bookId?: string | number
 }
 
 /** 一木：信用卡分期 */
@@ -48,6 +50,8 @@ export interface Instalment {
   billId?: string | number
   remark?: string
   updateTime?: number
+  /** 归属账本（共享账本按此作用域同步） */
+  bookId?: string | number
 }
 
 /** 一木：投资持仓（StockAsset） */
@@ -77,6 +81,8 @@ export interface StockAsset {
   intoTotalAsset?: boolean
   remark?: string
   updateTime?: number
+  /** 归属账本（共享账本按此作用域同步） */
+  bookId?: string | number
 }
 
 /** 一木：一笔持仓交易（StockInfo） */
@@ -91,6 +97,8 @@ export interface StockInfo {
   doTime: number
   remark?: string
   updateTime?: number
+  /** 归属账本（共享账本按此作用域同步） */
+  bookId?: string | number
 }
 
 /** 一木：模板（ModuleManagerActivity / AddModuleTransferActivity） */
@@ -103,6 +111,8 @@ export interface Template {
   /** 转账模板存档 */
   transfer?: { fromAssetId: number; toAssetId: number; cost: number; serviceCharge?: number; remark?: string }
   updateTime?: number
+  /** 归属账本（共享账本按此作用域同步） */
+  bookId?: string | number
 }
 
 /** 一木：账单组（把多条账单合成一条展示） */
@@ -132,6 +142,8 @@ export interface BillRelated {
   oneBillId: string | number
   twoBillId: string | number
   updateTime?: number
+  /** 归属账本（共享账本按此作用域同步） */
+  bookId?: string | number
 }
 
 /** 一木：AA 群组 */
@@ -141,6 +153,8 @@ export interface SplitGroup {
   userId?: number
   createTime?: number
   updateTime?: number
+  /** 归属账本（共享账本按此作用域同步） */
+  bookId?: string | number
 }
 
 /** 一木：群组成员，self 标记「我」 */
@@ -151,6 +165,8 @@ export interface SplitMember {
   self?: boolean
   userId?: number
   updateTime?: number
+  /** 归属账本（共享账本按此作用域同步） */
+  bookId?: string | number
 }
 
 /** 一木：AA 支出（按 sourceBillId 关联账单） */
@@ -170,6 +186,8 @@ export interface SplitExpense {
   time: number
   userId?: number
   updateTime?: number
+  /** 归属账本（共享账本按此作用域同步） */
+  bookId?: string | number
 }
 
 /** 一木：分摊明细，JSON 存进账单的 billShareInfo */

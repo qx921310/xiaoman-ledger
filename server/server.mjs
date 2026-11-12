@@ -506,8 +506,13 @@ const server = createServer(async (req, res) => {
       if (!user) return fail(res, '请先登录')
       const { bookId } = await readBody(req)
       if (!isAdmin(roleOf(bookId, user.id))) return fail(res, '只有「管理」可以清空账本数据')
-      const info = db.prepare('DELETE FROM records WHERE book_id = ?').run(bookId)
-      return ok(res, { removed: info.changes })
+      // 关键：不能物理删除。离线设备会拿着旧记录重推，物理删掉会被"复活"。
+      // 改成写墓碑（deleted=1, updated_at=now），旧数据推上来时因版本更旧被跳过。
+      const now = Date.now()
+      const info = db.prepare(`UPDATE records SET payload = 'null', deleted = 1, updated_at = ?
+        WHERE book_id = ? AND deleted = 0`).run(now, bookId)
+      db.prepare('DELETE FROM bill_periods WHERE book_id = ?').run(bookId)
+      return ok(res, { removed: info.changes, tombstoned: true, at: now })
     }
 
     if (path === '/api/books/leave' && req.method === 'POST') {
@@ -526,9 +531,10 @@ const server = createServer(async (req, res) => {
       if (!user) return fail(res, '请先登录')
       const body = await readBody(req)
       const list = Array.isArray(body.records) ? body.records : []
-      let accepted = 0, skipped = 0, denied = 0, duplicates = 0
+      let accepted = 0, skipped = 0, denied = 0, duplicates = 0, conflicts = 0
       // 逐条权威结果：客户端据此作废本地候选，而不是靠排序猜
       const authoritative = []
+      const conflicted = []
       db.exec('BEGIN IMMEDIATE')
       try { for (const r of list) {
         if (!r || typeof r.kind !== 'string' || r.id == null) { skipped++; continue }
@@ -571,6 +577,16 @@ const server = createServer(async (req, res) => {
         // 3) 版本比较（同一身份下）
         const mine = existing.find((e) => (e.book_id || null) === bookId)
         if (mine && (mine.updated_at > updatedAt || (mine.updated_at === updatedAt && mine.deleted && !r.deleted))) { skipped++; continue }
+        // 同一时间戳但内容不同：两台设备时钟相同时会互相覆盖，静默丢一方。
+        // 策略：保留服务端已有版本，把对方内容作为冲突回执返回，客户端标待核对。
+        if (mine && mine.updated_at === updatedAt && !r.deleted && !mine.deleted) {
+          const samePayload = String(mine.payload ?? '') === JSON.stringify(r.payload ?? null)
+          if (!samePayload) {
+            conflicts++
+            conflicted.push({ kind: r.kind, id: rid, reason: 'equal-timestamp', serverUpdatedAt: mine.updated_at })
+            continue
+          }
+        }
 
         let payload = r.payload ?? null
         // 周期账单：同一账本同一期只允许落地一条（服务端权威期号）
@@ -604,7 +620,7 @@ const server = createServer(async (req, res) => {
       upsertKv(`lastSync:${user.id}`, Date.now())
       db.exec('COMMIT')
       } catch (e) { db.exec('ROLLBACK'); throw e }
-      return ok(res, { accepted, skipped, denied, duplicates, authoritative, at: Date.now() })
+      return ok(res, { accepted, skipped, denied, duplicates, conflicts, authoritative, conflicted, at: Date.now() })
     }
 
     if (path === '/api/data/pull' && req.method === 'GET') {
