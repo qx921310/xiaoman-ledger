@@ -1050,3 +1050,8 @@ button.my-user {
 .guide-block { margin-bottom: var(--sp-3); }
 .guide-block ul { margin: 4px 0 0; padding-left: 18px; color: var(--muted); font-size: var(--font-sm); }
 .guide-block li { margin: 2px 0; }
+
+/* 账单多选（对齐 item_bill_main_list 的 radio_button 选中态） */
+.pick-bar { display: flex; align-items: center; gap: var(--sp-2); padding: 6px 0; }
+.pick-bar .muted { margin-right: auto; }
+.ledger-row.picked { background: var(--accent-soft); }

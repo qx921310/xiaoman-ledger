@@ -51,6 +51,15 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
   const [editingTransfer, setEditingTransfer] = useState<Transfer | null>(null)
 
   const [month, setMonth] = useState(monthOf(Date.now()))
+  // 一木列表支持多选（item_bill_main_list 的 radio_button）
+  const [selecting, setSelecting] = useState(false)
+  const [picked, setPicked] = useState<Set<string>>(new Set())
+  const togglePick = (id: string) => setPicked((prev) => {
+    const next = new Set(prev)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    return next
+  })
+  const exitSelect = () => { setSelecting(false); setPicked(new Set()) }
   const billGroups = useLedger((s) => s.billGroups)
   const dissolveBillGroup = useLedger((s) => s.dissolveBillGroup)
   const [kw, setKw] = useState('')
@@ -220,6 +229,31 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
           </div>
         )
       })}
+      {(list.length > 0 || tList.length > 0) && (
+        <div className="pick-bar">
+          {!selecting ? (
+            <button type="button" className="link" onClick={() => setSelecting(true)}>选择</button>
+          ) : (
+            <>
+              <span className="muted">已选 {picked.size} 条</span>
+              <button type="button" className="link" onClick={() => {
+                const all = new Set<string>([...list.map((b) => String(b.billId)), ...tList.map((t) => String(t.transferId))])
+                setPicked(picked.size === all.size ? new Set() : all)
+              }}>{picked.size === list.length + tList.length ? '取消全选' : '全选'}</button>
+              <button type="button" className="del" disabled={picked.size === 0} onClick={() => {
+                if (!confirm(`删除选中的 ${picked.size} 条记录？`)) return
+                for (const id of picked) {
+                  if (list.some((b) => String(b.billId) === id)) del(id)
+                  else delTransfer(Number(id))
+                }
+                exitSelect()
+              }}>删除</button>
+              <button type="button" className="link" onClick={exitSelect}>完成</button>
+            </>
+          )}
+        </div>
+      )}
+
       {groups.map(([day, rows]) => {
         const dayBills = rows.filter((it) => it.kind === 'bill').map((it) => (it as { b: Bill }).b)
         const daySum = summarizeBills(dayBills, parents, refunds)
@@ -240,7 +274,8 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
               const from = assets.find((a) => a.assetId === t.fromAssetId)
               const to = assets.find((a) => a.assetId === t.toAssetId)
               return (
-                <div key={'t' + t.transferId} className="row ledger-row">
+                <div key={'t' + t.transferId} className={'row ledger-row' + (picked.has(String(t.transferId)) ? ' picked' : '')}
+                  onClick={selecting ? () => togglePick(String(t.transferId)) : undefined}>
                   <i className="dot arrow">⇄</i>
                   <div className="grow">
                     <div>转账 · {from?.assetName ?? '已删除账户'} → {to?.assetName ?? '已删除账户'}</div>
@@ -263,7 +298,8 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
             const a = assets.find((x) => x.assetId === b.assetId)
             const inc = p?.kind === 'income'
             return (
-              <div key={b.billId} className={'row ledger-row' + (simpleView ? ' simple' : '')}>
+              <div key={b.billId} className={'row ledger-row' + (simpleView ? ' simple' : '') + (picked.has(String(b.billId)) ? ' picked' : '')}
+                onClick={selecting ? () => togglePick(String(b.billId)) : undefined}>
                 <span className="dot-badge" style={{ background: p?.bg ?? 'var(--accent-soft)', color: p?.color ?? 'var(--ink)' }}>
                   <CatIcon k={p?.icon} size={16} />
                 </span>
