@@ -7,6 +7,7 @@ import { errorMessage } from '../errors'
 import { AssetIcon } from '../ui/icons'
 import { ASSET_ICON_GROUPS } from '../ui/asset-icons'
 import { Modal } from '../ui/modal'
+import { usePullRefresh } from '../ui/use-pull-refresh'
 import { accountMoney, toBase } from '../money'
 import { visibleAssets } from '../domain/asset-scope'
 import { accountHistory } from '../domain/account-history'
@@ -111,15 +112,15 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
   // 一木：点净资产/存款/负债/组头 → 弹「构成」明细
   type CompRow = { name: string; amount: number; unit?: 'money' | 'count' | 'percent' }
   // 一木把「待报销 / 借出借入 / 投资持仓」做成独立页面；这里用条件渲染的子页复刻
-  const [screen, setScreen] = useState<'assets' | 'reimburse' | 'lend' | 'stock'>('assets')
+  const [screen, setScreen] = useState<'assets' | 'reimburse' | 'lend' | 'stock' | 'hidden'>('assets')
   const subpageTitle = useRef<HTMLHeadingElement>(null)
   // 只记录「从哪个卡片进来的」，不持有 DOM 节点（返回时卡片是重新渲染的，旧节点已卸载）
-  const cameFrom = useRef<'reimburse' | 'lend' | 'stock'>('reimburse')
+  const cameFrom = useRef<'reimburse' | 'lend' | 'stock' | 'hidden'>('reimburse')
   const rootRef = useRef<HTMLElement>(null)
-  const prevScreen = useRef<'assets' | 'reimburse' | 'lend' | 'stock'>('assets')
+  const prevScreen = useRef<'assets' | 'reimburse' | 'lend' | 'stock' | 'hidden'>('assets')
 
   /** 进入子页：压一条历史记录（去重，避免连点双压）；系统返回键可退回 */
-  const goto = (next: 'reimburse' | 'lend' | 'stock') => {
+  const goto = (next: 'reimburse' | 'lend' | 'stock' | 'hidden') => {
     cameFrom.current = next
     try {
       // 合并原 state，避免覆盖宿主或其他模块写进去的 history 字段
@@ -155,6 +156,12 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
     back?.focus()
   }, [screen])
   const [composition, setComposition] = useState<{ title: string; note?: string; rows: CompRow[] } | null>(null)
+  // 一木：资产页下拉进入「资产隐藏页面」
+  const hiddenPull = usePullRefresh(
+    async () => { setScreen('hidden') },
+    64,
+    { pulling: '下拉进入资产隐藏页面', released: '松开进入资产隐藏页面', busy: '正在打开…' }
+  )
   const openComposition = (title: string, rows: CompRow[], note?: string) =>
     setComposition({ title, note, rows: [...rows].sort((x, y) => Math.abs(y.amount) - Math.abs(x.amount)) })
   /** 账户 → 构成行；负债统一取绝对值，与顶部正数口径一致 */
@@ -183,10 +190,16 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
 
   return (
     <section ref={rootRef} className={screen === 'assets' ? 'card' : 'card subpage'}>
+      {(hiddenPull.progress > 0 || hiddenPull.busy) && screen === 'assets' && (
+        <div className="pull-tip" role="status" aria-live="polite">
+          {hiddenPull.busy ? hiddenPull.text.busy : hiddenPull.progress >= 1 ? hiddenPull.text.released : hiddenPull.text.pulling}
+        </div>
+      )}
+
       {screen !== 'assets' && (
         <div className="subpage-head">
           <button type="button" className="link" onClick={backToAssets}>‹ 返回资产</button>
-          <h3 ref={subpageTitle} tabIndex={-1}>{{ reimburse: '待报销', lend: '借入借出', stock: '投资持仓' }[screen]}</h3>
+          <h3 ref={subpageTitle} tabIndex={-1}>{{ reimburse: '待报销', lend: '借入借出', stock: '投资持仓', hidden: '隐藏资产' }[screen]}</h3>
         </div>
       )}
 
@@ -669,6 +682,47 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
 
       </div>
       )}
+      {screen === 'hidden' && (() => {
+          const hiddenAssets = assets.filter((a) => a.hide === true || a.intoTotalAsset === false)
+          const reimburseCards = hiddenAssets.filter((a) => a.assetType === 9)
+          const lendCards = hiddenAssets.filter((a) => a.assetType === 6 || a.assetType === 7)
+          const others = hiddenAssets.filter((a) => ![6, 7, 9].includes(a.assetType))
+          return (
+            <>
+              <p className="hint">这里是被隐藏或不计入总资产的账户。资产页下拉可再次进入本页。</p>
+              <div className="subpage-sum">
+                <div><small>隐藏账户</small><b>{hiddenAssets.length} 个</b></div>
+                <div><small>隐藏合计</small><b>{mask(hiddenAssets.reduce((s2, a) => s2 + Math.abs(toBase(a.assetNumber, a.currency, currencies, defaultCurrency)), 0))}</b></div>
+              </div>
+              {reimburseCards.length > 0 && (
+                <div className="cal-repay">
+                  <b>报销</b>
+                  {reimburseCards.map((a) => (
+                    <div key={a.assetId} className="row"><span className="grow">{a.simpleName || a.assetName}</span><b>{mask(a.assetNumber)}</b></div>
+                  ))}
+                </div>
+              )}
+              {lendCards.length > 0 && (
+                <div className="cal-repay">
+                  <b>借贷</b>
+                  {lendCards.map((a) => (
+                    <div key={a.assetId} className="row"><span className="grow">{a.simpleName || a.assetName}</span><b>{mask(a.assetNumber)}</b></div>
+                  ))}
+                </div>
+              )}
+              {others.length > 0 && (
+                <div className="cal-repay">
+                  <b>其他隐藏账户</b>
+                  {others.map((a) => (
+                    <div key={a.assetId} className="row"><span className="grow">{a.simpleName || a.assetName}</span><b>{mask(a.assetNumber)}</b></div>
+                  ))}
+                </div>
+              )}
+              {hiddenAssets.length === 0 && <p className="hint">没有隐藏的账户。</p>}
+            </>
+          )
+        })()}
+
       {screen === 'reimburse' && (<>
         <div className="subpage-sum">
           <div><small>未报销</small><b>{mask(pendingReimburse)}</b></div>
