@@ -74,6 +74,41 @@ export function CalendarPage({ onAddBill }: { onAddBill?: () => void } = {}) {
     return { income: +income.toFixed(2), expense: +expense.toFixed(2), balance: +(income - expense).toFixed(2) }
   }, [daily])
 
+  // 真周视图：从 picked 所在周的周日开始，连续 7 天（跨月也能正确显示）
+  const weekDays = useMemo(() => {
+    const base = new Date(`${picked ?? fullDay(Date.now())}T00:00:00`)
+    const start = new Date(base)
+    start.setDate(base.getDate() - base.getDay())
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(start)
+      d.setDate(start.getDate() + i)
+      return d
+    })
+  }, [picked])
+
+  /** 任意日期当天的收入/支出（周视图跨月时不能只查当月 daily） */
+  const statOf = (date: Date) => {
+    if (date.getFullYear() === year && date.getMonth() === monthIdx) return daily.get(fullDay(date.getTime())) ?? { income: 0, expense: 0, count: 0 }
+    let income = 0, expense = 0, count = 0
+    for (const b of bills) {
+      if (bookId !== 0 && String(b.bookId) !== String(bookId)) continue
+      if (fullDay(b.time) !== fullDay(date.getTime())) continue
+      if (!b.notIntoTotal) {
+        if (kindOf.get(b.parentCategoryId) === 'income') income = +(income + b.cost).toFixed(2)
+        else expense = +(expense + billNetAmount(b, refunds)).toFixed(2)
+      }
+      count++
+    }
+    return { income, expense, count }
+  }
+  const lunarOfDate = (date: Date) => {
+    try {
+      const solar = Solar.fromDate(date)
+      const lunar = solar.getLunar()
+      return solar.getFestivals()[0] ?? lunar.getFestivals()[0] ?? lunar.getJieQi() ?? lunar.getDayInChinese()
+    } catch { return '' }
+  }
+
   const pickedStat = (picked && daily.get(picked)) || { income: 0, expense: 0, count: 0 }
   /** 某天的农历（选中日头部用） */
   const dayLunar = (key: string) => {
@@ -92,8 +127,10 @@ export function CalendarPage({ onAddBill }: { onAddBill?: () => void } = {}) {
   const repayReminders = useMemo(() => {
     if (!picked) return []
     const dayNum = Number(picked.slice(8, 10))
+    const daysInThisMonth = new Date(year, monthIdx + 1, 0).getDate()
     const list = assets
-      .filter((a) => a.assetType === 2 && a.outAccountDate === dayNum)
+      .filter((a) => (bookId === 0 || a.bookId == null || String(a.bookId) === String(bookId)))
+      .filter((a) => a.assetType === 2 && Math.min(a.outAccountDate ?? 0, daysInThisMonth) === dayNum)
       .map((a) => ({ key: 'card-' + a.assetId, name: a.simpleName || a.assetName, due: Math.abs(a.assetNumber) }))
     return list
   }, [picked, assets])
@@ -126,18 +163,25 @@ export function CalendarPage({ onAddBill }: { onAddBill?: () => void } = {}) {
       <div className="cal-grid cal-weekdays">
         {['日', '一', '二', '三', '四', '五', '六'].map((w) => <span key={w}>{w}</span>)}
       </div>
-      {mode === 'week' && picked && <p className="hint">周视图：只显示 {picked} 所在的一周</p>}
+      {mode === 'week' ? (
+        <div className="cal-grid">
+          {weekDays.map((date) => {
+            const key = fullDay(date.getTime())
+            const stat = statOf(date)
+            return (
+              <button key={key} className={'cal-cell' + (picked === key ? ' on' : '')}
+                onClick={() => setPicked(key)} aria-label={`${date.getMonth() + 1}月${date.getDate()}日`}>
+                <em>{key === todayKey ? '今' : date.getDate()}</em>
+                <i className="cal-lunar">{lunarOfDate(date)}</i>
+                {stat.expense ? <i className="out">{'-'}{money(stat.expense).replace('¥', '')}</i> : null}
+                {stat.income ? <i className="in">+{money(stat.income).replace('¥', '')}</i> : null}
+              </button>
+            )
+          })}
+        </div>
+      ) : (
       <div className="cal-grid">
-        {(mode === 'week' && picked
-          ? cells.filter((d) => {
-            if (d == null) return false
-            const base = new Date(`${picked}T00:00:00`)
-            const weekStart = new Date(base)
-            weekStart.setDate(base.getDate() - base.getDay())
-            const cur = new Date(year, monthIdx, d)
-            return cur >= weekStart && cur <= new Date(weekStart.getTime() + 6 * 86400000)
-          }).map((d) => d)
-          : cells).map((day, i) => {
+        {cells.map((day, i) => {
           if (day == null) return <span key={'e' + i} className="cal-cell empty" />
           const stat = daily.get(keyOf(day))
           return (
@@ -151,6 +195,7 @@ export function CalendarPage({ onAddBill }: { onAddBill?: () => void } = {}) {
           )
         })}
       </div>
+      )}
 
       {picked && (
         <div className="cal-list">
