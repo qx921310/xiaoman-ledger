@@ -444,6 +444,15 @@ function BillDetail({ bill, me, onClose, onEdit }: {
   const isIncome = p?.kind === 'income'
   const tagColor = (name: string) => tags.find((t) => t.name === name)?.color
   const [memberMap, setMemberMap] = useState<Record<number, string>>({})
+  const instalments = useLedger((s2) => s2.instalments)
+  const addRefund = useLedger((s2) => s2.addRefund)
+  const addReimbursement = useLedger((s2) => s2.addReimbursement)
+  const [refundOpen, setRefundOpen] = useState(false)
+  const [refundAmt, setRefundAmt] = useState('')
+  const [claimOpen, setClaimOpen] = useState(false)
+  const [claimAsset, setClaimAsset] = useState(0)
+  const [claimAmt, setClaimAmt] = useState('')
+  const instalment = instalments.find((i) => String(i.billId) === String(bill.billId))
   useEffect(() => {
     bookApi.members(String(bill.bookId)).then((r) => {
       const m: Record<number, string> = {}
@@ -573,13 +582,57 @@ function BillDetail({ bill, me, onClose, onEdit }: {
             </span>
           </Row>
         )}
+        <Row label="入账日期">{bill.inAssetTime ? dayOf(bill.inAssetTime) : '—'}</Row>
+        <Row label="分期信息">{instalment ? `分 ${instalment.periods} 期 · ${money(instalment.totalNumber)}` : '未分期'}</Row>
         <Row label="记账人">
           {bill.ownerId == null || bill.ownerId === me?.id
             ? `${me?.email ?? '我'}（我）`
             : (memberMap[bill.ownerId] ?? `用户 #${bill.ownerId}`)}
         </Row>
 
+      {refundOpen && (
+        <Modal label="退款" onClose={() => setRefundOpen(false)}>
+          <h3>退款</h3>
+          <div className="label">退款金额</div>
+          <input aria-label="退款金额" inputMode="decimal" value={refundAmt}
+            onChange={(e) => setRefundAmt(e.target.value.replace(/[^\d.]/g, ''))} />
+          <div className="modal-btns">
+            <button className="ghost" onClick={() => setRefundOpen(false)}>取消</button>
+            <button className="primary" onClick={() => {
+              const v = Number(refundAmt) || 0
+              if (v > 0) { addRefund({ billId: bill.billId, number: v }); setRefundAmt(''); setRefundOpen(false) }
+            }}>保存退款</button>
+          </div>
+        </Modal>
+      )}
+
+      {claimOpen && (
+        <Modal label="报销" onClose={() => setClaimOpen(false)}>
+          <h3>报销</h3>
+          <div className="label">报销账户</div>
+          <select aria-label="报销账户" value={claimAsset} onChange={(e) => setClaimAsset(Number(e.target.value))}>
+            <option value={0}>请选择账户</option>
+            {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
+          </select>
+          <div className="label">报销金额</div>
+          <input aria-label="报销金额" inputMode="decimal" value={claimAmt}
+            onChange={(e) => setClaimAmt(e.target.value.replace(/[^\d.]/g, ''))} />
+          <div className="modal-btns">
+            <button className="ghost" onClick={() => setClaimOpen(false)}>取消</button>
+            <button className="primary" onClick={() => {
+              const v = Number(claimAmt) || 0
+              if (v > 0 && claimAsset) {
+                addReimbursement({ billId: bill.billId, assetId: claimAsset, number: v })
+                setClaimAmt(''); setClaimOpen(false)
+              }
+            }}>保存报销</button>
+          </div>
+        </Modal>
+      )}
+
       <div className="bill-page-actions">
+        <button className="ghost" onClick={() => setClaimOpen(true)}>报销</button>
+        <button className="ghost" onClick={() => setRefundOpen(true)}>退款</button>
         <button className="ghost" onClick={() => { del(bill.billId); onClose() }}>删除</button>
         <button className="primary" onClick={onEdit}>编辑</button>
       </div>
