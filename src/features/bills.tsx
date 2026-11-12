@@ -13,7 +13,15 @@ import { billNetAmount } from '../bill-amount'
 import { resolveBillChild } from '../taxonomy'
 import { summarizeBills } from '../bill-summary'
 
-export function Bills({ me, onAdd, embedded = false }: { me?: { id: number; email: string }; onAdd?: () => void; embedded?: boolean }) {
+export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleView = false }: {
+  me?: { id: number; email: string }
+  onAdd?: () => void
+  embedded?: boolean
+  /** 一木「范围」菜单：全部 / 按月 */
+  rangeAll?: boolean
+  /** 一木「视图」菜单：简约 / 详细 */
+  simpleView?: boolean
+}) {
   const bills = useLedger((s) => s.bills)
   const transfers = useLedger((s) => s.transfers)
   const parents = useLedger((s) => s.parentCategories)
@@ -64,7 +72,7 @@ export function Bills({ me, onAdd, embedded = false }: { me?: { id: number; emai
   }
   const match = (b: Bill) => {
     // 指定了日期范围时按范围过滤，不再受月份限制
-    if (!dateRangeActive && monthOf(b.time) !== month) return false
+    if (!rangeAll && !dateRangeActive && monthOf(b.time) !== month) return false
     if (currentBookId !== 0 && b.bookId !== currentBookId) return false
     if (fPid && b.parentCategoryId !== fPid) return false
     if (fAid && b.assetId !== fAid) return false
@@ -98,7 +106,7 @@ export function Bills({ me, onAdd, embedded = false }: { me?: { id: number; emai
   const list = useMemo(() => bills.filter((b) => !groupedIds.has(String(b.billId))).filter(match).sort((a, b) => b.time - a.time), [bills, month, kw, fPid, fAid, parents, currentBookId, fMin, fMax, fTag, fFrom, fTo, dateRangeActive])
 
   const tList = useMemo(() => transfers.filter((t) => {
-    if (!dateRangeActive && monthOf(t.time) !== month) return false
+    if (!rangeAll && !dateRangeActive && monthOf(t.time) !== month) return false
     if (currentBookId !== 0 && t.bookId !== undefined && String(t.bookId) !== String(currentBookId)) return false
     if (fAid && t.fromAssetId !== fAid && t.toAssetId !== fAid) return false
     if (fPid) return false
@@ -253,7 +261,7 @@ export function Bills({ me, onAdd, embedded = false }: { me?: { id: number; emai
             const a = assets.find((x) => x.assetId === b.assetId)
             const inc = p?.kind === 'income'
             return (
-              <div key={b.billId} className="row ledger-row">
+              <div key={b.billId} className={'row ledger-row' + (simpleView ? ' simple' : '')}>
                 <span className="dot-badge" style={{ background: p?.bg ?? 'var(--accent-soft)', color: p?.color ?? 'var(--ink)' }}>
                   <CatIcon k={p?.icon} size={16} />
                 </span>

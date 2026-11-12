@@ -898,3 +898,32 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   font: inherit; color: inherit; padding: 0; cursor: pointer; display: grid; gap: 2px;
 }
 .home-summary .hm-item:disabled { cursor: default; }
+
+/* 首页「更多」菜单（对齐 popup_home_menu）：视图/范围分段 + 功能项 */
+.menu-mask {
+  position: fixed; inset: 0; z-index: 60;
+  background: var(--scrim);
+  display: grid; align-items: start; justify-items: end;
+  padding: 56px var(--sp-3) var(--sp-3);
+}
+.home-menu {
+  width: min(320px, 100%); display: grid; gap: var(--sp-3);
+  background: var(--card); border-radius: var(--r-md);
+  padding: var(--sp-3); box-shadow: var(--shadow-2);
+}
+.hm-group { display: grid; gap: 6px; }
+.hm-label { font-size: var(--font-xs); color: var(--muted); }
+.hm-seg { display: flex; gap: 4px; background: var(--surface-2); border-radius: var(--r-sm); padding: 3px; }
+.hm-seg button {
+  flex: 1; border: 0; background: transparent; color: var(--muted);
+  font-size: var(--font-sm); padding: 7px 0; border-radius: var(--r-sm); cursor: pointer;
+}
+.hm-seg button.on { background: var(--card); color: var(--ink); font-weight: 600; box-shadow: var(--shadow-1); }
+.hm-item {
+  text-align: left; border: 0; background: transparent; color: var(--ink);
+  font-size: var(--font-sm); padding: 9px 0; cursor: pointer;
+  border-bottom: 1px solid var(--line);
+}
+.hm-item:last-child { border-bottom: 0; }
+.hm-item.muted, .hm-item:disabled { color: var(--muted); cursor: default; }
+.ledger-row.simple small { display: none; }
