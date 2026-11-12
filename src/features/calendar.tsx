@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Solar } from 'lunar-typescript'
 import { useLedger } from '../store'
 import { money, fullDay } from '../ui-format'
+import { toBase } from '../money'
 import { billNetAmount } from '../bill-amount'
 
 /** 日历：按月看每日收支（照一木「日历」标签的最小可用版） */
@@ -10,6 +11,8 @@ export function CalendarPage({ onAddBill }: { onAddBill?: () => void } = {}) {
   const parents = useLedger((s) => s.parentCategories)
   const refunds = useLedger((s) => s.refunds)
   const assets = useLedger((s) => s.assets)
+  const currencies = useLedger((s) => s.currencies)
+  const defaultCurrency = useLedger((s) => s.defaultCurrency)
   const bookId = useLedger((s) => s.currentBookId)
   const [cursor, setCursor] = useState(() => new Date())
   const [picked, setPicked] = useState<string | null>(null)
@@ -112,7 +115,10 @@ export function CalendarPage({ onAddBill }: { onAddBill?: () => void } = {}) {
     } catch { return '' }
   }
 
-  const pickedStat = (picked && daily.get(picked)) || { income: 0, expense: 0, count: 0 }
+  // 必须走 statOf：周视图可能选中非当前月的日期，daily 里没有那条数据
+  const pickedStat = picked
+    ? statOf(new Date(`${picked}T00:00:00`))
+    : { income: 0, expense: 0, count: 0 }
   /** 某天的农历（选中日头部用） */
   const dayLunar = (key: string) => {
     try {
@@ -134,9 +140,14 @@ export function CalendarPage({ onAddBill }: { onAddBill?: () => void } = {}) {
     const list = assets
       .filter((a) => (bookId === 0 || a.bookId == null || String(a.bookId) === String(bookId)))
       .filter((a) => a.assetType === 2 && Math.min(a.outAccountDate ?? 0, daysInThisMonth) === dayNum)
-      .map((a) => ({ key: 'card-' + a.assetId, name: a.simpleName || a.assetName, due: Math.abs(a.assetNumber) }))
+      .map((a) => ({
+        key: 'card-' + a.assetId,
+        name: a.simpleName || a.assetName,
+        // 原币换算成本位币，避免外币卡显示错币种
+        due: Math.abs(toBase(a.assetNumber, a.currency, currencies, defaultCurrency))
+      }))
     return list
-  }, [picked, assets])
+  }, [picked, assets, bookId, year, monthIdx])
 
   const pickedBills = picked
     ? bills.filter((b) => (bookId === 0 || String(b.bookId) === String(bookId)) && fullDay(b.time) === picked)

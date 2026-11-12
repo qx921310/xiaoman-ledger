@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useLedger, useTotalAssets } from '../store'
 import { ASSET_TYPE, LEND_TYPE } from '../types'
 import type { Asset } from '../types'
-import { money, dayOf } from '../ui-format'
+import { money, dayOf, fullDay } from '../ui-format'
 import { errorMessage } from '../errors'
 import { AssetIcon } from '../ui/icons'
 import { ASSET_ICON_GROUPS } from '../ui/asset-icons'
@@ -58,7 +58,7 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
   const [stockSell, setStockSell] = useState<Record<number, string>>({})
   const [stockSellAmt, setStockSellAmt] = useState<Record<number, string>>({})
   const [loanForm, setLoanForm] = useState({ name: '房贷', commercial: '', commercialRate: '4.3', provident: '', providentRate: '3.1', lprAdd: '', periods: '360', repayment: 'equal-payment' as 'equal-payment' | 'equal-principal' })
-  const [insForm, setInsForm] = useState({ total: '', periods: '12', serviceRate: '7.2', serviceType: 0, month: new Date().toISOString().slice(0, 7), assetId: 0 })
+  const [insForm, setInsForm] = useState({ total: '', periods: '12', serviceRate: '7.2', serviceType: 0, month: fullDay(Date.now()).slice(0, 7), assetId: 0 })
   const bills = useLedger((s) => s.bills)
   const allAssetsParents = useLedger((s) => s.parentCategories)
   const transfers = useLedger((s) => s.transfers)
@@ -384,7 +384,7 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
                 }}>刷新行情</button>
               </div>
               <div className="row2">
-                <input aria-label={`${h.name} 现价`} placeholder="当前价" defaultValue={h.price ?? ''}
+                <input key={`price-${h.stockAssetId}-${h.price ?? ''}`} aria-label={`${h.name} 现价`} placeholder="当前价" defaultValue={h.price ?? ''}
                   inputMode="decimal"
                   onBlur={(e) => { const v2 = Number(e.target.value); if (v2 > 0) setStockPrice(h.stockAssetId, v2) }} />
                 <input aria-label={`${h.name} 卖出份额`} placeholder="卖出份额" value={stockSell[h.stockAssetId] ?? ''}
