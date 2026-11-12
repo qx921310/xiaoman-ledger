@@ -172,6 +172,10 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
   const [assetSearchOpen, setAssetSearchOpen] = useState(false)
   const [assetKw, setAssetKw] = useState('')
   const [remindOpen, setRemindOpen] = useState(false)
+  const [bookScopeOpen, setBookScopeOpen] = useState(false)
+  const currentBookIdForScope = useLedger((st) => st.currentBookId)
+  // 私有资产（无 bookId）只属于本人，生效账本按当前账本判断
+  const bookScopeId = currentBookIdForScope === 0 ? (accountBooks[0]?.bookId ?? '') : currentBookIdForScope
   const [remindDays, setRemindDays] = useState<number>(() => {
     try { return Number(localStorage.getItem('xiaoman-repay-remind') ?? 3) } catch { return 3 }
   })
@@ -830,7 +834,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
               <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); setRemindOpen(true) }}>还款提醒</button>
               <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); onOpenStats?.() }}>资产统计</button>
               <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); setAssetSearchOpen(true) }}>搜索账户</button>
-              <button type="button" className="hm-item muted" disabled>生效账本（暂未实现）</button>
+              <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); setBookScopeOpen(true) }}>生效账本</button>
               <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); setDepositOpen(true) }}>定期存款</button>
               <button type="button" className="hm-item muted" disabled>更多数据（敬请期待）</button>
             </div>
@@ -844,6 +848,31 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
           <h3>资产分布</h3>
           <AssetSankey />
           <div className="modal-btns"><button type="button" className="ghost" onClick={() => setSankeyOpen(false)}>关闭</button></div>
+        </Modal>
+      )}
+
+      {bookScopeOpen && (
+        <Modal label="生效账本" onClose={() => setBookScopeOpen(false)}>
+          <h3>生效账本</h3>
+          <p className="hint">为每个账本设置需要显示/隐藏的资产账户。</p>
+          {assets.map((a) => {
+            const allBooks = accountBooks.map((b) => String(b.bookId))
+            const cur = String(bookScopeId)
+            // showBook 为空数组 = 全部账本可见
+            const scope = a.showBook && a.showBook.length ? a.showBook.map(String) : allBooks
+            const shown = scope.includes(cur)
+            return (
+              <label key={a.assetId} className="row asset-scope-row">
+                <span className="grow">{a.simpleName || a.assetName}</span>
+                <input type="checkbox" checked={shown} onChange={(e) => {
+                  const next = new Set(scope)
+                  if (e.target.checked) next.add(cur); else next.delete(cur)
+                  updateAsset({ ...a, showBook: next.size >= allBooks.length ? [] : [...next] })
+                }} />
+              </label>
+            )
+          })}
+          <div className="modal-btns"><button type="button" className="ghost" onClick={() => setBookScopeOpen(false)}>完成</button></div>
         </Modal>
       )}
 

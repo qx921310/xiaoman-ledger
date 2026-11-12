@@ -1055,3 +1055,6 @@ button.my-user {
 .pick-bar { display: flex; align-items: center; gap: var(--sp-2); padding: 6px 0; }
 .pick-bar .muted { margin-right: auto; }
 .ledger-row.picked { background: var(--accent-soft); }
+
+/* 生效账本：按账本勾选资产显示 */
+.asset-scope-row { align-items: center; }
