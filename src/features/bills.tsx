@@ -39,6 +39,7 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
   const updateBill = useLedger((s) => s.updateBill)
   const reimbursements = useLedger((s) => s.reimbursements)
   const refunds = useLedger((s) => s.refunds)
+  const userId = useLedger((s) => s.userId)
   const currentBookId = useLedger((s) => s.currentBookId)
   const allTags = useLedger((s) => s.tags)
   const tags = allTags.filter((t) => !t.hide)
@@ -281,6 +282,7 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
                       ? ` · ${b.currencyInfo} ${b.currencyAssetNumber.toFixed(2)}`
                       : (b.currencyInfo ? ' · ' + b.currencyInfo : '')}
                     {b.files?.length ? ` · ${b.files.length} 个附件` : ''}
+                    {b.ownerId && b.ownerId !== userId ? ` · 由成员记账` : ''}
                   </small>
                   {(reimbursements.some((r) => r.billId === b.billId) || (b.refundNum ?? 0) > 0 || (b.tags?.length ?? 0) > 0 || (b.files?.length ?? 0) > 0) && (
                     <div className="tags">

@@ -1045,3 +1045,8 @@ button.my-user {
 /* 愿望清单（对齐 activity_dream_list） */
 .dream-row { align-items: flex-start; gap: var(--sp-2); }
 .dream-row .hb-bar { margin-top: 4px; }
+
+/* 使用指南（对齐 activity_user_guide 的图文内容位） */
+.guide-block { margin-bottom: var(--sp-3); }
+.guide-block ul { margin: 4px 0 0; padding-left: 18px; color: var(--muted); font-size: var(--font-sm); }
+.guide-block li { margin: 2px 0; }

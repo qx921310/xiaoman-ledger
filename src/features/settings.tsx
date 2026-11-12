@@ -11,6 +11,7 @@ const APP_VERSION = 'v0.1.0'
 import { HiddenPage } from './hidden-page'
 import { DreamList } from './dream'
 import { AiTypeManager } from './ai-type'
+import { Guide } from './guide'
 import { usePullRefresh } from '../ui/use-pull-refresh'
 import { ROLE_LABEL } from '../ui/roles'
 import { validateBackup } from '../backup'
@@ -118,6 +119,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [profileOpen, setProfileOpen] = useState(false)
   const [dreamOpen, setDreamOpen] = useState(false)
   const [aiTypeOpen, setAiTypeOpen] = useState(false)
+  const [guideOpen, setGuideOpen] = useState(false)
   const [backupOpen, setBackupOpen] = useState(false)
   // 一木 UserInfoActivity：昵称与头像可改（本地保存，账号维度）
   const profileKey = `xiaoman-profile:${me?.id ?? 0}`
@@ -473,6 +475,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
 
       {dreamOpen && <DreamList onBack={() => setDreamOpen(false)} />}
       {aiTypeOpen && <AiTypeManager onBack={() => setAiTypeOpen(false)} notify={notify} />}
+      {guideOpen && <Guide onBack={() => setGuideOpen(false)} />}
 
       {profileOpen && (
         <Modal label="个人资料" onClose={() => setProfileOpen(false)}>
@@ -539,6 +542,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
             }
             if (key === 'dream') { setDreamOpen(true); return }
             if (key === 'ai') { setAiTypeOpen(true); return }
+            if (key === 'guide') { setGuideOpen(true); return }
             if (key === 'theme') { notify('敬请期待：主题设置'); return }
             notify('敬请期待')
           }}>{label}</button>
