@@ -169,6 +169,12 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
   const [sankeyOpen, setSankeyOpen] = useState(false)
   const [repayOpen, setRepayOpen] = useState(false)
   const [depositOpen, setDepositOpen] = useState(false)
+  const [assetSearchOpen, setAssetSearchOpen] = useState(false)
+  const [assetKw, setAssetKw] = useState('')
+  const [remindOpen, setRemindOpen] = useState(false)
+  const [remindDays, setRemindDays] = useState<number>(() => {
+    try { return Number(localStorage.getItem('xiaoman-repay-remind') ?? 3) } catch { return 3 }
+  })
   const [composition, setComposition] = useState<{ title: string; note?: string; rows: CompRow[] } | null>(null)
   // 一木：资产页下拉进入「资产隐藏页面」
   const hiddenPull = usePullRefresh(
@@ -821,9 +827,9 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
               <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); setScreen('hidden') }}>资产隐藏</button>
               <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); setSankeyOpen(true) }}>资产分布</button>
               <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); openComposition('资产组成', assetRows(assets)) }}>资产组成</button>
-              <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); setRepayOpen(true) }}>还款提醒</button>
+              <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); setRemindOpen(true) }}>还款提醒</button>
               <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); onOpenStats?.() }}>资产统计</button>
-              <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); onOpenSearch?.() }}>搜索账户</button>
+              <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); setAssetSearchOpen(true) }}>搜索账户</button>
               <button type="button" className="hm-item muted" disabled>生效账本（暂未实现）</button>
               <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); setDepositOpen(true) }}>定期存款</button>
               <button type="button" className="hm-item muted" disabled>更多数据（敬请期待）</button>
@@ -838,6 +844,44 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
           <h3>资产分布</h3>
           <AssetSankey />
           <div className="modal-btns"><button type="button" className="ghost" onClick={() => setSankeyOpen(false)}>关闭</button></div>
+        </Modal>
+      )}
+
+      {assetSearchOpen && (
+        <Modal label="搜索账户" onClose={() => setAssetSearchOpen(false)}>
+          <h3>搜索账户</h3>
+          <input className="sp-input" aria-label="搜索账户" autoFocus placeholder="账户名 / 分组"
+            value={assetKw} onChange={(e) => setAssetKw(e.target.value)} />
+          {assets
+            .filter((a) => !assetKw.trim() || (a.simpleName || a.assetName).includes(assetKw.trim()) || a.groupName?.includes(assetKw.trim()))
+            .map((a) => (
+              <div key={a.assetId} className="row">
+                <span className="grow">{a.simpleName || a.assetName}</span>
+                <span className="muted">{ASSET_TYPE[a.assetType] ?? ''}</span>
+                <b>{mask(a.assetNumber)}</b>
+              </div>
+            ))}
+          <div className="modal-btns"><button type="button" className="ghost" onClick={() => setAssetSearchOpen(false)}>关闭</button></div>
+        </Modal>
+      )}
+
+      {remindOpen && (
+        <Modal label="还款提醒" onClose={() => setRemindOpen(false)}>
+          <h3>还款提醒</h3>
+          <div className="label">提前天数</div>
+          <select aria-label="提前天数" value={remindDays}
+            onChange={(e) => { const v = Number(e.target.value); setRemindDays(v); try { localStorage.setItem('xiaoman-repay-remind', String(v)) } catch { /* 忽略 */ } }}>
+            {[1, 3, 5, 7].map((d) => <option key={d} value={d}>提前 {d} 天</option>)}
+          </select>
+          <div className="label">账户还款日</div>
+          {assets.filter((a) => a.assetType === 2).length === 0 && <p className="hint">没有信贷账户。</p>}
+          {assets.filter((a) => a.assetType === 2).map((a) => (
+            <div key={a.assetId} className="row">
+              <span className="grow">{a.simpleName || a.assetName}</span>
+              <span className="muted">{a.outAccountDate ? `每月 ${a.outAccountDate} 日` : '未设置'}</span>
+            </div>
+          ))}
+          <div className="modal-btns"><button type="button" className="ghost" onClick={() => setRemindOpen(false)}>完成</button></div>
         </Modal>
       )}
 
