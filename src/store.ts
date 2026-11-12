@@ -40,6 +40,8 @@ export interface Budget {
   budgetId?: number
   /** 预算名称，便于区分多个自定义预算 */
   budgetName?: string
+  /** 一木：预算可隐藏（隐藏后不出现在预算页，只在「隐藏内容」里可恢复） */
+  hide?: boolean
   /** 自定义区间（含首尾） */
   startTime?: number
   endTime?: number

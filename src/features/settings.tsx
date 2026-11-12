@@ -111,6 +111,8 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [syncBlocked, setSyncBlocked] = useState(0)
   const [autoSync, setAutoSync] = useState<AutoSyncState | null>(null)
   const [hiddenOpen, setHiddenOpen] = useState(false)
+  const budgets = useLedger((s2) => s2.budgets)
+  const setBudget = useLedger((s2) => s2.setBudget)
   const pull = usePullRefresh(async () => setHiddenOpen(true), 64,
     { pulling: '下拉进入隐藏内容', released: '松开进入隐藏内容', busy: '正在打开…' })
   useEffect(() => subscribeAutoSync(setAutoSync), [])
@@ -349,13 +351,22 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
           </div>
           <HiddenPage
             title="隐藏内容"
-            tip="被隐藏的账本与标签。下拉「我的」可再次进入。"
+            tip="被隐藏的账本、标签与预算。下拉「我的」可再次进入。"
             groups={[
               {
                 key: 'books', label: '账本',
                 rows: (accountBooks as Array<{ bookId?: string | number; accountBookName?: string; hide?: boolean }>)
                   .filter((b) => b.hide === true)
                   .map((b) => ({ key: String(b.bookId), name: b.accountBookName ?? '账本', value: '' }))
+              },
+              {
+                key: 'budgets', label: '预算',
+                rows: budgets.filter((b) => b.hide).map((b) => ({
+                  key: `budget-${b.month}-${b.categoryId}-${b.type ?? 'month'}`,
+                  name: `${b.budgetName || (b.categoryId === 0 ? '总预算' : `分类 ${b.categoryId}`)} · ${b.month}`,
+                  value: money(b.amount),
+                  onRestore: () => { setBudget({ ...b, hide: false }); notify('已恢复显示') }
+                }))
               },
               {
                 key: 'tags', label: '标签',
