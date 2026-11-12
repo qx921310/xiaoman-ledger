@@ -3,9 +3,16 @@ export const BILL_TYPE: Record<number, string> = {
   4: '周期记账', 5: '自动记账', 6: '模板记账'
 }
 
+// 一木 manager/t.java 的 k() 原样映射（资产构成与类型展示用词）
 export const ASSET_TYPE: Record<number, string> = {
-  1: '资金账户', 2: '信用卡', 3: '充值账户', 4: '投资理财',
-  5: '二手货物', 6: '借出', 7: '借入', 8: '贷款', 9: '报销'
+  1: '资金账户', 2: '信贷账户', 3: '充值账户', 4: '投资理财',
+  5: '二手货物', 6: '应收款/借出', 7: '应付款/借入', 8: '贷款',
+  9: '其他账户', 10: '房贷', 11: '理财账户'
+}
+
+// 一木 manager/t.java 的 j()：净资产 / 总资产 / 负资产 的口径名
+export const ASSET_TOTAL_LABEL: Record<number, string> = {
+  2: '负资产', 3: '净资产'
 }
 
 /** 信用卡余额以负数表示 */
