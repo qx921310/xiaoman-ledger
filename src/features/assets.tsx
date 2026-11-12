@@ -9,6 +9,7 @@ import { ASSET_ICON_GROUPS } from '../ui/asset-icons'
 import { Modal } from '../ui/modal'
 import { usePullRefresh } from '../ui/use-pull-refresh'
 import { HiddenPage } from './hidden-page'
+import { AssetSankey } from './asset-sankey'
 import { accountMoney, toBase } from '../money'
 import { visibleAssets } from '../domain/asset-scope'
 import { accountHistory } from '../domain/account-history'
@@ -26,7 +27,12 @@ function iconLabel(key: string): string {
   return ''
 }
 
-export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void; onOpenSettings?: () => void }) {
+export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
+  notify: (m: string) => void
+  onOpenSettings?: () => void
+  onOpenStats?: () => void
+  onOpenSearch?: () => void
+}) {
   const allAssets = useLedger((s) => s.assets)
   const currentBookId = useLedger((s) => s.currentBookId)
   const meId = useLedger((s) => s.userId)
@@ -157,6 +163,10 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
     const back = rootRef.current?.querySelector<HTMLElement>(`[data-asset-card="${cameFrom.current}"]`)
     back?.focus()
   }, [screen])
+  // 一木 popup_asset_menu：搜索账户/还款提醒/生效账本/定期存款/资产统计/资产隐藏/资产分布/更多数据/资产组成
+  const [settingOpen, setSettingOpen] = useState(false)
+  const [sankeyOpen, setSankeyOpen] = useState(false)
+  const [repayOpen, setRepayOpen] = useState(false)
   const [composition, setComposition] = useState<{ title: string; note?: string; rows: CompRow[] } | null>(null)
   // 一木：资产页下拉进入「资产隐藏页面」
   const hiddenPull = usePullRefresh(
@@ -226,7 +236,7 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
             <small>负债</small><b>{mask(liability)}</b>
           </button>
         </div>
-        {onOpenSettings && <button type="button" className="link asset-setting" onClick={onOpenSettings}>资产设置</button>}
+        {onOpenSettings && <button type="button" className="link asset-setting" onClick={() => setSettingOpen(true)}>资产设置</button>}
       </div>
 
       <div className="asset-cards">
@@ -800,6 +810,48 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
         <IconPicker value={newIcon} assetType={type}
           onChange={(icon) => setNewIcon(icon ?? '')}
           onClose={() => setPickerOpen(false)} />
+      )}
+
+      {settingOpen && (
+        <div className="menu-mask" onClick={() => setSettingOpen(false)}>
+          <div className="home-menu" role="dialog" aria-label="资产设置" onClick={(e) => e.stopPropagation()}>
+            <div className="hm-group">
+              <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); setScreen('hidden') }}>资产隐藏</button>
+              <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); setSankeyOpen(true) }}>资产分布</button>
+              <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); openComposition('资产组成', assetRows(assets)) }}>资产组成</button>
+              <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); setRepayOpen(true) }}>还款提醒</button>
+              <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); onOpenStats?.() }}>资产统计</button>
+              <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); onOpenSearch?.() }}>搜索账户</button>
+              <button type="button" className="hm-item muted" disabled>生效账本（暂未实现）</button>
+              <button type="button" className="hm-item muted" disabled>定期存款（敬请期待）</button>
+              <button type="button" className="hm-item muted" disabled>更多数据（敬请期待）</button>
+            </div>
+            <button type="button" className="ghost wide" onClick={() => setSettingOpen(false)}>关闭</button>
+          </div>
+        </div>
+      )}
+
+      {sankeyOpen && (
+        <Modal label="资产分布" onClose={() => setSankeyOpen(false)}>
+          <h3>资产分布</h3>
+          <AssetSankey />
+          <div className="modal-btns"><button type="button" className="ghost" onClick={() => setSankeyOpen(false)}>关闭</button></div>
+        </Modal>
+      )}
+
+      {repayOpen && (
+        <Modal label="还款提醒" onClose={() => setRepayOpen(false)}>
+          <h3>还款提醒</h3>
+          {assets.filter((a) => a.assetType === 2).length === 0 && <p className="hint">没有信贷账户。</p>}
+          {assets.filter((a) => a.assetType === 2).map((a) => (
+            <div key={a.assetId} className="row">
+              <span className="grow">{a.simpleName || a.assetName}</span>
+              <span className="muted">{a.outAccountDate ? `${a.outAccountDate} 日还款` : '未设还款日'}</span>
+              <b className="out">{mask(Math.abs(a.assetNumber))}</b>
+            </div>
+          ))}
+          <div className="modal-btns"><button type="button" className="ghost" onClick={() => setRepayOpen(false)}>关闭</button></div>
+        </Modal>
       )}
 
       {composition && (
