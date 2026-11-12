@@ -113,29 +113,37 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
   // 一木把「待报销 / 借出借入 / 投资持仓」做成独立页面；这里用条件渲染的子页复刻
   const [screen, setScreen] = useState<'assets' | 'reimburse' | 'lend' | 'stock'>('assets')
   const subpageTitle = useRef<HTMLHeadingElement>(null)
-  const triggerRef = useRef<HTMLElement | null>(null)
+  // 只记录「从哪个卡片进来的」，不持有 DOM 节点（返回时卡片是重新渲染的，旧节点已卸载）
+  const cameFrom = useRef<'reimburse' | 'lend' | 'stock'>('reimburse')
 
-  /** 进入子页：压一条历史记录，系统返回键可退回；同时记住触发元素用于焦点回归 */
-  const goto = (next: 'reimburse' | 'lend' | 'stock', from?: HTMLElement | null) => {
-    triggerRef.current = from ?? (document.activeElement as HTMLElement | null)
-    try { history.pushState({ assetsScreen: next }, '') } catch { /* file:// 等环境忽略 */ }
+  /** 进入子页：压一条历史记录（去重，避免连点双压）；系统返回键可退回 */
+  const goto = (next: 'reimburse' | 'lend' | 'stock') => {
+    cameFrom.current = next
+    try {
+      if (history.state?.assetsScreen !== next) history.pushState({ assetsScreen: next }, '')
+    } catch { /* file:// 等环境忽略 */ }
     setScreen(next)
   }
   const backToAssets = () => {
-    if (history.state?.assetsScreen) { history.back(); return }
+    // 以 React 状态为准，history 只作为「能否后退」的旁证，避免两者不同步时决策错误
+    if (screen !== 'assets' && history.state?.assetsScreen) { history.back(); return }
     setScreen('assets')
   }
   useEffect(() => {
     if (typeof window === 'undefined') return
     const onPop = (e: PopStateEvent) => {
-      if (!e.state?.assetsScreen) { setScreen('assets'); triggerRef.current?.focus?.() }
+      const next = e.state?.assetsScreen
+      // 前进/后退都按 history 的 state 恢复，保证双向可用
+      setScreen(next === 'reimburse' || next === 'lend' || next === 'stock' ? next : 'assets')
     }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
   }, [])
   useEffect(() => {
-    if (screen !== 'assets') subpageTitle.current?.focus()
-    else triggerRef.current?.focus?.()
+    if (screen !== 'assets') { subpageTitle.current?.focus(); return }
+    // 返回主页面：按 id 重新查找卡片再聚焦，不用可能已卸载的旧节点
+    const back = document.querySelector<HTMLElement>(`[data-asset-card="${cameFrom.current}"]`)
+    back?.focus()
   }, [screen])
   const [composition, setComposition] = useState<{ title: string; note?: string; rows: CompRow[] } | null>(null)
   const openComposition = (title: string, rows: CompRow[], note?: string) =>
@@ -197,17 +205,17 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
       </div>
 
       <div className="asset-cards">
-        <button type="button" className="asset-card" onClick={(e) => goto('reimburse', e.currentTarget)}>
+        <button type="button" className="asset-card" data-asset-card="reimburse" onClick={() => goto('reimburse')}>
           <small>待报销</small>
           <b>{mask(pendingReimburse)}</b>
           <small className="dim">已报 {mask(doneReimburse)}</small>
         </button>
-        <button type="button" className="asset-card" onClick={(e) => goto('lend', e.currentTarget)}>
+        <button type="button" className="asset-card" data-asset-card="lend" onClick={() => goto('lend')}>
           <small>借出借入</small>
           <b>{mask(receivable)}</b>
           <small className="dim">借入 {mask(payable)}</small>
         </button>
-        <button type="button" className="asset-card" onClick={(e) => goto('stock', e.currentTarget)}>
+        <button type="button" className="asset-card" data-asset-card="stock" onClick={() => goto('stock')}>
           <small>投资</small>
           <b>{mask(stockValue)}</b>
           <small className="dim">收益 {mask(stockProfit)}</small>
