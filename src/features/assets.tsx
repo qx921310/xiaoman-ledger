@@ -252,7 +252,8 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
         )
       })()}
 
-      <h3 id="block-stock">投资持仓</h3>
+      <details className="fold" id="block-stock">
+        <summary>投资持仓</summary>
       <p className="hint">按一木的持仓模型记录：买入/卖出自动算移动加权成本与已实现盈亏，填当前价看浮动盈亏。</p>
       <div className="row2">
         <input aria-label="持仓名称" value={stockForm.name} placeholder="名称，如 沪深300ETF"
@@ -333,7 +334,9 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
         )
       })}
 
-      <h3>房贷计划</h3>
+      </details>
+      <details className="fold">
+        <summary>房贷计划</summary>
       <p className="hint">组合贷：商业贷款 + 公积金贷款，支持等额本息/等额本金与 LPR 加点。</p>
       <div className="row2">
         <input aria-label="商业贷款金额" placeholder="商贷金额" value={loanForm.commercial} inputMode="decimal"
@@ -402,7 +405,9 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
         )
       })}
 
-      <h3>信用卡分期</h3>
+      </details>
+      <details className="fold">
+        <summary>信用卡分期</summary>
       <div className="row2">
         <input aria-label="分期本金" placeholder="分期本金" value={insForm.total} inputMode="decimal"
           onChange={(e) => setInsForm({ ...insForm, total: e.target.value.replace(/[^\d.]/g, '') })} />
@@ -461,6 +466,7 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
         )
       })}
 
+      </details>
       {editingAsset && (
         <AssetEditor
           asset={editingAsset}
@@ -469,7 +475,8 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
         />
       )}
 
-      <h3 id="block-lend">借入借出</h3>
+      <details className="fold" id="block-lend">
+        <summary>借入借出</summary>
       {(receivable !== 0 || payable !== 0) && (
         <p className="hint">待收回 {money(receivable)} · 待归还 {money(payable)}</p>
       )}
@@ -585,7 +592,9 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
         </Modal>
       )}
 
-      <div className="label">新增账户</div>
+      </details>
+      <details className="fold">
+        <summary>新增账户</summary>
       {/* 字段顺序照一木 AddCapitalActivity / AddCreditCardActivity */}
       <input aria-label="新账户名称" value={name} onChange={(e) => setName(e.target.value)} placeholder="账户名（如：招行储蓄卡）" />
       <div className="row2">
@@ -658,6 +667,7 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
           </div>
         </Modal>
       )}
+      </details>
     </section>
   )
 }
