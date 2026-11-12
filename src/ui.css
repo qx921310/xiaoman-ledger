@@ -1058,3 +1058,7 @@ button.my-user {
 
 /* 生效账本：按账本勾选资产显示 */
 .asset-scope-row { align-items: center; }
+
+/* 首页模块选择（对齐 dialog_bottom_custom_module 的「选择模块」） */
+.hm-check { align-items: center; border-bottom: 1px solid var(--line); padding: 8px 0; }
+.hm-check:last-child { border-bottom: 0; }

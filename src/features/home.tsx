@@ -48,6 +48,17 @@ export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot }:
   const [rangeAll, setRangeAll] = useState(false)
   // 下拉刷新：触发一次同步（对应一木各页的 pull_layout）
   const [pullAction, setPullAction] = useState<'sync' | 'add'>('sync')
+  // 数据小卡片：选择首页显示哪些模块（一木 dialog_bottom_custom_module）
+  const [modulesOpen, setModulesOpen] = useState(false)
+  const [modules, setModules] = useState<{ summary: boolean; budget: boolean; flow: boolean }>(() => {
+    try { return { summary: true, budget: true, flow: true, ...(JSON.parse(localStorage.getItem('xiaoman-home-modules') ?? '{}')) } }
+    catch { return { summary: true, budget: true, flow: true } }
+  })
+  const toggleModule = (k: 'summary' | 'budget' | 'flow') => {
+    const next = { ...modules, [k]: !modules[k] }
+    setModules(next)
+    try { localStorage.setItem('xiaoman-home-modules', JSON.stringify(next)) } catch { /* 忽略 */ }
+  }
   const { progress: pullProgress, busy: pulling, text: pullText } = usePullRefresh(
     async () => {
       if (pullAction === 'add') { onAdd(); return }
@@ -100,7 +111,7 @@ export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot }:
           </button>
         </div>
       </div>
-      <div className="home-summary">
+      {modules.summary && <div className="home-summary">
         <button type="button" className="hm-item" onClick={onOpenStats} disabled={!onOpenStats}>
           <small>本月支出</small>
           <b className="out">{money(used)}</b>
@@ -113,9 +124,9 @@ export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot }:
           <small>本月结余</small>
           <b>{money(summary.income - used)}</b>
         </button>
-      </div>
+      </div>}
 
-      {budgetTotal > 0 && (
+      {modules.budget && budgetTotal > 0 && (
         <div className="home-budget" role="group" aria-label="本月预算">
           <div className="hb-head">
             <span>本月预算 {money(budgetTotal)}</span>
@@ -123,6 +134,23 @@ export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot }:
           </div>
           <div className="hb-bar"><i style={{ width: `${percent}%` }} /></div>
           <small>剩余 {money(Math.max(0, budgetTotal - budgetUsed))}</small>
+        </div>
+      )}
+
+      {modulesOpen && (
+        <div className="menu-mask" onClick={() => setModulesOpen(false)}>
+          <div className="home-menu" role="dialog" aria-label="选择模块" onClick={(e) => e.stopPropagation()}>
+            <div className="hm-label">选择模块</div>
+            <div className="hm-group">
+              {([['summary', '本月收支汇总'], ['budget', '预算进度'], ['flow', '账单流水']] as const).map(([k, label]) => (
+                <label key={k} className="row hm-check">
+                  <span className="grow">{label}</span>
+                  <input type="checkbox" checked={modules[k]} onChange={() => toggleModule(k)} />
+                </label>
+              ))}
+            </div>
+            <button type="button" className="ghost wide" onClick={() => setModulesOpen(false)}>完成</button>
+          </div>
         </div>
       )}
 
@@ -158,7 +186,7 @@ export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot }:
               <button type="button" className="hm-item" onClick={() => { setMenuOpen(false); onMore?.() }}>截图导入</button>
             </div>
             <div className="hm-group">
-              <button type="button" className="hm-item muted" disabled>数据小卡片（暂不支持）</button>
+              <button type="button" className="hm-item" onClick={() => { setMenuOpen(false); setModulesOpen(true) }}>数据小卡片</button>
               <button type="button" className="hm-item muted" disabled>扫一扫（平台限制）</button>
               <button type="button" className="hm-item muted" disabled>本地 MCP（暂不支持）</button>
             </div>
@@ -167,10 +195,10 @@ export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot }:
         </div>
       )}
 
-      <div className="home-flow">
+      {modules.flow && <div className="home-flow">
         <div className="hf-head">流水</div>
         <Bills me={me} onAdd={onAdd} embedded rangeAll={rangeAll} simpleView={simpleView} />
-      </div>
+      </div>}
     </section>
   )
 }
