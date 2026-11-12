@@ -1103,3 +1103,9 @@ button.cycle-open {
   border: 0; background: transparent; text-align: left; font: inherit; color: inherit;
   cursor: pointer; display: block; width: 100%;
 }
+
+/* 账单组标题可点 */
+button.day-btn {
+  width: 100%; border: 0; background: transparent; text-align: left;
+  font: inherit; color: inherit; cursor: pointer; display: flex; justify-content: space-between;
+}

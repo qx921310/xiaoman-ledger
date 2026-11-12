@@ -9,6 +9,7 @@ import { parseShares, splitAmounts } from '../domain/split'
 import { AssetIcon, CatIcon } from '../ui/icons'
 import { TransferEditor } from './transfer-editor'
 import { Modal } from '../ui/modal'
+import { FilteredBills } from './filtered-bills'
 import { accountMoney, fromBase, hasCurrencyRate } from '../money'
 import { billNetAmount } from '../bill-amount'
 import { resolveBillChild } from '../taxonomy'
@@ -52,6 +53,7 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
 
   const [month, setMonth] = useState(monthOf(Date.now()))
   // 一木列表支持多选（item_bill_main_list 的 radio_button）
+  const [drill, setDrill] = useState<{ title: string; ids: string[] } | null>(null)
   const [selecting, setSelecting] = useState(false)
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const togglePick = (id: string) => setPicked((prev) => {
@@ -159,8 +161,17 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
     return [...m.entries()]
   }, [list, tList])
 
+  if (drill) {
+    return (
+      <FilteredBills title={drill.title}
+        bills={bills.filter((b) => drill.ids.includes(String(b.billId)))}
+        onBack={() => setDrill(null)} />
+    )
+  }
+
   return (
     <section className={embedded ? 'card embedded' : 'card'}>
+
       {!embedded && (
       <div className="row2">
         <div>
@@ -211,7 +222,9 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
         if (!first) return null
         return (
           <div key={'g' + g.billGroupId} className="group">
-            <div className="day"><span>账单组</span><small>{members.length} 笔 · 合计 {money(g.totalNumber)}</small></div>
+            <button type="button" className="day day-btn" onClick={() => setDrill({ title: '账单组明细', ids: members.map((m) => String(m.billId)) })}>
+              <span>账单组</span><small>{members.length} 笔 · 合计 {money(g.totalNumber)} ›</small>
+            </button>
             {members.map((m) => (
               <div key={'gm' + String(m.billId)} className="row">
                 <i className="dot">·</i>
