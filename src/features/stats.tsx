@@ -55,6 +55,32 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
   const totalBudget = limitOf(monthBudgets.find((b) => b.categoryId === 0) ?? { amount: 0 })
   const catBudgets = monthBudgets.filter((b) => b.categoryId !== 0)
   // 每日支出序列（一木普通页柱状图：按日看收支）
+  // 资产走势：当前净资产为终点，按区间内每日净收支回推（一木「资产走势」模块）
+  const assetTrend = useMemo(() => {
+    const dayNet = new Map<string, number>()
+    for (const b of rangeBills) {
+      if (b.notIntoTotal) continue
+      const d = new Date(b.time)
+      const key = `${d.getMonth() + 1}/${d.getDate()}`
+      const income = parents.find((p) => p.id === b.parentCategoryId)?.kind === 'income'
+      const delta = income ? b.cost : -billNetAmount(b, refunds)
+      dayNet.set(key, +((dayNet.get(key) ?? 0) + delta).toFixed(2))
+    }
+    const keys = [...dayNet.keys()].sort((a, b) => {
+      const [am, ad] = a.split('/').map(Number)
+      const [bm, bd] = b.split('/').map(Number)
+      return am - bm || ad - bd
+    })
+    const total = assets.reduce((n, a) => n + (a.intoTotalAsset !== false && !a.hide ? a.assetNumber : 0), 0)
+    let running = total
+    const out: Array<{ label: string; 净值: number }> = []
+    for (let i = keys.length - 1; i >= 0; i--) {
+      out.unshift({ label: keys[i], 净值: +running.toFixed(2) })
+      running -= dayNet.get(keys[i]) ?? 0
+    }
+    return out
+  }, [rangeBills, parents, refunds, assets])
+
   const daySeries = useMemo(() => {
     const map = new Map<string, number>()
     for (const b of monthBills) {
@@ -366,6 +392,64 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
           </div>
         )
       })()}
+
+      {mods['标签占比'] && tagRows.length > 0 && (
+        <>
+          <div className="label">标签占比</div>
+          <div className="stats-chart" role="img" aria-label="标签支出占比饼图">
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie data={tagRows.slice(0, 6).map((r) => ({ name: r.name, value: r.amount }))}
+                  dataKey="value" nameKey="name" innerRadius={48} outerRadius={78} paddingAngle={2}>
+                  {tagRows.slice(0, 6).map((r, i) => (
+                    <Cell key={r.name} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(v) => money(Number(v))} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </>
+      )}
+
+      {mods['收支对比'] && (() => {
+        const compare = [
+          { label: '收入', 金额: rangeSummary.income },
+          { label: '支出', 金额: rangeSummary.expense },
+          { label: '结余', 金额: +(rangeSummary.income - rangeSummary.expense).toFixed(2) }
+        ]
+        return (
+          <>
+            <div className="label">收支对比</div>
+            <div className="stats-chart" role="img" aria-label="收支对比条形图">
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart data={compare} layout="vertical">
+                  <XAxis type="number" hide />
+                  <YAxis type="category" dataKey="label" width={48} tick={{ fontSize: 11 }} />
+                  <Tooltip formatter={(v) => money(Number(v))} />
+                  <Bar dataKey="金额" fill="var(--accent)" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </>
+        )
+      })()}
+
+      {mods['资产走势'] && (
+        <>
+          <div className="label">资产走势</div>
+          <div className="stats-chart" role="img" aria-label="资产走势折线图">
+            <ResponsiveContainer width="100%" height={180}>
+              <LineChart data={assetTrend}>
+                <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                <YAxis hide />
+                <Tooltip formatter={(v) => money(Number(v))} />
+                <Line type="monotone" dataKey="净值" stroke="var(--accent)" dot={false} strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </>
+      )}
 
       {mods['支出占比'] && expenseRows.length > 0 && (
         <>
