@@ -8,6 +8,7 @@ import { AssetIcon } from '../ui/icons'
 import { ASSET_ICON_GROUPS } from '../ui/asset-icons'
 import { Modal } from '../ui/modal'
 import { usePullRefresh } from '../ui/use-pull-refresh'
+import { HiddenPage } from './hidden-page'
 import { accountMoney, toBase } from '../money'
 import { visibleAssets } from '../domain/asset-scope'
 import { accountHistory } from '../domain/account-history'
@@ -682,46 +683,35 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
 
       </div>
       )}
-      {screen === 'hidden' && (() => {
-          const hiddenAssets = assets.filter((a) => a.hide === true || a.intoTotalAsset === false)
-          const reimburseCards = hiddenAssets.filter((a) => a.assetType === 9)
-          const lendCards = hiddenAssets.filter((a) => a.assetType === 6 || a.assetType === 7)
-          const others = hiddenAssets.filter((a) => ![6, 7, 9].includes(a.assetType))
-          return (
-            <>
-              <p className="hint">这里是被隐藏或不计入总资产的账户。资产页下拉可再次进入本页。</p>
-              <div className="subpage-sum">
-                <div><small>隐藏账户</small><b>{hiddenAssets.length} 个</b></div>
-                <div><small>隐藏合计</small><b>{mask(hiddenAssets.reduce((s2, a) => s2 + Math.abs(toBase(a.assetNumber, a.currency, currencies, defaultCurrency)), 0))}</b></div>
-              </div>
-              {reimburseCards.length > 0 && (
-                <div className="cal-repay">
-                  <b>报销</b>
-                  {reimburseCards.map((a) => (
-                    <div key={a.assetId} className="row"><span className="grow">{a.simpleName || a.assetName}</span><b>{mask(a.assetNumber)}</b></div>
-                  ))}
-                </div>
-              )}
-              {lendCards.length > 0 && (
-                <div className="cal-repay">
-                  <b>借贷</b>
-                  {lendCards.map((a) => (
-                    <div key={a.assetId} className="row"><span className="grow">{a.simpleName || a.assetName}</span><b>{mask(a.assetNumber)}</b></div>
-                  ))}
-                </div>
-              )}
-              {others.length > 0 && (
-                <div className="cal-repay">
-                  <b>其他隐藏账户</b>
-                  {others.map((a) => (
-                    <div key={a.assetId} className="row"><span className="grow">{a.simpleName || a.assetName}</span><b>{mask(a.assetNumber)}</b></div>
-                  ))}
-                </div>
-              )}
-              {hiddenAssets.length === 0 && <p className="hint">没有隐藏的账户。</p>}
-            </>
-          )
-        })()}
+      {screen === 'hidden' && (
+        <HiddenPage
+          title="隐藏资产"
+          tip="这里是被隐藏或不计入总资产的账户。资产页下拉可再次进入本页。"
+          summary={[
+            { label: '隐藏账户', value: `${assets.filter((a) => a.hide === true || a.intoTotalAsset === false).length} 个` },
+            { label: '隐藏合计', value: mask(assets.filter((a) => a.hide === true || a.intoTotalAsset === false)
+              .reduce((s2, a) => s2 + Math.abs(toBase(a.assetNumber, a.currency, currencies, defaultCurrency)), 0)) }
+          ]}
+          groups={[
+            {
+              key: 'reimburse', label: '报销',
+              rows: assets.filter((a) => (a.hide === true || a.intoTotalAsset === false) && a.assetType === 9)
+                .map((a) => ({ key: String(a.assetId), name: a.simpleName || a.assetName, value: mask(a.assetNumber) }))
+            },
+            {
+              key: 'lend', label: '借贷',
+              rows: assets.filter((a) => (a.hide === true || a.intoTotalAsset === false) && (a.assetType === 6 || a.assetType === 7))
+                .map((a) => ({ key: String(a.assetId), name: a.simpleName || a.assetName, value: mask(a.assetNumber) }))
+            },
+            {
+              key: 'other', label: '其他隐藏账户',
+              rows: assets.filter((a) => (a.hide === true || a.intoTotalAsset === false) && ![6, 7, 9].includes(a.assetType))
+                .map((a) => ({ key: String(a.assetId), name: a.simpleName || a.assetName, value: mask(a.assetNumber) }))
+            }
+          ]}
+          emptyText="没有隐藏的账户。"
+        />
+      )}
 
       {screen === 'reimburse' && (<>
         <div className="subpage-sum">

@@ -6,6 +6,8 @@ import { books as bookApi, type BookInfo } from '../auth'
 import { syncNow, getVersionedConflicts, getVersionedRecovery, keepLocalConflict, acceptRemoteConflict, previewVersionedConflict } from '../sync'
 import { syncNowImmediate, getLastSyncResult, subscribeAutoSync, type AutoSyncState } from '../sync-auto'
 import { money } from '../ui-format'
+import { HiddenPage } from './hidden-page'
+import { usePullRefresh } from '../ui/use-pull-refresh'
 import { ROLE_LABEL } from '../ui/roles'
 import { validateBackup } from '../backup'
 import { DEFAULT_BOOK_COLOR } from '../default-colors'
@@ -108,6 +110,9 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [syncConflicts, setSyncConflicts] = useState(getVersionedConflicts)
   const [syncBlocked, setSyncBlocked] = useState(0)
   const [autoSync, setAutoSync] = useState<AutoSyncState | null>(null)
+  const [hiddenOpen, setHiddenOpen] = useState(false)
+  const pull = usePullRefresh(async () => setHiddenOpen(true), 64,
+    { pulling: '下拉进入隐藏内容', released: '松开进入隐藏内容', busy: '正在打开…' })
   useEffect(() => subscribeAutoSync(setAutoSync), [])
   const [conflictPreview, setConflictPreview] = useState<Awaited<ReturnType<typeof previewVersionedConflict>> | null>(null)
   useEffect(() => subscribeAutoSync(() => setSyncConflicts(getVersionedConflicts())), [])
@@ -329,6 +334,39 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   return (
     <section className="card">
       <h2 className="page-title">我的</h2>
+
+      {(pull.progress > 0 || pull.busy) && !hiddenOpen && (
+        <div className="pull-tip" role="status" aria-live="polite">
+          {pull.busy ? pull.text.busy : pull.progress >= 1 ? pull.text.released : pull.text.pulling}
+        </div>
+      )}
+
+      {hiddenOpen && (
+        <>
+          <div className="subpage-head">
+            <button type="button" className="link" onClick={() => setHiddenOpen(false)}>‹ 返回</button>
+            <h3>隐藏内容</h3>
+          </div>
+          <HiddenPage
+            title="隐藏内容"
+            tip="被隐藏的账本与标签。下拉「我的」可再次进入。"
+            groups={[
+              {
+                key: 'books', label: '账本',
+                rows: (accountBooks as Array<{ bookId?: string | number; accountBookName?: string; hide?: boolean }>)
+                  .filter((b) => b.hide === true)
+                  .map((b) => ({ key: String(b.bookId), name: b.accountBookName ?? '账本', value: '' }))
+              },
+              {
+                key: 'tags', label: '标签',
+                rows: (useLedger.getState().tags ?? []).filter((t) => t.hide).map((t) => ({ key: String(t.tagId), name: t.name, value: '' }))
+              },
+            ]}
+            emptyText="没有被隐藏的内容。"
+          />
+        </>
+      )}
+
 
       <div className="me-book">
         <label className="label" htmlFor="me-book-switch">当前账本</label>
