@@ -135,6 +135,8 @@ interface LedgerState {
   deleteStockAsset: (stockAssetId: number) => void
   /** 买入/卖出：更新持仓成本与已实现盈亏，并记录一笔 StockInfo */
   tradeStock: (stockAssetId: number, type: 1 | 2, num: number, amount: number, fee?: number, time?: number) => boolean
+  /** 一木 StockHideActivity：切换持仓的隐藏状态 */
+  setStockHidden: (stockAssetId: number, hidden: boolean) => void
   setStockPrice: (stockAssetId: number, price: number) => void
   setStockCostMethod: (stockAssetId: number, method: 0 | 1 | 2) => void
   addTemplate: (patch: Omit<import('./types').Template, 'templateId' | 'updateTime'>) => import('./types').Template
@@ -478,6 +480,11 @@ export const useLedger = create<LedgerState>()(
       settleSplit: (splitExpenseId, settlement) => set((s) => ({
         splitExpenses: s.splitExpenses.map((x) => x.splitExpenseId === splitExpenseId
           ? { ...x, settlement, updateTime: NOW() } : x)
+      })),
+
+      setStockHidden: (stockAssetId, hidden) => set((s) => ({
+        stockAssets: s.stockAssets.map((st) => st.stockAssetId === stockAssetId
+          ? { ...st, hide: hidden, updateTime: NOW() } : st)
       })),
 
       addStockAsset: (patch) => {

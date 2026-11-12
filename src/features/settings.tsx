@@ -357,7 +357,8 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
                 key: 'books', label: '账本',
                 rows: (accountBooks as Array<{ bookId?: string | number; accountBookName?: string; hide?: boolean }>)
                   .filter((b) => b.hide === true)
-                  .map((b) => ({ key: String(b.bookId), name: b.accountBookName ?? '账本', value: '' }))
+                  .map((b) => ({ key: String(b.bookId), name: b.accountBookName ?? '账本', value: '',
+                    onRestore: () => { updateBookMeta(String(b.bookId), { hide: false }); notify('已恢复显示') } }))
               },
               {
                 key: 'budgets', label: '预算',
@@ -370,7 +371,10 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
               },
               {
                 key: 'tags', label: '标签',
-                rows: (useLedger.getState().tags ?? []).filter((t) => t.hide).map((t) => ({ key: String(t.tagId), name: t.name, value: '' }))
+                rows: (useLedger.getState().tags ?? []).filter((t) => t.hide).map((t) => ({
+                  key: String(t.tagId), name: t.name, value: '',
+                  onRestore: () => { updateTag(t.tagId, { hide: false }); notify('已恢复显示') }
+                }))
               },
             ]}
             emptyText="没有被隐藏的内容。"
