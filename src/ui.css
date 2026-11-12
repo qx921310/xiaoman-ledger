@@ -844,3 +844,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .topbar { padding: 10px 12px 4px; }
   .toast { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
 }
+
+/* 我的页顶部：页面标题 + 账本切换 + 同步状态 */
+.page-title { margin: 0 0 var(--sp-3); font-size: var(--font-lg); }
+.me-book { display: grid; gap: 4px; margin-bottom: var(--sp-3); }
+.me-book select { width: 100%; }
+.me-sync {
+  font-size: var(--font-xs); color: var(--muted);
+  background: var(--surface-2); border-radius: var(--r-sm);
+  padding: 8px 10px; margin-bottom: var(--sp-3);
+}

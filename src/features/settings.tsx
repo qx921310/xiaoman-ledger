@@ -4,7 +4,7 @@ import type { Cycle } from '../types'
 import type { ImportPlan } from '../importer'
 import { books as bookApi, type BookInfo } from '../auth'
 import { syncNow, getVersionedConflicts, getVersionedRecovery, keepLocalConflict, acceptRemoteConflict, previewVersionedConflict } from '../sync'
-import { syncNowImmediate, getLastSyncResult, subscribeAutoSync } from '../sync-auto'
+import { syncNowImmediate, getLastSyncResult, subscribeAutoSync, type AutoSyncState } from '../sync-auto'
 import { money } from '../ui-format'
 import { ROLE_LABEL } from '../ui/roles'
 import { validateBackup } from '../backup'
@@ -107,6 +107,8 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [syncing, setSyncing] = useState(false)
   const [syncConflicts, setSyncConflicts] = useState(getVersionedConflicts)
   const [syncBlocked, setSyncBlocked] = useState(0)
+  const [autoSync, setAutoSync] = useState<AutoSyncState | null>(null)
+  useEffect(() => subscribeAutoSync(setAutoSync), [])
   const [conflictPreview, setConflictPreview] = useState<Awaited<ReturnType<typeof previewVersionedConflict>> | null>(null)
   useEffect(() => subscribeAutoSync(() => setSyncConflicts(getVersionedConflicts())), [])
   const currencies = useLedger((s) => s.currencies)
@@ -326,6 +328,27 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
 
   return (
     <section className="card">
+      <h2 className="page-title">我的</h2>
+
+      <div className="me-book">
+        <label className="label" htmlFor="me-book-switch">当前账本</label>
+        <select id="me-book-switch" value={String(currentBookId)}
+          onChange={(e) => { const v = e.target.value; setBook(v === '0' ? 0 : v) }}>
+          {accountBooks.filter((b) => b.bookId != null).map((b) => (
+            <option key={String(b.bookId)} value={String(b.bookId)}>{b.accountBookName}</option>
+          ))}
+        </select>
+        <small className="muted">{currentBook?.role === 'admin' ? '管理' : currentBook?.role === 'peer' ? '可协作' : '只读'}</small>
+      </div>
+
+      <div className="me-sync">
+        {autoSync?.running ? '同步中…'
+          : autoSync?.lastError ? `同步失败：${autoSync.lastError}（点下方「立即同步」重试）`
+          : autoSync?.pending ? '有改动待同步'
+          : autoSync?.lastOkAt ? `上次同步 ${new Date(autoSync.lastOkAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`
+          : '尚未同步'}
+      </div>
+
       <h3>从其他记账软件迁移</h3>
       <p className="hint">
         支持 <b>一木记账导出的 Excel/CSV</b>（表头含 日期/收支类型/金额/类别/二级分类/账户）、
