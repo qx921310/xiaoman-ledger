@@ -948,3 +948,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   padding-bottom: var(--sp-2); border-bottom: 1px solid var(--line);
 }
 .sp-row { width: 100%; text-align: left; border: 0; background: transparent; font: inherit; color: inherit; cursor: pointer; }
+
+/* 下拉刷新提示 */
+.pull-tip {
+  text-align: center; font-size: var(--font-xs); color: var(--muted);
+  padding: 4px 0; min-height: 20px;
+}
+/* 搜索页筛选面板 */
+.sp-filter { display: grid; gap: var(--sp-2); padding: var(--sp-2) 0; border-block: 1px solid var(--line); }
+.sp-filter select { width: 100%; }

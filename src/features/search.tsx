@@ -16,11 +16,17 @@ export function Search({ onClose, onPick }: { onClose: () => void; onPick?: (bil
   const parents = useLedger((s) => s.parentCategories)
   const refunds = useLedger((s) => s.refunds)
   const tags = useLedger((s) => s.tags)
+  const assets = useLedger((s) => s.assets)
   const bookId = useLedger((s) => s.currentBookId)
   const billTags = useLedger((s) => (s as unknown as { billTags?: Array<{ billId: number | string; tagId: number }> }).billTags ?? [])
 
   const [kw, setKw] = useState('')
   const [sort, setSort] = useState<'time' | 'amount'>('time')
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [fPid, setFPid] = useState<number | 0>(0)
+  const [fAid, setFAid] = useState<number | 0>(0)
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
   const [history, setHistory] = useState<string[]>([])
 
   useEffect(() => {
@@ -41,7 +47,7 @@ export function Search({ onClose, onPick }: { onClose: () => void; onPick?: (bil
   const terms = useMemo(() => kw.trim().split(/\s+/).filter(Boolean), [kw])
 
   const hits = useMemo(() => {
-    if (terms.length === 0) return []
+    if (terms.length === 0 && !fPid && !fAid && !from && !to) return []
     const tagNameOf = new Map(tags.map((t) => [t.tagId, t.name]))
     const bookTagsOf = new Map<string, string[]>()
     for (const bt of billTags) {
@@ -52,9 +58,15 @@ export function Search({ onClose, onPick }: { onClose: () => void; onPick?: (bil
     }
     const matched = bills.filter((b) => {
       if (bookId !== 0 && String(b.bookId) !== String(bookId)) return false
+      if (fPid && b.parentCategoryId !== fPid) return false
+      if (fAid && b.assetId !== fAid) return false
+      const day = new Date(b.time).toISOString().slice(0, 10)
+      if (from && day < from) return false
+      if (to && day > to) return false
       const cat = parents.find((p) => p.id === b.parentCategoryId)?.name ?? ''
       const billTagNames = bookTagsOf.get(String(b.billId)) ?? []
       const haystack = [cat, b.remark ?? '', ...billTagNames].join(' ')
+      if (terms.length === 0) return true
       return terms.every((t) =>
         t.startsWith('#') ? billTagNames.some((n) => n.includes(t.slice(1))) : haystack.includes(t)
       )
@@ -62,7 +74,7 @@ export function Search({ onClose, onPick }: { onClose: () => void; onPick?: (bil
     return sort === 'time'
       ? matched.sort((a, b) => b.time - a.time)
       : matched.sort((a, b) => b.cost - a.cost)
-  }, [terms, bills, bookId, parents, tags, billTags, sort])
+  }, [terms, bills, bookId, parents, tags, billTags, sort, fPid, fAid, from, to])
 
   const sum = useMemo(() => {
     let income = 0, expense = 0
@@ -87,7 +99,25 @@ export function Search({ onClose, onPick }: { onClose: () => void; onPick?: (bil
           onKeyDown={(e) => { if (e.key === 'Enter') remember(kw) }}
         />
         {kw && <button type="button" className="link" onClick={() => setKw('')}>清空</button>}
+        <button type="button" className="link" aria-expanded={filterOpen} onClick={() => setFilterOpen(!filterOpen)}>筛选</button>
       </div>
+
+      {filterOpen && (
+        <div className="sp-filter">
+          <select aria-label="按分类筛选" value={fPid} onChange={(e) => setFPid(Number(e.target.value))}>
+            <option value={0}>全部分类</option>
+            {parents.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <select aria-label="按账户筛选" value={fAid} onChange={(e) => setFAid(Number(e.target.value))}>
+            <option value={0}>全部账户</option>
+            {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
+          </select>
+          <div className="row2">
+            <input aria-label="起始日期" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+            <input aria-label="结束日期" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          </div>
+        </div>
+      )}
 
       {terms.length === 0 && history.length > 0 && (
         <div className="sp-history">
@@ -100,7 +130,7 @@ export function Search({ onClose, onPick }: { onClose: () => void; onPick?: (bil
         </div>
       )}
 
-      {terms.length > 0 && (
+      {(terms.length > 0 || fPid || fAid || from || to) && (
         <>
           <div className="sp-sum">
             <span>{hits.length} 笔</span>

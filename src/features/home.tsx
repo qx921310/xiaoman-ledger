@@ -3,6 +3,8 @@ import { useLedger } from '../store'
 import { summarizeBills } from '../bill-summary'
 import { money } from '../ui-format'
 import { Bills } from './bills'
+import { usePullRefresh } from '../ui/use-pull-refresh'
+import { syncNowImmediate } from '../sync-auto'
 
 /** 首页：本月汇总 + 预算卡 + 记账入口 + 流水（照一木的单列结构） */
 export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot }: {
@@ -41,6 +43,10 @@ export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot }:
   const [menuOpen, setMenuOpen] = useState(false)
   const [simpleView, setSimpleView] = useState(false)
   const [rangeAll, setRangeAll] = useState(false)
+  // 下拉刷新：触发一次同步（对应一木各页的 pull_layout）
+  const { progress: pullProgress, busy: pulling } = usePullRefresh(async () => {
+    try { await syncNowImmediate() } catch { /* 离线时忽略，同步徽标会提示 */ }
+  })
   const bookName = useLedger((s) => {
     const b = s.accountBooks.find((x) => String(x.bookId) === String(s.currentBookId))
     return b?.accountBookName ?? '我的账本'
@@ -50,6 +56,12 @@ export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot }:
 
   return (
     <section className="home">
+      {(pullProgress > 0 || pulling) && (
+        <div className="pull-tip" role="status" aria-live="polite">
+          {pulling ? '正在刷新…' : pullProgress >= 1 ? '松开刷新' : '下拉刷新'}
+        </div>
+      )}
+
       <div className="home-toolbar">
         <div className="ht-left">
           <span className="ht-book" aria-label="当前账本">{bookName}</span>
