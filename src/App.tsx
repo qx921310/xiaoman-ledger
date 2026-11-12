@@ -10,6 +10,7 @@ import { advanceSessionEpoch, captureSessionEpoch } from './domain/session-epoch
 import { AuthScreen } from './features/auth'
 import { AddBill } from './features/add-bill'
 import { Home } from './features/home'
+import { Search } from './features/search'
 import { CalendarPage } from './features/calendar'
 import { Assets } from './features/assets'
 import { Stats } from './features/stats'
@@ -138,6 +139,7 @@ export default function App() {
 
 function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User; onLogout: () => void; syncWarning: string; dismissSyncWarning: () => void }) {
   const [tab, setTab] = useState<Tab>('home')
+  const [searchOpen, setSearchOpen] = useState(false)
   const mergeTaxonomy = useLedger((s) => s.mergeTaxonomy)
 
   const runCycles = useLedger((s) => s.runCycles)
@@ -177,10 +179,11 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User
 
       <main className="main">
         {syncWarning && <div className="warn" role="alert">{syncWarning} <button className="link" onClick={() => { setTab('me'); dismissSyncWarning() }}>查看同步</button></div>}
-        {tab === 'home' && (
+        {searchOpen && <Search onClose={() => setSearchOpen(false)} />}
+        {!searchOpen && tab === 'home' && (
           <Home me={user} onAdd={() => setTab('add')}
             onOpenStats={() => setTab('stats')}
-            onSearch={() => setTab('stats')}
+            onSearch={() => setSearchOpen(true)}
             onMore={() => setTab('me')} />
         )}
         {tab === 'calendar' && <CalendarPage onAddBill={() => setTab('add')} />}

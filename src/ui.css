@@ -927,3 +927,24 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .hm-item:last-child { border-bottom: 0; }
 .hm-item.muted, .hm-item:disabled { color: var(--muted); cursor: default; }
 .ledger-row.simple small { display: none; }
+
+/* 账单搜索页（对齐 activity_bill_search）：搜索框 + 历史 + 结果汇总 */
+.search-page { display: grid; gap: var(--sp-3); }
+.sp-head { display: flex; align-items: center; gap: var(--sp-2); }
+.sp-input {
+  flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: var(--r-pill);
+  background: var(--surface-2); padding: 9px 12px; font-size: var(--font-sm); color: var(--ink);
+}
+.sp-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.sp-history { display: grid; gap: var(--sp-2); }
+.sp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.sp-chip {
+  border: 1px solid var(--line); background: var(--card); color: var(--muted);
+  border-radius: var(--r-pill); padding: 5px 10px; font-size: var(--font-xs); cursor: pointer;
+}
+.sp-sum {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-2);
+  font-size: var(--font-xs); color: var(--muted);
+  padding-bottom: var(--sp-2); border-bottom: 1px solid var(--line);
+}
+.sp-row { width: 100%; text-align: left; border: 0; background: transparent; font: inherit; color: inherit; cursor: pointer; }
