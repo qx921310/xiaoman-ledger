@@ -4,6 +4,7 @@ import { BILL_TYPE } from '../types'
 import type { Bill, Transfer } from '../types'
 import { books as bookApi } from '../auth'
 import { money, dayOf, fullDay, hhmm, monthOf, toLocalInput, humanDay } from '../ui-format'
+import imageCompression from 'browser-image-compression'
 import { parseShares, splitAmounts } from '../domain/split'
 import { AssetIcon, CatIcon } from '../ui/icons'
 import { TransferEditor } from './transfer-editor'
@@ -630,11 +631,16 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
         <div className="label">备注</div>
         <input aria-label="账单备注" value={remark} onChange={(e) => setRemark(e.target.value)} />
         <div className="label">附件（图片或 PDF，可选）</div>
+        <p className="hint">附件仅保留 30 天，到期自动销毁（原图会先压缩到 1MB 内再上传）。</p>
         <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf" aria-label="添加附件"
           onChange={async (e) => {
-            const f = e.target.files?.[0]
+            let f = e.target.files?.[0]
             if (!f) return
             try {
+              // 图片先压缩再上传：手机原图 3-8MB，压到 1MB 内；附件只保留 30 天
+              if (f.type.startsWith('image/')) {
+                f = await imageCompression(f, { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true })
+              }
               const res = await fetch(`/api/files?name=${encodeURIComponent(f.name)}`, {
                 method: 'POST', credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/octet-stream' }, body: f

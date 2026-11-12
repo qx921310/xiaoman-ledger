@@ -1,6 +1,6 @@
 import { createServer } from 'node:http'
 import { DatabaseSync } from 'node:sqlite'
-import { mkdirSync, writeFileSync, createReadStream, existsSync, statSync } from 'node:fs'
+import { mkdirSync, writeFileSync, createReadStream, existsSync, statSync, rmSync } from 'node:fs'
 import { scryptSync, randomBytes, timingSafeEqual, createHash } from 'node:crypto'
 import { dirname, join, extname, basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -127,6 +127,21 @@ function cleanupSyncReceipts(now) {
   if (now - lastReceiptCleanup < 60 * 60 * 1000) return
   db.prepare('DELETE FROM sync_operations WHERE created_at < ?').run(now - 30 * 24 * 60 * 60 * 1000)
   lastReceiptCleanup = now
+}
+
+// 附件保留 30 天：到期销毁（暂时不承担长期存储成本；将来可改为快照/对象存储）
+const UPLOAD_RETAIN_MS = 30 * 24 * 60 * 60 * 1000
+let lastUploadCleanup = 0
+function cleanupExpiredUploads(now) {
+  if (now - lastUploadCleanup < 60 * 60 * 1000) return
+  lastUploadCleanup = now
+  const cutoff = now - UPLOAD_RETAIN_MS
+  const rows = db.prepare('SELECT file_id FROM files WHERE created_at < ?').all(cutoff)
+  for (const r of rows) {
+    try { rmSync(join(UPLOAD_DIR, r.file_id), { force: true }) } catch { /* 文件已不在，忽略 */ }
+  }
+  db.prepare('DELETE FROM files WHERE created_at < ?').run(cutoff)
+  if (rows.length) console.log(`[uploads] 清理过期附件 ${rows.length} 个`)
 }
 
 const PORT = Number(process.env.PORT || 8787)
@@ -590,6 +605,7 @@ const server = createServer(async (req, res) => {
       const list = Array.isArray(body.records) ? body.records : []
       const v2 = body.protocolVersion === 2
       if (v2) cleanupSyncReceipts(Date.now())
+      cleanupExpiredUploads(Date.now())
       if (!v2 && db.prepare('SELECT 1 FROM sync_v2_users WHERE user_id = ?').get(user.id)) {
         return fail(res, '同步协议已升级，请更新客户端；本地未同步数据会保留', 409)
       }
@@ -847,6 +863,7 @@ const server = createServer(async (req, res) => {
       if (!['png', 'jpg', 'jpeg', 'webp', 'gif', 'pdf'].includes(ext)) return fail(res, '只支持图片或 PDF')
       const buf = await readRaw(req)
       if (!buf.length) return fail(res, '空文件')
+      // 30 天后自动销毁，前端会提示用户
       const file = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
       writeFileSync(join(UPLOAD_DIR, file), buf)
       // 记录归属：只有本人或该账本成员可以访问

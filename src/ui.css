@@ -961,3 +961,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 /* 账单行：附件标记与优惠前金额（一木 has_file_tag / old_cost） */
 .cost-cell { display: grid; justify-items: end; gap: 1px; flex: none; }
 .old-cost { font-size: var(--font-xs); color: var(--muted); }
+
+/* 首页提示条（对应 fragment_home 的 tip_layout） */
+.home-tip {
+  display: flex; align-items: center; gap: var(--sp-2);
+  font-size: var(--font-xs); color: var(--muted);
+  background: var(--accent-soft); border-radius: var(--r-sm);
+  padding: 8px 10px; margin-bottom: var(--sp-2);
+}
+.home-tip .link { margin-left: auto; flex: none; }
