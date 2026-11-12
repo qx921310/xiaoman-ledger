@@ -12,6 +12,7 @@ import { HiddenPage } from './hidden-page'
 import { DreamList } from './dream'
 import { AiTypeManager } from './ai-type'
 import { Guide } from './guide'
+import { FilteredBills } from './filtered-bills'
 import { TemplateList } from './templates'
 import { hasPin, setPin, clearPin } from './lock'
 import { usePullRefresh } from '../ui/use-pull-refresh'
@@ -123,6 +124,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [aiTypeOpen, setAiTypeOpen] = useState(false)
   const [guideOpen, setGuideOpen] = useState(false)
   const [tplOpen, setTplOpen] = useState(false)
+  const [cycleDrill, setCycleDrill] = useState<{ title: string; cycleId: string | number } | null>(null)
   const [backupOpen, setBackupOpen] = useState(false)
   // 一木 UserInfoActivity：昵称与头像可改（本地保存，账号维度）
   const profileKey = `xiaoman-profile:${me?.id ?? 0}`
@@ -478,6 +480,12 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
 
       {dreamOpen && <DreamList onBack={() => setDreamOpen(false)} />}
       {aiTypeOpen && <AiTypeManager onBack={() => setAiTypeOpen(false)} notify={notify} />}
+      {cycleDrill && (
+        <FilteredBills title={cycleDrill.title}
+          bills={bills.filter((b) => String(b.cycleId) === String(cycleDrill.cycleId))}
+          onBack={() => setCycleDrill(null)} />
+      )}
+
       {guideOpen && <Guide onBack={() => setGuideOpen(false)} />}
       {tplOpen && <TemplateList onBack={() => setTplOpen(false)} onAdd={() => { setTplOpen(false); notify('请到记账页点「存为模板」') }} notify={notify} />}
 
@@ -783,7 +791,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         const a = assets.find((x) => x.assetId === c.assetId)
         return (
           <div key={c.cycleId} className="row">
-            <div className="grow">
+            <button type="button" className="grow cycle-open" onClick={() => setCycleDrill({ title: `${c.name} · 已生成账单`, cycleId: c.cycleId })}>
               <div>
                 {c.name}
                 <span className="tag">{describeCycle(c)}</span>
@@ -794,7 +802,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
                 {c.endMode === 'date' && c.endDate ? ` · 至 ${new Date(c.endDate).toISOString().slice(0, 10)}` : ''}
                 {c.bookId == null ? ' · ⚠️ 账本待确认' : ''}
               </small>
-            </div>
+            </button>
             {(() => {
               const next = pendingDates(c)[0]
               return next ? (

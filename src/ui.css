@@ -1097,3 +1097,9 @@ button.my-user {
   padding-top: var(--sp-3); margin-top: var(--sp-2); border-top: 1px solid var(--line);
 }
 .bill-page-actions .primary, .bill-page-actions .ghost { width: auto; padding-inline: var(--sp-4); }
+
+/* 周期规则行可点（进入已生成账单明细） */
+button.cycle-open {
+  border: 0; background: transparent; text-align: left; font: inherit; color: inherit;
+  cursor: pointer; display: block; width: 100%;
+}

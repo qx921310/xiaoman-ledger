@@ -275,7 +275,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
         const p = parents.find((x) => x.id === b.categoryId)
         return (
           <div key={String(b.budgetId ?? b.budgetName)} className="budget-box small">
-            <div className="budget-line">
+            <div className="budget-line" onClick={() => setDrill({ title: `${p?.name ?? '分类'}预算明细`, catId: b.categoryId })}>
               <span>{b.budgetName || '自定义预算'}（{b.startTime ? new Date(b.startTime).toISOString().slice(0, 10) : ''} ~ {b.endTime ? new Date(b.endTime).toISOString().slice(0, 10) : ''}）</span>
               <b>{money(used)} / {money(limit)}</b>
             </div>
@@ -298,7 +298,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
         const used = spentOf(b.categoryId)
         return (
           <div key={b.categoryId} className="budget-box small">
-            <div className="budget-line">
+            <div className="budget-line" onClick={() => setDrill({ title: `${p?.name ?? '分类'}预算明细`, catId: b.categoryId })}>
               <span><CatIcon k={p?.icon} size={14} /> {p?.name ?? '分类'}预算</span>
               <b>{money(used)} / {money(limitOf(b))}</b>
             </div>
