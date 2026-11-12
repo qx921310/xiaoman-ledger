@@ -1078,3 +1078,11 @@ button.my-user {
   border-radius: var(--r-md); font-size: var(--font-md); cursor: pointer; color: var(--ink);
 }
 .pin-key:disabled { opacity: 0; }
+
+/* 本月总结（对齐统计页「本月总结」模块） */
+.stats-summary { display: grid; gap: var(--sp-2); padding: var(--sp-2) 0; border-bottom: 1px solid var(--line); }
+.summary-text {
+  width: 100%; border: 1px solid var(--line); border-radius: var(--r-md);
+  padding: 10px; font-size: var(--font-sm); font-family: inherit; color: var(--ink);
+  background: var(--surface-2); resize: vertical;
+}

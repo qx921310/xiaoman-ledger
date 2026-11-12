@@ -15,7 +15,7 @@ import { AssetSankey } from './asset-sankey'
 import { Modal } from '../ui/modal'
 import { IMPORTED_CATEGORY_COLOR } from '../default-colors'
 
-export function Stats() {
+export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
   const bills = useLedger((s) => s.bills)
   const refunds = useLedger((s) => s.refunds)
   const lends = useLedger((s) => s.lends)
@@ -93,6 +93,26 @@ export function Stats() {
   }
 
   const [moreInfo, setMoreInfo] = useState(false)
+  const [summaryText, setSummaryText] = useState<string | null>(null)
+  // 本月总结（一木「本月总结」模块：自动生成，可编辑复制）
+  const buildSummary = () => {
+    const top = expenseRows.slice(0, 3)
+    const days = new Set(rangeBills.map((b) => new Date(b.time).getDate())).size || 1
+    const lines = [
+      `# ${month.slice(0, 4)} 年 ${Number(month.slice(5, 7))} 月账单总结`,
+      '',
+      `- 支出：${money(rangeSummary.expense)}`,
+      `- 收入：${money(rangeSummary.income)}`,
+      `- 结余：${money(+(rangeSummary.income - rangeSummary.expense).toFixed(2))}`,
+      `- 笔数：${rangeBills.length} 笔，日均支出 ${money(+(rangeSummary.expense / days).toFixed(2))}`,
+      '',
+      '## 支出前三'
+    ]
+    if (top.length === 0) lines.push('- 本月暂无支出')
+    else top.forEach((r, i) => lines.push(`${i + 1}. ${r.name}：${money(r.amount)}`))
+    return lines.join('\n')
+  }
+
   const trend = useMemo(() => bounds ? chartTrend(rangeBills, parents, refunds, bounds) : [], [rangeBills, parents, refunds, bounds])
   const expenseRows = useMemo(() => categoryDistribution(rangeBills, parents, refunds, 'expense'), [rangeBills, parents, refunds])
   const incomeRows = useMemo(() => categoryDistribution(rangeBills, parents, refunds, 'income'), [rangeBills, parents, refunds])
@@ -274,6 +294,25 @@ export function Stats() {
           </div>
         </>
       )}
+
+      <div className="stats-summary">
+        <div className="row">
+          <b className="grow">本月总结</b>
+          <button type="button" className="link" onClick={() => setSummaryText(buildSummary())}>生成</button>
+        </div>
+        {summaryText && (
+          <>
+            <textarea className="summary-text" aria-label="本月总结" value={summaryText}
+              onChange={(e) => setSummaryText(e.target.value)} rows={8} />
+            <div className="row">
+              <button type="button" className="link" onClick={async () => {
+                try { await navigator.clipboard.writeText(summaryText) ; notify?.('已复制总结') } catch { notify?.('复制失败') }
+              }}>复制总结</button>
+              <small className="muted">可编辑后复制</small>
+            </div>
+          </>
+        )}
+      </div>
 
       <button type="button" className="link stats-more" onClick={() => setMoreInfo(!moreInfo)}>
         {moreInfo ? '收起明细' : '更多明细'}
