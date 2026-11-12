@@ -6,6 +6,8 @@ import { books as bookApi, type BookInfo } from '../auth'
 import { syncNow, getVersionedConflicts, getVersionedRecovery, keepLocalConflict, acceptRemoteConflict, previewVersionedConflict } from '../sync'
 import { syncNowImmediate, getLastSyncResult, subscribeAutoSync, type AutoSyncState } from '../sync-auto'
 import { money, fullDay } from '../ui-format'
+
+const APP_VERSION = 'v0.1.0'
 import { HiddenPage } from './hidden-page'
 import { usePullRefresh } from '../ui/use-pull-refresh'
 import { ROLE_LABEL } from '../ui/roles'
@@ -123,6 +125,10 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
     while (days.has(fullDay(d.getTime()))) { n++; d.setDate(d.getDate() - 1) }
     return n
   }, [bills])
+
+  const attachments = useMemo(() => bills.flatMap((b) =>
+    (b.files ?? []).map((f) => ({ key: `${b.billId}-${f.remotePath}`, name: f.name, url: f.remotePath, day: fullDay(b.time) }))
+  ), [bills])
 
   const attachmentCount = useMemo(
     () => bills.reduce((n, b) => n + (b.files?.length ?? 0), 0),
@@ -483,9 +489,21 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         <div className="row"><span className="grow">导出备份</span><span className="muted">JSON</span></div>
       </div>
 
-      <h3>附件（{attachmentCount}）</h3>
+      <h3>账单文件</h3>
       {attachmentCount === 0 && <p className="hint">还没有附件。</p>}
-      {attachmentCount > 0 && <p className="hint">附件仅保留 30 天，到期自动销毁；导出备份不含附件文件。</p>}
+      {attachmentCount > 0 && (
+        <>
+          <p className="hint">仅保留 30 天，到期销毁；导出备份不含附件文件。</p>
+          <div className="my-files">
+            {attachments.map((f) => (
+              <a key={f.key} className="row my-file" href={f.url} target="_blank" rel="noreferrer">
+                <span className="grow">{f.name}</span>
+                <span className="muted">{f.day}</span>
+              </a>
+            ))}
+          </div>
+        </>
+      )}
 
       <h3>从其他记账软件迁移</h3>
       <p className="hint">
@@ -1352,7 +1370,22 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       <h3>财务工具</h3>
       <p className="hint">房贷计划、信用卡分期在「资产」页使用。</p>
 
+      <h3>更多</h3>
+      <div className="my-links">
+        {[
+          ['使用指南', 'guide'], ['意见反馈', 'feedback'], ['去评分', 'evaluate'],
+          ['邀请好友', 'invite'], ['活动中心', 'activity'], ['更多应用', 'apps'],
+          ['桌面小组件', 'widget'],
+        ].map(([label, key]) => (
+          <button key={key} type="button" className="my-link" onClick={() => notify('敬请期待')}>{label}</button>
+        ))}
+      </div>
+
       <h3>关于</h3>
+      <div className="my-about">
+        <div className="row"><span className="grow">小满记账</span><span className="muted">{APP_VERSION}</span></div>
+        <div className="row"><span className="grow">备案号</span><span className="muted">—</span></div>
+      </div>
       <p className="hint">
         数据存在你自己的账号下，登录后自动同步。
       </p>

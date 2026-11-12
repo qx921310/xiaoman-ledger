@@ -1014,3 +1014,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 .my-vip .link { margin-left: auto; flex: none; }
 .my-data { display: grid; gap: 2px; margin-bottom: var(--sp-3); }
+
+/* 我的页：账单文件列表 / 更多入口 / 关于 */
+.my-files { display: grid; gap: 2px; margin-bottom: var(--sp-3); }
+.my-file { text-decoration: none; color: var(--ink); }
+.my-links { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: var(--sp-3); }
+.my-link {
+  border: 1px solid var(--line); background: var(--card); border-radius: var(--r-md);
+  padding: 10px 4px; font-size: var(--font-xs); color: var(--ink); cursor: pointer;
+}
+.my-about { display: grid; gap: 2px; }
