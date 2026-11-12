@@ -1041,3 +1041,7 @@ button.my-user {
   width: 100%; border: 0; background: transparent; text-align: left;
   font: inherit; color: inherit; cursor: pointer; padding: 0;
 }
+
+/* 愿望清单（对齐 activity_dream_list） */
+.dream-row { align-items: flex-start; gap: var(--sp-2); }
+.dream-row .hb-bar { margin-top: 4px; }

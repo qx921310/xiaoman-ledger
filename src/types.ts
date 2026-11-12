@@ -108,6 +108,24 @@ export interface StockInfo {
   bookId?: string | number
 }
 
+/** 一木：愿望清单（DreamListActivity / AddDreamActivity） */
+export interface Dream {
+  dreamId: number
+  /** 愿望名称 */
+  name: string
+  /** 目标金额 */
+  totalNum: number
+  /** 已攒金额 */
+  startNum: number
+  remark?: string
+  /** 图标键 */
+  icon?: string
+  /** 开始日期 */
+  startTime?: number
+  bookId?: string | number
+  updateTime?: number
+}
+
 /** 一木：模板（ModuleManagerActivity / AddModuleTransferActivity） */
 export interface Template {
   templateId: number

@@ -9,6 +9,7 @@ import { money, fullDay } from '../ui-format'
 
 const APP_VERSION = 'v0.1.0'
 import { HiddenPage } from './hidden-page'
+import { DreamList } from './dream'
 import { usePullRefresh } from '../ui/use-pull-refresh'
 import { ROLE_LABEL } from '../ui/roles'
 import { validateBackup } from '../backup'
@@ -114,6 +115,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [autoSync, setAutoSync] = useState<AutoSyncState | null>(null)
   const [hiddenOpen, setHiddenOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [dreamOpen, setDreamOpen] = useState(false)
   const [backupOpen, setBackupOpen] = useState(false)
   // 一木 UserInfoActivity：昵称与头像可改（本地保存，账号维度）
   const profileKey = `xiaoman-profile:${me?.id ?? 0}`
@@ -467,6 +469,8 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       </div>
 
 
+      {dreamOpen && <DreamList onBack={() => setDreamOpen(false)} />}
+
       {profileOpen && (
         <Modal label="个人资料" onClose={() => setProfileOpen(false)}>
           <h3>个人资料</h3>
@@ -529,6 +533,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
               notify('见下方「数据」区块')
               return
             }
+            if (key === 'dream') { setDreamOpen(true); return }
             if (key === 'theme') { notify('敬请期待：主题设置'); return }
             notify('敬请期待')
           }}>{label}</button>
