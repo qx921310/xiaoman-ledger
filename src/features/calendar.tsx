@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Solar } from 'lunar-typescript'
 import { useLedger } from '../store'
 import { money, fullDay } from '../ui-format'
 import { billNetAmount } from '../bill-amount'
@@ -42,19 +43,21 @@ export function CalendarPage({ onAddBill }: { onAddBill?: () => void } = {}) {
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1)
   ]
 
+  const todayKey = fullDay(Date.now())
+  const isToday = (day: number) => keyOf(day) === todayKey
+
   const keyOf = (day: number) => `${year}-${String(monthIdx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 
-  // 一木日历格里有农历（ActivityMonthView 第二行）。用 Intl 的中国历法取，再转成「初一/十五」
+  // 一木用开源库 com.haibin.calendarview 渲染格子，农历/节气/节日由库提供。
+  // Web 端用同源的 lunar-typescript（6tail，成熟库），不再自己解析 Intl 字符串。
   const lunarOf = (day: number) => {
     try {
-      const raw = new Intl.DateTimeFormat('zh-CN-u-ca-chinese', { month: 'long', day: 'numeric' })
-        .format(new Date(year, monthIdx, day))
-      const n = Number(raw.replace(/\D+/g, '').match(/\d+$/)?.[0] ?? 0)
-      if (!n) return raw
-      const names = ['初一','初二','初三','初四','初五','初六','初七','初八','初九','初十',
-        '十一','十二','十三','十四','十五','十六','十七','十八','十九','二十',
-        '廿一','廿二','廿三','廿四','廿五','廿六','廿七','廿八','廿九','三十']
-      return names[n - 1] ?? raw
+      const solar = Solar.fromDate(new Date(year, monthIdx, day))
+      const lunar = solar.getLunar()
+      // 一木格子第二行优先显示节日/节气，其次农历日
+      const festival = solar.getFestivals()[0] ?? lunar.getFestivals()[0] ?? lunar.getJieQi()
+      if (festival) return festival
+      return lunar.getDayInChinese()
     } catch { return '' }
   }
 
@@ -64,6 +67,18 @@ export function CalendarPage({ onAddBill }: { onAddBill?: () => void } = {}) {
     for (const row of daily.values()) { income += row.income; expense += row.expense }
     return { income: +income.toFixed(2), expense: +expense.toFixed(2), balance: +(income - expense).toFixed(2) }
   }, [daily])
+
+  const pickedStat = (picked && daily.get(picked)) || { income: 0, expense: 0, count: 0 }
+  /** 某天的农历（选中日头部用） */
+  const dayLunar = (key: string) => {
+    try {
+      const [y, m, d] = key.split('-').map(Number)
+      const solar = Solar.fromDate(new Date(y, m - 1, d))
+      const lunar = solar.getLunar()
+      return (solar.getFestivals()[0] ?? lunar.getFestivals()[0] ?? lunar.getJieQi()
+        ?? `${lunar.getMonthInChinese()}月${lunar.getDayInChinese()}`)
+    } catch { return '' }
+  }
 
   const pickedBills = picked
     ? bills.filter((b) => (bookId === 0 || String(b.bookId) === String(bookId)) && fullDay(b.time) === picked)
@@ -98,9 +113,9 @@ export function CalendarPage({ onAddBill }: { onAddBill?: () => void } = {}) {
           return (
             <button key={day} className={'cal-cell' + (picked === keyOf(day) ? ' on' : '')}
               onClick={() => setPicked(keyOf(day))} aria-label={`${monthIdx + 1}月${day}日`}>
-              <em>{day}</em>
+              <em>{isToday(day) ? '今' : day}</em>
               <i className="cal-lunar">{lunarOf(day)}</i>
-              {stat?.expense ? <i className="out">{money(stat.expense).replace('¥', '')}</i> : null}
+              {stat?.expense ? <i className="out">{'-'}{money(stat.expense).replace('¥', '')}</i> : null}
               {stat?.income ? <i className="in">+{money(stat.income).replace('¥', '')}</i> : null}
             </button>
           )
@@ -110,10 +125,12 @@ export function CalendarPage({ onAddBill }: { onAddBill?: () => void } = {}) {
       {picked && (
         <div className="cal-list">
           <div className="hf-head">
-            <span>{picked}</span>
+            <span>
+              {picked}
+              <small className="cal-lunar">{dayLunar(picked)}</small>
+            </span>
             <span className="cal-day-sum">
-              收 {money(pickedBills.filter((b) => kindOf.get(b.parentCategoryId) === 'income').reduce((s, b) => s + b.cost, 0))} ·
-              支 {money(pickedBills.filter((b) => kindOf.get(b.parentCategoryId) !== 'income').reduce((s, b) => s + billNetAmount(b, refunds), 0))}
+              收 {money(pickedStat.income)} · 支 {money(pickedStat.expense)} · 结余 {money(+(pickedStat.income - pickedStat.expense).toFixed(2))}
             </span>
             <span>共 {pickedBills.length} 笔</span>
           </div>
