@@ -140,6 +140,7 @@ export default function App() {
 function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User; onLogout: () => void; syncWarning: string; dismissSyncWarning: () => void }) {
   const [tab, setTab] = useState<Tab>('home')
   const [searchOpen, setSearchOpen] = useState(false)
+  const changeTab = (next: Tab) => { setSearchOpen(false); setTab(next) }
   const mergeTaxonomy = useLedger((s) => s.mergeTaxonomy)
 
   const runCycles = useLedger((s) => s.runCycles)
@@ -153,12 +154,15 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User
   const assets = useLedger((s) => s.assets)
   const addAsset = useLedger((s) => s.addAsset)
   const seededAsset = useRef(false)
+  // 必须等首次同步完成再判断，否则新设备在拉取云端数据前会各自建一个「现金」，导致重复
+  const synced = useLedger((s) => s.sessionSyncAt)
   useEffect(() => {
     if (seededAsset.current) return
+    if (!synced) return           // 未完成首次同步：不假定云端为空
     if (assets.length > 0) return
     seededAsset.current = true
     addAsset({ assetName: '现金', assetType: 1, assetNumber: 0, intoTotal: 1 } as never)
-  }, [assets.length, addAsset])
+  }, [synced, assets.length, addAsset])
   // 补生成周期账单：必须等首次同步拉完，否则两台设备会各自生成同一期
   const sessionSyncAt = useLedger((s) => s.sessionSyncAt)
   const cyclesRan = useRef(false)
@@ -186,13 +190,15 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User
 
       <nav className="nav">
         {([['home', '首页'], ['calendar', '日历'], ['assets', '资产'], ['stats', '统计'], ['me', '我的']] as [Tab, string][]).map(([k, label]) => (
-          <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{label}</button>
+          <button key={k} className={tab === k ? 'on' : ''} onClick={() => changeTab(k)}>{label}</button>
         ))}
       </nav>
 
       <main className="main">
         {syncWarning && <div className="warn" role="alert">{syncWarning} <button className="link" onClick={() => { setTab('me'); dismissSyncWarning() }}>查看同步</button></div>}
-        {searchOpen && <Search onClose={() => setSearchOpen(false)} />}
+        {searchOpen && (
+          <Search onClose={() => setSearchOpen(false)} onPick={() => setSearchOpen(false)} />
+        )}
         {!searchOpen && tab === 'home' && (
           <Home me={user} onAdd={() => setTab('add')}
             onOpenStats={() => setTab('stats')}

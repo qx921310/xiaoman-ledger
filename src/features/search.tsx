@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLedger } from '../store'
-import { money, dayOf, hhmm } from '../ui-format'
+import { money, dayOf, hhmm, fullDay } from '../ui-format'
 import { billNetAmount } from '../bill-amount'
 import { CatIcon } from '../ui/icons'
 
@@ -18,7 +18,7 @@ export function Search({ onClose, onPick }: { onClose: () => void; onPick?: (bil
   const tags = useLedger((s) => s.tags)
   const assets = useLedger((s) => s.assets)
   const bookId = useLedger((s) => s.currentBookId)
-  const billTags = useLedger((s) => (s as unknown as { billTags?: Array<{ billId: number | string; tagId: number }> }).billTags ?? [])
+
 
   const [kw, setKw] = useState('')
   const [sort, setSort] = useState<'time' | 'amount'>('time')
@@ -48,23 +48,17 @@ export function Search({ onClose, onPick }: { onClose: () => void; onPick?: (bil
 
   const hits = useMemo(() => {
     if (terms.length === 0 && !fPid && !fAid && !from && !to) return []
-    const tagNameOf = new Map(tags.map((t) => [t.tagId, t.name]))
-    const bookTagsOf = new Map<string, string[]>()
-    for (const bt of billTags) {
-      const name = tagNameOf.get(bt.tagId)
-      if (!name) continue
-      const key = String(bt.billId)
-      bookTagsOf.set(key, [...(bookTagsOf.get(key) ?? []), name])
-    }
+    // 账单标签就是 Bill.tags: string[]（没有独立的关联表）
     const matched = bills.filter((b) => {
       if (bookId !== 0 && String(b.bookId) !== String(bookId)) return false
       if (fPid && b.parentCategoryId !== fPid) return false
       if (fAid && b.assetId !== fAid) return false
-      const day = new Date(b.time).toISOString().slice(0, 10)
+      // 本地时区日期：toISOString 是 UTC，东八区凌晨会被算到前一天
+      const day = fullDay(b.time)
       if (from && day < from) return false
       if (to && day > to) return false
       const cat = parents.find((p) => p.id === b.parentCategoryId)?.name ?? ''
-      const billTagNames = bookTagsOf.get(String(b.billId)) ?? []
+      const billTagNames = b.tags ?? []
       const haystack = [cat, b.remark ?? '', ...billTagNames].join(' ')
       if (terms.length === 0) return true
       return terms.every((t) =>
@@ -74,11 +68,12 @@ export function Search({ onClose, onPick }: { onClose: () => void; onPick?: (bil
     return sort === 'time'
       ? matched.sort((a, b) => b.time - a.time)
       : matched.sort((a, b) => b.cost - a.cost)
-  }, [terms, bills, bookId, parents, tags, billTags, sort, fPid, fAid, from, to])
+  }, [terms, bills, bookId, parents, tags, sort, fPid, fAid, from, to])
 
   const sum = useMemo(() => {
     let income = 0, expense = 0
     for (const b of hits) {
+      if (b.notIntoTotal) continue          // 与统计同口径：不计收支的账单不进汇总
       if (parents.find((p) => p.id === b.parentCategoryId)?.kind === 'income') income += b.cost
       else expense += billNetAmount(b, refunds)
     }

@@ -699,13 +699,13 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
               key: 'reimburse', label: '报销',
               rows: assets.filter((a) => (a.hide === true || a.intoTotalAsset === false) && a.assetType === 9)
                 .map((a) => ({ key: String(a.assetId), name: a.simpleName || a.assetName, value: mask(a.assetNumber),
-                  onRestore: () => { updateAsset({ ...a, hide: false, intoTotalAsset: true }); notify('已恢复显示') } }))
+                  onRestore: () => { updateAsset({ ...a, hide: false }); notify('已恢复显示（是否计入总资产保持不变）') } }))
             },
             {
               key: 'lend', label: '借贷',
               rows: assets.filter((a) => (a.hide === true || a.intoTotalAsset === false) && (a.assetType === 6 || a.assetType === 7))
                 .map((a) => ({ key: String(a.assetId), name: a.simpleName || a.assetName, value: mask(a.assetNumber),
-                  onRestore: () => { updateAsset({ ...a, hide: false, intoTotalAsset: true }); notify('已恢复显示') } }))
+                  onRestore: () => { updateAsset({ ...a, hide: false }); notify('已恢复显示（是否计入总资产保持不变）') } }))
             },
             {
               key: 'stock', label: '投资持仓',
@@ -717,7 +717,7 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
               key: 'other', label: '其他隐藏账户',
               rows: assets.filter((a) => (a.hide === true || a.intoTotalAsset === false) && ![6, 7, 9].includes(a.assetType))
                 .map((a) => ({ key: String(a.assetId), name: a.simpleName || a.assetName, value: mask(a.assetNumber),
-                  onRestore: () => { updateAsset({ ...a, hide: false, intoTotalAsset: true }); notify('已恢复显示') } }))
+                  onRestore: () => { updateAsset({ ...a, hide: false }); notify('已恢复显示（是否计入总资产保持不变）') } }))
             }
           ]}
           emptyText="没有隐藏的账户。"

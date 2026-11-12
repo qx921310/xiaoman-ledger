@@ -1074,7 +1074,10 @@ export const useLedger = create<LedgerState>()(
         let lendId = Date.now()
         while (s.lends.some((l) => l.lendId === lendId)) lendId++
         const rec: Lend = {
-          lendId, type, assetId, counterparty: counterparty ?? '',
+          lendId,
+          // 借贷参与余额计算，必须带账本，否则服务端返回 book-required 且另一设备余额不一致
+          bookId: s.currentBookId === 0 ? undefined : s.currentBookId,
+          type, assetId, counterparty: counterparty ?? '',
           number: amt,
           interest: Number(interest) || 0,
           repaymentAssetId: repaymentAssetId || undefined,
@@ -1122,7 +1125,8 @@ export const useLedger = create<LedgerState>()(
           assets = assets.map((a) => a.assetId === cashAsset
             ? { ...a, assetNumber: +(a.assetNumber + sign * r.number).toFixed(2), updateTime: NOW() } : a)
           tombstones = [...tombstones.filter((t) => !(t.kind === 'lend' && t.id === String(r.lendId))),
-            { kind: 'lend', id: String(r.lendId), updatedAt: NOW() }]
+            { kind: 'lend', id: String(r.lendId), updatedAt: NOW(),
+              bookId: r.bookId ?? (s.currentBookId === 0 ? undefined : s.currentBookId) }]
         }
         return {
           lends: s.lends.filter((x) => !targets.some((r) => r.lendId === x.lendId)),

@@ -48,7 +48,7 @@ export function Stats() {
     (currentBookId === 0 || String(b.bookId) === String(currentBookId)) && b.time >= bounds.start.getTime() && b.time < bounds.end.getTime()) : [], [bills, currentBookId, bounds])
   const spentOf = (cid: number) => cid === 0 ? monthSummary.budget : (monthSummary.budgetByCategory.get(cid) ?? 0)
   const limitOf = (b: { amount: number; addNum?: number }) => (b.amount ?? 0) + (b.addNum ?? 0)
-  const monthBudgets = budgets.filter((b) => b.month === 'all' && (b.type ?? 'month') === 'month')
+  const monthBudgets = budgets.filter((b) => !b.hide && b.month === 'all' && (b.type ?? 'month') === 'month')
   const yearBudgets = budgets.filter((b) => b.month === 'all' && b.type === 'year')
   const totalBudget = limitOf(monthBudgets.find((b) => b.categoryId === 0) ?? { amount: 0 })
   const catBudgets = monthBudgets.filter((b) => b.categoryId !== 0)
@@ -101,11 +101,11 @@ export function Stats() {
       <div className="label">时间范围</div>
       <div className="row2">
         <div className="stats-tabs" role="tablist" aria-label="统计视图">
-        {([['month', '普通'], ['month2', '月度'], ['year', '年度'], ['custom', '自定义']] as const).map(([key, label]) => (
+        {([['month', '普通'], ['year', '年度'], ['custom', '自定义']] as const).map(([key, label]) => (
           <button key={key} type="button" role="tab"
-            aria-selected={rangeMode === key || (key === 'month' && rangeMode === 'month')}
-            className={(rangeMode === key) ? 'on' : ''}
-            onClick={() => setRangeMode((key === 'month2' ? 'month' : key) as 'month' | 'week' | 'year' | 'custom')}>
+            aria-selected={rangeMode === key}
+            className={rangeMode === key ? 'on' : ''}
+            onClick={() => setRangeMode(key as 'month' | 'week' | 'year' | 'custom')}>
             {label}
           </button>
         ))}

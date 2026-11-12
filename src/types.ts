@@ -395,6 +395,8 @@ export interface Cycle {
 /** 借入借出：独立资金动作，有自己的流水 */
 export interface Lend {
   lendId: number
+  /** 归属账本：借贷参与余额计算，必须随账本同步（服务端要求 lend 带 bookId） */
+  bookId?: string | number
   /** 1 借出 / 2 借出收回 / 3 借入 / 4 借入还款 */
   type: 1 | 2 | 3 | 4
   /** 资金所在账户 */
