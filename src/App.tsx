@@ -198,7 +198,7 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User
         {syncWarning && <div className="warn" role="alert">{syncWarning} <button className="link" onClick={() => { setTab('me'); dismissSyncWarning() }}>查看同步</button></div>}
         {tab === 'home' && <Home me={user} onAdd={() => setTab('add')} />}
         {tab === 'calendar' && <CalendarPage />}
-        {tab === 'assets' && <Assets notify={notify} />}
+        {tab === 'assets' && <Assets notify={notify} onOpenSettings={() => setTab('me')} />}
         {tab === 'stats' && <Stats />}
         {tab === 'me' && <Settings notify={notify} me={user} />}
         {tab === 'add' && <AddBill notify={notify} onClose={() => setTab('home')} onNeedAsset={() => setTab('assets')} />}

@@ -24,7 +24,7 @@ function iconLabel(key: string): string {
   return ''
 }
 
-export function Assets({ notify }: { notify: (m: string) => void }) {
+export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void; onOpenSettings?: () => void }) {
   const allAssets = useLedger((s) => s.assets)
   const currentBookId = useLedger((s) => s.currentBookId)
   const meId = useLedger((s) => s.userId)
@@ -105,19 +105,69 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
     notify('账户已添加')
   }
 
-  const debts = assets.filter((a) => a.assetType === 2 || a.assetType === 7 || a.assetType === 8).reduce((s, a) => s + toBase(a.assetNumber, a.currency, currencies, defaultCurrency), 0)
+
+  // 一木资产页：净资产（可隐藏）+ 存款/负债 两栏 + 三张汇总卡片 + 按类型分组列表
+  const [hideAmount, setHideAmount] = useState(false)
+  const mask = (v: number) => (hideAmount ? '••••' : money(v))
+  const deposit = assets.filter((a) => a.assetNumber > 0).reduce((s, a) => s + toBase(a.assetNumber, a.currency, currencies, defaultCurrency), 0)
+  const liability = Math.abs(assets.filter((a) => a.assetNumber < 0).reduce((s, a) => s + toBase(a.assetNumber, a.currency, currencies, defaultCurrency), 0))
+  const pendingReimburse = reimbursements.filter((r) => r.status === 'pending').reduce((s, r) => s + (r.number || 0), 0)
+  const doneReimburse = reimbursements.filter((r) => r.status !== 'pending').reduce((s, r) => s + (r.number || 0), 0)
+  const stockValue = stockAssets.reduce((s, h) => s + holdingValue(h.primeNum, h.primeCost, h.price ?? h.primeCost).market, 0)
+  const stockProfit = stockAssets.reduce((s, h) => s + totalProfit(h.historyIncome, holdingValue(h.primeNum, h.primeCost, h.price ?? h.primeCost).floating), 0)
+  const grouped = Object.entries(
+    assets.reduce<Record<string, Asset[]>>((acc, a) => {
+      const k = String(a.assetType)
+      ;(acc[k] ??= []).push(a)
+      return acc
+    }, {})
+  ).sort(([a], [b]) => Number(a) - Number(b))
 
   return (
     <section className="card">
-      <div className="totalbox">
-        <small>净资产</small>
-        <strong>{money(total)}</strong>
-        <span>负资产 {money(debts)}</span>
+      <div className="asset-banner">
+        <div className="asset-net">
+          <div className="asset-net-label">
+            <small>净资产</small>
+            <button type="button" className="link" aria-label={hideAmount ? '显示金额' : '隐藏金额'}
+              onClick={() => setHideAmount((v) => !v)}>{hideAmount ? '显示' : '隐藏'}</button>
+          </div>
+          <strong className="asset-net-value">{mask(total)}</strong>
+        </div>
+        <div className="asset-two">
+          <div><small>存款</small><b>{mask(deposit)}</b></div>
+          <div><small>负债</small><b>{mask(liability)}</b></div>
+        </div>
+        {onOpenSettings && <button type="button" className="link asset-setting" onClick={onOpenSettings}>资产设置</button>}
       </div>
 
-      <p className="hint">余额会随记账自动变动；点右侧「改」可填入实际余额（迁移后建议先对一次账）。</p>
+      <div className="asset-cards">
+        <button type="button" className="asset-card" onClick={() => notify(`待报销 ${money(pendingReimburse)}，已报销 ${money(doneReimburse)}`)}>
+          <small>待报销</small>
+          <b>{mask(pendingReimburse)}</b>
+          <small className="dim">已报 {mask(doneReimburse)}</small>
+        </button>
+        <button type="button" className="asset-card" onClick={() => notify(`借出 ${money(receivable)}，借入 ${money(payable)}`)}>
+          <small>借出借入</small>
+          <b>{mask(receivable)}</b>
+          <small className="dim">借入 {mask(payable)}</small>
+        </button>
+        <button type="button" className="asset-card" onClick={() => notify(`持仓市值 ${money(stockValue)}，累计收益 ${money(stockProfit)}`)}>
+          <small>投资</small>
+          <b>{mask(stockValue)}</b>
+          <small className="dim">收益 {mask(stockProfit)}</small>
+        </button>
+      </div>
 
-      {assets.map((a) => (
+      <p className="hint">余额会随记账自动变动；点账户名看流水，点「改」可填实际余额。</p>
+
+      {grouped.map(([typeKey, list]) => (
+        <div key={typeKey} className="asset-group">
+          <div className="asset-group-head">
+            <span>{ASSET_TYPE[Number(typeKey)] ?? '其他'}</span>
+            <b>{mask(list.reduce((sum, a) => sum + toBase(a.assetNumber, a.currency, currencies, defaultCurrency), 0))}</b>
+          </div>
+          {list.map((a) => (
         <div key={a.assetId} className="row">
           <span className="asset-badge"><AssetIcon type={a.assetType} name={a.assetName} size={16} icon={a.assetIcon} /></span>
           <div className="grow">
@@ -152,6 +202,8 @@ export function Assets({ notify }: { notify: (m: string) => void }) {
             deleteAsset(a.assetId)
             notify('账户已删除')
           }}>删</button>
+        </div>
+          ))}
         </div>
       ))}
 

@@ -1,7 +1,1 @@
 
-/* 同步状态徽标 */
-.sync-badge { font-size: 12px; padding: 2px 8px; border-radius: var(--r-pill); border: 1px solid var(--line); background: var(--surface-2); color: var(--muted); white-space: nowrap; }
-.sync-badge.sync-running { color: var(--accent-ink); }
-.sync-badge.sync-pending { color: var(--warn-ink, var(--accent-ink)); }
-.sync-badge.sync-failed { color: var(--danger-ink, #a33); border-color: currentColor; cursor: pointer; }
-.sync-badge.sync-ok { color: var(--muted); }
