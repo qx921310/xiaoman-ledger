@@ -20,14 +20,22 @@ const realFetch = globalThis.fetch
 
 function installFetch() {
   pushCalls = 0; pullCalls = 0
-  ;(globalThis as any).fetch = async (url: string) => {
+  const remote = new Map<string, any>()
+  ;(globalThis as any).fetch = async (url: string, init?: RequestInit) => {
     if (String(url).includes('/api/data/push')) {
       pushCalls++
-      return { status: 200, json: async () => ({ code: 0, result: { accepted: 0, skipped: 0, denied: 0, duplicates: 0, conflicts: 0, authoritative: [], at: Date.now() } }) }
+      const body = JSON.parse(String(init?.body ?? '{}'))
+      const results = (body.records ?? []).map((record: any) => {
+        const key = record.kind + ':' + record.id
+        const version = (remote.get(key)?.version ?? 0) + 1
+        remote.set(key, { ...record, version, ownerId: record.payload?.userId ?? 1 })
+        return { kind: record.kind, id: record.id, operationId: record.operationId, status: 'accepted', version }
+      })
+      return { status: 200, json: async () => ({ code: 0, result: { accepted: results.length, skipped: 0, denied: 0, duplicates: 0, results } }) }
     }
     if (String(url).includes('/api/data/pull')) {
       pullCalls++
-      return { status: 200, json: async () => ({ code: 0, result: { records: [], lastSync: 0 } }) }
+      return { status: 200, json: async () => ({ code: 0, result: { records: [...remote.values()], generations: [{ bookId: '1', generation: 0 }] } }) }
     }
     return { status: 200, json: async () => ({ code: 0, result: {} }) }
   }

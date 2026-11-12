@@ -80,7 +80,7 @@ export function mergeRemote(s: MergeableState, records: SyncIncoming[], now = Da
       // 作用域判定不了时不删除（历史数据宁留重复也不丢）
       if (delIdx >= 0 && !tombstoneMatches(r.kind, r as unknown as Record<string, unknown>, arr[delIdx])) continue
       // 本地记录比墓碑新 → 墓碑已过期，保留本地记录
-      if (delIdx >= 0 && Number(arr[delIdx].updateTime ?? 0) > Number(r.updatedAt ?? 0)) continue
+      if (!r.versionAuthoritative && delIdx >= 0 && Number(arr[delIdx].updateTime ?? 0) > Number(r.updatedAt ?? 0)) continue
       if (delIdx >= 0) next[k[0]] = arr.filter((_, i) => i !== delIdx)
       // 墓碑时间必须取较新的一次，否则更早的记录会被误判为更新而复活
       const existingTomb = tombstones.findIndex((t) => t.kind === r.kind && t.id === String(r.id)
@@ -108,7 +108,11 @@ export function mergeRemote(s: MergeableState, records: SyncIncoming[], now = Da
     // （删除已有记录必须严格，见上面的 tombstoneMatches）
     const deleted = tombstones.find((t) => t.kind === r.kind && t.id === String(r.id)
       && sameIdentityOf(r.kind, t as unknown as Record<string, unknown>, r.payload as Record<string, unknown>) !== false)
-    if (deleted && deleted.updatedAt >= (r.updatedAt ?? 0)) continue
+    if (!r.versionAuthoritative && deleted && deleted.updatedAt >= (r.updatedAt ?? 0)) continue
+    if (r.versionAuthoritative && deleted) {
+      const index = tombstones.indexOf(deleted)
+      if (index >= 0) tombstones.splice(index, 1)
+    }
     if (r.ownerId != null && r.payload.ownerId == null) r.payload = { ...r.payload, ownerId: r.ownerId }
 
     // 之前因属主不同被顺位改号的记录，用原始身份认回，避免每次合并都再改一次号
@@ -147,7 +151,7 @@ export function mergeRemote(s: MergeableState, records: SyncIncoming[], now = Da
       }
       next[k[0]] = arr
     }
-    if (idx < 0 || Number(r.updatedAt ?? 0) > localTime) {
+    if (idx < 0 || r.versionAuthoritative || Number(r.updatedAt ?? 0) > localTime) {
       if (idx >= 0) {
         // 改过号的记录：用新内容更新，但保留已分配的编号与来源身份
         const prev = arr[idx]

@@ -5,9 +5,12 @@ import { advanceSessionEpoch } from '../src/domain/session-epoch'
 import { startAutoSync, stopAutoSync, syncNowImmediate, getAutoSyncState } from '../src/sync-auto'
 
 const map = new Map<string, string>()
+// Exercise an already-started request, independently of Node's Web Locks scheduler.
+Object.defineProperty(globalThis, 'navigator', { value: {}, configurable: true })
 Object.defineProperty(globalThis, 'localStorage', { value: { getItem: (k: string) => map.get(k) ?? null, setItem: (k: string, v: string) => map.set(k, v), removeItem: (k: string) => map.delete(k), key: (i: number) => [...map.keys()][i] ?? null, get length() { return map.size } }, configurable: true })
 const result = (result: unknown) => ({ json: async () => ({ code: 0, result }) }) as Response
 async function main() {
+  map.set('xiaoman-sync-v2:0', JSON.stringify({ schema: 2, generations: { '1': 0 }, bases: {}, pending: {}, conflicts: {} }))
   let releasePush!: (response: Response) => void
   let seenSignal: AbortSignal | undefined
   globalThis.fetch = (async (_url: string | URL | Request, init?: RequestInit) => { seenSignal = init?.signal ?? undefined; return new Promise<Response>(resolve => { releasePush = resolve }) }) as typeof fetch
@@ -22,8 +25,12 @@ async function main() {
 
   let releasePull!: (response: Response) => void
   let pulls = 0
-  globalThis.fetch = (async (url: string | URL | Request) => {
-    if (String(url).includes('/push')) return result({ accepted: 0, denied: 0, authoritative: [] })
+  globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+    if (String(url).includes('/push')) {
+      const records = JSON.parse(String(init?.body ?? '{}')).records ?? []
+      return result({ accepted: records.length, skipped: 0, denied: 0, duplicates: 0,
+        results: records.map((r: { kind: string; id: string; operationId: string }) => ({ ...r, status: 'accepted', version: 1 })) })
+    }
     pulls++
     return new Promise<Response>(resolve => { releasePull = resolve })
   }) as typeof fetch

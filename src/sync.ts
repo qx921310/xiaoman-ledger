@@ -3,6 +3,10 @@ import type { Bill } from './types'
 import { periodKeyOf as cyclePeriodKey } from './domain/cycle-dedupe'
 import { beginRemote, endRemote } from './domain/dirty-bus'
 import { captureSessionEpoch } from './domain/session-epoch'
+import { getCurrentUid } from './auth'
+import { runVersionedSync } from './domain/sync-v2-runner'
+import { bookOf, fingerprint, queueChanges, recordKey } from './domain/sync-v2-state'
+import type { VersionedMeta, RemoteRecord } from './domain/sync-v2-state'
 
 export interface SyncRecord {
   kind: string
@@ -85,58 +89,162 @@ async function call(path: string, init?: RequestInit) {
   return data.result
 }
 
-/** 先推后拉：推送本地记录，再把云端记录合并回来（逐条 LWW） */
-export async function syncNow() {
-  const session = captureSessionEpoch()
-  const records = collectRecords()
-  try {
-    return await runSync(records, session)
-  } catch (e) {
-    // 失败也要解除"等待首次同步"的阻塞，否则周期账单永远不生成
-    if (!session.signal.aborted) useLedger.getState().setSessionSyncAt(-1)
-    throw e
-  }
+const inFlight = new WeakMap<AbortSignal, ReturnType<typeof runVersionedSync>>()
+
+// Tabs share the same outbox in localStorage; serialize its read/modify/write.
+function withSyncLock<T>(session: ReturnType<typeof captureSessionEpoch>, work: () => Promise<T>): Promise<T> {
+  const uid = getCurrentUid()
+  if (typeof navigator === 'undefined' || !navigator.locks) return work()
+  return navigator.locks.request<Promise<T>>(`xiaoman-sync-v2:${uid}`, { signal: session.signal }, async () => {
+    session.assertCurrent()
+    return work()
+  }) as unknown as Promise<T>
 }
 
-async function runSync(records: ReturnType<typeof collectRecords>, session: ReturnType<typeof captureSessionEpoch>) {
-  session.assertCurrent()
-  const pushed = await call('/data/push', { method: 'POST', body: JSON.stringify({ records }), signal: session.signal })
-  session.assertCurrent()
-
-  // 服务端权威：期号冲突要先拉回胜出记录，才能判断本地候选是「重复」还是「被改过」
-  const authoritative = (pushed.authoritative ?? []) as Array<{ id: string; winnerId: string; reason: string }>
-
-  const pulled = await call('/data/pull', { signal: session.signal })
-  session.assertCurrent()
-  // 同步收尾期间的所有写入（应用远端、分类规范、周期去重、同步元数据）
-  // 都不算本地改动，否则会立刻触发下一轮同步，形成自循环。
-  let conflictsKept = 0
-  beginRemote()
+export function getVersionedConflicts() {
   try {
-    useLedger.getState().applyRemote(pulled.records || [])
-    if (authoritative.length) {
-      const r = useLedger.getState().resolvePeriodConflicts(authoritative.map((a) => ({ id: a.id, winnerId: a.winnerId })))
-      conflictsKept = r.kept
-    }
-    // 云端记录会带回旧分类，合并后再跑一次规范/去重
-    useLedger.getState().mergeTaxonomy()
-    // 多设备可能各自补生成了同一期周期账单：交回 store 去重（会重算余额并排墓碑）
-    useLedger.getState().dedupeCycleBills()
-    useLedger.getState().setSessionSyncAt(Date.now())
-    if (!pushed.denied) useLedger.getState().setLastSync(Date.now())
-  } finally {
-    endRemote()
+    const raw = localStorage.getItem(`xiaoman-sync-v2:${getCurrentUid()}`)
+    if (!raw) return []
+    const meta = JSON.parse(raw) as VersionedMeta
+    return Object.entries(meta.conflicts ?? {}).map(([key, reason]) => {
+      const [kind, id] = JSON.parse(key) as [string, string]
+      return { key, kind, id, reason }
+    })
+  } catch { return [] }
+}
+
+/** Includes unsent operations and archived conflict versions in a user-requested backup. */
+export function getVersionedRecovery(): VersionedMeta | undefined {
+  const raw = localStorage.getItem(`xiaoman-sync-v2:${getCurrentUid()}`)
+  if (!raw) return undefined
+  return JSON.parse(raw) as VersionedMeta
+}
+
+export async function previewVersionedConflict(key: string) {
+  const session = captureSessionEpoch()
+  const uid = getCurrentUid()
+  const local = collectRecords().filter(r => recordKey(r) === key)
+  if (local.length !== 1) throw new Error('本地记录身份不明确，请先导出备份')
+  const pulled = await call('/data/pull', { signal: session.signal }) as { records: RemoteRecord[] }
+  session.assertCurrent()
+  if (getCurrentUid() !== uid || !Array.isArray(pulled.records)) throw new Error('会话或云端状态已变化，请重试')
+  const remote = pulled.records.filter(r => recordKey(r) === key)
+  if (remote.length > 1) throw new Error('云端存在同编号记录，请先导出备份')
+  return { key, local: structuredClone(local[0]), remote: remote[0] ?? null }
+}
+
+/** Explicit user decision; saves both versions before retrying against the latest revision. */
+export async function keepLocalConflict(key: string, preview: Awaited<ReturnType<typeof previewVersionedConflict>>) {
+  const session = captureSessionEpoch()
+  const uid = getCurrentUid()
+  const ensure = () => {
+    session.assertCurrent()
+    if (getCurrentUid() !== uid) throw new DOMException('登录会话已变更', 'AbortError')
   }
-  const conflicts = (pushed.conflicts ?? 0) as number
-  const conflicted = (pushed.conflicted ?? []) as Array<{ kind: string; id: string; reason: string }>
-  return {
-    pushed: pushed.accepted as number,
-    skipped: pushed.skipped as number,
-    denied: pushed.denied as number,
-    conflicts,
-    conflicted,
-    duplicates: (pushed.duplicates ?? 0) as number,
-    conflictsKept,
-    pulled: (pulled.records || []).length as number
+  const active = inFlight.get(session.signal)
+  if (active) await active
+  ensure()
+  const initial = collectRecords().filter(r => recordKey(r) === key)
+  if (initial.length !== 1) throw new Error('本地记录身份不明确，不能自动处理；请先导出备份')
+  const hash = fingerprint(initial[0])
+  const run = withSyncLock(session, async () => {
+    const pulled = await call('/data/pull', { signal: session.signal }) as { records: RemoteRecord[]; generations: Array<{ bookId: string; generation: number }> }
+    ensure()
+    if (!Array.isArray(pulled.records) || !Array.isArray(pulled.generations)) throw new Error('无法确认云端版本')
+    const local = collectRecords()
+    const matches = local.filter(r => recordKey(r) === key)
+    if (matches.length !== 1 || fingerprint(matches[0]) !== hash) throw new Error('本地记录已变化，请重新核对')
+    const raw = localStorage.getItem(`xiaoman-sync-v2:${uid}`)
+    if (!raw) throw new Error('同步状态不存在，请先同步')
+    const meta = JSON.parse(raw) as VersionedMeta
+    if (!meta.conflicts[key]) throw new Error('该记录已不在待核对列表')
+    const remote = pulled.records.filter(r => recordKey(r) === key)
+    if (remote.length > 1) throw new Error('云端存在同编号记录，请先导出备份')
+    if (preview.key !== key || fingerprint(matches[0]) !== fingerprint(preview.local) ||
+      (remote[0]?.version ?? 0) !== (preview.remote?.version ?? 0) ||
+      (remote[0] && preview.remote && fingerprint(remote[0]) !== fingerprint(preview.remote)))
+      throw new Error('记录在核对后发生变化，请重新查看')
+    const book = bookOf(matches[0])
+    const generation = book ? pulled.generations.find(g => String(g.bookId) === book)?.generation : undefined
+    if (book && !Number.isSafeInteger(generation)) throw new Error('无法确认账本代次，请检查账本权限')
+    // Freeze other drafts at their original generation before changing this book's baseline.
+    queueChanges(meta, local, () => globalThis.crypto.randomUUID())
+    meta.archives ??= []
+    meta.archives.push({ at: Date.now(), key, local: structuredClone(matches[0]), remote: remote[0] ? structuredClone(remote[0]) : null })
+    if (book) meta.generations[book] = generation!
+    delete meta.conflicts[key]
+    delete meta.pending[key]
+    meta.pending[key] = { ...structuredClone(matches[0]), operationId: globalThis.crypto.randomUUID(), baseVersion: remote[0]?.version ?? 0,
+      ...(book ? { generation } : {}) }
+    localStorage.setItem(`xiaoman-sync-v2:${uid}`, JSON.stringify(meta))
+    return executeSync(session)
+  }).finally(() => { if (inFlight.get(session.signal) === run) inFlight.delete(session.signal) })
+  inFlight.set(session.signal, run)
+  return run
+}
+
+/** All startup, manual and automatic syncs share one queue per account session. */
+export function syncNow(): ReturnType<typeof runVersionedSync> {
+  const session = captureSessionEpoch()
+  const existing = inFlight.get(session.signal)
+  if (existing) return existing
+  const run = withSyncLock(session, () => executeSync(session)).finally(() => {
+    if (inFlight.get(session.signal) === run) inFlight.delete(session.signal)
+  })
+  inFlight.set(session.signal, run)
+  return run
+}
+
+/** Versioned sync keeps account-scoped baselines and retry operations on disk. */
+async function executeSync(session: ReturnType<typeof captureSessionEpoch>) {
+  const uid = getCurrentUid()
+  const key = `xiaoman-sync-v2:${uid}`
+  const ensure = () => {
+    session.assertCurrent()
+    if (getCurrentUid() !== uid) throw new DOMException('登录会话已变更', 'AbortError')
+  }
+  try {
+    const result = await runVersionedSync({
+      read: collectRecords,
+      check: ensure,
+      id: () => globalThis.crypto.randomUUID(),
+      load: () => {
+        ensure()
+        const raw = localStorage.getItem(key)
+        if (!raw) return null
+        try { return JSON.parse(raw) as VersionedMeta } catch { throw new Error('本地同步状态损坏，请先导出备份') }
+      },
+      save: (meta) => {
+        ensure()
+        try { localStorage.setItem(key, JSON.stringify(meta)) } catch { throw new Error('无法保存同步草稿，请检查设备存储空间') }
+      },
+      pull: async () => {
+        const data = await call('/data/pull', { signal: session.signal })
+        ensure()
+        return data
+      },
+      push: async (records) => {
+        const data = await call('/data/push', { method: 'POST', body: JSON.stringify({ protocolVersion: 2, records }), signal: session.signal })
+        ensure()
+        return data
+      },
+      apply: (records: RemoteRecord[]) => {
+        ensure()
+        beginRemote()
+        try { useLedger.getState().applyRemote(records.map(r => ({ ...r, versionAuthoritative: true }))) }
+        finally { endRemote() }
+      }
+    })
+    ensure()
+    beginRemote()
+    try {
+      useLedger.getState().mergeTaxonomy()
+      useLedger.getState().setSessionSyncAt(Date.now())
+      if (!result.denied && !result.conflicts) useLedger.getState().setLastSync(Date.now())
+    } finally { endRemote() }
+    return result
+  } catch (e) {
+    if (!session.signal.aborted && getCurrentUid() === uid) useLedger.getState().setSessionSyncAt(-1)
+    throw e
   }
 }

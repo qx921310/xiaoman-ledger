@@ -3,8 +3,8 @@ import { useLedger } from '../store'
 import type { Cycle } from '../types'
 import type { ImportPlan } from '../importer'
 import { books as bookApi, type BookInfo } from '../auth'
-import { syncNow } from '../sync'
-import { syncNowImmediate, getLastSyncResult } from '../sync-auto'
+import { syncNow, getVersionedConflicts, getVersionedRecovery, keepLocalConflict, previewVersionedConflict } from '../sync'
+import { syncNowImmediate, getLastSyncResult, subscribeAutoSync } from '../sync-auto'
 import { money } from '../ui-format'
 import { ROLE_LABEL } from '../ui/roles'
 import { validateBackup } from '../backup'
@@ -105,6 +105,9 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
   const [err, setErr] = useState('')
   const [syncMsg, setSyncMsg] = useState('')
   const [syncing, setSyncing] = useState(false)
+  const [syncConflicts, setSyncConflicts] = useState(getVersionedConflicts)
+  const [conflictPreview, setConflictPreview] = useState<Awaited<ReturnType<typeof previewVersionedConflict>> | null>(null)
+  useEffect(() => subscribeAutoSync(() => setSyncConflicts(getVersionedConflicts())), [])
   const currencies = useLedger((s) => s.currencies)
   const defaultCurrency = useLedger((s) => s.defaultCurrency)
   const setCurrencyRate = useLedger((s) => s.setCurrencyRate)
@@ -146,7 +149,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
       else {
         const bits = [`已推送 ${r.pushed} 条（跳过 ${r.skipped} 条较旧记录），拉回 ${r.pulled} 条`]
         if (r.denied) bits.push(`${r.denied} 条未能推送，请核对权限、账本和记录身份`)
-        if (r.conflicts) bits.push(`${r.conflicts} 条与他人改动冲突，已保留服务端版本`)
+        if (r.conflicts) bits.push(`${r.conflicts} 条需要核对，本地内容已保留：${r.conflicted.map(c => `${c.kind}/${c.id}（${c.reason}）`).join('；')}`)
         setSyncMsg(bits.join('；'))
       }
     } catch (e) {
@@ -281,7 +284,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
   }
 
   const doExportJson = () => {
-    const blob = new Blob([JSON.stringify(exportAll(), null, 2)], { type: 'application/json' })
+    const blob = new Blob([JSON.stringify({ ...exportAll(), syncRecovery: getVersionedRecovery() }, null, 2)], { type: 'application/json' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
     a.download = `qingzhang-${new Date().toISOString().slice(0, 10)}.json`
@@ -811,7 +814,12 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
             if (!confirm('清空这个账本里的所有账单？操作不可撤销')) return
             try {
               const r = await bookApi.clear(String(currentBook.bookId))
-              notify(`已清空 ${r.removed} 条服务端记录（本地请点「清空数据」）`)
+              try {
+                await syncNow()
+                notify(`已清空 ${r.removed} 条云端记录；本地未同步的内容会保留并提示核对`)
+              } catch {
+                notify(`已清空 ${r.removed} 条云端记录，同步未完成，请联网后重试`)
+              }
             } catch (e) { notify(errorMessage(e, '失败')) }
           }}>清空账本</button>
           {me?.id === currentBook.ownerId && (
@@ -1121,13 +1129,41 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
 
       <h3>云端同步</h3>
       <p className="hint">
-        数据存在你自己的账号下。同步是<b>先推后拉</b>：本地改动推到服务器，再把别的设备改过的记录合并回来（逐条取更新时间晚的）。
+        数据存在你自己的账号下。同步会核对记录版本；发生冲突时保留本地内容并提示核对。
       </p>
       <div className="btns">
         <button onClick={runSync} disabled={syncing}>{syncing ? '同步中…' : '立即同步'}</button>
       </div>
       {lastSync > 0 && <p className="hint">上次同步：{new Date(lastSync).toLocaleString('zh-CN')}</p>}
       {syncMsg && <p className="hint">{syncMsg}</p>}
+      {syncConflicts.length > 0 && <div className="warn" role="status">
+        <p>以下记录的本机版本已保留。建议先导出 JSON 备份；选择本机版本会尝试覆盖该记录的当前云端版本。</p>
+        {syncConflicts.map(item => <div key={item.key}>
+          <div className="row">
+          <span className="grow">{item.kind} / {item.id}：{item.reason}</span>
+          <button className="ghost" disabled={syncing} onClick={async () => {
+            try { setConflictPreview(await previewVersionedConflict(item.key)) }
+            catch (error) { setSyncMsg(errorMessage(error, '读取失败')) }
+          }}>查看两份内容</button>
+          </div>
+          {conflictPreview?.key === item.key && <div>
+          <p>本机内容</p><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{JSON.stringify(conflictPreview.local.payload, null, 2)}</pre>
+          <p>云端内容</p><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{conflictPreview.remote?.deleted ? '已删除' : JSON.stringify(conflictPreview.remote?.payload ?? '云端无此记录', null, 2)}</pre>
+          <button className="ghost" disabled={syncing} onClick={async () => {
+            if (!confirm('确定使用本机版本吗？这会尝试替换该记录的云端版本，双方版本将先保存在本机同步备份中。')) return
+            setSyncing(true)
+            try {
+              const result = await keepLocalConflict(item.key, conflictPreview)
+              setConflictPreview(null)
+              setSyncMsg(result.conflicts ? `仍有 ${result.conflicts} 条记录需要核对` : '该记录已同步')
+              setSyncConflicts(getVersionedConflicts())
+              await syncNowImmediate()
+            } catch (error) { setSyncMsg(errorMessage(error, '处理失败，本机数据已保留')) }
+            finally { setSyncing(false) }
+          }}>使用本机版本</button>
+          </div>}
+        </div>)}
+      </div>}
 
       <h3>关于</h3>
       <p className="hint">

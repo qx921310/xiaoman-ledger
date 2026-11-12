@@ -94,14 +94,39 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT NOT NULL, updated_at INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS bills (bill_id INTEGER PRIMARY KEY, payload TEXT NOT NULL, user_id INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS assets (asset_id INTEGER PRIMARY KEY, payload TEXT NOT NULL, user_id INTEGER NOT NULL);
+  CREATE TABLE IF NOT EXISTS sync_v2_users (user_id INTEGER PRIMARY KEY);
+  CREATE TABLE IF NOT EXISTS sync_v2_books (book_id TEXT PRIMARY KEY);
+  CREATE TABLE IF NOT EXISTS sync_operations (
+    user_id INTEGER NOT NULL, operation_id TEXT NOT NULL, fingerprint TEXT NOT NULL,
+    result TEXT NOT NULL, PRIMARY KEY (user_id, operation_id)
+  );
 `)
 
 // 迁移要在建表之后：新库先建出 records，再按需补 book_id 列
 try {
   const cols = db.prepare('PRAGMA table_info(records)').all().map((c) => c.name)
   if (!cols.includes('book_id')) db.exec('ALTER TABLE records ADD COLUMN book_id TEXT')
+  if (!cols.includes('revision')) db.exec('ALTER TABLE records ADD COLUMN revision INTEGER NOT NULL DEFAULT 1')
+  const bookCols = db.prepare('PRAGMA table_info(books)').all().map((c) => c.name)
+  if (!bookCols.includes('generation')) db.exec('ALTER TABLE books ADD COLUMN generation INTEGER NOT NULL DEFAULT 0')
+  const operationCols = db.prepare('PRAGMA table_info(sync_operations)').all().map((c) => c.name)
+  if (!operationCols.includes('created_at')) {
+    db.exec('ALTER TABLE sync_operations ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0')
+    db.prepare('UPDATE sync_operations SET created_at = ? WHERE created_at = 0').run(Date.now())
+  }
+  db.exec('CREATE INDEX IF NOT EXISTS sync_operations_created_at ON sync_operations(created_at)')
 } catch (e) {
-  console.error('[migrate] records.book_id 补列失败:', e.message)
+  console.error('[migrate] 同步数据库迁移失败:', e.message)
+  throw e
+}
+
+// Expired receipts fall back to revision checks: an ancient retry may require
+// manual review, but must never be applied again as a fresh operation.
+let lastReceiptCleanup = 0
+function cleanupSyncReceipts(now) {
+  if (now - lastReceiptCleanup < 60 * 60 * 1000) return
+  db.prepare('DELETE FROM sync_operations WHERE created_at < ?').run(now - 180 * 24 * 60 * 60 * 1000)
+  lastReceiptCleanup = now
 }
 
 const PORT = Number(process.env.PORT || 8787)
@@ -535,10 +560,16 @@ const server = createServer(async (req, res) => {
       // 关键：不能物理删除。离线设备会拿着旧记录重推，物理删掉会被"复活"。
       // 改成写墓碑（deleted=1, updated_at=now），旧数据推上来时因版本更旧被跳过。
       const now = Date.now()
-      const info = db.prepare(`UPDATE records SET payload = 'null', deleted = 1, updated_at = ?
-        WHERE book_id = ? AND deleted = 0`).run(now, bookId)
-      db.prepare('DELETE FROM bill_periods WHERE book_id = ?').run(bookId)
-      return ok(res, { removed: info.changes, tombstoned: true, at: now })
+      db.exec('BEGIN IMMEDIATE')
+      try {
+        const info = db.prepare(`UPDATE records SET payload = 'null', deleted = 1, updated_at = ?, revision = revision + 1
+          WHERE book_id = ? AND deleted = 0 AND kind NOT IN ('book', 'asset')`).run(now, bookId)
+        db.prepare('UPDATE books SET generation = generation + 1 WHERE book_id = ?').run(bookId)
+        db.prepare('DELETE FROM bill_periods WHERE book_id = ?').run(bookId)
+        const generation = db.prepare('SELECT generation FROM books WHERE book_id = ?').get(bookId).generation
+        db.exec('COMMIT')
+        return ok(res, { removed: info.changes, tombstoned: true, generation, at: now })
+      } catch (e) { db.exec('ROLLBACK'); throw e }
     }
 
     if (path === '/api/books/leave' && req.method === 'POST') {
@@ -557,55 +588,98 @@ const server = createServer(async (req, res) => {
       if (!user) return fail(res, '请先登录')
       const body = await readBody(req)
       const list = Array.isArray(body.records) ? body.records : []
+      const v2 = body.protocolVersion === 2
+      if (v2) cleanupSyncReceipts(Date.now())
+      if (!v2 && db.prepare('SELECT 1 FROM sync_v2_users WHERE user_id = ?').get(user.id)) {
+        return fail(res, '同步协议已升级，请更新客户端；本地未同步数据会保留', 409)
+      }
       let accepted = 0, skipped = 0, denied = 0, duplicates = 0, conflicts = 0
       // 逐条权威结果：客户端据此作废本地候选，而不是靠排序猜
       const authoritative = []
       const conflicted = []
+      const results = []
       db.exec('BEGIN IMMEDIATE')
-      try { for (const r of list) {
+      try {
+      if (v2) {
+        db.prepare('INSERT OR IGNORE INTO sync_v2_users(user_id) VALUES (?)').run(user.id)
+        db.prepare('INSERT OR IGNORE INTO sync_v2_books(book_id) SELECT book_id FROM book_members WHERE user_id = ?').run(user.id)
+      }
+      // Resolve account references only after same-batch account operations have actually succeeded.
+      const ordered = v2 ? [...list].sort((a, b) => Number(b?.kind === 'asset') - Number(a?.kind === 'asset')) : list
+      for (const r of ordered) {
         if (!r || typeof r.kind !== 'string' || r.id == null) { skipped++; continue }
         const rid = String(r.id)
+        const reject = (status) => {
+          denied++
+          if (v2) results.push({ kind: r.kind, id: rid, operationId: r.operationId, status })
+        }
         const updatedAt = Number(r.updatedAt) || 0
 
         // 1) 定位这条记录所属账本：优先用提交内容，墓碑则从服务端已有记录反查
         let bookId = r.bookId || (r.payload && r.payload.bookId != null ? String(r.payload.bookId) : null)
-        const existing = db.prepare(`SELECT user_id, book_id, updated_at, deleted, payload FROM records
+        const existing = db.prepare(`SELECT user_id, book_id, updated_at, deleted, payload, revision FROM records
           WHERE kind = ? AND rid = ? AND (user_id = ? OR book_id IN (
             SELECT book_id FROM book_members WHERE user_id = ?))`)
           .all(r.kind, rid, user.id, user.id)
         if (!bookId && existing.length) bookId = existing[0].book_id || null
-        if (existing.some(e => e.book_id && bookId && e.book_id !== String(bookId))) { denied++; continue }
+        if (v2 && !bookId && ['bill', 'transfer', 'lend', 'refund', 'reimbursement', 'cycle'].includes(r.kind)) { reject('book-required'); continue }
+        if (existing.some(e => e.book_id && bookId && e.book_id !== String(bookId))) { reject('scope-conflict'); continue }
         // 记录存在于别人的账本里、而我不是成员 → 直接拒绝，避免写出一条无意义的私有墓碑
-        if (!bookId && existing.some((e) => e.user_id !== user.id && e.book_id)) { denied++; continue }
+        if (!bookId && existing.some((e) => e.user_id !== user.id && e.book_id)) { reject('permission-denied'); continue }
 
         // 2) 权限：账本内必须可写；删除/改写他人记录要求 admin
         if (bookId) {
           const role = roleOf(bookId, user.id)
-          if (!role) { denied++; continue }
-          if (!canWrite(role)) { denied++; continue }
+          if (!role) { reject('permission-denied'); continue }
+          if (!canWrite(role)) { reject('permission-denied'); continue }
+          if (!v2 && (db.prepare('SELECT 1 FROM sync_v2_books WHERE book_id = ?').get(bookId) || db.prepare('SELECT 1 FROM book_members m JOIN sync_v2_users u ON u.user_id = m.user_id WHERE m.book_id = ?').get(bookId))) { reject('protocol-upgrade-required'); continue }
           const others = existing.filter((e) => e.book_id === bookId && e.user_id !== user.id)
-          if (others.length && !isAdmin(role)) { denied++; continue }
+          if (others.length && !isAdmin(role)) { reject('permission-denied'); continue }
           const multiMember = db.prepare('SELECT COUNT(*) AS n FROM book_members WHERE book_id = ?').get(bookId).n > 1
           if (multiMember && !r.deleted && r.payload) {
             // 若账户不明，宁可拒绝并提示核对，也不能把私有账户快照发给其他成员。
             const refs = referencedAccounts(r.kind, r.payload)
-            if (refs.some((id) => !isAccountShared(accountForBook(id, user.id, bookId, list), bookId))) { denied++; continue }
+            if (refs.some((id) => !isAccountShared(accountForBook(id, user.id, bookId, v2 ? [] : list), bookId))) { reject('account-not-shared'); continue }
           }
           // 非所有者拿到的是脱敏快照，不能把该快照写回覆盖原始历史记录。
           if (!r.deleted && r.kind === 'bill' && existing.some((e) => e.book_id === bookId && Number(e.user_id) !== Number(user.id))) {
             const old = db.prepare('SELECT payload,user_id FROM records WHERE kind = ? AND rid = ? AND book_id = ? LIMIT 1').get(r.kind, rid, bookId)
             let previous = null
             try { previous = old && JSON.parse(old.payload) } catch { /* 未能确认隐私时拒绝 */ }
-            if (!previous || !isAccountShared(accountForBook(previous.assetId, old.user_id, bookId), bookId)) { denied++; continue }
+            if (!previous || !isAccountShared(accountForBook(previous.assetId, old.user_id, bookId), bookId)) { reject('private-history'); continue }
           }
         }
 
         // 3) 版本比较（同一身份下）
-        const mine = existing.find((e) => (e.book_id || null) === bookId)
-        if (mine && (mine.updated_at > updatedAt || (mine.updated_at === updatedAt && mine.deleted && !r.deleted))) { skipped++; continue }
+        // An asset is owned by the account even when it is newly shared with a
+        // book. Its previous private revision remains the CAS baseline.
+        const mine = existing.find((e) => (e.book_id || null) === bookId) ??
+          (r.kind === 'asset' ? existing.find((e) => e.user_id === user.id && !e.book_id) : undefined)
+        if (v2) {
+          if (typeof r.operationId !== 'string' || r.operationId.length < 8 || r.operationId.length > 128 || !Number.isSafeInteger(r.baseVersion) || r.baseVersion < 0) {
+            denied++; results.push({ kind: r.kind, id: rid, operationId: r.operationId, status: 'invalid-operation' }); continue
+          }
+          const fingerprint = sha(JSON.stringify(r))
+          const prior = db.prepare('SELECT fingerprint, result FROM sync_operations WHERE user_id = ? AND operation_id = ?').get(user.id, r.operationId)
+          if (prior) {
+            if (prior.fingerprint !== fingerprint) { denied++; results.push({ kind: r.kind, id: rid, operationId: r.operationId, status: 'operation-id-reused' }); continue }
+            results.push(JSON.parse(prior.result)); skipped++; continue
+          }
+          if (bookId) {
+            const generation = db.prepare('SELECT generation FROM books WHERE book_id = ?').get(bookId)?.generation
+            if (!Number.isSafeInteger(r.generation) || r.generation !== generation) {
+              conflicts++; results.push({ kind: r.kind, id: rid, operationId: r.operationId, status: 'stale-generation', generation }); continue
+            }
+          }
+          const version = mine?.revision ?? 0
+          if (r.baseVersion !== version) {
+            conflicts++; results.push({ kind: r.kind, id: rid, operationId: r.operationId, status: 'version-conflict', version }); continue
+          }
+        }
+        if (!v2 && mine && (mine.updated_at > updatedAt || (mine.updated_at === updatedAt && mine.deleted && !r.deleted))) { skipped++; continue }
         // 同一时间戳但内容不同：两台设备时钟相同时会互相覆盖，静默丢一方。
         // 策略：保留服务端已有版本，把对方内容作为冲突回执返回，客户端标待核对。
-        if (mine && mine.updated_at === updatedAt && !r.deleted && !mine.deleted) {
+        if (!v2 && mine && mine.updated_at === updatedAt && !r.deleted && !mine.deleted) {
           const samePayload = sameBusinessContent(mine.payload, r.payload)
           if (!samePayload) {
             conflicts++
@@ -622,31 +696,43 @@ const server = createServer(async (req, res) => {
           if (held && held.record_id !== rid) {
             duplicates++
             authoritative.push({ kind: 'bill', id: rid, periodKey: String(r.periodKey), winnerId: held.record_id, reason: 'duplicate-period' })
+            if (v2) results.push({ kind: r.kind, id: rid, operationId: r.operationId, status: 'duplicate-period', winnerId: held.record_id })
             continue
           }
         }
         if (r.kind === 'bill' && !r.deleted && bookId && payload) {
-          if (payload.syncId && payload.syncId !== rid) { denied++; continue }
+          if (payload.syncId && payload.syncId !== rid) { reject('invalid-identity'); continue }
           const number = billNumber(bookId, rid, mine?.user_id ?? user.id)
           payload = { ...payload, ownerId: number.creator_id, memberNo: number.member_no,
             sequenceNo: number.sequence_no, displayId: number.member_no + '-' + String(number.sequence_no).padStart(4, '0') }
         }
-        db.prepare(`INSERT INTO records (user_id, kind, rid, payload, updated_at, deleted, book_id)
-          VALUES (?,?,?,?,?,?,?)
+        db.prepare(`INSERT INTO records (user_id, kind, rid, payload, updated_at, deleted, book_id, revision)
+          VALUES (?,?,?,?,?,?,?,?)
           ON CONFLICT(user_id, kind, rid) DO UPDATE SET payload=excluded.payload, updated_at=excluded.updated_at,
-            deleted=excluded.deleted, book_id=excluded.book_id`)
-          .run(mine?.user_id ?? user.id, r.kind, rid, JSON.stringify(payload), updatedAt, r.deleted ? 1 : 0, bookId)
+            deleted=excluded.deleted, book_id=excluded.book_id, revision=excluded.revision`)
+          .run(mine?.user_id ?? user.id, r.kind, rid, JSON.stringify(payload), updatedAt, r.deleted ? 1 : 0, bookId, (mine?.revision ?? 0) + 1)
         if (r.kind === 'bill' && !r.deleted && bookId && r.periodKey) {
           db.prepare(`INSERT INTO bill_periods (book_id, period_key, record_id, user_id, created_at)
             VALUES (?,?,?,?,?) ON CONFLICT(book_id, period_key) DO NOTHING`)
             .run(bookId, String(r.periodKey), rid, user.id, Date.now())
         }
         accepted++
+        if (v2) {
+          const receipt = { kind: r.kind, id: rid, operationId: r.operationId, status: 'accepted', version: (mine?.revision ?? 0) + 1 }
+          db.prepare('INSERT INTO sync_operations(user_id, operation_id, fingerprint, result, created_at) VALUES (?,?,?,?,?)')
+            .run(user.id, r.operationId, sha(JSON.stringify(r)), JSON.stringify(receipt), Date.now())
+          results.push(receipt)
+        }
+      }
+      if (v2 && (denied || conflicts || duplicates)) {
+        db.exec('ROLLBACK')
+        return ok(res, { accepted: 0, skipped, denied, duplicates, conflicts, authoritative, conflicted,
+          results: results.map(result => result.status === 'accepted' ? { ...result, status: 'batch-aborted', version: undefined } : result), at: Date.now() })
       }
       upsertKv(`lastSync:${user.id}`, Date.now())
       db.exec('COMMIT')
       } catch (e) { db.exec('ROLLBACK'); throw e }
-      return ok(res, { accepted, skipped, denied, duplicates, conflicts, authoritative, conflicted, at: Date.now() })
+      return ok(res, { accepted, skipped, denied, duplicates, conflicts, authoritative, conflicted, results, at: Date.now() })
     }
 
     if (path === '/api/data/pull' && req.method === 'GET') {
@@ -655,7 +741,7 @@ const server = createServer(async (req, res) => {
       const mine = db.prepare('SELECT book_id FROM book_members WHERE user_id = ?').all(user.id).map((r) => r.book_id)
       const placeholders = mine.length ? `OR r.book_id IN (${mine.map(() => '?').join(',')})` : ''
       // 带上记录作用域：客户端靠 bookId/ownerId 判断「同一条记录」，墓碑也需要
-      const rows = db.prepare(`SELECT r.kind, r.rid, r.payload, r.updated_at, r.deleted, r.user_id, r.book_id
+      const rows = db.prepare(`SELECT r.kind, r.rid, r.payload, r.updated_at, r.deleted, r.user_id, r.book_id, r.revision
         FROM records r WHERE (r.user_id = ? ${placeholders})`).all(user.id, ...mine)
       const records = rows.map((r) => ({
         kind: r.kind,
@@ -663,10 +749,12 @@ const server = createServer(async (req, res) => {
         payload: r.payload ? redactPrivateSnapshot(r.kind, JSON.parse(r.payload), r.user_id, r.book_id, user.id) : null,
         updatedAt: r.updated_at,
         deleted: r.deleted === 1,
+        version: r.revision,
         ownerId: r.user_id,
         bookId: r.book_id ?? undefined
       }))
-      return ok(res, { records, lastSync: getKv(`lastSync:${user.id}`) })
+      const generations = db.prepare('SELECT b.book_id AS bookId, b.generation FROM books b JOIN book_members m ON m.book_id = b.book_id WHERE m.user_id = ?').all(user.id)
+      return ok(res, { records, generations, lastSync: getKv(`lastSync:${user.id}`) })
     }
 
     // 旧版 REST/sync 接口已移除：客户端只用 /api/data/*、/api/auth/*、/api/books/*

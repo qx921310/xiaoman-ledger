@@ -567,4 +567,6 @@ export interface SyncIncoming {
   deleted?: boolean
   ownerId?: number
   bookId?: string | number
+  /** Set only after the versioned sync layer confirms there is no local draft. */
+  versionAuthoritative?: boolean
 }
