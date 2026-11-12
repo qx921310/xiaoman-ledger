@@ -854,3 +854,19 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   background: var(--surface-2); border-radius: var(--r-sm);
   padding: 8px 10px; margin-bottom: var(--sp-3);
 }
+
+/* 窄屏（≤430px）：三栏汇总不挤压，标签缩小、金额换行自适应 */
+@media (max-width: 430px) {
+  .home-summary { gap: 6px; }
+  .hm-item small { font-size: var(--font-xs); }
+  .hm-item b { font-size: var(--font-md); }
+  .cal-totals { gap: 6px; }
+  .cal-totals small { font-size: var(--font-xs); }
+  .cal-totals b { font-size: var(--font-sm); }
+  .asset-cards { gap: 6px; }
+  .asset-card { padding: 10px; }
+  .asset-card b { font-size: var(--font-sm); }
+  .subpage-sum { padding: 10px; gap: 8px; }
+  .subpage-sum b { font-size: var(--font-md); }
+  .page-title { font-size: var(--font-md); }
+}

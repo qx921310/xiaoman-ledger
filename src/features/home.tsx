@@ -35,6 +35,7 @@ export function Home({ me, onAdd }: { me?: { id: number; email: string }; onAdd:
 
   return (
     <section className="home">
+      <h2 className="page-title">{new Date().getFullYear()} 年 {new Date().getMonth() + 1} 月</h2>
       <div className="home-summary">
         <div className="hm-item">
           <small>本月支出</small>
