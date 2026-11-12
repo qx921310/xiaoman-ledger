@@ -10,6 +10,13 @@ const dataDir = join(here, 'data')
 mkdirSync(dataDir, { recursive: true })
 
 const db = new DatabaseSync(join(dataDir, 'ledger.db'))
+// WAL：读写不互相阻塞，单请求延迟明显下降；synchronous=NORMAL 在 WAL 下仍然安全
+db.exec(`
+  PRAGMA journal_mode = WAL;
+  PRAGMA synchronous = NORMAL;
+  PRAGMA busy_timeout = 5000;
+  PRAGMA foreign_keys = ON;
+`)
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

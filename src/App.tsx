@@ -3,6 +3,7 @@ import { useLedger } from './store'
 import { auth, books as bookApi, setCurrentUid, type BookInfo, type User } from './auth'
 import { loadAccountData } from './account-session'
 import { syncNow } from './sync'
+import { startAutoSync, subscribeAutoSync, syncNowImmediate, type AutoSyncState } from './sync-auto'
 
 import { AuthScreen } from './features/auth'
 import { AddBill } from './features/add-bill'
@@ -28,7 +29,8 @@ export default function App() {
     await loadAccountData(u.id)
     setUser(u)
     await loadBooks()
-    autoSyncOnce()
+    startAutoSync({ sync: () => syncNow() })
+    await autoSyncOnce()
   }
 
   useEffect(() => {
@@ -119,6 +121,8 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User
       runCycles()
     }
   }, [sessionSyncAt, syncGrace, runCycles])
+  const [autoSync, setAutoSync] = useState<AutoSyncState | null>(null)
+  useEffect(() => subscribeAutoSync(setAutoSync), [])
   const [toast, setToast] = useState('')
   const notify = (m: string) => {
     setToast(m)
@@ -136,6 +140,7 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User
           </div>
         </div>
         <div className="userbox">
+          <SyncBadge state={autoSync} onRetry={() => { void syncNowImmediate() }} />
           <BookSwitch />
           <span className="uemail" title={user.email}>{user.email}</span>
           <button className="ghost tiny" onClick={onLogout}>退出</button>
@@ -190,4 +195,23 @@ function BookSwitch() {
   )
 }
 
-
+/** 同步状态徽标：待同步 / 同步中 / 失败可重试 / 上次同步时间 */
+function SyncBadge({ state, onRetry }: { state: AutoSyncState | null; onRetry: () => void }) {
+  if (!state) return null
+  if (state.running) return <span className="sync-badge sync-running" title="正在同步">同步中…</span>
+  if (state.lastError) {
+    return (
+      <button type="button" className="sync-badge sync-failed" title={state.lastError} onClick={onRetry}>
+        同步失败 · 重试
+      </button>
+    )
+  }
+  if (state.pending) return <span className="sync-badge sync-pending" title="有本地改动待推送">待同步</span>
+  if (state.lastOkAt) {
+    const t = new Date(state.lastOkAt)
+    const hh = String(t.getHours()).padStart(2, '0')
+    const mm = String(t.getMinutes()).padStart(2, '0')
+    return <span className="sync-badge sync-ok" title="已与服务端一致">{hh}:{mm} 已同步</span>
+  }
+  return null
+}

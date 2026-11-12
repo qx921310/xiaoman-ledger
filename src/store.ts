@@ -6,6 +6,7 @@ import { normalizeBuiltInChild, resolveBillChild, TAXONOMY_CHILDREN, TAXONOMY_IN
 import { getCurrentUid, userStorage } from './auth'
 import { deriveAssets } from './balances'
 import { newBillIdentity } from './identity'
+import { markDirty } from './domain/dirty-bus'
 import { lendRemaining } from './lend'
 import { mergeRemote, type MergeableState } from './domain/sync-merge'
 import { planCycles } from './domain/cycles'
@@ -190,7 +191,7 @@ export const useLedger = create<LedgerState>()(
         const combined = { ...state, ...changes }
         const children = combined.childCategories.map(normalizeBuiltInChild)
         if (children.some((child: Category, index: number) => child !== combined.childCategories[index])) changes.childCategories = children
-        if (!combined.assets || !combined.bills || !combined.parentCategories) return changes
+        if (!combined.assets || !combined.bills || !combined.parentCategories) { markDirty(); return changes }
         const assets = deriveAssets(combined).map(asset => {
           const previous = state.assets.find(a => a.assetId === asset.assetId)
           if (!previous) return asset
@@ -200,6 +201,7 @@ export const useLedger = create<LedgerState>()(
           return JSON.stringify(metadata) === JSON.stringify(oldMetadata)
             ? { ...asset, updateTime: previous.updateTime } : asset
         })
+        markDirty()
         return { ...changes, assets }
       }, replace)
       return ({

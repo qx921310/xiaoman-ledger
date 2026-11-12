@@ -1,6 +1,7 @@
 import { useLedger } from './store'
 import type { Bill } from './types'
 import { periodKeyOf as cyclePeriodKey } from './domain/cycle-dedupe'
+import { beginRemote, endRemote } from './domain/dirty-bus'
 
 export interface SyncRecord {
   kind: string
@@ -102,7 +103,13 @@ async function runSync(records: ReturnType<typeof collectRecords>) {
   const authoritative = (pushed.authoritative ?? []) as Array<{ id: string; winnerId: string; reason: string }>
 
   const pulled = await call('/data/pull')
-  useLedger.getState().applyRemote(pulled.records || [])
+  // 应用远端数据期间产生的写入不算本地改动，否则会触发自我循环同步
+  beginRemote()
+  try {
+    useLedger.getState().applyRemote(pulled.records || [])
+  } finally {
+    endRemote()
+  }
   let conflictsKept = 0
   if (authoritative.length) {
     const r = useLedger.getState().resolvePeriodConflicts(authoritative.map((a) => ({ id: a.id, winnerId: a.winnerId })))
