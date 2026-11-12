@@ -789,3 +789,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 .subpage-head h3 { margin: 0; font-size: var(--font-md); outline: none; }
 .subpage-block { display: grid; gap: var(--sp-2); }
+
+/* 子页顶部两栏汇总（对齐一木 activity_lend/stock/reimbursement 的顶部数字区） */
+.subpage-sum {
+  display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3);
+  padding: var(--sp-3); margin-bottom: var(--sp-3);
+  background: var(--surface-2); border-radius: var(--r-md);
+}
+.subpage-sum > div { display: grid; gap: 2px; }
+.subpage-sum small { color: var(--muted); font-size: var(--font-xs); }
+.subpage-sum b { font-size: var(--font-lg); }

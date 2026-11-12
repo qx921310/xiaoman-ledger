@@ -320,6 +320,10 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
       </>)}
       {screen === 'stock' && (
       <div className="subpage-block">
+      <div className="subpage-sum">
+        <div><small>总市值</small><b>{money(stockValue)}</b></div>
+        <div><small>累计收益</small><b className={stockProfit < 0 ? 'out' : 'in'}>{money(stockProfit)}</b></div>
+      </div>
       <p className="hint">按一木的持仓模型记录：买入/卖出自动算移动加权成本与已实现盈亏，填当前价看浮动盈亏。</p>
       <div className="row2">
         <input aria-label="持仓名称" value={stockForm.name} placeholder="名称，如 沪深300ETF"
@@ -546,9 +550,10 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
 
       {screen === 'lend' && (
       <div className="subpage-block">
-      {(receivable !== 0 || payable !== 0) && (
-        <p className="hint">待收回 {money(receivable)} · 待归还 {money(payable)}</p>
-      )}
+      <div className="subpage-sum">
+        <div><small>借出</small><b>{money(receivable)}</b></div>
+        <div><small>借入</small><b>{money(payable)}</b></div>
+      </div>
       {lends.length === 0 && <p className="hint">还没有借贷记录。</p>}
       {lends.slice(0, 8).map((l) => (
         <div key={l.lendId} className="row">
@@ -664,7 +669,11 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
       </div>
       )}
       {screen === 'reimburse' && (<>
-        <div className="row"><b className="grow">待报销明细</b><span className="muted">共 {pendingReimburseCount} 笔 · {money(pendingReimburse)}</span></div>
+        <div className="subpage-sum">
+          <div><small>未报销</small><b>{money(pendingReimburse)}</b></div>
+          <div><small>已报销</small><b>{money(doneReimburse)}</b></div>
+        </div>
+        <div className="row"><b className="grow">待报销明细</b><span className="muted">共 {pendingReimburseCount} 笔</span></div>
         {reimbursements.filter((r) => r.status === 'pending').length === 0 && <p className="hint">没有待报销的账单。</p>}
         {reimbursements.filter((r) => r.status === 'pending').map((r) => {
           const bill = bills.find((b) => String(b.billId) === String(r.billId))
