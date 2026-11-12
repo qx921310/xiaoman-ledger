@@ -230,7 +230,7 @@ export function Bills({ me, onAdd, embedded = false }: { me?: { id: number; emai
               const from = assets.find((a) => a.assetId === t.fromAssetId)
               const to = assets.find((a) => a.assetId === t.toAssetId)
               return (
-                <div key={'t' + t.transferId} className="row">
+                <div key={'t' + t.transferId} className="row ledger-row">
                   <i className="dot arrow">⇄</i>
                   <div className="grow">
                     <div>转账 · {from?.assetName ?? '已删除账户'} → {to?.assetName ?? '已删除账户'}</div>
@@ -241,8 +241,10 @@ export function Bills({ me, onAdd, embedded = false }: { me?: { id: number; emai
                     </small>
                   </div>
                   <b className="neutral">{money(t.cost)}</b>
-                  <button className="link" aria-label="编辑转账" onClick={() => setEditingTransfer(t)}>改</button>
-                  <button className="del" aria-label="删除转账" onClick={() => delTransfer(t.transferId)}>删</button>
+                  <div className="ledger-actions">
+                    <button className="link" aria-label="编辑转账" onClick={() => setEditingTransfer(t)}>编辑</button>
+                    <button className="del" aria-label="删除转账" onClick={() => delTransfer(t.transferId)}>删除</button>
+                  </div>
                 </div>
               )
             }
@@ -251,7 +253,7 @@ export function Bills({ me, onAdd, embedded = false }: { me?: { id: number; emai
             const a = assets.find((x) => x.assetId === b.assetId)
             const inc = p?.kind === 'income'
             return (
-              <div key={b.billId} className="row">
+              <div key={b.billId} className="row ledger-row">
                 <span className="dot-badge" style={{ background: p?.bg ?? 'var(--accent-soft)', color: p?.color ?? 'var(--ink)' }}>
                   <CatIcon k={p?.icon} size={16} />
                 </span>
@@ -287,10 +289,12 @@ export function Bills({ me, onAdd, embedded = false }: { me?: { id: number; emai
                   )}
                 </div>
                 <b className={inc ? 'in' : 'out'}>{inc ? '+' : '-'}{money(inc ? b.cost : billNetAmount(b, refunds))}</b>
-                <button className="link" aria-label={`查看${p?.name ?? '账单'}明细`} onClick={() => setDetail(b)}>明细</button>
-                {!readOnly && <button className="link" aria-label={`编辑${p?.name ?? '账单'}`} onClick={() => setEditing(b)}>改</button>}
-                {!readOnly && <button className="link" aria-label={`复制${p?.name ?? '账单'}`} onClick={() => duplicate(b.billId)}>复制</button>}
-                {!readOnly && <button className="del" aria-label={`删除${p?.name ?? '账单'}`} onClick={() => removeWithUndo(b)}>删</button>}
+                <div className="ledger-actions">
+                  <button className="link" aria-label={`查看${p?.name ?? '账单'}明细`} onClick={() => setDetail(b)}>明细</button>
+                  {!readOnly && <button className="link" aria-label={`编辑${p?.name ?? '账单'}`} onClick={() => setEditing(b)}>编辑</button>}
+                  {!readOnly && <button className="link" aria-label={`复制${p?.name ?? '账单'}`} onClick={() => duplicate(b.billId)}>复制</button>}
+                  {!readOnly && <button className="del" aria-label={`删除${p?.name ?? '账单'}`} onClick={() => removeWithUndo(b)}>删除</button>}
+                </div>
               </div>
             )
           })}
