@@ -454,7 +454,11 @@ function BillDetail({ bill, me, onClose, onEdit }: {
 
 
   return (
-    <Modal label="账单详情" className="detail" onClose={onClose}>
+    <section className="card bill-page" aria-label="账单详情">
+      <div className="subpage-head">
+        <button type="button" className="link" onClick={onClose}>‹ 返回</button>
+        <h3>账单详情</h3>
+      </div>
         <div className="dhead" style={{ background: p?.bg ?? 'var(--accent-soft)', color: p?.color ?? 'var(--ink)' }}>
           <CatIcon k={c?.icon ?? p?.icon} size={34} />
           <div className="grow">
@@ -575,12 +579,11 @@ function BillDetail({ bill, me, onClose, onEdit }: {
             : (memberMap[bill.ownerId] ?? `用户 #${bill.ownerId}`)}
         </Row>
 
-        <div className="modal-btns">
-          <button className="ghost" onClick={onClose}>关闭</button>
-          <button className="ghost" onClick={() => { del(bill.billId); onClose() }}>删除</button>
-          <button className="primary" onClick={onEdit}>编辑</button>
-        </div>
-    </Modal>
+      <div className="bill-page-actions">
+        <button className="ghost" onClick={() => { del(bill.billId); onClose() }}>删除</button>
+        <button className="primary" onClick={onEdit}>编辑</button>
+      </div>
+    </section>
   )
 }
 
