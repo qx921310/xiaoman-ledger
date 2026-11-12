@@ -12,6 +12,7 @@ import { byAsset, byTag } from '../domain/stats-breakdown'
 import { statisticsBounds, chartTrend, categoryDistribution } from '../domain/statistics-charts'
 import { CategoryChart, TrendChart } from './statistics-charts'
 import { AssetSankey } from './asset-sankey'
+import { FilteredBills } from './filtered-bills'
 import { Modal } from '../ui/modal'
 import { IMPORTED_CATEGORY_COLOR } from '../default-colors'
 
@@ -124,6 +125,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
   // 一木统计页的 11 个可勾选模块（StatisticsModule）
   const MODULES = ['支出占比', '支出数据', '收支统计', '收支对比', '标签占比', '标签数据', '资产走势', '账户收支', '本月总结', '报表统计', '成员收支'] as const
   const [modOpen, setModOpen] = useState(false)
+  const [drill, setDrill] = useState<{ title: string; catId: number } | null>(null)
   const [mods, setMods] = useState<Record<string, boolean>>(() => {
     const base: Record<string, boolean> = {}
     for (const m of MODULES) base[m] = !['报表统计', '成员收支', '资产走势'].includes(m)
@@ -162,6 +164,12 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
 
   return (
     <section className="card">
+      {drill && (
+        <FilteredBills title={drill.title}
+          bills={rangeBills.filter((b) => b.parentCategoryId === drill.catId)}
+          onBack={() => setDrill(null)} />
+      )}
+      {!drill && (<>
       <div className="label">时间范围</div>
       <div className="row2">
         <div className="row">
@@ -218,8 +226,8 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
       </p>
 
       <TrendChart points={trend} />
-      <CategoryChart title="支出分类" rows={expenseRows} />
-      <CategoryChart title="收入分类" rows={incomeRows} />
+      <CategoryChart title="支出分类" rows={expenseRows} onPick={(id, name) => setDrill({ title: name, catId: id })} />
+      <CategoryChart title="收入分类" rows={incomeRows} onPick={(id, name) => setDrill({ title: name, catId: id })} />
 
       <div className="label">预算</div>
       {totalBudget > 0 ? (
@@ -629,6 +637,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
             </div>
         </Modal>
       )}
+    </>)}
     </section>
   )
 }

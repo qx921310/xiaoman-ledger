@@ -5,7 +5,7 @@ import type { CategoryPoint, ChartPoint } from '../domain/statistics-charts'
 
 const COLORS = ['var(--accent)', 'var(--out)', 'var(--in)', 'var(--focus-ink)', 'var(--muted)']
 
-export function CategoryChart({ title, rows }: { title: string; rows: CategoryPoint[] }) {
+export function CategoryChart({ title, rows, onPick }: { title: string; rows: CategoryPoint[]; onPick?: (id: number, name: string) => void }) {
   const total = rows.reduce((sum, row) => sum + row.amount, 0)
   let offset = 0
   return <section className="stats-panel" aria-label={title}>
@@ -25,11 +25,12 @@ export function CategoryChart({ title, rows }: { title: string; rows: CategoryPo
         <div className="stats-donut-center"><small>{title.slice(0, 2)}合计</small><strong>{money(total)}</strong></div>
       </div>
       <div className="stats-legend">
-        {rows.map((row, index) => <div className="stats-category" key={row.id}>
+        {rows.map((row, index) => <button type="button" className="stats-category" key={row.id}
+          onClick={onPick ? () => onPick(row.id, row.name) : undefined}>
           <span className="stats-dot" style={{ background: COLORS[index % COLORS.length] }} />
           <span className="stats-category-name"><CatIcon k={row.icon} size={16} /> {row.name}<small>{row.count} 笔</small></span>
           <span className="stats-category-value"><strong>{money(row.amount)}</strong><small>{(row.amount / total * 100).toFixed(1)}%</small></span>
-        </div>)}
+        </button>)}
       </div>
     </div>}
   </section>
