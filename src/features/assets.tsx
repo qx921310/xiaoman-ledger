@@ -109,26 +109,25 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
   // 一木资产页：净资产（可隐藏）+ 存款/负债 两栏 + 三张汇总卡片 + 按类型分组列表
   const [hideAmount, setHideAmount] = useState(false)
   // 一木：点净资产/存款/负债/组头 → 弹「构成」明细
-  const [composition, setComposition] = useState<{ title: string; note?: string; rows: Array<{ name: string; amount: number }> } | null>(null)
-  const openComposition = (title: string, rows: Array<{ name: string; amount: number }>, note?: string) =>
+  type CompRow = { name: string; amount: number; unit?: 'money' | 'count' | 'percent' }
+  // 一木把「待报销 / 借出借入 / 投资持仓」做成独立页面；这里用屏内分页复刻
+  const [screen, setScreen] = useState<'assets' | 'reimburse' | 'lend' | 'stock'>('assets')
+  const [composition, setComposition] = useState<{ title: string; note?: string; rows: CompRow[] } | null>(null)
+  const openComposition = (title: string, rows: CompRow[], note?: string) =>
     setComposition({ title, note, rows: [...rows].sort((x, y) => Math.abs(y.amount) - Math.abs(x.amount)) })
-  /** 卡片点击：展开对应折叠入口再滚过去（折叠状态下只滚标题会让用户以为没反应） */
-  const openSection = (id: string) => {
-    const el = document.getElementById(id) as HTMLDetailsElement | null
-    if (!el) return
-    el.open = true
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-
   /** 账户 → 构成行；负债统一取绝对值，与顶部正数口径一致 */
-  const assetRows = (list: Asset[], sign: 1 | -1 = 1) => list.map((a) => ({
+  const assetRows = (list: Asset[]) => list.map((a) => ({
     name: a.simpleName || a.assetName,
-    amount: sign * Math.abs(toBase(a.assetNumber, a.currency, currencies, defaultCurrency))
+    amount: Math.abs(toBase(a.assetNumber, a.currency, currencies, defaultCurrency)),
+    unit: 'money' as const
   }))
   const mask = (v: number) => (hideAmount ? '••••' : money(v))
   const deposit = assets.filter((a) => a.assetNumber > 0).reduce((s, a) => s + toBase(a.assetNumber, a.currency, currencies, defaultCurrency), 0)
   const liability = Math.abs(assets.filter((a) => a.assetNumber < 0).reduce((s, a) => s + toBase(a.assetNumber, a.currency, currencies, defaultCurrency), 0))
-  const pendingReimburse = reimbursements.filter((r) => r.status === 'pending').reduce((s, r) => s + (r.number || 0), 0)
+  const pendingList = reimbursements.filter((r) => r.status === 'pending')
+  const pendingReimburseCount = pendingList.length
+  const pendingReimburse = pendingList.reduce((s, r) => s + (r.number || 0), 0)
+  const deleteReimbursement = useLedger((st) => st.deleteReimbursement)
   const doneReimburse = reimbursements.filter((r) => r.status !== 'pending').reduce((s, r) => s + (r.number || 0), 0)
   const stockValue = stockAssets.reduce((s, h) => s + holdingValue(h.primeNum, h.primeCost, h.price ?? h.primeCost).market, 0)
   const stockProfit = stockAssets.reduce((s, h) => s + totalProfit(h.historyIncome, holdingValue(h.primeNum, h.primeCost, h.price ?? h.primeCost).floating), 0)
@@ -141,7 +140,14 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
   ).sort(([a], [b]) => Number(a) - Number(b))
 
   return (
-    <section className="card">
+    <section className={`card${screen === 'assets' ? '' : ` subpage-mode assets-screen--${screen}`}`}>
+      {screen !== 'assets' && (
+        <div className="subpage-head">
+          <button type="button" className="link" onClick={() => setScreen('assets')}>‹ 返回资产</button>
+          <b>{{ reimburse: '待报销', lend: '借入借出', stock: '投资持仓' }[screen]}</b>
+        </div>
+      )}
+
       <div className="asset-banner">
         <div className="asset-net">
           <div className="asset-net-label">
@@ -157,7 +163,7 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
           <button type="button" className="asset-two-item" onClick={() => openComposition('存款构成', assetRows(assets.filter((a) => a.assetNumber > 0)))}>
             <small>存款</small><b>{mask(deposit)}</b>
           </button>
-          <button type="button" className="asset-two-item" onClick={() => openComposition('负债构成', assetRows(assets.filter((a) => a.assetNumber < 0), -1))}>
+          <button type="button" className="asset-two-item" onClick={() => openComposition('负债构成', assetRows(assets.filter((a) => a.assetNumber < 0)))}>
             <small>负债</small><b>{mask(liability)}</b>
           </button>
         </div>
@@ -165,22 +171,17 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
       </div>
 
       <div className="asset-cards">
-        <button type="button" className="asset-card" onClick={() => openComposition('待报销明细',
-            reimbursements.filter((r) => r.status === 'pending').map((r) => {
-              const bill = bills.find((b) => String(b.billId) === String(r.billId))
-              return { name: bill?.remark || `账单 ${String(r.billId).slice(0, 6)}`, amount: r.number || 0 }
-            }),
-            '按账单逐笔列出待报销金额')}>
+        <button type="button" className="asset-card" onClick={() => setScreen('reimburse')}>
           <small>待报销</small>
           <b>{mask(pendingReimburse)}</b>
           <small className="dim">已报 {mask(doneReimburse)}</small>
         </button>
-        <button type="button" className="asset-card" onClick={() => openSection('block-lend')}>
+        <button type="button" className="asset-card" onClick={() => setScreen('lend')}>
           <small>借出借入</small>
           <b>{mask(receivable)}</b>
           <small className="dim">借入 {mask(payable)}</small>
         </button>
-        <button type="button" className="asset-card" onClick={() => openSection('block-stock')}>
+        <button type="button" className="asset-card" onClick={() => setScreen('stock')}>
           <small>投资</small>
           <b>{mask(stockValue)}</b>
           <small className="dim">收益 {mask(stockProfit)}</small>
@@ -193,11 +194,11 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
         <div key={typeKey} className="asset-group">
           <button type="button" className="asset-group-head" onClick={() => {
             const sum = list.reduce((acc, a) => acc + toBase(a.assetNumber, a.currency, currencies, defaultCurrency), 0)
-            const share = total ? Math.round((sum / total) * 100) : 0
+            const share = total ? Math.round((Math.abs(sum) / Math.abs(total)) * 100) : 0
             openComposition(`${ASSET_TYPE[Number(typeKey)] ?? '其他'} · 统计`, [
-              { name: `账户数`, amount: list.length },
-              { name: `合计`, amount: sum },
-              { name: `占净资产`, amount: share }
+              { name: '账户数', amount: list.length, unit: 'count' },
+              { name: '合计', amount: sum, unit: 'money' },
+              { name: '占净资产', amount: share, unit: 'percent' }
             ], '组头点击查看该类型的统计概览')
           }}>
             <span>{ASSET_TYPE[Number(typeKey)] ?? '其他'} ›</span>
@@ -274,7 +275,7 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
         )
       })()}
 
-      <details className="fold" id="block-stock">
+      <details className="fold fold-stock" id="block-stock" open={screen === 'stock'}>
         <summary>投资持仓</summary>
       <p className="hint">按一木的持仓模型记录：买入/卖出自动算移动加权成本与已实现盈亏，填当前价看浮动盈亏。</p>
       <div className="row2">
@@ -497,7 +498,7 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
         />
       )}
 
-      <details className="fold" id="block-lend">
+      <details className="fold fold-lend" id="block-lend" open={screen === 'lend'}>
         <summary>借入借出</summary>
       {(receivable !== 0 || payable !== 0) && (
         <p className="hint">待收回 {money(receivable)} · 待归还 {money(payable)}</p>
@@ -615,6 +616,24 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
       )}
 
       </details>
+      <section className="fold fold-reimburse">
+        <div className="row"><b className="grow">待报销明细</b><span className="muted">共 {pendingReimburseCount} 笔 · {money(pendingReimburse)}</span></div>
+        {reimbursements.filter((r) => r.status === 'pending').length === 0 && <p className="hint">没有待报销的账单。</p>}
+        {reimbursements.filter((r) => r.status === 'pending').map((r) => {
+          const bill = bills.find((b) => String(b.billId) === String(r.billId))
+          return (
+            <div key={r.reimbursementId} className="row">
+              <div className="grow">
+                <div>{bill?.remark || `账单 ${String(r.billId).slice(0, 6)}`}</div>
+                <small>{dayOf(r.updateTime ?? Date.now())}{r.detail ? ` · ${r.detail}` : ''}</small>
+              </div>
+              <b>{money(r.number || 0)}</b>
+              <button type="button" className="del" onClick={() => { deleteReimbursement(r.reimbursementId); notify('已撤销该笔报销登记') }}>撤销</button>
+            </div>
+          )
+        })}
+      </section>
+
       <details className="fold">
         <summary>新增账户</summary>
       {/* 字段顺序照一木 AddCapitalActivity / AddCreditCardActivity */}
@@ -678,13 +697,15 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
           {composition.rows.map((r) => (
             <div key={r.name} className="row">
               <span className="grow">{r.name}</span>
-              <b>{mask(r.amount)}</b>
+              <b>{r.unit === 'count' ? `${r.amount} 个` : r.unit === 'percent' ? `${r.amount}%` : mask(r.amount)}</b>
             </div>
           ))}
-          <div className="row">
-            <span className="grow">合计</span>
-            <b>{mask(composition.rows.reduce((sum, r) => sum + r.amount, 0))}</b>
-          </div>
+          {composition.rows.some((r) => (r.unit ?? 'money') === 'money') && (
+            <div className="row">
+              <span className="grow">合计</span>
+              <b>{mask(composition.rows.filter((r) => (r.unit ?? 'money') === 'money').reduce((sum, r) => sum + r.amount, 0))}</b>
+            </div>
+          )}
           <div className="modal-btns">
             <button type="button" className="ghost" onClick={() => setComposition(null)}>关闭</button>
           </div>

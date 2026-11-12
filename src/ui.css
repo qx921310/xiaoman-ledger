@@ -780,3 +780,23 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .fold > summary::after { content: '›'; color: var(--muted); transform: rotate(90deg); transition: transform .15s; }
 .fold[open] > summary::after { transform: rotate(-90deg); }
 .fold[open] { padding-bottom: var(--sp-3); }
+
+/* 资产页子页面（复刻一木的独立页面：返回 + 只显示该块） */
+.subpage-mode > * { display: none; }
+.subpage-mode > .subpage-head,
+.subpage-mode > .fold-stock,
+.subpage-mode > .fold-lend,
+.subpage-mode > .fold-reimburse { display: block; }
+.assets-screen--stock > .fold-lend,
+.assets-screen--stock > .fold-reimburse,
+.assets-screen--lend > .fold-stock,
+.assets-screen--lend > .fold-reimburse,
+.assets-screen--reimburse > .fold-stock,
+.assets-screen--reimburse > .fold-lend { display: none; }
+.subpage-mode .fold[open] > summary { display: none; }
+.subpage-mode .fold { border: 0; padding: 0; margin: 0; }
+.subpage-head {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--line);
+}
