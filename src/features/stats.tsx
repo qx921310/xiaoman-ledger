@@ -94,6 +94,19 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
 
   const [moreInfo, setMoreInfo] = useState(false)
   const [summaryText, setSummaryText] = useState<string | null>(null)
+  // 一木统计页的 11 个可勾选模块（StatisticsModule）
+  const MODULES = ['支出占比', '支出数据', '收支统计', '收支对比', '标签占比', '标签数据', '资产走势', '账户收支', '本月总结', '报表统计', '成员收支'] as const
+  const [modOpen, setModOpen] = useState(false)
+  const [mods, setMods] = useState<Record<string, boolean>>(() => {
+    const base: Record<string, boolean> = {}
+    for (const m of MODULES) base[m] = !['报表统计', '成员收支', '资产走势'].includes(m)
+    try { return { ...base, ...(JSON.parse(localStorage.getItem('xiaoman-stats-modules') ?? '{}')) } } catch { return base }
+  })
+  const toggleMod = (m: string) => {
+    const next = { ...mods, [m]: !mods[m] }
+    setMods(next)
+    try { localStorage.setItem('xiaoman-stats-modules', JSON.stringify(next)) } catch { /* 忽略 */ }
+  }
   // 本月总结（一木「本月总结」模块：自动生成，可编辑复制）
   const buildSummary = () => {
     const top = expenseRows.slice(0, 3)
@@ -124,7 +137,27 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
     <section className="card">
       <div className="label">时间范围</div>
       <div className="row2">
-        <div className="stats-tabs" role="tablist" aria-label="统计视图">
+        <div className="row">
+        <span className="grow" />
+        <button type="button" className="link" onClick={() => setModOpen(true)}>模块</button>
+      </div>
+
+      {modOpen && (
+        <div className="menu-mask" onClick={() => setModOpen(false)}>
+          <div className="home-menu" role="dialog" aria-label="统计模块" onClick={(e) => e.stopPropagation()}>
+            <div className="hm-label">统计模块</div>
+            {MODULES.map((m) => (
+              <label key={m} className="row hm-check">
+                <span className="grow">{m}</span>
+                <input type="checkbox" checked={!!mods[m]} onChange={() => toggleMod(m)} />
+              </label>
+            ))}
+            <button type="button" className="ghost wide" onClick={() => setModOpen(false)}>完成</button>
+          </div>
+        </div>
+      )}
+
+      <div className="stats-tabs" role="tablist" aria-label="统计视图">
         {([['month', '普通'], ['year', '年度'], ['custom', '自定义']] as const).map(([key, label]) => (
           <button key={key} type="button" role="tab"
             aria-selected={rangeMode === key}
@@ -261,7 +294,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
         <AssetSankey />
       </details>
 
-      {trend.length > 0 && rangeMode === 'custom' && (
+      {mods['收支统计'] && trend.length > 0 && rangeMode === 'custom' && (
         <>
           <div className="label">收支趋势（折线）</div>
           <div className="stats-chart" role="img" aria-label="自定义区间收支折线图">
@@ -278,7 +311,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
         </>
       )}
 
-      {trend.length > 0 && (rangeMode === 'month' || rangeMode === 'year') && (
+      {mods['收支统计'] && trend.length > 0 && (rangeMode === 'month' || rangeMode === 'year') && (
         <>
           <div className="label">{rangeMode === 'year' ? '年度趋势' : '本月趋势'}</div>
           <div className="stats-chart" role="img" aria-label="收支柱状图">
@@ -295,7 +328,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
         </>
       )}
 
-      <div className="stats-summary">
+      {mods['本月总结'] && <div className="stats-summary">
         <div className="row">
           <b className="grow">本月总结</b>
           <button type="button" className="link" onClick={() => setSummaryText(buildSummary())}>生成</button>
@@ -312,7 +345,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
             </div>
           </>
         )}
-      </div>
+      </div>}
 
       <button type="button" className="link stats-more" onClick={() => setMoreInfo(!moreInfo)}>
         {moreInfo ? '收起明细' : '更多明细'}
@@ -334,7 +367,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
         )
       })()}
 
-      {expenseRows.length > 0 && (
+      {mods['支出占比'] && expenseRows.length > 0 && (
         <>
           <div className="label">分类占比</div>
           <div className="stats-chart" role="img" aria-label="分类支出占比饼图">
@@ -365,7 +398,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
         </>
       )}
 
-      {assetRows.length > 0 && (
+      {mods['账户收支'] && assetRows.length > 0 && (
         <>
           <div className="label">按账户</div>
           {assetRows.map((r) => (
@@ -379,7 +412,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
         </>
       )}
 
-      {tagRows.length > 0 && (
+      {mods['标签数据'] && tagRows.length > 0 && (
         <>
           <div className="label">按标签</div>
           {tagRows.map((r) => (
