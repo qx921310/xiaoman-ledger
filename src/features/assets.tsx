@@ -113,7 +113,30 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
   // 一木把「待报销 / 借出借入 / 投资持仓」做成独立页面；这里用条件渲染的子页复刻
   const [screen, setScreen] = useState<'assets' | 'reimburse' | 'lend' | 'stock'>('assets')
   const subpageTitle = useRef<HTMLHeadingElement>(null)
-  useEffect(() => { if (screen !== 'assets') subpageTitle.current?.focus() }, [screen])
+  const triggerRef = useRef<HTMLElement | null>(null)
+
+  /** 进入子页：压一条历史记录，系统返回键可退回；同时记住触发元素用于焦点回归 */
+  const goto = (next: 'reimburse' | 'lend' | 'stock', from?: HTMLElement | null) => {
+    triggerRef.current = from ?? (document.activeElement as HTMLElement | null)
+    try { history.pushState({ assetsScreen: next }, '') } catch { /* file:// 等环境忽略 */ }
+    setScreen(next)
+  }
+  const backToAssets = () => {
+    if (history.state?.assetsScreen) { history.back(); return }
+    setScreen('assets')
+  }
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const onPop = (e: PopStateEvent) => {
+      if (!e.state?.assetsScreen) { setScreen('assets'); triggerRef.current?.focus?.() }
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+  useEffect(() => {
+    if (screen !== 'assets') subpageTitle.current?.focus()
+    else triggerRef.current?.focus?.()
+  }, [screen])
   const [composition, setComposition] = useState<{ title: string; note?: string; rows: CompRow[] } | null>(null)
   const openComposition = (title: string, rows: CompRow[], note?: string) =>
     setComposition({ title, note, rows: [...rows].sort((x, y) => Math.abs(y.amount) - Math.abs(x.amount)) })
@@ -145,7 +168,7 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
     <section className={screen === 'assets' ? 'card' : 'card subpage'}>
       {screen !== 'assets' && (
         <div className="subpage-head">
-          <button type="button" className="link" onClick={() => setScreen('assets')}>‹ 返回资产</button>
+          <button type="button" className="link" onClick={backToAssets}>‹ 返回资产</button>
           <h3 ref={subpageTitle} tabIndex={-1}>{{ reimburse: '待报销', lend: '借入借出', stock: '投资持仓' }[screen]}</h3>
         </div>
       )}
@@ -174,17 +197,17 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
       </div>
 
       <div className="asset-cards">
-        <button type="button" className="asset-card" onClick={() => setScreen('reimburse')}>
+        <button type="button" className="asset-card" onClick={(e) => goto('reimburse', e.currentTarget)}>
           <small>待报销</small>
           <b>{mask(pendingReimburse)}</b>
           <small className="dim">已报 {mask(doneReimburse)}</small>
         </button>
-        <button type="button" className="asset-card" onClick={() => setScreen('lend')}>
+        <button type="button" className="asset-card" onClick={(e) => goto('lend', e.currentTarget)}>
           <small>借出借入</small>
           <b>{mask(receivable)}</b>
           <small className="dim">借入 {mask(payable)}</small>
         </button>
-        <button type="button" className="asset-card" onClick={() => setScreen('stock')}>
+        <button type="button" className="asset-card" onClick={(e) => goto('stock', e.currentTarget)}>
           <small>投资</small>
           <b>{mask(stockValue)}</b>
           <small className="dim">收益 {mask(stockProfit)}</small>
@@ -496,7 +519,6 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
       })}
 
       </details>
-      </>)}
       {editingAsset && (
         <AssetEditor
           asset={editingAsset}
@@ -504,6 +526,7 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
           onSave={(next) => { updateAsset(next); setEditingAsset(null); notify('账户已更新') }}
         />
       )}
+      </>)}
 
       {screen === 'lend' && (
       <div className="subpage-block">
