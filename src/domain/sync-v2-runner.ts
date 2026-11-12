@@ -20,7 +20,8 @@ const explain = (status: string) => explanations[status] ?? '同步未完成，�
 
 // Keep records that refer to one another together, including conflicted records.
 // Unknown relationships are not treated as permission to discard any operation.
-function groups(meta: VersionedMeta, local: VersionedRecord[]): Array<Array<[string, PendingOperation]>> {
+function groups(meta: VersionedMeta, local: VersionedRecord[]):
+  { pushable: Array<Array<[string, PendingOperation]>>; blocked: string[] } {
   const all = new Map(local.filter(r => meta.conflicts[recordKey(r)] || meta.pending[recordKey(r)]).map(r => [recordKey(r), r]))
   for (const [key, op] of Object.entries(meta.pending)) all.set(key, op)
   const nodes = [...all.entries()]
@@ -49,9 +50,19 @@ function groups(meta: VersionedMeta, local: VersionedRecord[]): Array<Array<[str
     }
     buckets.push(target)
   }
-  return buckets.filter(b => ![...b.keys].some(k => meta.conflicts[k]))
-    .map(b => [...b.keys].filter(k => meta.pending[k]).map(k => [k, meta.pending[k]] as [string, PendingOperation]))
-    .filter(b => b.length > 0)
+  const blocked: string[] = []
+  const pushable: Array<Array<[string, PendingOperation]>> = []
+  for (const bucket of buckets) {
+    const conflicted = [...bucket.keys].filter(k => meta.conflicts[k])
+    if (conflicted.length) {
+      // 组内有冲突：这组其他待推送记录被连带拦下，必须让用户看见数量
+      for (const k of bucket.keys) if (meta.pending[k]) blocked.push(k)
+      continue
+    }
+    const ops = [...bucket.keys].filter(k => meta.pending[k]).map(k => [k, meta.pending[k]] as [string, PendingOperation])
+    if (ops.length) pushable.push(ops)
+  }
+  return { pushable, blocked }
 }
 /** 必须原子提交的父子关系：父被阻塞时子也不动（其余引用不绑定） */
 const HARD_RELATIONS: Record<string, string[]> = {
@@ -115,8 +126,8 @@ export async function runVersionedSync(adapter: VersionedAdapter) {
   if (meta.schema !== 2) throw new Error('本地同步状态无法识别，请先导出备份')
   queueChanges(meta, adapter.read(), adapter.id)
   adapter.save(meta) // durable before any request
-  const components = groups(meta, adapter.read())
-  const pending = components.flat()
+  const { pushable, blocked } = groups(meta, adapter.read())
+  const pending = pushable.flat()
   let pushed = await adapter.push(pending.map(([, operation]) => operation))
   adapter.check()
   if (!Array.isArray(pushed.results)) throw new Error('服务器未确认同步协议，本地数据已保留')
@@ -139,7 +150,8 @@ export async function runVersionedSync(adapter: VersionedAdapter) {
   // A rejected batch is atomic. Retry unaffected components independently so a
   // newly discovered conflict does not indefinitely block unrelated changes.
   if (pushed.results.some(r => r.status === 'batch-aborted')) {
-    for (const component of groups(meta, adapter.read())) {
+    const retry = groups(meta, adapter.read()).pushable
+    for (const component of retry) {
       const result = await adapter.push(component.map(([, operation]) => operation))
       adapter.check()
       if (!Array.isArray(result.results)) throw new Error('服务器未确认同步协议，本地数据已保留')
@@ -164,5 +176,7 @@ export async function runVersionedSync(adapter: VersionedAdapter) {
     return { kind, id, reason }
   })
   return { pushed: pushed.accepted, skipped: pushed.skipped, denied: pushed.denied, duplicates: pushed.duplicates,
-    conflicts: conflicts.length, conflicted: conflicts, conflictsKept: 0, pulled: pulled.records.length }
+    conflicts: conflicts.length, conflicted: conflicts, conflictsKept: 0, pulled: pulled.records.length,
+    // 被「同组冲突」连带拦下的记录：不是冲突本身，但这次没推上去
+    blocked: blocked.length, blockedKeys: blocked }
 }

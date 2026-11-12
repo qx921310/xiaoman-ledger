@@ -65,8 +65,10 @@ async function main() {
     const a = adapter({ meta, records: [c2, child] as any[], onPush: (r) => { pushed = r.map((x: any) => x.id)
       return { accepted: r.length, skipped: 0, denied: 0, duplicates: 0,
         results: r.map((x: any) => ({ kind: x.kind, id: x.id, operationId: x.operationId, status: 'accepted', version: 2 })) } } })
-    await runVersionedSync(a)
-    console.log(`  冲突记录 c2 的子记录 i1 推送情况 = ${JSON.stringify(pushed)}`)
+    const res = await runVersionedSync(a)
+    console.log(`  冲突记录 c2 的子记录 i1 推送情况 = ${JSON.stringify(pushed)}，blocked=${(res as any).blocked}`)
+    assert.equal((res as any).blocked, 1, '被连带拦下的记录数必须暴露给界面')
+    assert.deepEqual((res as any).blockedKeys, ['["stockInfo","i1"]'], '要能指出是哪条被拦下')
     assert.deepEqual(pushed, [], '父记录冲突时，子记录必须一同停发（否则会写出悬空引用）')
     console.log('  ✅ 父子关系保持绑定（避免悬空引用）')
 

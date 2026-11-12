@@ -106,6 +106,7 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
   const [syncMsg, setSyncMsg] = useState('')
   const [syncing, setSyncing] = useState(false)
   const [syncConflicts, setSyncConflicts] = useState(getVersionedConflicts)
+  const [syncBlocked, setSyncBlocked] = useState(0)
   const [conflictPreview, setConflictPreview] = useState<Awaited<ReturnType<typeof previewVersionedConflict>> | null>(null)
   useEffect(() => subscribeAutoSync(() => setSyncConflicts(getVersionedConflicts())), [])
   const currencies = useLedger((s) => s.currencies)
@@ -145,11 +146,14 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
     try {
       await syncNowImmediate()
       const r = getLastSyncResult() as Awaited<ReturnType<typeof syncNow>> | null
+      setSyncBlocked(Number((r as { blocked?: number } | null)?.blocked ?? 0))
       if (!r) setSyncMsg('同步完成')
       else {
         const bits = [`已推送 ${r.pushed} 条（跳过 ${r.skipped} 条较旧记录），拉回 ${r.pulled} 条`]
         if (r.denied) bits.push(`${r.denied} 条未能推送，请核对权限、账本和记录身份`)
         if (r.conflicts) bits.push(`${r.conflicts} 条需要核对，本地内容已保留：${r.conflicted.map(c => `${c.kind}/${c.id}（${c.reason}）`).join('；')}`)
+        const blocked = Number((r as { blocked?: number }).blocked ?? 0)
+        if (blocked) bits.push(`另有 ${blocked} 条记录因关联到待核对的对象而暂停上传，处理完上面的冲突后会自动补传`)
         setSyncMsg(bits.join('；'))
       }
     } catch (e) {
@@ -1138,6 +1142,9 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
       {syncMsg && <p className="hint">{syncMsg}</p>}
       {syncConflicts.length > 0 && <div className="warn" role="status">
         <p>以下记录的本机版本已保留。建议先导出 JSON 备份；选择本机版本会尝试覆盖该记录的当前云端版本。</p>
+        {syncBlocked > 0 && (
+          <p className="hint">另有 {syncBlocked} 条记录关联到下面待核对的对象，已暂停上传；处理完冲突后会自动补传。</p>
+        )}
         {syncConflicts.map(item => <div key={item.key}>
           <div className="row">
           <span className="grow">{item.kind} / {item.id}：{item.reason}</span>
