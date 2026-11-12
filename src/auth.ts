@@ -9,14 +9,29 @@ let currentUid = 0
 export const getCurrentUid = () => currentUid
 export const setCurrentUid = (id: number) => { currentUid = id }
 
+/** 网络不可用（fetch 本身失败），区别于「服务端明确说没登录」 */
+export class OfflineError extends Error {
+  constructor(message = '网络不可用') { super(message); this.name = 'OfflineError' }
+}
+
 async function call(path: string, init?: RequestInit) {
-  const res = await fetch('/api' + path, {
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
-    ...init
-  })
+  let res: Response
+  try {
+    res = await fetch('/api' + path, {
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      ...init
+    })
+  } catch {
+    throw new OfflineError()
+  }
   const data = await res.json().catch(() => ({ code: 1, msg: '响应不是 JSON' }))
-  if (data.code !== 0) throw new Error(data.msg || '请求失败')
+  if (data.code !== 0) {
+    // 服务端明确拒绝（含 401）→ 真正的未登录/无权限
+    const err = new Error(data.msg || '请求失败') as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
   return data.result
 }
 
@@ -44,12 +59,41 @@ export const books = {
   clear: (bookId: string) => call('/books/clear', { method: 'POST', body: JSON.stringify({ bookId }) })
 }
 
+/** 上次成功登录的身份：断网重开时用它把应用打开 */
+const LAST_USER_KEY = 'xiaoman-last-user'
+export function cacheUser(u: User | null) {
+  try {
+    if (u) localStorage.setItem(LAST_USER_KEY, JSON.stringify(u))
+    else localStorage.removeItem(LAST_USER_KEY)
+  } catch { /* 隐私模式下忽略 */ }
+}
+export function cachedUser(): User | null {
+  try {
+    const raw = localStorage.getItem(LAST_USER_KEY)
+    if (!raw) return null
+    const u = JSON.parse(raw) as User
+    return u && typeof u.id === 'number' ? u : null
+  } catch { return null }
+}
+
 export const auth = {
+  /**
+   * 取当前登录身份。断网时不能用「未登录」处理——那会让离线用户连本地账本都打不开。
+   * 只有服务端明确说没登录才返回 null。
+   */
   me: async (): Promise<User | null> => {
     try {
       const r = await call('/auth/me')
-      return r?.user ?? null
-    } catch {
+      const u = (r?.user ?? null) as User | null
+      cacheUser(u)
+      return u
+    } catch (e) {
+      if (e instanceof OfflineError) {
+        const cached = cachedUser()
+        if (cached) return cached
+        return null
+      }
+      cacheUser(null)
       return null
     }
   },

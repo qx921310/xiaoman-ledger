@@ -70,13 +70,29 @@ export default function App() {
         // 老账单的 bookId 是数字，统一迁到服务端第一个账本
         useLedger.getState().migrateBookIds(list[0].bookId)
       }
+      // 缓存账本列表：断网重开时用它把账本恢复出来
+      try { localStorage.setItem('xm-books-cache', JSON.stringify(list)) } catch { /* 忽略 */ }
       const cur = useLedger.getState().currentBookId
       const match = list.find((b) => b.bookId === localStorage.getItem('xm-current-book'))
       if (match) useLedger.getState().setBook(match.bookId)
       else if (list[0]) useLedger.getState().setBook(list[0].bookId)
       else if (!cur) useLedger.getState().setBook(0)
     } catch (e) {
-      console.warn('[books] 加载失败', e)
+      // 断网：用上次缓存的账本列表把应用打开，同步恢复后会自动刷新
+      const cached = (() => {
+        try { return JSON.parse(localStorage.getItem('xm-books-cache') || 'null') as BookInfo[] | null } catch { return null }
+      })()
+      if (cached?.length) {
+        useLedger.getState().setAccountBooks(cached.map((b) => ({
+          accountBookId: 0, accountBookName: b.name, userId: 0, createTime: 0,
+          bookId: b.bookId, ownerId: b.ownerId, role: b.role
+        })))
+        const match = cached.find((b) => b.bookId === localStorage.getItem('xm-current-book')) ?? cached[0]
+        if (match) useLedger.getState().setBook(match.bookId)
+        setSyncWarning('当前离线，正在使用本机数据；恢复网络后会自动同步。')
+      } else {
+        console.warn('[books] 加载失败', e)
+      }
     }
   }
 
