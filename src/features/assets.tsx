@@ -10,6 +10,7 @@ import { Modal } from '../ui/modal'
 import { usePullRefresh } from '../ui/use-pull-refresh'
 import { HiddenPage } from './hidden-page'
 import { AssetSankey } from './asset-sankey'
+import { FixedDepositList } from './fixed-deposit'
 import { accountMoney, toBase } from '../money'
 import { visibleAssets } from '../domain/asset-scope'
 import { accountHistory } from '../domain/account-history'
@@ -167,6 +168,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
   const [settingOpen, setSettingOpen] = useState(false)
   const [sankeyOpen, setSankeyOpen] = useState(false)
   const [repayOpen, setRepayOpen] = useState(false)
+  const [depositOpen, setDepositOpen] = useState(false)
   const [composition, setComposition] = useState<{ title: string; note?: string; rows: CompRow[] } | null>(null)
   // 一木：资产页下拉进入「资产隐藏页面」
   const hiddenPull = usePullRefresh(
@@ -823,7 +825,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
               <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); onOpenStats?.() }}>资产统计</button>
               <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); onOpenSearch?.() }}>搜索账户</button>
               <button type="button" className="hm-item muted" disabled>生效账本（暂未实现）</button>
-              <button type="button" className="hm-item muted" disabled>定期存款（敬请期待）</button>
+              <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); setDepositOpen(true) }}>定期存款</button>
               <button type="button" className="hm-item muted" disabled>更多数据（敬请期待）</button>
             </div>
             <button type="button" className="ghost wide" onClick={() => setSettingOpen(false)}>关闭</button>
@@ -838,6 +840,8 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
           <div className="modal-btns"><button type="button" className="ghost" onClick={() => setSankeyOpen(false)}>关闭</button></div>
         </Modal>
       )}
+
+      {depositOpen && <FixedDepositList onBack={() => setDepositOpen(false)} notify={notify} />}
 
       {repayOpen && (
         <Modal label="还款提醒" onClose={() => setRepayOpen(false)}>

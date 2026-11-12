@@ -108,6 +108,28 @@ export interface StockInfo {
   bookId?: string | number
 }
 
+/** 一木：定期存款（ActivityAssetFixedDeposit / item_fixed_deposit） */
+export interface FixedDeposit {
+  depositId: number
+  /** 关联账户（可空） */
+  assetId?: number
+  /** 定存类型，一木目前为「整存整取」 */
+  depositType: string
+  /** 存入金额 */
+  amount: number
+  /** 年利率，百分数（3.28 表示 3.28%） */
+  rate: number
+  /** 存期（年） */
+  termYears: number
+  /** 存入日期 */
+  startTime: number
+  remark?: string
+  /** 关联账单（一木 item 里带 bill_layout） */
+  billId?: string | number
+  bookId?: string | number
+  updateTime?: number
+}
+
 /** 一木：自定义智能分类规则（CategoryKeyManagerActivity / AddAiTypeActivity） */
 export interface AiTypeRule {
   ruleId: number

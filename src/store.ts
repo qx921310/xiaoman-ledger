@@ -70,6 +70,7 @@ interface LedgerState {
   tags: Tag[]
   dreams: import('./types').Dream[]
   aiTypeRules: import('./types').AiTypeRule[]
+  fixedDeposits: import('./types').FixedDeposit[]
   stockAssets: import('./types').StockAsset[]
   stockInfos: import('./types').StockInfo[]
   templates: import('./types').Template[]
@@ -146,6 +147,9 @@ interface LedgerState {
   /** 一木：自定义智能分类 */
   addAiTypeRule: (patch: { keywords: string[]; categoryId: number }) => void
   deleteAiTypeRule: (ruleId: number) => void
+  /** 一木：定期存款 */
+  addFixedDeposit: (patch: { amount: number; rate: number; termYears: number; startTime?: number; remark?: string; assetId?: number; depositType?: string }) => void
+  deleteFixedDeposit: (depositId: number) => void
   setStockPrice: (stockAssetId: number, price: number) => void
   setStockCostMethod: (stockAssetId: number, method: 0 | 1 | 2) => void
   addTemplate: (patch: Omit<import('./types').Template, 'templateId' | 'updateTime'>) => import('./types').Template
@@ -202,7 +206,7 @@ const BUSINESS_KEYS = [
   'reimbursements', 'refunds', 'budgets', 'tombstones',
   'splitGroups', 'splitMembers', 'splitExpenses',
   'stockAssets', 'stockInfos', 'templates', 'homeLoans', 'instalments',
-  'billGroups', 'billRelated', 'dreams', 'aiTypeRules'
+  'billGroups', 'billRelated', 'dreams', 'aiTypeRules', 'fixedDeposits'
 ] as const
 
 export const useLedger = create<LedgerState>()(
@@ -252,6 +256,7 @@ export const useLedger = create<LedgerState>()(
       tags: [],
       dreams: [],
       aiTypeRules: [],
+      fixedDeposits: [],
       stockAssets: [],
       stockInfos: [],
       templates: [],
@@ -491,6 +496,26 @@ export const useLedger = create<LedgerState>()(
       settleSplit: (splitExpenseId, settlement) => set((s) => ({
         splitExpenses: s.splitExpenses.map((x) => x.splitExpenseId === splitExpenseId
           ? { ...x, settlement, updateTime: NOW() } : x)
+      })),
+
+      addFixedDeposit: (patch) => set((s) => {
+        let depositId = Date.now()
+        while (s.fixedDeposits.some((d) => d.depositId === depositId)) depositId++
+        return {
+          fixedDeposits: [{
+            depositId, depositType: patch.depositType ?? '整存整取',
+            amount: Number(patch.amount) || 0, rate: Number(patch.rate) || 0,
+            termYears: Number(patch.termYears) || 1,
+            startTime: patch.startTime ?? NOW(), remark: patch.remark ?? '',
+            assetId: patch.assetId, updateTime: NOW(),
+            bookId: s.currentBookId === 0 ? undefined : s.currentBookId
+          }, ...s.fixedDeposits]
+        }
+      }),
+      deleteFixedDeposit: (depositId) => set((s) => ({
+        fixedDeposits: s.fixedDeposits.filter((d) => d.depositId !== depositId),
+        tombstones: [...s.tombstones, { kind: 'fixedDeposit', id: String(depositId), updatedAt: NOW(),
+          bookId: s.currentBookId === 0 ? undefined : s.currentBookId }]
       })),
 
       addAiTypeRule: (patch) => set((s) => {
@@ -1314,6 +1339,7 @@ export const useLedger = create<LedgerState>()(
         splitGroups: [], splitMembers: [], splitExpenses: [],
         dreams: [],
       aiTypeRules: [],
+      fixedDeposits: [],
       stockAssets: [], stockInfos: [], templates: [],
         homeLoans: [], instalments: [],
         billGroups: [], billRelated: [],
