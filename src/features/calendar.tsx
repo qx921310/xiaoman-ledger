@@ -84,8 +84,8 @@ export function CalendarPage({ onAddBill }: { onAddBill?: () => void } = {}) {
           <div><small>结余</small><b>{money(monthTotals.balance)}</b></div>
         </div>
         <div className="cal-actions">
-          <button type="button" className="ghost tiny" onClick={() => { const t = new Date(); setCursor(t); setPicked(fullDay(t.getTime())) }}>返回今天</button>
-          {onAddBill && <button type="button" className="primary tiny" onClick={onAddBill}>记一笔</button>}
+          <button type="button" className="cal-today" onClick={() => { const t = new Date(); setCursor(t); setPicked(fullDay(t.getTime())) }}>返回今天</button>
+          {onAddBill && <button type="button" className="cal-add" onClick={onAddBill}>记一笔</button>}
         </div>
       </div>
       <div className="cal-grid cal-weekdays">
