@@ -3,7 +3,8 @@ import { useLedger } from './store'
 import { auth, books as bookApi, setCurrentUid, type BookInfo, type User } from './auth'
 import { loadAccountData } from './account-session'
 import { syncNow } from './sync'
-import { startAutoSync, subscribeAutoSync, syncNowImmediate, type AutoSyncState } from './sync-auto'
+import { startAutoSync, subscribeAutoSync, syncNowImmediate, getAutoSyncState, type AutoSyncState } from './sync-auto'
+import { startMultiTab } from './multi-tab'
 
 import { AuthScreen } from './features/auth'
 import { AddBill } from './features/add-bill'
@@ -30,6 +31,14 @@ export default function App() {
     setUser(u)
     await loadBooks()
     startAutoSync({ sync: () => syncNow() })
+    // 多标签页：别的标签改了数据就重新加载，避免本标签的旧状态把对方覆盖
+    startMultiTab({
+      rehydrate: () => useLedger.persist.rehydrate(),
+      isBusy: () => {
+        const st = getAutoSyncState()
+        return st.running || st.pending
+      }
+    })
     await autoSyncOnce()
   }
 

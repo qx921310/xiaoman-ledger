@@ -7,6 +7,7 @@ import { getCurrentUid, userStorage } from './auth'
 import { deriveAssets } from './balances'
 import { newBillIdentity } from './identity'
 import { markDirty } from './domain/dirty-bus'
+import { announceWrite } from './multi-tab'
 import { lendRemaining } from './lend'
 import { mergeRemote, type MergeableState } from './domain/sync-merge'
 import { planCycles } from './domain/cycles'
@@ -202,6 +203,7 @@ export const useLedger = create<LedgerState>()(
             ? { ...asset, updateTime: previous.updateTime } : asset
         })
         markDirty()
+        announceWrite()
         return { ...changes, assets }
       }, replace)
       return ({
