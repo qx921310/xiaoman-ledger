@@ -260,7 +260,16 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
         const label = humanDay(day)
         return (
         <div key={day} className="group">
-          <div className="day">
+          <div className="day" onClick={selecting ? () => {
+            const ids = rows.filter((it) => it.kind === 'bill').map((it) => String((it as { b: { billId: string | number } }).b.billId))
+            const allOn = ids.length > 0 && ids.every((id) => picked.has(id))
+            setPicked((prev) => {
+              const next = new Set(prev)
+              for (const id of ids) { if (allOn) next.delete(id); else next.add(id) }
+              return next
+            })
+          } : undefined}
+            style={selecting ? { cursor: 'pointer' } : undefined}>
             <span>{label}</span>
             <small>
               {daySum.income ? `收 ${money(daySum.income)}` : ''}

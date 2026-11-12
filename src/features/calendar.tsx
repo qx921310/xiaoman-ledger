@@ -20,6 +20,9 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
   const [mode, setMode] = useState<'month' | 'week'>('month')
   // 一木 popup_calendar_menu：本月账单 / 多选账本 / 显示热力背景 / 热力图指标 / 更多设置
   const [menuOpen, setMenuOpen] = useState(false)
+  const [tipClosed, setTipClosed] = useState(() => {
+    try { return localStorage.getItem('xiaoman-cal-tip') === 'off' } catch { return true }
+  })
   const [heat, setHeat] = useState(false)
   const [heatType, setHeatType] = useState<'balance' | 'amount'>('balance')
 
@@ -176,6 +179,14 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
 
   return (
     <section className="card">
+      {!tipClosed && (
+        <div className="home-tip" role="status">
+          <span>选中日期可看当日明细与还款提醒。</span>
+          <button type="button" className="link" aria-label="关闭提示"
+            onClick={() => { setTipClosed(true); try { localStorage.setItem('xiaoman-cal-tip', 'off') } catch { /* 忽略 */ } }}>×</button>
+        </div>
+      )}
+
       <div className="cal-toolbar">
         <div className="cal-title">
           <button className="ghost" aria-label="上个月" onClick={() => setCursor(new Date(year, monthIdx - 1, 1))}>‹</button>

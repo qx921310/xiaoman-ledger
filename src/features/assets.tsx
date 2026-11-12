@@ -210,7 +210,7 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
       <div className="asset-banner">
         <div className="asset-net">
           <div className="asset-net-label">
-            <small>净资产</small>
+            <small>净资产（{assets.filter((a) => a.intoTotalAsset !== false && !a.hide).length} 个账户）</small>
             <button type="button" className="link" aria-label={hideAmount ? '显示金额' : '隐藏金额'}
               onClick={() => setHideAmount((v) => !v)}>{hideAmount ? '显示' : '隐藏'}</button>
           </div>
