@@ -88,7 +88,7 @@ interface LedgerState {
   seeded: boolean
 
   addBill: (patch: Partial<Bill>) => Bill
-  deleteTransfer: (transferId: number) => void
+  deleteTransfer: (transferId: number | string) => void
   addReimbursement: (patch: { billId: string | number; assetId: number; number: number; detail?: string }) => void
   settleReimbursement: (reimbursementId: number) => void
   deleteReimbursement: (reimbursementId: number) => void
@@ -146,8 +146,8 @@ interface LedgerState {
   linkBills: (a: string | number, b: string | number) => boolean
   unlinkBills: (relatedId: number) => void
   updateBill: (billId: string | number, patch: Partial<Bill>) => void
-  addTransfer: (patch: { fromAssetId: number; toAssetId: number; cost: number; toCost?: number; serviceCharge?: number; time?: number; remark?: string }) => Transfer
-  updateTransfer: (transferId: number, patch: Partial<Pick<Transfer, 'fromAssetId' | 'toAssetId' | 'cost' | 'toCost' | 'serviceCharge' | 'time' | 'remark'>>) => void
+  addTransfer: (patch: { transferId?: number | string; fromAssetId: number; toAssetId: number; cost: number; toCost?: number; serviceCharge?: number; time?: number; remark?: string }) => Transfer
+  updateTransfer: (transferId: number | string, patch: Partial<Pick<Transfer, 'fromAssetId' | 'toAssetId' | 'cost' | 'toCost' | 'serviceCharge' | 'time' | 'remark'>>) => void
   addAsset: (patch: Partial<Asset>) => void
   deleteAsset: (assetId: number) => void
   updateAsset: (asset: Asset) => void
@@ -714,8 +714,13 @@ export const useLedger = create<LedgerState>()(
       // 注意：本金必须从转出方扣、给转入方加；手续费是额外的一笔支出账单。
       addTransfer: (patch) => {
         const s = get()
-        let transferId = Math.floor(NOW() / 1000)
-        while (s.transfers.some((t) => t.transferId === transferId)) transferId++
+        // 旧实现用秒级时间戳：两台设备同一秒各建一笔转账会拿到同一个 id，
+        // 同步到服务端后互相覆盖（丢账）。这里改用全局唯一值。
+        // 新转账一律用全局唯一 id；历史数字 id 仍可读、可编辑
+        const newId = () => globalThis.crypto?.randomUUID?.() ?? `t-${NOW()}-${Math.random().toString(36).slice(2, 10)}`
+        // 编辑时传入原 id，保证身份不变（否则每次改金额都会变成一笔"新转账"）
+        let transferId: string | number = patch.transferId ?? newId()
+        while (!patch.transferId && s.transfers.some((t) => String(t.transferId) === String(transferId))) transferId = newId()
         const fee = Number(patch.serviceCharge ?? 0)
         const time = patch.time ?? NOW()
         const toCost = Number(patch.toCost ?? patch.cost)
@@ -787,6 +792,7 @@ export const useLedger = create<LedgerState>()(
         }))
 
         get().addTransfer({
+          transferId: old.transferId,
           fromAssetId: patch.fromAssetId ?? old.fromAssetId,
           toAssetId: patch.toAssetId ?? old.toAssetId,
           cost: patch.cost ?? old.cost,

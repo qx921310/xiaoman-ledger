@@ -1300,3 +1300,26 @@ const bySource = new Map(state().splitExpenses.map((x) => [String(x.sourceBillId
 assert.equal(bySource.get(String(sa1.billId)), 100)
 assert.equal(bySource.get(String(sa2.billId)), 200)
 assert.ok(am.length >= 1)
+
+// P0-4：转账 id 必须全局唯一。旧实现用秒级时间戳，两台设备同秒会撞车丢账。
+// 按用户要求：数据相关测试样本量 ≥ 100。
+state().reset()
+state().addAsset({ assetId: 71, assetName: '转出账户', assetNumber: 100000 })
+state().addAsset({ assetId: 72, assetName: '转入账户', assetNumber: 0 })
+const transferIds: string[] = []
+for (let i = 0; i < 150; i++) {
+  const t = state().addTransfer({ fromAssetId: 71, toAssetId: 72, cost: 1, serviceCharge: 0, time: 1_700_000_000_000 + i })
+  transferIds.push(String(t.transferId))
+}
+assert.equal(new Set(transferIds).size, 150, '150 笔转账 id 必须全部唯一')
+assert.equal(state().transfers.length, 150, '150 笔转账全部落库')
+// 余额守恒：转出减少 150，转入增加 150
+assert.equal(state().assets.find((a) => a.assetId === 71)!.assetNumber, 100000 - 150)
+assert.equal(state().assets.find((a) => a.assetId === 72)!.assetNumber, 150)
+
+// 旧数字 id 仍要能编辑与删除（向后兼容）
+const legacy = state().addTransfer({ fromAssetId: 71, toAssetId: 72, cost: 2, serviceCharge: 0, time: 1_700_000_100_000 })
+state().updateTransfer(legacy.transferId, { cost: 3 })
+assert.equal(state().transfers.find((t) => t.transferId === legacy.transferId)!.cost, 3, '字符串 id 可编辑')
+state().deleteTransfer(legacy.transferId)
+assert.equal(state().transfers.some((t) => t.transferId === legacy.transferId), false, '字符串 id 可删除')

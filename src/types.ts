@@ -501,7 +501,8 @@ export interface Category {
 export interface Transfer {
   /** 归属账本：共享账本里的事务 */
   bookId?: string | number
-  transferId: number
+  /** 转账 id：历史上是秒级时间戳（两设备同秒会撞），新记录用 UUID 字符串 */
+  transferId: number | string
   fromAssetId: number
   toAssetId: number
   /** 转出金额（按转出账户币种） */

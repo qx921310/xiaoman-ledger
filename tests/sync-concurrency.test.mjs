@@ -28,7 +28,7 @@ const stats = (arr) => ({
   avg: Math.round(arr.reduce((a, b) => a + b, 0) / arr.length)
 })
 
-test(`并发压测：4 组 × ${N} 并发 × ${ROUNDS} 轮`, async () => {
+test(`并发压测：5 组 × ${N} 并发 × ${ROUNDS} 轮`, async () => {
   const temp = await mkdtemp(join(tmpdir(), 'xiaoman-conc-'))
   await mkdir(join(temp, 'server'))
   await copyFile('server/server.mjs', join(temp, 'server', 'server.mjs'))
@@ -62,7 +62,7 @@ test(`并发压测：4 组 × ${N} 并发 × ${ROUNDS} 轮`, async () => {
     const bookId = books.body.result.books[0].bookId
     const push = (records) => req('/api/data/push', { records }, dev)
 
-    const allLat = { A: [], B: [], C: [], D: [] }
+    const allLat = { A: [], B: [], C: [], D: [], E: [] }
     const rounds = []
 
     for (let r = 0; r < ROUNDS; r++) {
@@ -121,6 +121,20 @@ test(`并发压测：4 组 × ${N} 并发 × ${ROUNDS} 轮`, async () => {
         .find((x) => x.kind === 'template' && x.id === `D${r}`)
       row.D = { ...aggD, final: pullD?.payload?.name, wall: Date.now() - tD0, lat: stats(D.map((x) => x.ms)) }
 
+      // E：100 笔转账并发推送（id 为 UUID），不允许互相覆盖
+      const tE = Date.now()
+      const E = await Promise.all(Array.from({ length: N }, (_, i) =>
+        push([{ kind: 'transfer', id: `T${r}-${i}-${Math.random().toString(36).slice(2, 8)}`, bookId,
+          updatedAt: now + i,
+          payload: { transferId: `T${r}-${i}`, cost: 1 + i, serviceCharge: 0, bookId, time: now, updateTime: now + i } }])))
+      allLat.E.push(...E.map((x) => x.ms))
+      const pullE = (await req('/api/data/pull', undefined, dev)).body.result.records
+        .filter((x) => x.kind === 'transfer' && String(x.id).startsWith(`T${r}-`))
+      row.E = { accepted: E.reduce((a, x) => a + (x.body.result?.accepted ?? 0), 0),
+        errors: E.filter((x) => !x.ok).length, landed: pullE.length,
+        unique: new Set(pullE.map((x) => x.id)).size, wall: Date.now() - tE,
+        lat: stats(E.map((x) => x.ms)) }
+
       rounds.push(row)
 
       // 每轮都断言，不是只看最后一轮
@@ -133,15 +147,19 @@ test(`并发压测：4 组 × ${N} 并发 × ${ROUNDS} 轮`, async () => {
       assert.equal(row.C.landed, 1, `第${r + 1}轮 C 组最终 1 条`)
       assert.equal(row.D.accepted, 1, `第${r + 1}轮 D 组只落一条`)
       assert.equal(row.D.conflicts, N - 1, `第${r + 1}轮 D 组其余记冲突`)
+      assert.equal(row.E.accepted, N, `第${r + 1}轮 E 组 100 笔转账全部写入`)
+      assert.equal(row.E.landed, N, `第${r + 1}轮 E 组 100 笔转账全部落库`)
+      assert.equal(row.E.unique, N, `第${r + 1}轮 E 组 id 必须 100 个互不相同`)
     }
 
-    console.log('\n══════ 并发压测：4 组 × 100 并发 × 3 轮 ══════')
+    console.log('\n══════ 并发压测：5 组 × 100 并发 × 3 轮 ══════')
     for (const row of rounds) {
       console.log(`第 ${row.round} 轮`)
       console.log(`  A 新增   accepted=${row.A.accepted} denied=${row.A.denied} errors=${row.A.errors} 落库=${row.A.landed} 墙钟=${row.A.wall}ms`)
       console.log(`  B 同条   final=${row.B.final} errors=${row.B.errors} 墙钟=${row.B.wall}ms`)
       console.log(`  C 同期号 accepted=${row.C.accepted} 判重=${row.C.duplicates} 落库=${row.C.landed} 墙钟=${row.C.wall}ms`)
       console.log(`  D 同时间 accepted=${row.D.accepted} 冲突=${row.D.conflicts} final=${row.D.final} 墙钟=${row.D.wall}ms`)
+      console.log(`  E 转账   accepted=${row.E.accepted} 落库=${row.E.landed} 唯一id=${row.E.unique} 墙钟=${row.E.wall}ms`)
     }
     console.log('\n────── 跨轮延迟聚合（ms，全部请求合并）──────')
     for (const [k, v] of Object.entries(allLat)) {
@@ -153,7 +171,7 @@ test(`并发压测：4 组 × ${N} 并发 × ${ROUNDS} 轮`, async () => {
     console.log(`  总请求错误数: ${totalErrors}`)
     console.log('════════════════════════════════════════════\n')
     assert.equal(totalErrors, 0, '3 轮 1200 次并发请求不应有 HTTP 错误')
-    assert.equal(total.length, ROUNDS * 4 * N, '样本数应为 3 轮 × 4 组 × 100')
+    assert.equal(total.length, ROUNDS * 5 * N, '样本数应为 3 轮 × 5 组 × 100')
   } finally {
     child.kill()
     await rm(temp, { recursive: true, force: true }).catch(() => {})
