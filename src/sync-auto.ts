@@ -10,6 +10,8 @@ export interface AutoSyncState {
   lastOkAt: number | null
   lastError: string | null
   attempts: number
+  /** 服务端拒绝/冲突的条数：>0 时界面不能显示"已同步" */
+  incomplete: number
 }
 
 const DEBOUNCE_MS = 2500
@@ -19,9 +21,10 @@ const RETRY_MAX_MS = 60_000
 
 type SyncFn = () => Promise<unknown>
 
-let state: AutoSyncState = { running: false, pending: false, lastOkAt: null, lastError: null, attempts: 0 }
+let state: AutoSyncState = { running: false, pending: false, lastOkAt: null, lastError: null, attempts: 0, incomplete: 0 }
 const subs = new Set<(s: AutoSyncState) => void>()
 let syncFn: SyncFn | null = null
+let lastResult: unknown = null
 let timer: ReturnType<typeof setTimeout> | null = null
 let retryTimer: ReturnType<typeof setTimeout> | null = null
 let pollTimer: ReturnType<typeof setInterval> | null = null
@@ -34,6 +37,8 @@ export function subscribeAutoSync(fn: (s: AutoSyncState) => void) {
   return () => { subs.delete(fn) }
 }
 export function getAutoSyncState() { return state }
+/** 最近一次同步的业务结果（供设置页展示推送/跳过/冲突明细） */
+export function getLastSyncResult() { return lastResult }
 
 function update(patch: Partial<AutoSyncState>) {
   state = { ...state, ...patch }
@@ -46,8 +51,10 @@ async function runOnce() {
   update({ running: true, pending: false })
   inFlight = (async () => {
     try {
-      await syncFn!()
-      update({ running: false, lastOkAt: Date.now(), lastError: null, attempts: 0 })
+      const r = (await syncFn!()) as { denied?: number; conflicts?: number } | undefined
+      lastResult = r
+      const incomplete = Number(r?.denied ?? 0) + Number(r?.conflicts ?? 0)
+      update({ running: false, lastOkAt: Date.now(), lastError: null, attempts: 0, incomplete })
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       const attempts = state.attempts + 1
@@ -72,9 +79,9 @@ export function schedule(delay = DEBOUNCE_MS) {
 }
 
 /** 立即同步（设置页「立即同步」按钮用） */
-export function syncNowImmediate() {
+export async function syncNowImmediate(): Promise<void> {
   if (timer) { clearTimeout(timer); timer = null }
-  return runOnce()
+  await runOnce()
 }
 
 export interface StartOptions {
@@ -128,5 +135,5 @@ export function __resetForTest() {
   inFlight = null
   started = false
   syncFn = null
-  state = { running: false, pending: false, lastOkAt: null, lastError: null, attempts: 0 }
+  state = { running: false, pending: false, lastOkAt: null, lastError: null, attempts: 0, incomplete: 0 }
 }

@@ -171,6 +171,25 @@ function currentUser(req) {
 
 // ---------- 共享账本 ----------
 const ROLES = ['silent', 'peer', 'admin']
+/** 服务端会往账单里附加编号字段，客户端拿不到；比较业务内容时必须忽略 */
+const SERVER_ADDED_FIELDS = ['ownerId', 'memberNo', 'sequenceNo', 'displayId']
+function normalizePayload(raw) {
+  let obj = raw
+  if (typeof raw === 'string') {
+    try { obj = JSON.parse(raw) } catch { return raw }
+  }
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return JSON.stringify(obj ?? null)
+  const out = {}
+  for (const k of Object.keys(obj).sort()) {
+    if (SERVER_ADDED_FIELDS.includes(k)) continue
+    out[k] = obj[k]
+  }
+  return JSON.stringify(out)
+}
+function sameBusinessContent(a, b) {
+  return normalizePayload(a) === normalizePayload(b)
+}
+
 const roleOf = (bookId, userId) => {
   const m = db.prepare('SELECT role FROM book_members WHERE book_id = ? AND user_id = ?').get(bookId, userId)
   return m ? m.role : null
@@ -550,7 +569,7 @@ const server = createServer(async (req, res) => {
 
         // 1) 定位这条记录所属账本：优先用提交内容，墓碑则从服务端已有记录反查
         let bookId = r.bookId || (r.payload && r.payload.bookId != null ? String(r.payload.bookId) : null)
-        const existing = db.prepare(`SELECT user_id, book_id, updated_at, deleted FROM records
+        const existing = db.prepare(`SELECT user_id, book_id, updated_at, deleted, payload FROM records
           WHERE kind = ? AND rid = ? AND (user_id = ? OR book_id IN (
             SELECT book_id FROM book_members WHERE user_id = ?))`)
           .all(r.kind, rid, user.id, user.id)
@@ -587,7 +606,7 @@ const server = createServer(async (req, res) => {
         // 同一时间戳但内容不同：两台设备时钟相同时会互相覆盖，静默丢一方。
         // 策略：保留服务端已有版本，把对方内容作为冲突回执返回，客户端标待核对。
         if (mine && mine.updated_at === updatedAt && !r.deleted && !mine.deleted) {
-          const samePayload = String(mine.payload ?? '') === JSON.stringify(r.payload ?? null)
+          const samePayload = sameBusinessContent(mine.payload, r.payload)
           if (!samePayload) {
             conflicts++
             conflicted.push({ kind: r.kind, id: rid, reason: 'equal-timestamp', serverUpdatedAt: mine.updated_at })

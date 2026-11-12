@@ -3,7 +3,7 @@ import { useLedger } from './store'
 import { auth, books as bookApi, setCurrentUid, type BookInfo, type User } from './auth'
 import { loadAccountData } from './account-session'
 import { syncNow } from './sync'
-import { startAutoSync, subscribeAutoSync, syncNowImmediate, getAutoSyncState, type AutoSyncState } from './sync-auto'
+import { startAutoSync, stopAutoSync, subscribeAutoSync, syncNowImmediate, getAutoSyncState, type AutoSyncState } from './sync-auto'
 import { startMultiTab } from './multi-tab'
 
 import { AuthScreen } from './features/auth'
@@ -109,6 +109,8 @@ export default function App() {
   const afterAuth = async (u: User) => { await initAccount(u) }
 
   const logout = async () => {
+    // 先停调度，避免在途请求的结果落到下一个账号
+    stopAutoSync()
     try { await auth.logout() } catch { /* 忽略 */ }
     setCurrentUid(0)
     setSyncWarning('')
@@ -232,6 +234,14 @@ function SyncBadge({ state, onRetry }: { state: AutoSyncState | null; onRetry: (
     )
   }
   if (state.pending) return <span className="sync-badge sync-pending" title="有本地改动待推送">待同步</span>
+  if (state.incomplete > 0) {
+    return (
+      <button type="button" className="sync-badge sync-failed"
+        title={`${state.incomplete} 条记录未被服务端接受（冲突或拒绝），请到设置页查看`} onClick={onRetry}>
+        {state.incomplete} 条待处理
+      </button>
+    )
+  }
   if (state.lastOkAt) {
     const t = new Date(state.lastOkAt)
     const hh = String(t.getHours()).padStart(2, '0')

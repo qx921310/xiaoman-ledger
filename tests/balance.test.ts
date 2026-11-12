@@ -1323,3 +1323,40 @@ state().updateTransfer(legacy.transferId, { cost: 3 })
 assert.equal(state().transfers.find((t) => t.transferId === legacy.transferId)!.cost, 3, '字符串 id 可编辑')
 state().deleteTransfer(legacy.transferId)
 assert.equal(state().transfers.some((t) => t.transferId === legacy.transferId), false, '字符串 id 可删除')
+
+// Codex CR-3：删除新实体必须写墓碑，否则下次同步会被云端旧记录复活
+state().reset()
+state().addAsset({ assetId: 73, assetName: '墓碑账户', assetNumber: 100 })
+const tombTemplate = state().addTemplate({ name: '待删模板', mode: 'bill', bill: { assetId: 73, parentCategoryId: 7, cost: 5 } })
+state().deleteTemplate(tombTemplate.templateId)
+assert.ok(state().tombstones.some((t) => t.kind === 'template' && t.id === String(tombTemplate.templateId)), '模板删除要有墓碑')
+
+const tombGroup = state().addSplitGroup({ name: '待删组', members: ['我'] })
+const beforeMembers = state().splitMembers.filter((m) => m.splitGroupId === tombGroup.splitGroupId).length
+state().deleteSplitGroup(tombGroup.splitGroupId)
+const groupTombs = state().tombstones.filter((t) => t.kind === 'splitGroup' || t.kind === 'splitMember')
+assert.ok(groupTombs.some((t) => t.kind === 'splitGroup' && t.id === String(tombGroup.splitGroupId)), 'AA 群组删除要有墓碑')
+assert.equal(groupTombs.filter((t) => t.kind === 'splitMember').length, beforeMembers, 'AA 成员级联墓碑')
+
+const tombStock = state().addStockAsset({ name: '待删持仓', code: 'sh600519', price: 1000 })
+state().tradeStock(tombStock.stockAssetId, 1, 10, 1000)
+const infoCount = state().stockInfos.filter((x) => x.stockAssetId === tombStock.stockAssetId).length
+state().deleteStockAsset(tombStock.stockAssetId)
+assert.ok(state().tombstones.some((t) => t.kind === 'stockAsset' && t.id === String(tombStock.stockAssetId)), '持仓删除要有墓碑')
+assert.equal(state().tombstones.filter((t) => t.kind === 'stockInfo').length, infoCount, '持仓交易级联墓碑')
+
+const tombLoan = state().addHomeLoan({ name: '待删房贷', commercial: 100000, commercialRate: 0.043, provident: 0, providentRate: 0, periods: 120, repayment: 'equal-payment' })
+state().deleteHomeLoan(tombLoan.loanId)
+assert.ok(state().tombstones.some((t) => t.kind === 'homeLoan' && t.id === String(tombLoan.loanId)), '房贷删除要有墓碑')
+
+const tombIns = state().addInstalment({ totalNumber: 1200, periods: 6, serviceRate: 0.06, serviceType: 0, accountMonth: '2026-11' })
+state().deleteInstalment(tombIns.instalmentId)
+assert.ok(state().tombstones.some((t) => t.kind === 'instalment' && t.id === String(tombIns.instalmentId)), '分期删除要有墓碑')
+
+// 级联删除后不得留下悬空引用
+assert.equal(state().splitMembers.some((m) => m.splitGroupId === tombGroup.splitGroupId), false)
+assert.equal(state().stockInfos.some((x) => x.stockAssetId === tombStock.stockAssetId), false)
+
+// Codex CR-4：转账必须带账本作用域，否则清空账本扫不到它
+const scoped = state().addTransfer({ fromAssetId: 71, toAssetId: 72, cost: 1, serviceCharge: 0, time: 1_700_000_200_000 })
+assert.ok(scoped.bookId !== undefined && scoped.bookId !== null, '新转账必须带 bookId')

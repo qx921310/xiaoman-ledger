@@ -4,6 +4,7 @@ import type { Cycle } from '../types'
 import type { ImportPlan } from '../importer'
 import { books as bookApi, type BookInfo } from '../auth'
 import { syncNow } from '../sync'
+import { syncNowImmediate, getLastSyncResult } from '../sync-auto'
 import { money } from '../ui-format'
 import { ROLE_LABEL } from '../ui/roles'
 import { validateBackup } from '../backup'
@@ -139,8 +140,15 @@ export function Settings({ notify, me }: { notify: (m: string) => void; me?: { i
     setSyncing(true)
     setSyncMsg('')
     try {
-      const r = await syncNow()
-      setSyncMsg(`已推送 ${r.pushed} 条（跳过 ${r.skipped} 条较旧记录），拉回 ${r.pulled} 条` + (r.denied ? `；${r.denied} 条未能推送，请核对权限、账本和记录身份` : ''))
+      await syncNowImmediate()
+      const r = getLastSyncResult() as Awaited<ReturnType<typeof syncNow>> | null
+      if (!r) setSyncMsg('同步完成')
+      else {
+        const bits = [`已推送 ${r.pushed} 条（跳过 ${r.skipped} 条较旧记录），拉回 ${r.pulled} 条`]
+        if (r.denied) bits.push(`${r.denied} 条未能推送，请核对权限、账本和记录身份`)
+        if (r.conflicts) bits.push(`${r.conflicts} 条与他人改动冲突，已保留服务端版本`)
+        setSyncMsg(bits.join('；'))
+      }
     } catch (e) {
       setSyncMsg('同步失败：' + (errorMessage(e, '未知错误')))
     } finally {

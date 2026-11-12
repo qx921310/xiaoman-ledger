@@ -133,6 +133,21 @@ test('同账号两台设备：新实体同步、删除、冲突与周期去重',
     const eqTpl = eqPull.body.result.records.find((r) => r.kind === 'template' && r.id === 'eq-1')
     assert.equal(eqTpl.payload.name, '设备A的模板', '冲突时保留先在服务端的版本，不静默覆盖')
 
+    // ── Codex CR-2：完全相同的重推必须幂等，不能误报冲突 ──
+    const idemTime = now + 3000
+    const idemRec = { kind: 'stockInfo', id: 'idem-1', bookId, updatedAt: idemTime,
+      payload: { stockInfoId: 'idem-1', num: 5, bookId, updateTime: idemTime } }
+    await req('/api/data/push', { records: [idemRec] }, dev)
+    const idemAgain = await req('/api/data/push', { records: [idemRec] }, dev)
+    assert.equal(idemAgain.body.result.conflicts, 0, '完全相同的重推不应算冲突')
+    assert.equal(idemAgain.body.result.accepted + idemAgain.body.result.skipped, 1, '重推应被幂等接受或跳过')
+
+    // 键顺序不同但内容相同 → 仍视为同一版本
+    const reordered = { kind: 'stockInfo', id: 'idem-1', bookId, updatedAt: idemTime,
+      payload: { updateTime: idemTime, bookId, num: 5, stockInfoId: 'idem-1' } }
+    const idemShuffled = await req('/api/data/push', { records: [reordered] }, dev)
+    assert.equal(idemShuffled.body.result.conflicts, 0, '键顺序不同不应算冲突')
+
     // ── Codex P0-5：清空账本后，离线设备重推旧记录不能复活 ──
     const clearRes = await req('/api/books/clear', { bookId }, dev)
     assert.equal(clearRes.body.code, 0, '清空成功')

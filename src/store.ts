@@ -182,6 +182,16 @@ interface LedgerState {
   tombstone: (kind: string, id: string | number) => void
 }
 
+// 参与同步的业务集合：只有它们变化才需要推送
+const BUSINESS_KEYS = [
+  'assets', 'bills', 'transfers', 'lends', 'cycles', 'tags',
+  'parentCategories', 'childCategories', 'accountBooks',
+  'reimbursements', 'refunds', 'budgets', 'tombstones',
+  'splitGroups', 'splitMembers', 'splitExpenses',
+  'stockAssets', 'stockInfos', 'templates', 'homeLoans', 'instalments',
+  'billGroups', 'billRelated'
+] as const
+
 export const useLedger = create<LedgerState>()(
   persist(
     (persistSet, get) => {
@@ -202,8 +212,13 @@ export const useLedger = create<LedgerState>()(
           return JSON.stringify(metadata) === JSON.stringify(oldMetadata)
             ? { ...asset, updateTime: previous.updateTime } : asset
         })
-        markDirty()
-        announceWrite()
+        // 只有「业务实体」真的变了才打脏标记。
+        // 否则 setSessionSyncAt/setLastSync 这类同步元数据也会触发新一轮同步 → 自循环。
+        if (BUSINESS_KEYS.some((k) => (changes as Record<string, unknown>)[k] !== undefined
+          && (changes as Record<string, unknown>)[k] !== (state as unknown as Record<string, unknown>)[k])) {
+          markDirty()
+          announceWrite()
+        }
         return { ...changes, assets }
       }, replace)
       return ({
@@ -402,7 +417,11 @@ export const useLedger = create<LedgerState>()(
 
       deleteSplitGroup: (splitGroupId) => set((s) => ({
         splitGroups: s.splitGroups.filter((g) => g.splitGroupId !== splitGroupId),
-        splitMembers: s.splitMembers.filter((m) => m.splitGroupId !== splitGroupId)
+        splitMembers: s.splitMembers.filter((m) => m.splitGroupId !== splitGroupId),
+        tombstones: [...s.tombstones,
+          { kind: 'splitGroup', id: String(splitGroupId), bookId: s.splitGroups.find((g) => g.splitGroupId === splitGroupId)?.bookId, updatedAt: NOW() },
+          ...s.splitMembers.filter((m) => m.splitGroupId === splitGroupId)
+            .map((m) => ({ kind: 'splitMember', id: String(m.splitMemberId), bookId: m.bookId, updatedAt: NOW() }))]
       })),
 
       addSplitMember: (splitGroupId, name, self) => {
@@ -422,7 +441,8 @@ export const useLedger = create<LedgerState>()(
       })),
 
       deleteSplitMember: (splitMemberId) => set((s) => ({
-        splitMembers: s.splitMembers.filter((m) => m.splitMemberId !== splitMemberId)
+        splitMembers: s.splitMembers.filter((m) => m.splitMemberId !== splitMemberId),
+        tombstones: [...s.tombstones, { kind: 'splitMember', id: String(splitMemberId), bookId: s.splitMembers.find((m) => m.splitMemberId === splitMemberId)?.bookId, updatedAt: NOW() }]
       })),
 
       applySplit: (billId, splitGroupId, splitType, values, payerMemberId) => {
@@ -481,7 +501,11 @@ export const useLedger = create<LedgerState>()(
 
       deleteStockAsset: (stockAssetId) => set((s) => ({
         stockAssets: s.stockAssets.filter((x) => x.stockAssetId !== stockAssetId),
-        stockInfos: s.stockInfos.filter((x) => x.stockAssetId !== stockAssetId)
+        stockInfos: s.stockInfos.filter((x) => x.stockAssetId !== stockAssetId),
+        tombstones: [...s.tombstones,
+          { kind: 'stockAsset', id: String(stockAssetId), bookId: s.stockAssets.find((x) => x.stockAssetId === stockAssetId)?.bookId, updatedAt: NOW() },
+          ...s.stockInfos.filter((x) => x.stockAssetId === stockAssetId)
+            .map((x) => ({ kind: 'stockInfo', id: String(x.stockInfoId), bookId: x.bookId, updatedAt: NOW() }))]
       })),
 
       tradeStock: (stockAssetId, type, num, amount, fee = 0, time) => {
@@ -535,7 +559,14 @@ export const useLedger = create<LedgerState>()(
         return tpl
       },
 
-      deleteTemplate: (templateId) => set((s) => ({ templates: s.templates.filter((t) => t.templateId !== templateId) })),
+      deleteTemplate: (templateId) => set((s) => {
+        const t = s.templates.find((x) => x.templateId === templateId)
+        return {
+          templates: s.templates.filter((x) => x.templateId !== templateId),
+          // 删除必须留墓碑，否则下次同步会把云端旧记录拉回来（复活）
+          tombstones: [...s.tombstones, { kind: 'template', id: String(templateId), bookId: t?.bookId, updatedAt: NOW() }]
+        }
+      }),
 
       applyTemplate: (templateId) => {
         const s = get()
@@ -571,7 +602,10 @@ export const useLedger = create<LedgerState>()(
         return loan
       },
 
-      deleteHomeLoan: (loanId) => set((s) => ({ homeLoans: s.homeLoans.filter((x) => x.loanId !== loanId) })),
+      deleteHomeLoan: (loanId) => set((s) => ({
+        homeLoans: s.homeLoans.filter((x) => x.loanId !== loanId),
+        tombstones: [...s.tombstones, { kind: 'homeLoan', id: String(loanId), bookId: s.homeLoans.find((x) => x.loanId === loanId)?.bookId, updatedAt: NOW() }]
+      })),
 
       addInstalment: (patch) => {
         const s = get()
@@ -582,7 +616,10 @@ export const useLedger = create<LedgerState>()(
         return rec
       },
 
-      deleteInstalment: (instalmentId) => set((s) => ({ instalments: s.instalments.filter((x) => x.instalmentId !== instalmentId) })),
+      deleteInstalment: (instalmentId) => set((s) => ({
+        instalments: s.instalments.filter((x) => x.instalmentId !== instalmentId),
+        tombstones: [...s.tombstones, { kind: 'instalment', id: String(instalmentId), bookId: s.instalments.find((x) => x.instalmentId === instalmentId)?.bookId, updatedAt: NOW() }]
+      })),
 
       // 把分期计划的每期本金+手续费生成账单（支出），只生成一次
       postInstalmentBills: (instalmentId) => {
@@ -662,7 +699,8 @@ export const useLedger = create<LedgerState>()(
       },
 
       unlinkBills: (relatedId) => set((s) => ({
-        billRelated: s.billRelated.filter((r) => r.relatedId !== relatedId)
+        billRelated: s.billRelated.filter((r) => r.relatedId !== relatedId),
+        tombstones: [...s.tombstones, { kind: 'billRelated', id: String(relatedId), bookId: s.billRelated.find((r) => r.relatedId === relatedId)?.bookId, updatedAt: NOW() }]
       })),
 
       setBillShares: (billId, shares) => set((s) => ({
@@ -756,6 +794,8 @@ export const useLedger = create<LedgerState>()(
 
         const t: Transfer = {
           transferId,
+          // 账本作用域：清空账本、多人共享都要按 bookId 命中，缺了会被当成个人记录
+          bookId: s.currentBookId,
           fromAssetId: patch.fromAssetId,
           toAssetId: patch.toAssetId,
           cost: Number(patch.cost),

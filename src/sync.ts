@@ -103,28 +103,33 @@ async function runSync(records: ReturnType<typeof collectRecords>) {
   const authoritative = (pushed.authoritative ?? []) as Array<{ id: string; winnerId: string; reason: string }>
 
   const pulled = await call('/data/pull')
-  // 应用远端数据期间产生的写入不算本地改动，否则会触发自我循环同步
+  // 同步收尾期间的所有写入（应用远端、分类规范、周期去重、同步元数据）
+  // 都不算本地改动，否则会立刻触发下一轮同步，形成自循环。
+  let conflictsKept = 0
   beginRemote()
   try {
     useLedger.getState().applyRemote(pulled.records || [])
+    if (authoritative.length) {
+      const r = useLedger.getState().resolvePeriodConflicts(authoritative.map((a) => ({ id: a.id, winnerId: a.winnerId })))
+      conflictsKept = r.kept
+    }
+    // 云端记录会带回旧分类，合并后再跑一次规范/去重
+    useLedger.getState().mergeTaxonomy()
+    // 多设备可能各自补生成了同一期周期账单：交回 store 去重（会重算余额并排墓碑）
+    useLedger.getState().dedupeCycleBills()
+    useLedger.getState().setSessionSyncAt(Date.now())
+    if (!pushed.denied) useLedger.getState().setLastSync(Date.now())
   } finally {
     endRemote()
   }
-  let conflictsKept = 0
-  if (authoritative.length) {
-    const r = useLedger.getState().resolvePeriodConflicts(authoritative.map((a) => ({ id: a.id, winnerId: a.winnerId })))
-    conflictsKept = r.kept
-  }
-  // 云端记录会带回旧分类，合并后再跑一次规范/去重
-  useLedger.getState().mergeTaxonomy()
-  // 多设备可能各自补生成了同一期周期账单：交回 store 去重（会重算余额并排墓碑）
-  useLedger.getState().dedupeCycleBills()
-  useLedger.getState().setSessionSyncAt(Date.now())
-  if (!pushed.denied) useLedger.getState().setLastSync(Date.now())
+  const conflicts = (pushed.conflicts ?? 0) as number
+  const conflicted = (pushed.conflicted ?? []) as Array<{ kind: string; id: string; reason: string }>
   return {
     pushed: pushed.accepted as number,
     skipped: pushed.skipped as number,
     denied: pushed.denied as number,
+    conflicts,
+    conflicted,
     duplicates: (pushed.duplicates ?? 0) as number,
     conflictsKept,
     pulled: (pulled.records || []).length as number
