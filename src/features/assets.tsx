@@ -704,6 +704,11 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
                 .map((a) => ({ key: String(a.assetId), name: a.simpleName || a.assetName, value: mask(a.assetNumber) }))
             },
             {
+              key: 'stock', label: '投资持仓',
+              rows: (stockAssets ?? []).filter((st) => st.hide === true)
+                .map((st) => ({ key: `stock-${st.stockAssetId}`, name: st.name, value: String(st.primeNum) }))
+            },
+            {
               key: 'other', label: '其他隐藏账户',
               rows: assets.filter((a) => (a.hide === true || a.intoTotalAsset === false) && ![6, 7, 9].includes(a.assetType))
                 .map((a) => ({ key: String(a.assetId), name: a.simpleName || a.assetName, value: mask(a.assetNumber) }))
