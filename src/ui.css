@@ -1024,3 +1024,20 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   padding: 10px 4px; font-size: var(--font-xs); color: var(--ink); cursor: pointer;
 }
 .my-about { display: grid; gap: 2px; }
+
+/* 我的页：用户区可点、头像选择、行按钮 */
+button.my-user {
+  width: 100%; text-align: left; border: 0; background: transparent;
+  font: inherit; color: inherit; cursor: pointer; display: flex; align-items: center; gap: var(--sp-3);
+}
+.my-user .grow { display: grid; gap: 2px; }
+.avatar-row { display: flex; gap: 8px; margin: 6px 0 var(--sp-3); }
+.avatar-dot {
+  width: 32px; height: 32px; border-radius: var(--r-pill); cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface-2);
+}
+.avatar-dot.on { outline: 2px solid var(--accent); outline-offset: 2px; }
+.my-row-btn {
+  width: 100%; border: 0; background: transparent; text-align: left;
+  font: inherit; color: inherit; cursor: pointer; padding: 0;
+}

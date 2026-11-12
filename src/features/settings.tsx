@@ -113,6 +113,20 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [syncBlocked, setSyncBlocked] = useState(0)
   const [autoSync, setAutoSync] = useState<AutoSyncState | null>(null)
   const [hiddenOpen, setHiddenOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [backupOpen, setBackupOpen] = useState(false)
+  // 一木 UserInfoActivity：昵称与头像可改（本地保存，账号维度）
+  const profileKey = `xiaoman-profile:${me?.id ?? 0}`
+  const [profile, setProfile] = useState<{ nick: string; avatar: string }>(() => {
+    try { return JSON.parse(localStorage.getItem(profileKey) ?? 'null') ?? { nick: me?.email?.split('@')[0] ?? '我', avatar: '' } }
+    catch { return { nick: me?.email?.split('@')[0] ?? '我', avatar: '' } }
+  })
+  const saveProfile = (next: { nick: string; avatar: string }) => {
+    setProfile(next)
+    try { localStorage.setItem(profileKey, JSON.stringify(next)) } catch { /* 忽略 */ }
+    setProfileOpen(false)
+    notify('已保存')
+  }
   const budgets = useLedger((s2) => s2.budgets)
 
   // 连续记账天数：从今天（或昨天）往前数，直到断档
@@ -366,13 +380,15 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
     <section className="card">
       <h2 className="page-title">我的</h2>
 
-      <div className="my-user">
-        <div className="my-avatar" aria-hidden="true">{(me?.email ?? '小')[0].toUpperCase()}</div>
-        <div className="grow">
-          <b>{me?.email?.split('@')[0] ?? '我'}</b>
-          <div className="muted">已连续记账 {streak} 天</div>
-        </div>
-      </div>
+      <button type="button" className="my-user" onClick={() => setProfileOpen(true)}>
+        <span className="my-avatar" aria-hidden="true" style={profile.avatar ? { background: profile.avatar } : undefined}>
+          {profile.avatar ? '' : (profile.nick || '我')[0].toUpperCase()}
+        </span>
+        <span className="grow">
+          <b>{profile.nick || me?.email?.split('@')[0] || '我'}</b>
+          <span className="muted">已连续记账 {streak} 天</span>
+        </span>
+      </button>
 
       <div className="my-vip">
         <span>会员权益（记账不限量、云备份扩容）</span>
@@ -451,6 +467,42 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       </div>
 
 
+      {profileOpen && (
+        <Modal label="个人资料" onClose={() => setProfileOpen(false)}>
+          <h3>个人资料</h3>
+          <div className="label">昵称</div>
+          <input aria-label="昵称" value={profile.nick} maxLength={12}
+            onChange={(e) => setProfile({ ...profile, nick: e.target.value })} />
+          <div className="label">头像颜色</div>
+          <div className="avatar-row">
+            {['', 'var(--accent)', 'var(--focus-ink)', 'var(--muted)', 'var(--out)', 'var(--in)'].map((c) => (
+              <button key={c || 'default'} type="button" className={'avatar-dot' + (profile.avatar === c ? ' on' : '')}
+                style={c ? { background: c } : undefined} aria-label={c ? '选择该颜色' : '默认颜色'}
+                onClick={() => setProfile({ ...profile, avatar: c })} />
+            ))}
+          </div>
+          <div className="modal-btns">
+            <button type="button" className="ghost" onClick={() => setProfileOpen(false)}>取消</button>
+            <button type="button" className="primary" onClick={() => saveProfile(profile)}>保存</button>
+          </div>
+        </Modal>
+      )}
+
+      {backupOpen && (
+        <Modal label="云备份" onClose={() => setBackupOpen(false)}>
+          <h3>云备份</h3>
+          <div className="row"><span className="grow">上次同步</span>
+            <span className="muted">{autoSync?.lastOkAt ? new Date(autoSync.lastOkAt).toLocaleString('zh-CN') : '尚未同步'}</span></div>
+          <div className="row"><span className="grow">账单数</span><span className="muted">{bills.length} 条</span></div>
+          <div className="row"><span className="grow">附件</span><span className="muted">{attachmentCount} 个（不含在备份内）</span></div>
+          <p className="hint">云端保存的是账目数据，附件 30 天后销毁。</p>
+          <div className="modal-btns">
+            <button type="button" className="ghost" onClick={() => setBackupOpen(false)}>关闭</button>
+            <button type="button" className="primary" onClick={async () => { try { await syncNowImmediate(); notify('已同步') } catch { notify('同步失败') } }}>立即同步</button>
+          </div>
+        </Modal>
+      )}
+
       <h3>功能</h3>
       <div className="my-grid">
         {([
@@ -486,6 +538,9 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       <h3>数据</h3>
       <div className="my-data">
         <div className="row"><span className="grow">云同步</span><span className="muted">{syncLine}</span></div>
+        <button type="button" className="row my-row-btn" onClick={() => setBackupOpen(true)}>
+          <span className="grow">云备份</span><span className="muted">{syncLine}</span>
+        </button>
         <div className="row"><span className="grow">导出备份</span><span className="muted">JSON</span></div>
       </div>
 
