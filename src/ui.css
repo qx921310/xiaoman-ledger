@@ -1062,3 +1062,7 @@ button.my-user {
 /* 首页模块选择（对齐 dialog_bottom_custom_module 的「选择模块」） */
 .hm-check { align-items: center; border-bottom: 1px solid var(--line); padding: 8px 0; }
 .hm-check:last-child { border-bottom: 0; }
+
+/* 统计「更多明细」 */
+.stats-more { align-self: flex-start; margin: var(--sp-2) 0; }
+.stats-more-box { display: grid; gap: 2px; padding: var(--sp-2) 0; border-bottom: 1px solid var(--line); }

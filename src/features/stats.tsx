@@ -18,6 +18,7 @@ import { IMPORTED_CATEGORY_COLOR } from '../default-colors'
 export function Stats() {
   const bills = useLedger((s) => s.bills)
   const refunds = useLedger((s) => s.refunds)
+  const lends = useLedger((s) => s.lends)
   const currentBookId = useLedger((s) => s.currentBookId)
   const parents = useLedger((s) => s.parentCategories)
   const budgets = useLedger((s) => s.budgets)
@@ -91,6 +92,7 @@ export function Stats() {
     return b.categoryId === 0 ? s2.budget : (s2.budgetByCategory.get(b.categoryId) ?? 0)
   }
 
+  const [moreInfo, setMoreInfo] = useState(false)
   const trend = useMemo(() => bounds ? chartTrend(rangeBills, parents, refunds, bounds) : [], [rangeBills, parents, refunds, bounds])
   const expenseRows = useMemo(() => categoryDistribution(rangeBills, parents, refunds, 'expense'), [rangeBills, parents, refunds])
   const incomeRows = useMemo(() => categoryDistribution(rangeBills, parents, refunds, 'income'), [rangeBills, parents, refunds])
@@ -272,6 +274,26 @@ export function Stats() {
           </div>
         </>
       )}
+
+      <button type="button" className="link stats-more" onClick={() => setMoreInfo(!moreInfo)}>
+        {moreInfo ? '收起明细' : '更多明细'}
+      </button>
+      {moreInfo && (() => {
+        const inRange = rangeBills
+        const transferSum = inRange.filter((b) => b.billType === 2 && b.remark?.includes('转账')).reduce((n, b) => n + b.cost, 0)
+        const repaySum = lends.filter((l) => l.type === 2 || l.type === 4).reduce((n, l) => n + l.number, 0)
+        const lendOut = lends.filter((l) => l.type === 1).reduce((n, l) => n + l.number, 0)
+        const lendIn = lends.filter((l) => l.type === 3).reduce((n, l) => n + l.number, 0)
+        return (
+          <div className="stats-more-box">
+            <div className="row"><span className="grow">转账明细</span><b>{money(transferSum)}</b></div>
+            <div className="row"><span className="grow">还款明细</span><b>{money(repaySum)}</b></div>
+            <div className="row"><span className="grow">应收/借出明细</span><b>{money(lendOut)}</b></div>
+            <div className="row"><span className="grow">应付/借入明细</span><b>{money(lendIn)}</b></div>
+            <div className="row"><span className="grow">收款明细</span><b>{money(repaySum)}</b></div>
+          </div>
+        )
+      })()}
 
       {expenseRows.length > 0 && (
         <>
