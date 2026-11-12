@@ -146,6 +146,19 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User
 
   // 启动时补齐内置分类（幂等，不动用户已有分类）
   useEffect(() => { mergeTaxonomy() }, [mergeTaxonomy])
+
+  // 首个账户兜底：一木记账必须选账户，新用户没有账户会卡在第一步。
+  // 注：一木的默认账户集合存在 resources.arsc（未反编译出明文字符串），
+  // 这里只补一个最小可用的「现金」（资产类型 1 资金账户），不臆造更多。
+  const assets = useLedger((s) => s.assets)
+  const addAsset = useLedger((s) => s.addAsset)
+  const seededAsset = useRef(false)
+  useEffect(() => {
+    if (seededAsset.current) return
+    if (assets.length > 0) return
+    seededAsset.current = true
+    addAsset({ assetName: '现金', assetType: 1, assetNumber: 0, intoTotal: 1 } as never)
+  }, [assets.length, addAsset])
   // 补生成周期账单：必须等首次同步拉完，否则两台设备会各自生成同一期
   const sessionSyncAt = useLedger((s) => s.sessionSyncAt)
   const cyclesRan = useRef(false)
