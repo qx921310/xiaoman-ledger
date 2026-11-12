@@ -39,7 +39,8 @@ const KIND_SPEC: Record<string, [string, string]> = {
   instalment: ['instalments', 'instalmentId'],
   billGroup: ['billGroups', 'billGroupId'],
   billRelated: ['billRelated', 'relatedId'],
-  dream: ['dreams', 'dreamId']
+  dream: ['dreams', 'dreamId'],
+  aiType: ['aiTypeRules', 'ruleId']
 }
 
 const idOf = (kind: string, item: Record<string, unknown>) =>

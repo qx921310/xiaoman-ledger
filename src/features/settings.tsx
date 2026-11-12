@@ -10,6 +10,7 @@ import { money, fullDay } from '../ui-format'
 const APP_VERSION = 'v0.1.0'
 import { HiddenPage } from './hidden-page'
 import { DreamList } from './dream'
+import { AiTypeManager } from './ai-type'
 import { usePullRefresh } from '../ui/use-pull-refresh'
 import { ROLE_LABEL } from '../ui/roles'
 import { validateBackup } from '../backup'
@@ -116,6 +117,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [hiddenOpen, setHiddenOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [dreamOpen, setDreamOpen] = useState(false)
+  const [aiTypeOpen, setAiTypeOpen] = useState(false)
   const [backupOpen, setBackupOpen] = useState(false)
   // 一木 UserInfoActivity：昵称与头像可改（本地保存，账号维度）
   const profileKey = `xiaoman-profile:${me?.id ?? 0}`
@@ -470,6 +472,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
 
 
       {dreamOpen && <DreamList onBack={() => setDreamOpen(false)} />}
+      {aiTypeOpen && <AiTypeManager onBack={() => setAiTypeOpen(false)} notify={notify} />}
 
       {profileOpen && (
         <Modal label="个人资料" onClose={() => setProfileOpen(false)}>
@@ -511,6 +514,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       <div className="my-grid">
         {([
           ['自动记账', 'auto'],
+          ['智能分类', 'ai'],
           ['周期记账', 'cycle'],
           ['账本管理', 'book'],
           ['标签管理', 'tag'],
@@ -534,6 +538,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
               return
             }
             if (key === 'dream') { setDreamOpen(true); return }
+            if (key === 'ai') { setAiTypeOpen(true); return }
             if (key === 'theme') { notify('敬请期待：主题设置'); return }
             notify('敬请期待')
           }}>{label}</button>

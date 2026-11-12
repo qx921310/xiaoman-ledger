@@ -69,6 +69,7 @@ interface LedgerState {
   /** 币种表；默认币种固定为 CNY，其余按 rate 折算 */
   tags: Tag[]
   dreams: import('./types').Dream[]
+  aiTypeRules: import('./types').AiTypeRule[]
   stockAssets: import('./types').StockAsset[]
   stockInfos: import('./types').StockInfo[]
   templates: import('./types').Template[]
@@ -142,6 +143,9 @@ interface LedgerState {
   addDream: (patch: { name: string; totalNum: number; startNum?: number; remark?: string; startTime?: number }) => void
   updateDream: (dreamId: number, patch: Partial<import('./types').Dream>) => void
   deleteDream: (dreamId: number) => void
+  /** 一木：自定义智能分类 */
+  addAiTypeRule: (patch: { keywords: string[]; categoryId: number }) => void
+  deleteAiTypeRule: (ruleId: number) => void
   setStockPrice: (stockAssetId: number, price: number) => void
   setStockCostMethod: (stockAssetId: number, method: 0 | 1 | 2) => void
   addTemplate: (patch: Omit<import('./types').Template, 'templateId' | 'updateTime'>) => import('./types').Template
@@ -198,7 +202,7 @@ const BUSINESS_KEYS = [
   'reimbursements', 'refunds', 'budgets', 'tombstones',
   'splitGroups', 'splitMembers', 'splitExpenses',
   'stockAssets', 'stockInfos', 'templates', 'homeLoans', 'instalments',
-  'billGroups', 'billRelated', 'dreams'
+  'billGroups', 'billRelated', 'dreams', 'aiTypeRules'
 ] as const
 
 export const useLedger = create<LedgerState>()(
@@ -247,6 +251,7 @@ export const useLedger = create<LedgerState>()(
       cycles: [],
       tags: [],
       dreams: [],
+      aiTypeRules: [],
       stockAssets: [],
       stockInfos: [],
       templates: [],
@@ -486,6 +491,20 @@ export const useLedger = create<LedgerState>()(
       settleSplit: (splitExpenseId, settlement) => set((s) => ({
         splitExpenses: s.splitExpenses.map((x) => x.splitExpenseId === splitExpenseId
           ? { ...x, settlement, updateTime: NOW() } : x)
+      })),
+
+      addAiTypeRule: (patch) => set((s) => {
+        let ruleId = Date.now()
+        while (s.aiTypeRules.some((r) => r.ruleId === ruleId)) ruleId++
+        return {
+          aiTypeRules: [{ ruleId, keywords: patch.keywords, categoryId: patch.categoryId,
+            updateTime: NOW(), bookId: s.currentBookId === 0 ? undefined : s.currentBookId }, ...s.aiTypeRules]
+        }
+      }),
+      deleteAiTypeRule: (ruleId) => set((s) => ({
+        aiTypeRules: s.aiTypeRules.filter((r) => r.ruleId !== ruleId),
+        tombstones: [...s.tombstones, { kind: 'aiType', id: String(ruleId), updatedAt: NOW(),
+          bookId: s.currentBookId === 0 ? undefined : s.currentBookId }]
       })),
 
       addDream: (patch) => set((s) => {
@@ -1294,6 +1313,7 @@ export const useLedger = create<LedgerState>()(
         // 新增实体也要一起清空，否则"清空数据"会留下 AA/持仓/模板等
         splitGroups: [], splitMembers: [], splitExpenses: [],
         dreams: [],
+      aiTypeRules: [],
       stockAssets: [], stockInfos: [], templates: [],
         homeLoans: [], instalments: [],
         billGroups: [], billRelated: [],

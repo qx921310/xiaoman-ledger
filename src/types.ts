@@ -108,6 +108,18 @@ export interface StockInfo {
   bookId?: string | number
 }
 
+/** 一木：自定义智能分类规则（CategoryKeyManagerActivity / AddAiTypeActivity） */
+export interface AiTypeRule {
+  ruleId: number
+  /** 关键词（多个，命中任一即归类） */
+  keywords: string[]
+  /** 归类到的分类 id */
+  categoryId: number
+  icon?: string
+  bookId?: string | number
+  updateTime?: number
+}
+
 /** 一木：愿望清单（DreamListActivity / AddDreamActivity） */
 export interface Dream {
   dreamId: number

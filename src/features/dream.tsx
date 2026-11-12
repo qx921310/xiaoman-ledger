@@ -14,7 +14,7 @@ export function DreamList({ onBack }: { onBack: () => void }) {
   const updateDream = useLedger((s) => s.updateDream)
   const deleteDream = useLedger((s) => s.deleteDream)
   const [open, setOpen] = useState(false)
-  const [form, setForm] = useState({ name: '', totalNum: '', startNum: '', remark: '' })
+  const [form, setForm] = useState({ name: '', totalNum: '', startNum: '', remark: '', start: '' })
 
   return (
     <>
@@ -60,14 +60,23 @@ export function DreamList({ onBack }: { onBack: () => void }) {
           <div className="label">已攒金额</div>
           <input aria-label="已攒金额" inputMode="decimal" value={form.startNum}
             onChange={(e) => setForm({ ...form, startNum: e.target.value.replace(/[^\d.]/g, '') })} />
+          <div className="label">开始日期</div>
+          <input aria-label="开始日期" type="date" value={form.start}
+            onChange={(e) => setForm({ ...form, start: e.target.value })} />
           <div className="label">备注</div>
           <input aria-label="备注" value={form.remark} onChange={(e) => setForm({ ...form, remark: e.target.value })} />
           <div className="modal-btns">
             <button type="button" className="ghost" onClick={() => setOpen(false)}>取消</button>
             <button type="button" className="primary" onClick={() => {
               if (!form.name.trim()) return
-              addDream({ name: form.name.trim(), totalNum: Number(form.totalNum) || 0, startNum: Number(form.startNum) || 0, remark: form.remark })
-              setForm({ name: '', totalNum: '', startNum: '', remark: '' })
+              addDream({
+                name: form.name.trim(),
+                totalNum: Number(form.totalNum) || 0,
+                startNum: Number(form.startNum) || 0,
+                remark: form.remark,
+                startTime: form.start ? new Date(`${form.start}T00:00:00`).getTime() : undefined
+              })
+              setForm({ name: '', totalNum: '', startNum: '', remark: '', start: '' })
               setOpen(false)
             }}>保存</button>
           </div>
