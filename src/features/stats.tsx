@@ -3,7 +3,7 @@ import { useLedger } from '../store'
 import { money, monthOf, toLocalInput } from '../ui-format'
 import { CatIcon } from '../ui/icons'
 import { summarizeBills } from '../bill-summary'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts'
 
 /** 图表色板：全部复用既有主题令牌，不新增主题色 */
 const CHART_COLORS = ['var(--accent)', 'var(--focus-ink)', 'var(--muted)', 'var(--accent-soft)', 'var(--out)', 'var(--in)']
@@ -100,7 +100,18 @@ export function Stats() {
     <section className="card">
       <div className="label">时间范围</div>
       <div className="row2">
-        <select aria-label="统计范围" value={rangeMode} onChange={(e) => setRangeMode(e.target.value as 'month' | 'week' | 'year' | 'custom')}>
+        <div className="stats-tabs" role="tablist" aria-label="统计视图">
+        {([['month', '普通'], ['month2', '月度'], ['year', '年度'], ['custom', '自定义']] as const).map(([key, label]) => (
+          <button key={key} type="button" role="tab"
+            aria-selected={rangeMode === key || (key === 'month' && rangeMode === 'month')}
+            className={(rangeMode === key) ? 'on' : ''}
+            onClick={() => setRangeMode((key === 'month2' ? 'month' : key) as 'month' | 'week' | 'year' | 'custom')}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <select aria-label="统计范围" value={rangeMode} onChange={(e) => setRangeMode(e.target.value as 'month' | 'week' | 'year' | 'custom')}>
           <option value="month">按月</option>
           <option value="week">按周</option>
           <option value="year">按年</option>
@@ -225,6 +236,40 @@ export function Stats() {
         <summary>查看资产构成</summary>
         <AssetSankey />
       </details>
+
+      {trend.length > 0 && rangeMode === 'custom' && (
+        <>
+          <div className="label">收支趋势（折线）</div>
+          <div className="stats-chart" role="img" aria-label="自定义区间收支折线图">
+            <ResponsiveContainer width="100%" height={180}>
+              <LineChart data={trend.map((t) => ({ label: t.label, 支出: t.expense, 收入: t.income }))}>
+                <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                <YAxis hide />
+                <Tooltip formatter={(v) => money(Number(v))} />
+                <Line type="monotone" dataKey="支出" stroke="var(--accent)" dot={false} strokeWidth={2} />
+                <Line type="monotone" dataKey="收入" stroke="var(--focus-ink)" dot={false} strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </>
+      )}
+
+      {trend.length > 0 && (rangeMode === 'month' || rangeMode === 'year') && (
+        <>
+          <div className="label">{rangeMode === 'year' ? '年度趋势' : '本月趋势'}</div>
+          <div className="stats-chart" role="img" aria-label="收支柱状图">
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={trend.map((t) => ({ label: t.label, 支出: t.expense, 收入: t.income }))}>
+                <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                <YAxis hide />
+                <Tooltip formatter={(v) => money(Number(v))} />
+                <Bar dataKey="支出" fill="var(--accent)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="收入" fill="var(--focus-ink)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </>
+      )}
 
       {expenseRows.length > 0 && (
         <>
