@@ -3,6 +3,10 @@ import { useLedger } from '../store'
 import { money, monthOf, toLocalInput } from '../ui-format'
 import { CatIcon } from '../ui/icons'
 import { summarizeBills } from '../bill-summary'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+
+/** 图表色板：全部复用既有主题令牌，不新增主题色 */
+const CHART_COLORS = ['var(--accent)', 'var(--focus-ink)', 'var(--muted)', 'var(--accent-soft)', 'var(--out)', 'var(--in)']
 import { byAsset, byTag } from '../domain/stats-breakdown'
 import { statisticsBounds, chartTrend, categoryDistribution } from '../domain/statistics-charts'
 import { CategoryChart, TrendChart } from './statistics-charts'
@@ -48,6 +52,22 @@ export function Stats() {
   const yearBudgets = budgets.filter((b) => b.month === 'all' && b.type === 'year')
   const totalBudget = limitOf(monthBudgets.find((b) => b.categoryId === 0) ?? { amount: 0 })
   const catBudgets = monthBudgets.filter((b) => b.categoryId !== 0)
+  // 每日支出序列（一木普通页柱状图：按日看收支）
+  const daySeries = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const b of monthBills) {
+      if (b.notIntoTotal) continue
+      if (parents.find((p) => p.id === b.parentCategoryId)?.kind === 'income') continue
+      const d = new Date(b.time)
+      const key = `${d.getMonth() + 1}/${d.getDate()}`
+      map.set(key, +((map.get(key) ?? 0) + b.cost).toFixed(2))
+    }
+    return [...map.entries()].sort((a, b) => {
+      const [am, ad] = a[0].split('/').map(Number)
+      const [bm, bd] = b[0].split('/').map(Number)
+      return am - bm || ad - bd
+    }).map(([label, expense]) => ({ label, expense }))
+  }, [monthBills, parents])
 
   // 年度支出（当年）
   const yearSpend = useMemo(() => {
@@ -205,6 +225,37 @@ export function Stats() {
         <summary>查看资产构成</summary>
         <AssetSankey />
       </details>
+
+      {expenseRows.length > 0 && (
+        <>
+          <div className="label">分类占比</div>
+          <div className="stats-chart" role="img" aria-label="分类支出占比饼图">
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie data={expenseRows.slice(0, 6).map((r) => ({ name: r.name, value: r.amount }))}
+                  dataKey="value" nameKey="name" innerRadius={48} outerRadius={78} paddingAngle={2}>
+                  {expenseRows.slice(0, 6).map((r, i) => (
+                    <Cell key={r.id} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(v) => money(Number(v))} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="label">每日支出</div>
+          <div className="stats-chart" role="img" aria-label="每日支出柱状图">
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={daySeries}>
+                <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                <YAxis hide />
+                <Tooltip formatter={(v) => money(Number(v))} />
+                <Bar dataKey="expense" fill="var(--accent)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </>
+      )}
 
       {assetRows.length > 0 && (
         <>

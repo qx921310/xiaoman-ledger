@@ -970,3 +970,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   padding: 8px 10px; margin-bottom: var(--sp-2);
 }
 .home-tip .link { margin-left: auto; flex: none; }
+
+/* 统计页图表容器（recharts 自适应宽度） */
+.stats-chart { width: 100%; margin: 4px 0 var(--sp-3); }
