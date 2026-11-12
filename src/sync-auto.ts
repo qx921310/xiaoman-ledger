@@ -30,6 +30,8 @@ let retryTimer: ReturnType<typeof setTimeout> | null = null
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let started = false
 let inFlight: Promise<void> | null = null
+let lifecycle = 0
+let removeListeners: (() => void) | null = null
 
 function emit() { for (const fn of subs) fn(state) }
 export function subscribeAutoSync(fn: (s: AutoSyncState) => void) {
@@ -48,14 +50,17 @@ function update(patch: Partial<AutoSyncState>) {
 async function runOnce() {
   if (!syncFn) return
   if (inFlight) { return inFlight }
+  const currentLifecycle = lifecycle
   update({ running: true, pending: false })
   inFlight = (async () => {
     try {
       const r = (await syncFn!()) as { denied?: number; conflicts?: number } | undefined
+      if (currentLifecycle !== lifecycle) return
       lastResult = r
       const incomplete = Number(r?.denied ?? 0) + Number(r?.conflicts ?? 0)
       update({ running: false, lastOkAt: Date.now(), lastError: null, attempts: 0, incomplete })
     } catch (e) {
+      if (currentLifecycle !== lifecycle) return
       const msg = e instanceof Error ? e.message : String(e)
       const attempts = state.attempts + 1
       update({ running: false, lastError: msg, attempts })
@@ -64,8 +69,10 @@ async function runOnce() {
       if (retryTimer) clearTimeout(retryTimer)
       retryTimer = setTimeout(() => { retryTimer = null; void runOnce() }, delay)
     } finally {
-      inFlight = null
-      if (state.pending) schedule(0)
+      if (currentLifecycle === lifecycle) {
+        inFlight = null
+        if (state.pending) schedule(0)
+      }
     }
   })()
   return inFlight
@@ -96,6 +103,7 @@ export function startAutoSync(opts: StartOptions) {
   syncFn = opts.sync
   if (started) return stopAutoSync
   started = true
+  lifecycle++
 
   const off = onDirty(() => schedule(opts.debounceMs ?? DEBOUNCE_MS))
 
@@ -115,20 +123,31 @@ export function startAutoSync(opts: StartOptions) {
     }, pollMs)
   }
 
-  return () => { off(); stopAutoSync(); window.removeEventListener?.('online', onOnline); document.removeEventListener?.('visibilitychange', onVisible) }
+  removeListeners = () => {
+    off()
+    if (typeof window !== 'undefined') window.removeEventListener('online', onOnline)
+    if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisible)
+  }
+  return stopAutoSync
 }
 
 export function stopAutoSync() {
+  lifecycle++
+  removeListeners?.()
+  removeListeners = null
   started = false
   syncFn = null
+  inFlight = null
+  lastResult = null
   if (timer) { clearTimeout(timer); timer = null }
   if (retryTimer) { clearTimeout(retryTimer); retryTimer = null }
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
-  update({ pending: false, running: false })
+  update({ pending: false, running: false, lastOkAt: null, lastError: null, attempts: 0, incomplete: 0 })
 }
 
 /** 仅供测试：清空调度状态与定时器 */
 export function __resetForTest() {
+  stopAutoSync()
   if (timer) { clearTimeout(timer); timer = null }
   if (retryTimer) { clearTimeout(retryTimer); retryTimer = null }
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null }

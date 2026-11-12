@@ -2,6 +2,7 @@ import { useLedger } from './store'
 import type { Bill } from './types'
 import { periodKeyOf as cyclePeriodKey } from './domain/cycle-dedupe'
 import { beginRemote, endRemote } from './domain/dirty-bus'
+import { captureSessionEpoch } from './domain/session-epoch'
 
 export interface SyncRecord {
   kind: string
@@ -86,23 +87,27 @@ async function call(path: string, init?: RequestInit) {
 
 /** 先推后拉：推送本地记录，再把云端记录合并回来（逐条 LWW） */
 export async function syncNow() {
+  const session = captureSessionEpoch()
   const records = collectRecords()
   try {
-    return await runSync(records)
+    return await runSync(records, session)
   } catch (e) {
     // 失败也要解除"等待首次同步"的阻塞，否则周期账单永远不生成
-    useLedger.getState().setSessionSyncAt(-1)
+    if (!session.signal.aborted) useLedger.getState().setSessionSyncAt(-1)
     throw e
   }
 }
 
-async function runSync(records: ReturnType<typeof collectRecords>) {
-  const pushed = await call('/data/push', { method: 'POST', body: JSON.stringify({ records }) })
+async function runSync(records: ReturnType<typeof collectRecords>, session: ReturnType<typeof captureSessionEpoch>) {
+  session.assertCurrent()
+  const pushed = await call('/data/push', { method: 'POST', body: JSON.stringify({ records }), signal: session.signal })
+  session.assertCurrent()
 
   // 服务端权威：期号冲突要先拉回胜出记录，才能判断本地候选是「重复」还是「被改过」
   const authoritative = (pushed.authoritative ?? []) as Array<{ id: string; winnerId: string; reason: string }>
 
-  const pulled = await call('/data/pull')
+  const pulled = await call('/data/pull', { signal: session.signal })
+  session.assertCurrent()
   // 同步收尾期间的所有写入（应用远端、分类规范、周期去重、同步元数据）
   // 都不算本地改动，否则会立刻触发下一轮同步，形成自循环。
   let conflictsKept = 0

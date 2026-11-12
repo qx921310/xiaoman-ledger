@@ -5,6 +5,7 @@ import { loadAccountData } from './account-session'
 import { syncNow } from './sync'
 import { startAutoSync, stopAutoSync, subscribeAutoSync, syncNowImmediate, getAutoSyncState, type AutoSyncState } from './sync-auto'
 import { startMultiTab } from './multi-tab'
+import { advanceSessionEpoch, captureSessionEpoch } from './domain/session-epoch'
 
 import { AuthScreen } from './features/auth'
 import { AddBill } from './features/add-bill'
@@ -21,18 +22,25 @@ type Tab = 'home' | 'calendar' | 'assets' | 'stats' | 'me' | 'add'
 export default function App() {
   const [user, setUser] = useState<User | null | undefined>(undefined)
   const [syncWarning, setSyncWarning] = useState('')
+  const multiTabHandle = useRef<ReturnType<typeof startMultiTab> | null>(null)
 
   /**
    * 账号初始化：启动恢复、登录、注册共用同一条路径。
    * 顺序：切换身份 → 清会话状态 → 载入该账号数据 → 设当前用户 → 加载账本 → 同步。
    */
   const initAccount = async (u: User) => {
+    advanceSessionEpoch()
+    multiTabHandle.current?.stop()
+    multiTabHandle.current = null
+    const session = captureSessionEpoch()
     await loadAccountData(u.id)
+    if (session.signal.aborted) return
     setUser(u)
     await loadBooks()
+    if (session.signal.aborted) return
     startAutoSync({ sync: () => syncNow() })
     // 多标签页：别的标签改了数据就重新加载，避免本标签的旧状态把对方覆盖
-    startMultiTab({
+    multiTabHandle.current = startMultiTab({
       rehydrate: () => useLedger.persist.rehydrate(),
       isBusy: () => {
         const st = getAutoSyncState()
@@ -62,8 +70,10 @@ export default function App() {
   }
 
   const loadBooks = async () => {
+    const session = captureSessionEpoch()
     try {
       const r = await bookApi.list()
+      if (session.signal.aborted) return
       const list: BookInfo[] = r?.books ?? []
       const setBooks = useLedger.getState().setAccountBooks
       setBooks(list.map((b) => ({
@@ -87,6 +97,7 @@ export default function App() {
       else if (list[0]) useLedger.getState().setBook(list[0].bookId)
       else if (!cur) useLedger.getState().setBook(0)
     } catch (e) {
+      if (session.signal.aborted) return
       // 断网：用上次缓存的账本列表把应用打开，同步恢复后会自动刷新
       const cached = (() => {
         try { return JSON.parse(localStorage.getItem('xm-books-cache') || 'null') as BookInfo[] | null } catch { return null }
@@ -109,6 +120,9 @@ export default function App() {
   const afterAuth = async (u: User) => { await initAccount(u) }
 
   const logout = async () => {
+    advanceSessionEpoch()
+    multiTabHandle.current?.stop()
+    multiTabHandle.current = null
     // 先停调度，避免在途请求的结果落到下一个账号
     stopAutoSync()
     try { await auth.logout() } catch { /* 忽略 */ }
