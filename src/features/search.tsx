@@ -5,6 +5,7 @@ import { billNetAmount } from '../bill-amount'
 import { CatIcon } from '../ui/icons'
 
 const HISTORY_KEY = 'xiaoman-search-history'
+const LEGACY_KEY = 'xiaoman-search-history'
 
 /**
  * 账单搜索页（对应一木 BillSearchActivity / activity_bill_search.xml）
@@ -12,6 +13,9 @@ const HISTORY_KEY = 'xiaoman-search-history'
  * 输入约定与一木一致：空格分隔多个关键词（AND），# 开头按标签匹配。
  */
 export function Search({ onClose, onPick }: { onClose: () => void; onPick?: (billId: string | number) => void }) {
+  const userId = useLedger((s) => s.userId)
+  // 搜索历史按账号隔离，避免多账号共用同一份
+  const historyKey = `${LEGACY_KEY}:${userId ?? 0}`
   const bills = useLedger((s) => s.bills)
   const parents = useLedger((s) => s.parentCategories)
   const refunds = useLedger((s) => s.refunds)
@@ -30,18 +34,30 @@ export function Search({ onClose, onPick }: { onClose: () => void; onPick?: (bil
   const [history, setHistory] = useState<string[]>([])
 
   useEffect(() => {
-    try { setHistory(JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '[]')) } catch { setHistory([]) }
+    try {
+      const scoped = localStorage.getItem(historyKey)
+      if (scoped) { setHistory(JSON.parse(scoped)); return }
+      // 旧版本只有全局 key：迁移到当前账号后删除，避免串号
+      const legacy = localStorage.getItem(HISTORY_KEY)
+      if (legacy) {
+        localStorage.setItem(historyKey, legacy)
+        localStorage.removeItem(HISTORY_KEY)
+        setHistory(JSON.parse(legacy))
+        return
+      }
+      setHistory([])
+    } catch { setHistory([]) }
   }, [])
   const remember = (word: string) => {
     const w = word.trim()
     if (!w) return
     const next = [w, ...history.filter((h) => h !== w)].slice(0, 12)
     setHistory(next)
-    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(next)) } catch { /* 隐私模式忽略 */ }
+    try { localStorage.setItem(historyKey, JSON.stringify(next)) } catch { /* 隐私模式忽略 */ }
   }
   const clearHistory = () => {
     setHistory([])
-    try { localStorage.removeItem(HISTORY_KEY) } catch { /* 忽略 */ }
+    try { localStorage.removeItem(historyKey) } catch { /* 忽略 */ }
   }
 
   const terms = useMemo(() => kw.trim().split(/\s+/).filter(Boolean), [kw])

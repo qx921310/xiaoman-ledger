@@ -144,6 +144,9 @@ function cleanupExpiredUploads(now) {
   if (rows.length) console.log(`[uploads] 清理过期附件 ${rows.length} 个`)
 }
 
+// 每小时的定时清理：不依赖推送，保证「满 30 天即销毁」这句话成立
+setInterval(() => { try { cleanupExpiredUploads(Date.now()) } catch { /* 清理失败不阻塞服务 */ } }, 60 * 60 * 1000).unref?.()
+
 const PORT = Number(process.env.PORT || 8787)
 
 // ---------- 账号与会话 ----------

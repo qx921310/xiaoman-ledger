@@ -631,7 +631,7 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
         <div className="label">备注</div>
         <input aria-label="账单备注" value={remark} onChange={(e) => setRemark(e.target.value)} />
         <div className="label">附件（图片或 PDF，可选）</div>
-        <p className="hint">附件仅保留 30 天，到期自动销毁（原图会先压缩到 1MB 内再上传）。</p>
+        <p className="hint">附件仅保留 30 天，到期自动销毁；导出备份不含附件文件（原图会先压缩到 1MB 内再上传）。</p>
         <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf" aria-label="添加附件"
           onChange={async (e) => {
             let f = e.target.files?.[0]

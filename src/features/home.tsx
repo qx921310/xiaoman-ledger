@@ -63,7 +63,9 @@ export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot }:
     return b?.accountBookName ?? '我的账本'
   })
   const used = summary.expense
-  const percent = budgetTotal > 0 ? Math.min(100, Math.round((used / budgetTotal) * 100)) : 0
+  // 预算口径必须排除「不计预算」的账单（summary.budget），与 summary.expense 不同
+  const budgetUsed = summary.budget
+  const percent = budgetTotal > 0 ? Math.min(100, Math.round((budgetUsed / budgetTotal) * 100)) : 0
 
   return (
     <section className="home">
@@ -75,7 +77,7 @@ export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot }:
 
       {!tipClosed && (
         <div className="home-tip" role="status">
-          <span>附件仅保留 30 天；数据随时可导出备份。</span>
+          <span>附件仅保留 30 天（到期销毁）；导出备份只含账目数据，不含附件文件。</span>
           <button type="button" className="link" aria-label="关闭提示"
             onClick={() => { setTipClosed(true); try { localStorage.setItem('xiaoman-home-tip', 'off') } catch { /* 忽略 */ } }}>×</button>
         </div>
@@ -120,7 +122,7 @@ export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot }:
             <span className={percent >= 100 ? 'out' : ''}>已用 {percent}%</span>
           </div>
           <div className="hb-bar"><i style={{ width: `${percent}%` }} /></div>
-          <small>剩余 {money(Math.max(0, budgetTotal - used))}</small>
+          <small>剩余 {money(Math.max(0, budgetTotal - budgetUsed))}</small>
         </div>
       )}
 
