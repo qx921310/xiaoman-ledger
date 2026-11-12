@@ -109,13 +109,22 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
   // 一木资产页：净资产（可隐藏）+ 存款/负债 两栏 + 三张汇总卡片 + 按类型分组列表
   const [hideAmount, setHideAmount] = useState(false)
   // 一木：点净资产/存款/负债/组头 → 弹「构成」明细
-  const [composition, setComposition] = useState<{ title: string; rows: Array<{ name: string; amount: number }> } | null>(null)
-  const openComposition = (title: string, list: Asset[]) => setComposition({
-    title,
-    rows: list
-      .map((a) => ({ name: a.simpleName || a.assetName, amount: toBase(a.assetNumber, a.currency, currencies, defaultCurrency) }))
-      .sort((x, y) => Math.abs(y.amount) - Math.abs(x.amount))
-  })
+  const [composition, setComposition] = useState<{ title: string; note?: string; rows: Array<{ name: string; amount: number }> } | null>(null)
+  const openComposition = (title: string, rows: Array<{ name: string; amount: number }>, note?: string) =>
+    setComposition({ title, note, rows: [...rows].sort((x, y) => Math.abs(y.amount) - Math.abs(x.amount)) })
+  /** 卡片点击：展开对应折叠入口再滚过去（折叠状态下只滚标题会让用户以为没反应） */
+  const openSection = (id: string) => {
+    const el = document.getElementById(id) as HTMLDetailsElement | null
+    if (!el) return
+    el.open = true
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  /** 账户 → 构成行；负债统一取绝对值，与顶部正数口径一致 */
+  const assetRows = (list: Asset[], sign: 1 | -1 = 1) => list.map((a) => ({
+    name: a.simpleName || a.assetName,
+    amount: sign * Math.abs(toBase(a.assetNumber, a.currency, currencies, defaultCurrency))
+  }))
   const mask = (v: number) => (hideAmount ? '••••' : money(v))
   const deposit = assets.filter((a) => a.assetNumber > 0).reduce((s, a) => s + toBase(a.assetNumber, a.currency, currencies, defaultCurrency), 0)
   const liability = Math.abs(assets.filter((a) => a.assetNumber < 0).reduce((s, a) => s + toBase(a.assetNumber, a.currency, currencies, defaultCurrency), 0))
@@ -140,15 +149,15 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
             <button type="button" className="link" aria-label={hideAmount ? '显示金额' : '隐藏金额'}
               onClick={() => setHideAmount((v) => !v)}>{hideAmount ? '显示' : '隐藏'}</button>
           </div>
-          <button type="button" className="link asset-net-value" onClick={() => openComposition('净资产构成', assets)}>
+          <button type="button" className="link asset-net-value" onClick={() => openComposition('净资产构成', assetRows(assets))}>
             {mask(total)}
           </button>
         </div>
         <div className="asset-two">
-          <button type="button" className="asset-two-item" onClick={() => openComposition('存款构成', assets.filter((a) => a.assetNumber > 0))}>
+          <button type="button" className="asset-two-item" onClick={() => openComposition('存款构成', assetRows(assets.filter((a) => a.assetNumber > 0)))}>
             <small>存款</small><b>{mask(deposit)}</b>
           </button>
-          <button type="button" className="asset-two-item" onClick={() => openComposition('负债构成', assets.filter((a) => a.assetNumber < 0))}>
+          <button type="button" className="asset-two-item" onClick={() => openComposition('负债构成', assetRows(assets.filter((a) => a.assetNumber < 0), -1))}>
             <small>负债</small><b>{mask(liability)}</b>
           </button>
         </div>
@@ -156,17 +165,22 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
       </div>
 
       <div className="asset-cards">
-        <button type="button" className="asset-card" onClick={() => openComposition('待报销明细', assets.filter((a) => a.reimAssetNumber))}>
+        <button type="button" className="asset-card" onClick={() => openComposition('待报销明细',
+            reimbursements.filter((r) => r.status === 'pending').map((r) => {
+              const bill = bills.find((b) => String(b.billId) === String(r.billId))
+              return { name: bill?.remark || `账单 ${String(r.billId).slice(0, 6)}`, amount: r.number || 0 }
+            }),
+            '按账单逐笔列出待报销金额')}>
           <small>待报销</small>
           <b>{mask(pendingReimburse)}</b>
           <small className="dim">已报 {mask(doneReimburse)}</small>
         </button>
-        <button type="button" className="asset-card" onClick={() => document.getElementById('block-lend')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+        <button type="button" className="asset-card" onClick={() => openSection('block-lend')}>
           <small>借出借入</small>
           <b>{mask(receivable)}</b>
           <small className="dim">借入 {mask(payable)}</small>
         </button>
-        <button type="button" className="asset-card" onClick={() => document.getElementById('block-stock')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+        <button type="button" className="asset-card" onClick={() => openSection('block-stock')}>
           <small>投资</small>
           <b>{mask(stockValue)}</b>
           <small className="dim">收益 {mask(stockProfit)}</small>
@@ -177,7 +191,15 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
 
       {grouped.map(([typeKey, list]) => (
         <div key={typeKey} className="asset-group">
-          <button type="button" className="asset-group-head" onClick={() => openComposition(`${ASSET_TYPE[Number(typeKey)] ?? '其他'} · 构成`, list)}>
+          <button type="button" className="asset-group-head" onClick={() => {
+            const sum = list.reduce((acc, a) => acc + toBase(a.assetNumber, a.currency, currencies, defaultCurrency), 0)
+            const share = total ? Math.round((sum / total) * 100) : 0
+            openComposition(`${ASSET_TYPE[Number(typeKey)] ?? '其他'} · 统计`, [
+              { name: `账户数`, amount: list.length },
+              { name: `合计`, amount: sum },
+              { name: `占净资产`, amount: share }
+            ], '组头点击查看该类型的统计概览')
+          }}>
             <span>{ASSET_TYPE[Number(typeKey)] ?? '其他'} ›</span>
             <b>{mask(list.reduce((sum, a) => sum + toBase(a.assetNumber, a.currency, currencies, defaultCurrency), 0))}</b>
           </button>
@@ -651,6 +673,7 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
       {composition && (
         <Modal label={composition.title} onClose={() => setComposition(null)}>
           <h3>{composition.title}</h3>
+          {composition.note && <p className="hint">{composition.note}</p>}
           {composition.rows.length === 0 && <p className="hint">没有可展示的账户。</p>}
           {composition.rows.map((r) => (
             <div key={r.name} className="row">
