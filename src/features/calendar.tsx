@@ -60,7 +60,9 @@ export function CalendarPage({ onAddBill }: { onAddBill?: () => void } = {}) {
       try {
         const solar = Solar.fromDate(new Date(year, monthIdx, d))
         const lunar = solar.getLunar()
-        out.set(d, solar.getFestivals()[0] ?? lunar.getFestivals()[0] ?? lunar.getJieQi() ?? lunar.getDayInChinese())
+        const festival = solar.getFestivals()[0] ?? lunar.getFestivals()[0] ?? lunar.getJieQi()
+        // getJieQi() 无节气时返回空字符串，不能用 ?? 兜底，必须用 || 判断真值
+        out.set(d, festival || lunar.getDayInChinese())
       } catch { out.set(d, '') }
     }
     return out
@@ -105,7 +107,8 @@ export function CalendarPage({ onAddBill }: { onAddBill?: () => void } = {}) {
     try {
       const solar = Solar.fromDate(date)
       const lunar = solar.getLunar()
-      return solar.getFestivals()[0] ?? lunar.getFestivals()[0] ?? lunar.getJieQi() ?? lunar.getDayInChinese()
+      const f = solar.getFestivals()[0] ?? lunar.getFestivals()[0] ?? lunar.getJieQi()
+      return f || lunar.getDayInChinese()
     } catch { return '' }
   }
 
