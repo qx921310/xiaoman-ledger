@@ -999,3 +999,18 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   padding: 12px 4px; font-size: var(--font-xs); color: var(--ink); cursor: pointer;
 }
 .my-grid-item:active { background: var(--accent-soft); }
+
+/* 我的页顶部用户区 / 会员位 / 数据区（对齐 fragment_my 的 user_info_layout / open_vip_layout / data_layout） */
+.my-user { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.my-avatar {
+  width: 44px; height: 44px; border-radius: var(--r-pill);
+  display: grid; place-items: center; flex: none;
+  background: var(--accent-soft); color: var(--focus-ink); font-weight: 700;
+}
+.my-vip {
+  display: flex; align-items: center; gap: var(--sp-2);
+  background: var(--surface-2); border-radius: var(--r-md);
+  padding: 10px 12px; margin-bottom: var(--sp-3); font-size: var(--font-xs); color: var(--muted);
+}
+.my-vip .link { margin-left: auto; flex: none; }
+.my-data { display: grid; gap: 2px; margin-bottom: var(--sp-3); }

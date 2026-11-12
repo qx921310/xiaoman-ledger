@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLedger } from '../store'
 import type { Cycle } from '../types'
 import type { ImportPlan } from '../importer'
 import { books as bookApi, type BookInfo } from '../auth'
 import { syncNow, getVersionedConflicts, getVersionedRecovery, keepLocalConflict, acceptRemoteConflict, previewVersionedConflict } from '../sync'
 import { syncNowImmediate, getLastSyncResult, subscribeAutoSync, type AutoSyncState } from '../sync-auto'
-import { money } from '../ui-format'
+import { money, fullDay } from '../ui-format'
 import { HiddenPage } from './hidden-page'
 import { usePullRefresh } from '../ui/use-pull-refresh'
 import { ROLE_LABEL } from '../ui/roles'
@@ -112,6 +112,28 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [autoSync, setAutoSync] = useState<AutoSyncState | null>(null)
   const [hiddenOpen, setHiddenOpen] = useState(false)
   const budgets = useLedger((s2) => s2.budgets)
+
+  // 连续记账天数：从今天（或昨天）往前数，直到断档
+  const streak = useMemo(() => {
+    const days = new Set(bills.map((b) => fullDay(b.time)))
+    let n = 0
+    const d = new Date()
+    // 今天没记则从昨天起算（当天还没记完不算断）
+    if (!days.has(fullDay(d.getTime()))) d.setDate(d.getDate() - 1)
+    while (days.has(fullDay(d.getTime()))) { n++; d.setDate(d.getDate() - 1) }
+    return n
+  }, [bills])
+
+  const attachmentCount = useMemo(
+    () => bills.reduce((n, b) => n + (b.files?.length ?? 0), 0),
+    [bills]
+  )
+
+  const syncLine = autoSync?.running ? '同步中…'
+    : autoSync?.lastError ? '同步失败'
+    : autoSync?.pending ? '待同步'
+    : autoSync?.lastOkAt ? new Date(autoSync.lastOkAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+    : '尚未同步'
   const setBudget = useLedger((s2) => s2.setBudget)
   const pull = usePullRefresh(async () => setHiddenOpen(true), 64,
     { pulling: '下拉进入隐藏内容', released: '松开进入隐藏内容', busy: '正在打开…' },
@@ -338,6 +360,19 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
     <section className="card">
       <h2 className="page-title">我的</h2>
 
+      <div className="my-user">
+        <div className="my-avatar" aria-hidden="true">{(me?.email ?? '小')[0].toUpperCase()}</div>
+        <div className="grow">
+          <b>{me?.email?.split('@')[0] ?? '我'}</b>
+          <div className="muted">已连续记账 {streak} 天</div>
+        </div>
+      </div>
+
+      <div className="my-vip">
+        <span>会员权益（记账不限量、云备份扩容）</span>
+        <button type="button" className="link" onClick={() => notify('敬请期待')}>了解</button>
+      </div>
+
       {(pull.progress > 0 || pull.busy) && !hiddenOpen && (
         <div className="pull-tip" role="status" aria-live="polite">
           {pull.busy ? pull.text.busy : pull.progress >= 1 ? pull.text.released : pull.text.pulling}
@@ -441,6 +476,16 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
           }}>{label}</button>
         ))}
       </div>
+
+      <h3>数据</h3>
+      <div className="my-data">
+        <div className="row"><span className="grow">云同步</span><span className="muted">{syncLine}</span></div>
+        <div className="row"><span className="grow">导出备份</span><span className="muted">JSON</span></div>
+      </div>
+
+      <h3>附件（{attachmentCount}）</h3>
+      {attachmentCount === 0 && <p className="hint">还没有附件。</p>}
+      {attachmentCount > 0 && <p className="hint">附件仅保留 30 天，到期自动销毁；导出备份不含附件文件。</p>}
 
       <h3>从其他记账软件迁移</h3>
       <p className="hint">
@@ -1303,6 +1348,9 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       <h3>账号</h3>
       {me && <p className="hint">当前登录：{me.email}</p>}
       {onLogout && <button className="ghost wide" onClick={() => { if (confirm('确定退出登录吗？本机数据会保留。')) onLogout() }}>退出登录</button>}
+
+      <h3>财务工具</h3>
+      <p className="hint">房贷计划、信用卡分期在「资产」页使用。</p>
 
       <h3>关于</h3>
       <p className="hint">
