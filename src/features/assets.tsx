@@ -115,6 +115,7 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
   const subpageTitle = useRef<HTMLHeadingElement>(null)
   // 只记录「从哪个卡片进来的」，不持有 DOM 节点（返回时卡片是重新渲染的，旧节点已卸载）
   const cameFrom = useRef<'reimburse' | 'lend' | 'stock'>('reimburse')
+  const rootRef = useRef<HTMLElement>(null)
   const prevScreen = useRef<'assets' | 'reimburse' | 'lend' | 'stock'>('assets')
 
   /** 进入子页：压一条历史记录（去重，避免连点双压）；系统返回键可退回 */
@@ -150,7 +151,7 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
     // 首次挂载不抢焦点：只有「从子页回到主页面」才把焦点还给对应卡片
     if (screen !== 'assets') { subpageTitle.current?.focus(); return }
     if (was === 'assets') return
-    const back = document.querySelector<HTMLElement>(`[data-asset-card="${cameFrom.current}"]`)
+    const back = rootRef.current?.querySelector<HTMLElement>(`[data-asset-card="${cameFrom.current}"]`)
     back?.focus()
   }, [screen])
   const [composition, setComposition] = useState<{ title: string; note?: string; rows: CompRow[] } | null>(null)
@@ -181,7 +182,7 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
   ).sort(([a], [b]) => Number(a) - Number(b))
 
   return (
-    <section className={screen === 'assets' ? 'card' : 'card subpage'}>
+    <section ref={rootRef} className={screen === 'assets' ? 'card' : 'card subpage'}>
       {screen !== 'assets' && (
         <div className="subpage-head">
           <button type="button" className="link" onClick={backToAssets}>‹ 返回资产</button>
@@ -321,8 +322,8 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
       {screen === 'stock' && (
       <div className="subpage-block">
       <div className="subpage-sum">
-        <div><small>总市值</small><b>{money(stockValue)}</b></div>
-        <div><small>累计收益</small><b className={stockProfit < 0 ? 'out' : 'in'}>{money(stockProfit)}</b></div>
+        <div><small>总市值</small><b>{mask(stockValue)}</b></div>
+        <div><small>收益</small><b className={stockProfit < 0 ? 'out' : 'in'}>{mask(stockProfit)}</b></div>
       </div>
       <p className="hint">按一木的持仓模型记录：买入/卖出自动算移动加权成本与已实现盈亏，填当前价看浮动盈亏。</p>
       <div className="row2">
@@ -551,8 +552,8 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
       {screen === 'lend' && (
       <div className="subpage-block">
       <div className="subpage-sum">
-        <div><small>借出</small><b>{money(receivable)}</b></div>
-        <div><small>借入</small><b>{money(payable)}</b></div>
+        <div><small>借入</small><b>{mask(payable)}</b></div>
+        <div><small>借出</small><b>{mask(receivable)}</b></div>
       </div>
       {lends.length === 0 && <p className="hint">还没有借贷记录。</p>}
       {lends.slice(0, 8).map((l) => (
@@ -670,8 +671,8 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
       )}
       {screen === 'reimburse' && (<>
         <div className="subpage-sum">
-          <div><small>未报销</small><b>{money(pendingReimburse)}</b></div>
-          <div><small>已报销</small><b>{money(doneReimburse)}</b></div>
+          <div><small>未报销</small><b>{mask(pendingReimburse)}</b></div>
+          <div><small>已报销</small><b>{mask(doneReimburse)}</b></div>
         </div>
         <div className="row"><b className="grow">待报销明细</b><span className="muted">共 {pendingReimburseCount} 笔</span></div>
         {reimbursements.filter((r) => r.status === 'pending').length === 0 && <p className="hint">没有待报销的账单。</p>}
