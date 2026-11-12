@@ -203,7 +203,11 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User
           <Home me={user} onAdd={() => setTab('add')}
             onOpenStats={() => setTab('stats')}
             onSearch={() => setSearchOpen(true)}
-            onMore={() => setTab('me')} />
+            onMore={() => setTab('me')}
+            onScreenshot={() => {
+              setTab('me')
+              setTimeout(() => document.getElementById('ocr-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
+            }} />
         )}
         {tab === 'calendar' && (
           <CalendarPage onAddBill={() => setTab('add')} onOpenMonthBills={() => setTab('home')} />

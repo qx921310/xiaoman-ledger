@@ -639,7 +639,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         </div>
       )}
 
-      <h3>截图识别</h3>
+      <h3 id="ocr-section">截图识别</h3>
       <p className="hint">识别截图后可直接入账。</p>
       <label className="filebtn">
         选择账单截图
