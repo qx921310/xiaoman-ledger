@@ -991,3 +991,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   background: var(--surface-2); padding: 8px 12px; font-size: var(--font-sm); color: var(--ink);
   margin-bottom: var(--sp-2);
 }
+
+/* 我的页功能宫格（对齐 fragment_my 的 function_layout） */
+.my-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: var(--sp-3); }
+.my-grid-item {
+  border: 1px solid var(--line); background: var(--card); border-radius: var(--r-md);
+  padding: 12px 4px; font-size: var(--font-xs); color: var(--ink); cursor: pointer;
+}
+.my-grid-item:active { background: var(--accent-soft); }

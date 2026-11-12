@@ -409,6 +409,39 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
           : '尚未同步'}
       </div>
 
+
+      <h3>功能</h3>
+      <div className="my-grid">
+        {([
+          ['自动记账', 'auto'],
+          ['周期记账', 'cycle'],
+          ['账本管理', 'book'],
+          ['标签管理', 'tag'],
+          ['分类管理', 'cat'],
+          ['数据备份', 'backup'],
+          ['导入导出', 'import'],
+          ['主题设置', 'theme'],
+          ['使用指南', 'guide'],
+          ['梦想清单', 'dream'],
+          ['更多应用', 'apps'],
+          ['关于', 'about'],
+        ] as const).map(([label, key]) => (
+          <button key={key} type="button" className="my-grid-item" onClick={() => {
+            // 记账相关：落到我们已有的页面/功能；商业化项按约定提示「敬请期待」
+            if (key === 'cycle' || key === 'book' || key === 'tag' || key === 'cat') {
+              notify('请在下方对应区块操作')
+              return
+            }
+            if (key === 'backup' || key === 'import') {
+              notify('见下方「数据」区块')
+              return
+            }
+            if (key === 'theme') { notify('敬请期待：主题设置'); return }
+            notify('敬请期待')
+          }}>{label}</button>
+        ))}
+      </div>
+
       <h3>从其他记账软件迁移</h3>
       <p className="hint">
         支持 <b>一木记账导出的 Excel/CSV</b>（表头含 日期/收支类型/金额/类别/二级分类/账户）、
