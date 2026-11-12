@@ -1066,3 +1066,15 @@ button.my-user {
 /* 统计「更多明细」 */
 .stats-more { align-self: flex-start; margin: var(--sp-2) 0; }
 .stats-more-box { display: grid; gap: 2px; padding: var(--sp-2) 0; border-bottom: 1px solid var(--line); }
+
+/* 手势密码（对齐 GestureSettingActivity 的验证界面） */
+.pin-lock { display: grid; justify-items: center; gap: var(--sp-3); padding: 48px 16px; }
+.pin-dots { display: flex; gap: 14px; }
+.pin-dots i { width: 12px; height: 12px; border-radius: var(--r-pill); border: 1px solid var(--line); }
+.pin-dots i.on { background: var(--accent); border-color: var(--accent); }
+.pin-pad { display: grid; grid-template-columns: repeat(3, 64px); gap: 10px; }
+.pin-key {
+  height: 56px; border: 1px solid var(--line); background: var(--card);
+  border-radius: var(--r-md); font-size: var(--font-md); cursor: pointer; color: var(--ink);
+}
+.pin-key:disabled { opacity: 0; }

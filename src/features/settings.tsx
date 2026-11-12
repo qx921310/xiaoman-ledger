@@ -13,6 +13,7 @@ import { DreamList } from './dream'
 import { AiTypeManager } from './ai-type'
 import { Guide } from './guide'
 import { TemplateList } from './templates'
+import { hasPin, setPin, clearPin } from './lock'
 import { usePullRefresh } from '../ui/use-pull-refresh'
 import { ROLE_LABEL } from '../ui/roles'
 import { validateBackup } from '../backup'
@@ -533,7 +534,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
           ['梦想清单', 'dream'],
           ['更多应用', 'apps'],
           ['关于', 'about'],
-        ] as const).map(([label, key]) => (
+        ] as Array<[string, string]>).map(([label, key]) => (
           <button key={key} type="button" className="my-grid-item" onClick={() => {
             // 记账相关：落到我们已有的页面/功能；商业化项按约定提示「敬请期待」
             if (key === 'cycle' || key === 'book' || key === 'tag' || key === 'cat') {
@@ -548,6 +549,15 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
             if (key === 'ai') { setAiTypeOpen(true); return }
             if (key === 'guide') { setGuideOpen(true); return }
             if (key === 'tpl') { setTplOpen(true); return }
+            if (key === 'gesture') {
+              if (hasPin()) { if (confirm('关闭手势密码？')) { clearPin(); notify('已关闭手势密码') } }
+              else {
+                const p1 = prompt('设置 4 位数字密码')
+                if (p1 && /^\d{4}$/.test(p1)) { setPin(p1); notify('手势密码已设置') }
+                else if (p1) notify('请输入 4 位数字')
+              }
+              return
+            }
             if (key === 'theme') { notify('敬请期待：主题设置'); return }
             notify('敬请期待')
           }}>{label}</button>
@@ -1450,6 +1460,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
           ['使用指南', 'guide'], ['意见反馈', 'feedback'], ['去评分', 'evaluate'],
           ['邀请好友', 'invite'], ['活动中心', 'activity'], ['更多应用', 'apps'],
           ['桌面小组件', 'widget'],
+          ['手势密码', 'gesture'] as const,
         ].map(([label, key]) => (
           <button key={key} type="button" className="my-link" onClick={() => notify('敬请期待')}>{label}</button>
         ))}

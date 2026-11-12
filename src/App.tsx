@@ -11,6 +11,7 @@ import { AuthScreen } from './features/auth'
 import { AddBill } from './features/add-bill'
 import { Home } from './features/home'
 import { Search } from './features/search'
+import { PinLock, hasPin } from './features/lock'
 import { CalendarPage } from './features/calendar'
 import { Assets } from './features/assets'
 import { Stats } from './features/stats'
@@ -20,6 +21,7 @@ type Tab = 'home' | 'calendar' | 'assets' | 'stats' | 'me' | 'add'
 
 export default function App() {
   const [user, setUser] = useState<User | null | undefined>(undefined)
+  const [locked, setLocked] = useState(() => hasPin())
   const [syncWarning, setSyncWarning] = useState('')
   const multiTabHandle = useRef<ReturnType<typeof startMultiTab> | null>(null)
 
@@ -132,6 +134,7 @@ export default function App() {
   }
 
   if (user === undefined) return <div className="boot" role="status">加载中…</div>
+  if (user && locked) return <PinLock onUnlock={() => setLocked(false)} />
   if (user === null) return <AuthScreen onAuthed={afterAuth} />
   return <Shell user={user} onLogout={logout} syncWarning={syncWarning} dismissSyncWarning={() => setSyncWarning('')} />
 }
