@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLedger } from '../store'
+import { useSpeech } from '../ui/use-speech'
 import { accountMoney, currencySymbol, findCurrency, hasCurrencyRate, toBase } from '../money'
 import { money, toLocalInput } from '../ui-format'
 import { CatIcon } from '../ui/icons'
@@ -40,6 +41,13 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
   const [currency, setCurrency] = useState(defaultCurrency)
   const [mode, setMode] = useState<'expense' | 'income' | 'transfer'>('expense')
   const [cost, setCost] = useState('')
+  // 语音记账：识别文本取第一个数字当金额，其余作为备注（一木 SpeechActivity 同类行为）
+  const speech = useSpeech((text) => {
+    const num = text.match(/\d+(?:\.\d+)?/)
+    if (num) setCost(num[0])
+    const rest = text.replace(/\d+(?:\.\d+)?/g, '').replace(/[元块钱了]/g, '').trim()
+    if (rest) setRemark(rest)
+  })
   const [pid, setPid] = useState(lastParentId)
   const [cid, setCid] = useState(lastChildId)
   const [aid, setAid] = useState(lastAssetId || 0)
@@ -343,7 +351,13 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
       )}
 
       <div className="label">备注</div>
-      <input aria-label="备注" value={remark} onChange={(e) => setRemark(e.target.value)} placeholder="写点什么（可留空）" />
+      <div className="row">
+        <input className="grow" aria-label="备注" value={remark} onChange={(e) => setRemark(e.target.value)} placeholder="写点什么（可留空）" />
+        <button type="button" className="ghost" onClick={() => speech.listening ? speech.stop() : speech.start()}>
+          {speech.listening ? '停止' : '语音'}
+        </button>
+      </div>
+      {speech.unsupported && <p className="hint">当前浏览器不支持语音识别。</p>}
 
       {mode !== 'transfer' && (
         <div className="entry-attrs">
