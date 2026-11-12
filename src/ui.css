@@ -807,7 +807,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .cal-totals > div { display: grid; gap: 1px; }
 .cal-totals small { color: var(--muted); font-size: var(--font-xs); }
 .cal-totals b { font-size: var(--font-md); }
-.cal-actions { display: flex; justify-content: flex-end; align-items: center; gap: var(--sp-2); }
+.cal-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 6px; }
 .cal-today, .cal-add {
   flex: 0 0 auto; white-space: nowrap; cursor: pointer;
   border-radius: var(--r-pill); padding: 6px 14px; font-size: var(--font-xs);

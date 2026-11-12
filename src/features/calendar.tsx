@@ -6,7 +6,7 @@ import { toBase } from '../money'
 import { billNetAmount } from '../bill-amount'
 
 /** 日历：按月看每日收支（照一木「日历」标签的最小可用版） */
-export function CalendarPage({ onAddBill }: { onAddBill?: () => void } = {}) {
+export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () => void; onOpenMonthBills?: () => void } = {}) {
   const bills = useLedger((s) => s.bills)
   const parents = useLedger((s) => s.parentCategories)
   const refunds = useLedger((s) => s.refunds)
@@ -18,6 +18,10 @@ export function CalendarPage({ onAddBill }: { onAddBill?: () => void } = {}) {
   const [picked, setPicked] = useState<string | null>(null)
   // 一木 CalendarLayout 支持月/周切换
   const [mode, setMode] = useState<'month' | 'week'>('month')
+  // 一木 popup_calendar_menu：本月账单 / 多选账本 / 显示热力背景 / 热力图指标 / 更多设置
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [heat, setHeat] = useState(false)
+  const [heatType, setHeatType] = useState<'balance' | 'amount'>('balance')
 
   const kindOf = useMemo(() => new Map(parents.map((p) => [p.id, p.kind])), [parents])
 
@@ -116,6 +120,22 @@ export function CalendarPage({ onAddBill }: { onAddBill?: () => void } = {}) {
   }
 
   // 必须走 statOf：周视图可能选中非当前月的日期，daily 里没有那条数据
+  // 热力背景色阶：一木按当日结余/收支强度着色（0 为无底色）
+  const heatMax = useMemo(() => {
+    let max = 0
+    for (const v of daily.values()) {
+      const n = heatType === 'balance' ? Math.abs(v.income - v.expense) : v.income + v.expense
+      if (n > max) max = n
+    }
+    return max
+  }, [daily, heatType])
+  const heatStyle = (st?: { income: number; expense: number }) => {
+    if (!st || heatMax <= 0) return undefined
+    const n = heatType === 'balance' ? Math.abs(st.income - st.expense) : st.income + st.expense
+    if (n <= 0) return undefined
+    return `color-mix(in srgb, var(--accent) ${Math.round((n / heatMax) * 70)}%, transparent)`
+  }
+
   const pickedStat = picked
     ? statOf(new Date(`${picked}T00:00:00`))
     : { income: 0, expense: 0, count: 0 }
@@ -174,16 +194,42 @@ export function CalendarPage({ onAddBill }: { onAddBill?: () => void } = {}) {
           {onAddBill && <button type="button" className="cal-add" onClick={onAddBill}>记一笔</button>}
         </div>
       </div>
+        {menuOpen && (
+        <div className="menu-mask" onClick={() => setMenuOpen(false)}>
+          <div className="home-menu" role="dialog" aria-label="日历更多" onClick={(e) => e.stopPropagation()}>
+            <div className="hm-group">
+              <button type="button" className="hm-item" onClick={() => { setMenuOpen(false); onOpenMonthBills?.() }}>本月账单</button>
+              <button type="button" className="hm-item muted" disabled>多选账本（暂未实现）</button>
+            </div>
+            <div className="hm-group">
+              <div className="hm-label">热力背景</div>
+              <div className="hm-seg">
+                <button type="button" className={!heat ? 'on' : ''} onClick={() => setHeat(false)}>关闭</button>
+                <button type="button" className={heat ? 'on' : ''} onClick={() => setHeat(true)}>显示</button>
+              </div>
+              {heat && (
+                <div className="hm-seg">
+                  <button type="button" className={heatType === 'balance' ? 'on' : ''} onClick={() => setHeatType('balance')}>结余热力</button>
+                  <button type="button" className={heatType === 'amount' ? 'on' : ''} onClick={() => setHeatType('amount')}>收支热力</button>
+                </div>
+              )}
+            </div>
+            <button type="button" className="ghost wide" onClick={() => setMenuOpen(false)}>关闭</button>
+          </div>
+        </div>
+      )}
+
       <div className="cal-grid cal-weekdays">
         {['日', '一', '二', '三', '四', '五', '六'].map((w) => <span key={w}>{w}</span>)}
       </div>
       {mode === 'week' ? (
-        <div className="cal-grid">
+      <div className="cal-grid">
           {weekDays.map((date) => {
             const key = fullDay(date.getTime())
             const stat = statOf(date)
             return (
               <button key={key} className={'cal-cell' + (picked === key ? ' on' : '')}
+              style={heat ? { background: heatStyle(stat) } : undefined}
                 onClick={() => setPicked(key)} aria-label={`${date.getMonth() + 1}月${date.getDate()}日`}>
                 <em>{key === todayKey ? '今' : date.getDate()}</em>
                 <i className="cal-lunar">{lunarOfDate(date)}</i>
@@ -194,12 +240,14 @@ export function CalendarPage({ onAddBill }: { onAddBill?: () => void } = {}) {
           })}
         </div>
       ) : (
+
       <div className="cal-grid">
         {cells.map((day, i) => {
           if (day == null) return <span key={'e' + i} className="cal-cell empty" />
           const stat = daily.get(keyOf(day))
           return (
             <button key={day} className={'cal-cell' + (picked === keyOf(day) ? ' on' : '')}
+              style={heat ? { background: heatStyle(daily.get(keyOf(day))) } : undefined}
               onClick={() => setPicked(keyOf(day))} aria-label={`${monthIdx + 1}月${day}日`}>
               <em>{isToday(day) ? '今' : day}</em>
               <i className="cal-lunar">{lunarOf(day)}</i>

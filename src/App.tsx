@@ -205,7 +205,9 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User
             onSearch={() => setSearchOpen(true)}
             onMore={() => setTab('me')} />
         )}
-        {tab === 'calendar' && <CalendarPage onAddBill={() => setTab('add')} />}
+        {tab === 'calendar' && (
+          <CalendarPage onAddBill={() => setTab('add')} onOpenMonthBills={() => setTab('home')} />
+        )}
         {tab === 'assets' && <Assets notify={notify} onOpenSettings={() => setTab('me')} />}
         {tab === 'stats' && <Stats />}
         {tab === 'me' && <Settings notify={notify} me={user} onLogout={onLogout} />}
