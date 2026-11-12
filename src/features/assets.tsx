@@ -108,6 +108,14 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
 
   // 一木资产页：净资产（可隐藏）+ 存款/负债 两栏 + 三张汇总卡片 + 按类型分组列表
   const [hideAmount, setHideAmount] = useState(false)
+  // 一木：点净资产/存款/负债/组头 → 弹「构成」明细
+  const [composition, setComposition] = useState<{ title: string; rows: Array<{ name: string; amount: number }> } | null>(null)
+  const openComposition = (title: string, list: Asset[]) => setComposition({
+    title,
+    rows: list
+      .map((a) => ({ name: a.simpleName || a.assetName, amount: toBase(a.assetNumber, a.currency, currencies, defaultCurrency) }))
+      .sort((x, y) => Math.abs(y.amount) - Math.abs(x.amount))
+  })
   const mask = (v: number) => (hideAmount ? '••••' : money(v))
   const deposit = assets.filter((a) => a.assetNumber > 0).reduce((s, a) => s + toBase(a.assetNumber, a.currency, currencies, defaultCurrency), 0)
   const liability = Math.abs(assets.filter((a) => a.assetNumber < 0).reduce((s, a) => s + toBase(a.assetNumber, a.currency, currencies, defaultCurrency), 0))
@@ -132,27 +140,33 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
             <button type="button" className="link" aria-label={hideAmount ? '显示金额' : '隐藏金额'}
               onClick={() => setHideAmount((v) => !v)}>{hideAmount ? '显示' : '隐藏'}</button>
           </div>
-          <strong className="asset-net-value">{mask(total)}</strong>
+          <button type="button" className="link asset-net-value" onClick={() => openComposition('净资产构成', assets)}>
+            {mask(total)}
+          </button>
         </div>
         <div className="asset-two">
-          <div><small>存款</small><b>{mask(deposit)}</b></div>
-          <div><small>负债</small><b>{mask(liability)}</b></div>
+          <button type="button" className="asset-two-item" onClick={() => openComposition('存款构成', assets.filter((a) => a.assetNumber > 0))}>
+            <small>存款</small><b>{mask(deposit)}</b>
+          </button>
+          <button type="button" className="asset-two-item" onClick={() => openComposition('负债构成', assets.filter((a) => a.assetNumber < 0))}>
+            <small>负债</small><b>{mask(liability)}</b>
+          </button>
         </div>
         {onOpenSettings && <button type="button" className="link asset-setting" onClick={onOpenSettings}>资产设置</button>}
       </div>
 
       <div className="asset-cards">
-        <button type="button" className="asset-card" onClick={() => notify(`待报销 ${money(pendingReimburse)}，已报销 ${money(doneReimburse)}`)}>
+        <button type="button" className="asset-card" onClick={() => openComposition('待报销明细', assets.filter((a) => a.reimAssetNumber))}>
           <small>待报销</small>
           <b>{mask(pendingReimburse)}</b>
           <small className="dim">已报 {mask(doneReimburse)}</small>
         </button>
-        <button type="button" className="asset-card" onClick={() => notify(`借出 ${money(receivable)}，借入 ${money(payable)}`)}>
+        <button type="button" className="asset-card" onClick={() => document.getElementById('block-lend')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
           <small>借出借入</small>
           <b>{mask(receivable)}</b>
           <small className="dim">借入 {mask(payable)}</small>
         </button>
-        <button type="button" className="asset-card" onClick={() => notify(`持仓市值 ${money(stockValue)}，累计收益 ${money(stockProfit)}`)}>
+        <button type="button" className="asset-card" onClick={() => document.getElementById('block-stock')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
           <small>投资</small>
           <b>{mask(stockValue)}</b>
           <small className="dim">收益 {mask(stockProfit)}</small>
@@ -163,10 +177,10 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
 
       {grouped.map(([typeKey, list]) => (
         <div key={typeKey} className="asset-group">
-          <div className="asset-group-head">
-            <span>{ASSET_TYPE[Number(typeKey)] ?? '其他'}</span>
+          <button type="button" className="asset-group-head" onClick={() => openComposition(`${ASSET_TYPE[Number(typeKey)] ?? '其他'} · 构成`, list)}>
+            <span>{ASSET_TYPE[Number(typeKey)] ?? '其他'} ›</span>
             <b>{mask(list.reduce((sum, a) => sum + toBase(a.assetNumber, a.currency, currencies, defaultCurrency), 0))}</b>
-          </div>
+          </button>
           {list.map((a) => (
         <div key={a.assetId} className="row">
           <span className="asset-badge"><AssetIcon type={a.assetType} name={a.assetName} size={16} icon={a.assetIcon} /></span>
@@ -238,7 +252,7 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
         )
       })()}
 
-      <h3>投资持仓</h3>
+      <h3 id="block-stock">投资持仓</h3>
       <p className="hint">按一木的持仓模型记录：买入/卖出自动算移动加权成本与已实现盈亏，填当前价看浮动盈亏。</p>
       <div className="row2">
         <input aria-label="持仓名称" value={stockForm.name} placeholder="名称，如 沪深300ETF"
@@ -455,7 +469,7 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
         />
       )}
 
-      <h3>借入借出</h3>
+      <h3 id="block-lend">借入借出</h3>
       {(receivable !== 0 || payable !== 0) && (
         <p className="hint">待收回 {money(receivable)} · 待归还 {money(payable)}</p>
       )}
@@ -976,6 +990,25 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
       </select>
       <span className="asset-badge" aria-label="新账户图标预览"><AssetIcon type={type} name={name} icon={newIcon} size={20} /></span>
       <button className="ghost wide" onClick={create}>添加</button>
+      {composition && (
+        <Modal label={composition.title} onClose={() => setComposition(null)}>
+          <h3>{composition.title}</h3>
+          {composition.rows.length === 0 && <p className="hint">没有可展示的账户。</p>}
+          {composition.rows.map((r) => (
+            <div key={r.name} className="row">
+              <span className="grow">{r.name}</span>
+              <b>{mask(r.amount)}</b>
+            </div>
+          ))}
+          <div className="row">
+            <span className="grow">合计</span>
+            <b>{mask(composition.rows.reduce((sum, r) => sum + r.amount, 0))}</b>
+          </div>
+          <div className="modal-btns">
+            <button type="button" className="ghost" onClick={() => setComposition(null)}>关闭</button>
+          </div>
+        </Modal>
+      )}
     </section>
   )
 }

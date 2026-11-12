@@ -1,4 +1,5 @@
 :root {
+  --scrim: rgba(90, 58, 30, .28);
   --shade-1: rgba(183, 125, 55, 0.063);
   --shade-2: rgba(80, 52, 30, 0.400);
   --shade-3: rgba(90, 52, 30, 0.149);
@@ -737,4 +738,22 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   padding: var(--sp-1) 0; border-bottom: 1px solid var(--line);
   font-size: var(--font-sm); color: var(--muted);
 }
+.asset-group-head b { color: var(--ink); }
+
+/* 资产页可点区域（一木的交互习惯：点金额/组头看构成） */
+.asset-two-item {
+  display: grid; gap: 2px; text-align: left; border: 0; background: transparent;
+  padding: 0; font: inherit; color: inherit; cursor: pointer;
+}
+.asset-two-item small { color: var(--muted); font-size: var(--font-xs); }
+.asset-net-value {
+  border: 0; background: transparent; padding: 0; text-align: left;
+  cursor: pointer; font: inherit; color: inherit;
+}
+.asset-group-head {
+  width: 100%; border: 0; border-bottom: 1px solid var(--line); background: transparent;
+  cursor: pointer; font: inherit; text-align: left; padding: var(--sp-1) 0;
+  display: flex; justify-content: space-between; align-items: baseline;
+}
+.asset-group-head span { color: var(--muted); font-size: var(--font-sm); }
 .asset-group-head b { color: var(--ink); }
