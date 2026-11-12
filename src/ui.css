@@ -799,3 +799,15 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .subpage-sum > div { display: grid; gap: 2px; }
 .subpage-sum small { color: var(--muted); font-size: var(--font-xs); }
 .subpage-sum b { font-size: var(--font-lg); }
+
+/* 日历页工具栏：一木 tool_bar 的月收入/月支出/月结余 + 返回今天/记一笔 */
+.cal-toolbar { display: grid; gap: var(--sp-2); padding-bottom: var(--sp-2); border-bottom: 1px solid var(--line); }
+.cal-title { display: flex; align-items: center; justify-content: center; gap: var(--sp-2); }
+.cal-totals { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-2); }
+.cal-totals > div { display: grid; gap: 1px; }
+.cal-totals small { color: var(--muted); font-size: var(--font-xs); }
+.cal-totals b { font-size: var(--font-md); }
+.cal-actions { display: flex; justify-content: flex-end; align-items: center; gap: var(--sp-2); }
+.cal-actions .primary, .cal-actions .ghost { width: auto; white-space: nowrap; padding-inline: var(--sp-3); }
+.cal-lunar { color: var(--muted); font-size: var(--font-xs); font-style: normal; }
+.cal-day-sum { color: var(--muted); font-size: var(--font-xs); }
