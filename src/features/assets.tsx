@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLedger, useTotalAssets } from '../store'
 import { ASSET_TYPE, LEND_TYPE } from '../types'
 import type { Asset } from '../types'
@@ -110,8 +110,10 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
   const [hideAmount, setHideAmount] = useState(false)
   // 一木：点净资产/存款/负债/组头 → 弹「构成」明细
   type CompRow = { name: string; amount: number; unit?: 'money' | 'count' | 'percent' }
-  // 一木把「待报销 / 借出借入 / 投资持仓」做成独立页面；这里用屏内分页复刻
+  // 一木把「待报销 / 借出借入 / 投资持仓」做成独立页面；这里用条件渲染的子页复刻
   const [screen, setScreen] = useState<'assets' | 'reimburse' | 'lend' | 'stock'>('assets')
+  const subpageTitle = useRef<HTMLHeadingElement>(null)
+  useEffect(() => { if (screen !== 'assets') subpageTitle.current?.focus() }, [screen])
   const [composition, setComposition] = useState<{ title: string; note?: string; rows: CompRow[] } | null>(null)
   const openComposition = (title: string, rows: CompRow[], note?: string) =>
     setComposition({ title, note, rows: [...rows].sort((x, y) => Math.abs(y.amount) - Math.abs(x.amount)) })
@@ -140,14 +142,15 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
   ).sort(([a], [b]) => Number(a) - Number(b))
 
   return (
-    <section className={`card${screen === 'assets' ? '' : ` subpage-mode assets-screen--${screen}`}`}>
+    <section className={screen === 'assets' ? 'card' : 'card subpage'}>
       {screen !== 'assets' && (
         <div className="subpage-head">
           <button type="button" className="link" onClick={() => setScreen('assets')}>‹ 返回资产</button>
-          <b>{{ reimburse: '待报销', lend: '借入借出', stock: '投资持仓' }[screen]}</b>
+          <h3 ref={subpageTitle} tabIndex={-1}>{{ reimburse: '待报销', lend: '借入借出', stock: '投资持仓' }[screen]}</h3>
         </div>
       )}
 
+      {screen === 'assets' && (<>
       <div className="asset-banner">
         <div className="asset-net">
           <div className="asset-net-label">
@@ -275,8 +278,9 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
         )
       })()}
 
-      <details className="fold fold-stock" id="block-stock" open={screen === 'stock'}>
-        <summary>投资持仓</summary>
+      </>)}
+      {screen === 'stock' && (
+      <div className="subpage-block">
       <p className="hint">按一木的持仓模型记录：买入/卖出自动算移动加权成本与已实现盈亏，填当前价看浮动盈亏。</p>
       <div className="row2">
         <input aria-label="持仓名称" value={stockForm.name} placeholder="名称，如 沪深300ETF"
@@ -357,7 +361,9 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
         )
       })}
 
-      </details>
+      </div>
+      )}
+      {screen === 'assets' && (<>
       <details className="fold">
         <summary>房贷计划</summary>
       <p className="hint">组合贷：商业贷款 + 公积金贷款，支持等额本息/等额本金与 LPR 加点。</p>
@@ -490,6 +496,7 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
       })}
 
       </details>
+      </>)}
       {editingAsset && (
         <AssetEditor
           asset={editingAsset}
@@ -498,8 +505,8 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
         />
       )}
 
-      <details className="fold fold-lend" id="block-lend" open={screen === 'lend'}>
-        <summary>借入借出</summary>
+      {screen === 'lend' && (
+      <div className="subpage-block">
       {(receivable !== 0 || payable !== 0) && (
         <p className="hint">待收回 {money(receivable)} · 待归还 {money(payable)}</p>
       )}
@@ -615,8 +622,9 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
         </Modal>
       )}
 
-      </details>
-      <section className="fold fold-reimburse">
+      </div>
+      )}
+      {screen === 'reimburse' && (<>
         <div className="row"><b className="grow">待报销明细</b><span className="muted">共 {pendingReimburseCount} 笔 · {money(pendingReimburse)}</span></div>
         {reimbursements.filter((r) => r.status === 'pending').length === 0 && <p className="hint">没有待报销的账单。</p>}
         {reimbursements.filter((r) => r.status === 'pending').map((r) => {
@@ -632,8 +640,9 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
             </div>
           )
         })}
-      </section>
+      </>)}
 
+      {screen === 'assets' && (<>
       <details className="fold">
         <summary>新增账户</summary>
       {/* 字段顺序照一木 AddCapitalActivity / AddCreditCardActivity */}
@@ -712,6 +721,7 @@ export function Assets({ notify, onOpenSettings }: { notify: (m: string) => void
         </Modal>
       )}
       </details>
+      </>)}
     </section>
   )
 }
