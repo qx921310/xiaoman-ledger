@@ -47,9 +47,17 @@ export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot }:
   const [simpleView, setSimpleView] = useState(false)
   const [rangeAll, setRangeAll] = useState(false)
   // 下拉刷新：触发一次同步（对应一木各页的 pull_layout）
-  const { progress: pullProgress, busy: pulling } = usePullRefresh(async () => {
-    try { await syncNowImmediate() } catch { /* 离线时忽略，同步徽标会提示 */ }
-  })
+  const [pullAction, setPullAction] = useState<'sync' | 'add'>('sync')
+  const { progress: pullProgress, busy: pulling, text: pullText } = usePullRefresh(
+    async () => {
+      if (pullAction === 'add') { onAdd(); return }
+      try { await syncNowImmediate() } catch { /* 离线时忽略，同步徽标会提示 */ }
+    },
+    64,
+    pullAction === 'add'
+      ? { pulling: '下拉添加一条账单', released: '松开添加一条账单', busy: '正在打开记账…' }
+      : {}
+  )
   const bookName = useLedger((s) => {
     const b = s.accountBooks.find((x) => String(x.bookId) === String(s.currentBookId))
     return b?.accountBookName ?? '我的账本'
@@ -61,7 +69,7 @@ export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot }:
     <section className="home">
       {(pullProgress > 0 || pulling) && (
         <div className="pull-tip" role="status" aria-live="polite">
-          {pulling ? '正在刷新…' : pullProgress >= 1 ? '松开刷新' : '下拉刷新'}
+          {pulling ? pullText.busy : pullProgress >= 1 ? pullText.released : pullText.pulling}
         </div>
       )}
 
@@ -131,6 +139,13 @@ export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot }:
               <div className="hm-seg">
                 <button type="button" className={!rangeAll ? 'on' : ''} onClick={() => setRangeAll(false)}>按月</button>
                 <button type="button" className={rangeAll ? 'on' : ''} onClick={() => setRangeAll(true)}>全部</button>
+              </div>
+            </div>
+            <div className="hm-group">
+              <div className="hm-label">下拉动作</div>
+              <div className="hm-seg">
+                <button type="button" className={pullAction === 'sync' ? 'on' : ''} onClick={() => setPullAction('sync')}>同步数据</button>
+                <button type="button" className={pullAction === 'add' ? 'on' : ''} onClick={() => setPullAction('add')}>添加一条账单</button>
               </div>
             </div>
             <div className="hm-group">

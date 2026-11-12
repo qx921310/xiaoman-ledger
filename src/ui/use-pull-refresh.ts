@@ -5,7 +5,16 @@ import { useEffect, useRef, useState } from 'react'
  * 只在页面滚动到顶部时响应，触摸下拉超过阈值触发 onRefresh。
  * 不引入第三方库：这里只需要 touch 三段事件，成熟库反而更重。
  */
-export function usePullRefresh(onRefresh: () => Promise<void> | void, threshold = 64) {
+export function usePullRefresh(
+  onRefresh: () => Promise<void> | void,
+  threshold = 64,
+  labels: { pulling?: string; released?: string; busy?: string } = {}
+) {
+  const text = {
+    pulling: labels.pulling ?? '下拉同步数据',
+    released: labels.released ?? '松开同步数据',
+    busy: labels.busy ?? '正在同步…'
+  }
   const [progress, setProgress] = useState(0)
   const [busy, setBusy] = useState(false)
   const startY = useRef<number | null>(null)
@@ -45,5 +54,5 @@ export function usePullRefresh(onRefresh: () => Promise<void> | void, threshold 
     }
   }, [onRefresh, threshold, progress, busy])
 
-  return { progress, busy }
+  return { progress, busy, text }
 }
