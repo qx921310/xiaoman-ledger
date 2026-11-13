@@ -132,7 +132,9 @@ interface LedgerState {
   applySplit: (billId: string | number, splitGroupId: number, splitType: 0 | 1 | 2, values?: Record<number, number>, payerMemberId?: number) => boolean
   settleSplit: (splitExpenseId: number, settlement: boolean) => void
   /** 账单组：把多条账单合并成一条展示（一木 BillGroup） */
-  createBillGroup: (billIds: Array<string | number>) => boolean
+  createBillGroup: (billIds: Array<string | number>, meta?: { parentCategoryId?: number; childCategoryId?: number; remark?: string }) => boolean
+  /** 编辑账单组合（分类 / 子分类 / 备注 / 成员） */
+  updateBillGroup: (billGroupId: number, patch: Partial<import('./types').BillGroup>) => void
   dissolveBillGroup: (billGroupId: number) => void
   removeFromBillGroup: (billGroupId: number, billId: string | number) => void
   /** 账单关联：两两关联（一木 BillRelated） */
@@ -862,7 +864,7 @@ export const useLedger = create<LedgerState>()(
       },
 
       // 账单组（一木 BillGroup）：要求同一账本、至少两条且不重复
-      createBillGroup: (billIds) => {
+      createBillGroup: (billIds, meta) => {
         const s = get()
         const key = (b: { billId: string | number }) => String(b.billId)
         const raw = billIds.map(String)
@@ -881,8 +883,9 @@ export const useLedger = create<LedgerState>()(
           firstBillId: ids[0],
           billList: ids,
           totalNumber: +picked.reduce((sum, b) => sum + b.cost, 0).toFixed(2),
-          parentCategoryId: picked[0]?.parentCategoryId,
-          remark: picked[0]?.remark,
+          parentCategoryId: meta?.parentCategoryId ?? picked[0]?.parentCategoryId,
+          childCategoryId: meta?.childCategoryId,
+          remark: meta?.remark ?? picked[0]?.remark,
           updateTime: NOW()
         }
         set((st) => ({ billGroups: [...st.billGroups, group] }))
@@ -891,6 +894,20 @@ export const useLedger = create<LedgerState>()(
 
       dissolveBillGroup: (billGroupId) => set((s) => ({
         billGroups: s.billGroups.filter((g) => g.billGroupId !== billGroupId)
+      })),
+
+      /** 一木 BillGroupActivity：编辑组合的分类 / 子分类 / 备注 / 成员 */
+      updateBillGroup: (billGroupId, patch) => set((s) => ({
+        billGroups: s.billGroups.map((g) => {
+          if (g.billGroupId !== billGroupId) return g
+          const next = { ...g, ...patch, updateTime: NOW() }
+          if (patch.billList) {
+            const picked = s.bills.filter((b) => patch.billList!.map(String).includes(String(b.billId)))
+            next.totalNumber = +picked.reduce((sum, b) => sum + b.cost, 0).toFixed(2)
+            next.firstBillId = patch.billList[0] ?? g.firstBillId
+          }
+          return next
+        })
       })),
 
       removeFromBillGroup: (billGroupId, billId) => set((s) => ({

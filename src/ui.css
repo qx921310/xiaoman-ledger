@@ -1157,3 +1157,8 @@ button.day-btn {
 .stat-cards > div { display: grid; gap: 2px; }
 .stat-cards small { color: var(--muted); font-size: var(--font-sm); }
 .stat-cards b { font-size: var(--font-md); }
+
+/* 账单组合的分类选择（对齐 activity_bill_group 的 choice_category_layout） */
+.cat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-2); padding: var(--sp-2) 0; }
+.cat-cell { display: grid; place-items: center; gap: 4px; padding: var(--sp-2); border: 1px solid var(--line); background: var(--card); border-radius: var(--r-md); cursor: pointer; }
+.cat-cell.on { border-color: var(--accent); background: var(--accent-soft); }

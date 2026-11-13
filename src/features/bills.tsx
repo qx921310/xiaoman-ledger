@@ -11,6 +11,7 @@ import { TransferEditor } from './transfer-editor'
 import { Modal } from '../ui/modal'
 import { billNetAmount } from '../bill-amount'
 import { FilteredBills } from './filtered-bills'
+import { BillGroupEditor } from './bill-group'
 import { accountMoney, fromBase, hasCurrencyRate } from '../money'
 import { resolveBillChild } from '../taxonomy'
 import { summarizeBills } from '../bill-summary'
@@ -78,6 +79,9 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
   }, [focusBillId, bills, onFocusHandled])
   const billGroups = useLedger((s) => s.billGroups)
   const dissolveBillGroup = useLedger((s) => s.dissolveBillGroup)
+  const [editingGroup, setEditingGroup] = useState<number | null>(null)
+  const [tip, setTip] = useState('')
+  const [creatingGroup, setCreatingGroup] = useState(false)
   const [kw, setKw] = useState('')
   const [fPid, setFPid] = useState(0)
   const [fAid, setFAid] = useState(0)
@@ -190,6 +194,16 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
     )
   }
 
+  if (editingGroup != null || creatingGroup) {
+    return (
+      <>
+      {tip && <p className="hint" role="status">{tip}</p>}
+      <BillGroupEditor groupId={editingGroup ?? undefined} notify={setTip}
+        onDone={() => { setEditingGroup(null); setCreatingGroup(false); setTip('') }} />
+      </>
+    )
+  }
+
   return (
     <section className={embedded ? 'card embedded' : 'card'}>
 
@@ -205,6 +219,13 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
           <div><small>结余</small><b>{money(income - expense)}</b></div>
         </div>
       </div>
+      )}
+
+      {!embedded && (
+        <div className="row">
+          <span className="grow muted">把多笔账单合并成一条展示</span>
+          <button type="button" className="link" onClick={() => setCreatingGroup(true)}>账单组合</button>
+        </div>
       )}
 
       {!embedded && (
@@ -258,6 +279,7 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
               </div>
             ))}
             <div className="row">
+              <button className="link" onClick={() => setEditingGroup(g.billGroupId)}>编辑组合</button>
               <button className="link" onClick={() => dissolveBillGroup(g.billGroupId)}>解散账单组</button>
             </div>
           </div>

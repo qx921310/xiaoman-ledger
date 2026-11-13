@@ -275,6 +275,26 @@ test('预算删除墓碑编号与同步身份一致（周预算不能被云端�
   assert.match(identity, /^week:all:7$/)
 })
 
+test('账单组合：可按一木编辑页写入分类/备注，编辑后合计随成员变化', () => {
+  reset()
+  useLedger.setState({ currentBookId: 1, assets: [
+    { assetId: 10, assetName: '现金', assetNumber: 1000, openingBalance: 1000, assetType: 1 }
+  ] } as never)
+  const a = st().addBill({ assetId: 10, parentCategoryId: 7, cost: 30, time: Date.now() })
+  const b = st().addBill({ assetId: 10, parentCategoryId: 7, cost: 20, time: Date.now() })
+  const ok = st().createBillGroup([a.billId, b.billId], { parentCategoryId: 7, remark: '一起付的' })
+  assert.equal(ok, true)
+  const g = st().billGroups[0]
+  assert.equal(g.totalNumber, 50)
+  assert.equal(g.remark, '一起付的')
+  const c = st().addBill({ assetId: 10, parentCategoryId: 7, cost: 5, time: Date.now() })
+  st().updateBillGroup(g.billGroupId, { billList: [a.billId, b.billId, c.billId] })
+  assert.equal(st().billGroups[0].totalNumber, 55, '编辑成员后合计应重算')
+  st().dissolveBillGroup(g.billGroupId)
+  assert.equal(st().billGroups.length, 0)
+  assert.equal(st().bills.length, 3, '解散组合不影响账单本身')
+})
+
 test('账本开关与隐藏可持久化（一木 AddAccountBookActivity 的三个开关）', () => {
   reset()
   useLedger.setState({ currentBookId: 1 } as never)
