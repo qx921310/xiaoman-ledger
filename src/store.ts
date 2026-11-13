@@ -35,7 +35,7 @@ export interface Budget {
   /** 追加额度（叠加在基础额度上） */
   addNum?: number
   /** 预算周期：month 按月 / year 按年 / custom 自定义起止 */
-  type?: 'month' | 'year' | 'custom'
+  type?: 'week' | 'month' | 'year' | 'custom'
   /** 稳定 id（自定义预算用） */
   budgetId?: number
   /** 预算名称，便于区分多个自定义预算 */

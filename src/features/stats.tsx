@@ -36,7 +36,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
   const [customTo, setCustomTo] = useState('')
   const [editing, setEditing] = useState<{
     categoryId: number; amount: string; addNum?: string
-    type?: 'month' | 'year' | 'custom'
+    type?: 'week' | 'month' | 'year' | 'custom'
     budgetName?: string; startDate?: string; endDate?: string
   } | null>(null)
 

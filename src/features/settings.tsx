@@ -14,6 +14,7 @@ import { AiTypeManager } from './ai-type'
 import { Guide } from './guide'
 import { BillFiles } from './bill-files'
 import { BookManager } from './books'
+import { BudgetManager } from './budget'
 import { FilteredBills } from './filtered-bills'
 import { TemplateList } from './templates'
 import { hasPin, setPin, clearPin, verifyPin } from './lock'
@@ -126,6 +127,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [tplOpen, setTplOpen] = useState(false)
   const [booksOpen, setBooksOpen] = useState(false)
   const [filesOpen, setFilesOpen] = useState(false)
+  const [budgetOpen, setBudgetOpen] = useState(false)
   const [cycleDrill, setCycleDrill] = useState<{ title: string; cycleId: string | number } | null>(null)
   const [backupOpen, setBackupOpen] = useState(false)
   // 一木 UserInfoActivity：昵称与头像可改（本地保存，账号维度）
@@ -476,6 +478,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       {tplOpen && <TemplateList onBack={() => setTplOpen(false)} onAdd={() => { setTplOpen(false); notify('请到记账页点「存为模板」') }} notify={notify} />}
       {booksOpen && <BookManager notify={notify} onBack={() => setBooksOpen(false)} />}
       {filesOpen && <BillFiles notify={notify} onBack={() => setFilesOpen(false)} />}
+      {budgetOpen && <BudgetManager notify={notify} onBack={() => setBudgetOpen(false)} />}
 
       {profileOpen && (
         <Modal label="个人资料" onClose={() => setProfileOpen(false)}>
@@ -520,6 +523,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
           ['智能分类', 'ai'],
           ['周期记账', 'cycle'],
           ['账本管理', 'book'],
+          ['预算管理', 'budget'],
           ['模板记账', 'tpl'],
           ['标签管理', 'tag'],
           ['分类管理', 'cat'],
