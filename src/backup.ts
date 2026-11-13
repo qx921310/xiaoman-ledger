@@ -2,7 +2,7 @@ import type {
   AccountBook, Asset, Bill, BillGroup, BillRelated, Category, Currency, Cycle,
   HomeLoan, Instalment, Lend, Refund, Reimbursement, SplitExpense, SplitGroup,
   SplitMember, StockAsset, StockInfo, Tag, Template, TombstoneV1, Transfer,
-  Dream, AiTypeRule, FixedDeposit
+  Dream, AiTypeRule, FixedDeposit, AssetFlow
 } from './types'
 import type { Budget } from './store'
 
@@ -40,6 +40,7 @@ export interface BackupFile {
   dreams?: Dream[]
   aiTypeRules?: AiTypeRule[]
   fixedDeposits?: FixedDeposit[]
+  assetFlows?: AssetFlow[]
 }
 
 type BackupRecord = Record<string, unknown>
@@ -55,7 +56,7 @@ export function validateBackup(input: unknown): BackupFile {
     collections.push('splitGroups', 'splitMembers', 'splitExpenses', 'stockAssets', 'stockInfos',
       'templates', 'homeLoans', 'instalments', 'billGroups', 'billRelated',
       // 愿望清单 / 智能分类 / 定期存款
-      'dreams', 'aiTypeRules', 'fixedDeposits')
+      'dreams', 'aiTypeRules', 'fixedDeposits', 'assetFlows')
   }
   const rows = (key: string) => data[key] as BackupRecord[]
   for (const key of collections) {

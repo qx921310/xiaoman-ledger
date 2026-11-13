@@ -13,7 +13,7 @@ const reset = () => {
       { accountBookId: 1, bookId: 1, accountBookName: 'A', ownerId: 1, memberCount: 1, role: 'normal' },
       { accountBookId: 2, bookId: 2, accountBookName: 'B', ownerId: 1, memberCount: 1, role: 'normal' }
     ],
-    assets: [], bills: [], lends: [], templates: [], dreams: [], aiTypeRules: [], fixedDeposits: []
+    assets: [], bills: [], lends: [], templates: [], dreams: [], aiTypeRules: [], fixedDeposits: [], assetFlows: [], transfers: []
   } as never)
 }
 
@@ -35,7 +35,7 @@ test('备份包含愿望/智能分类/定存，且能通过校验', () => {
     tags: [], currencies: [], tombstones: [],
     splitGroups: [], splitMembers: [], splitExpenses: [], stockAssets: [], stockInfos: [],
     templates: [], homeLoans: [], instalments: [], billGroups: [], billRelated: [],
-    dreams: dump.dreams, aiTypeRules: dump.aiTypeRules, fixedDeposits: dump.fixedDeposits
+    dreams: dump.dreams, aiTypeRules: dump.aiTypeRules, fixedDeposits: dump.fixedDeposits, assetFlows: []
   }
   const file = validateBackup(minimal)
   assert.equal(file.dreams?.length, 1)
@@ -71,15 +71,22 @@ test('旧记录无属主时认领云端属主，不产生副本', () => {
   assert.equal(st().dreams[0].ownerId, 1)
 })
 
-test('定存累加：余额增加（与文案同向），删除扣回', () => {
+test('定存按一木写资产流水：有「新增定存/删除定存」记录、期初不变', () => {
   reset()
   useLedger.setState({ assets: [{ assetId: 10, assetName: '储蓄', assetNumber: 1000, openingBalance: 1000, assetType: 1 }] } as never)
   st().addFixedDeposit({ amount: 500, rate: 3, termYears: 3, assetId: 10, toAsset: true })
   const deposit = st().fixedDeposits[0]
   assert.equal(deposit.toAsset, true)
-  assert.equal(st().assets.find((a) => a.assetId === 10)!.assetNumber, 1500, '勾选累加后余额应增加')
+  const flow = st().assetFlows[0]
+  assert.ok(flow, '必须写入资产流水')
+  assert.equal(flow.reason, '新增定存')
+  assert.equal(flow.delta, 500)
+  assert.equal(st().assets.find((a) => a.assetId === 10)!.openingBalance, 1000, '期初不得被改写')
+  assert.equal(st().assets.find((a) => a.assetId === 10)!.assetNumber, 1500, '余额由流水推导后增加')
   st().deleteFixedDeposit(deposit.depositId, { reduceAsset: true })
   assert.equal(st().fixedDeposits.length, 0)
+  assert.equal(st().assetFlows.at(-1)!.reason, '删除定存', '删除应写反向流水')
+  assert.equal(st().assetFlows.at(-1)!.delta, -500)
   assert.equal(st().assets.find((a) => a.assetId === 10)!.assetNumber, 1000, '删除并扣回后回到原值')
 })
 
@@ -90,10 +97,12 @@ test('定存不勾选时不改余额；删除时选择不扣回也保持余额',
   assert.equal(st().assets[0].assetNumber, 1000, '不勾选累加则余额不变')
   st().addFixedDeposit({ amount: 500, rate: 3, termYears: 3, assetId: 10, toAsset: true })
   assert.equal(st().assets[0].assetNumber, 1500)
-  // 删除时选择「不扣回」：余额保持 1500，且不留悬空流水
+  // 删除时选择「不扣回」：余额保持，且不写反向流水
+  const flowsBefore = st().assetFlows.length
   st().deleteFixedDeposit(st().fixedDeposits[0].depositId, { reduceAsset: false })
   assert.equal(st().assets[0].assetNumber, 1500)
-  assert.equal(st().transfers.length, 0, '不应再产生指向已删虚拟账户的转账')
+  assert.equal(st().assetFlows.length, flowsBefore, '不扣回时不写反向流水')
+  assert.equal(st().transfers.length, 0, '不应产生转账')
 })
 
 test('跨账本还款继承父借贷账本', () => {
@@ -212,6 +221,37 @@ test('属主认领不跨账本：不同账本的同一 ID 记录保持两条', (
   }] as never)
   assert.ok(st().dreams.length >= before, '不同账本应保留为两条，而不是被覆盖成一条')
   assert.ok(st().dreams.some((d) => d.name === 'A账本愿望'), 'A 账本记录不能被覆盖')
+})
+
+test('只读账本的转账模板不能创建流水', () => {
+  reset()
+  useLedger.setState({
+    currentBookId: 1,
+    accountBooks: [{ accountBookId: 1, bookId: 1, accountBookName: 'A', memberCount: 1, role: 'silent' }],
+    assets: [
+      { assetId: 10, assetName: '现金', assetNumber: 100, openingBalance: 100, assetType: 1 },
+      { assetId: 11, assetName: '储蓄', assetNumber: 0, openingBalance: 0, assetType: 1 }
+    ]
+  } as never)
+  const tpl = st().addTemplate({ name: '转账模板', mode: 'transfer', transfer: { fromAssetId: 10, toAssetId: 11, cost: 10 } } as never)
+  assert.equal(st().applyTemplate(tpl.templateId), false, '只读账本必须拒绝')
+  assert.equal(st().transfers.length, 0, '不得产生转账')
+  assert.equal(st().assets.find((a) => a.assetId === 10)!.assetNumber, 100, '余额不得变化')
+})
+
+test('收款必须关联原借贷并冲减剩余', () => {
+  reset()
+  useLedger.setState({ currentBookId: 1, assets: [{ assetId: 10, assetName: '现金', assetNumber: 1000, openingBalance: 1000, assetType: 1 }] } as never)
+  st().addLend({ type: 1, assetId: 10, counterparty: '张三', number: 200 })
+  const parent = st().lends[0]
+  assert.equal(st().lends.filter((l) => l.parentLendId === parent.lendId).length, 0, '尚未收款')
+  st().repayLend({ lendId: parent.lendId, amount: 80, repaymentAssetId: 10 })
+  const child = st().lends.find((l) => l.parentLendId === parent.lendId)
+  assert.ok(child, '收款应生成关联记录')
+  assert.equal(String(child!.bookId), '1', '继承父借贷账本')
+  // 剩余应收 = 200 - 80
+  const { lendRemaining } = require('../src/lend') as typeof import('../src/lend')
+  assert.equal(lendRemaining(parent, st().lends), 120)
 })
 
 test('模板不能绕过只读账本与私有账户约束', () => {

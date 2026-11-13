@@ -71,6 +71,7 @@ interface LedgerState {
   dreams: import('./types').Dream[]
   aiTypeRules: import('./types').AiTypeRule[]
   fixedDeposits: import('./types').FixedDeposit[]
+  assetFlows: import('./types').AssetFlow[]
   stockAssets: import('./types').StockAsset[]
   stockInfos: import('./types').StockInfo[]
   templates: import('./types').Template[]
@@ -150,6 +151,8 @@ interface LedgerState {
   /** 一木：定期存款 */
   addFixedDeposit: (patch: { amount: number; rate: number; termYears: number; startTime?: number; remark?: string; assetId?: number; depositType?: string; toAsset?: boolean }) => void
   deleteFixedDeposit: (depositId: number, options?: { reduceAsset?: boolean }) => void
+  /** 资产流水：非账单类余额变动（一木 AssetHistory） */
+  addAssetFlow: (patch: { assetId: number; delta: number; reason: string; time?: number; bookId?: string | number }) => void
   setStockPrice: (stockAssetId: number, price: number) => void
   setStockCostMethod: (stockAssetId: number, method: 0 | 1 | 2) => void
   addTemplate: (patch: Omit<import('./types').Template, 'templateId' | 'updateTime'>) => import('./types').Template
@@ -206,7 +209,7 @@ const BUSINESS_KEYS = [
   'reimbursements', 'refunds', 'budgets', 'tombstones',
   'splitGroups', 'splitMembers', 'splitExpenses',
   'stockAssets', 'stockInfos', 'templates', 'homeLoans', 'instalments',
-  'billGroups', 'billRelated', 'dreams', 'aiTypeRules', 'fixedDeposits'
+  'billGroups', 'billRelated', 'dreams', 'aiTypeRules', 'fixedDeposits', 'assetFlows'
 ] as const
 
 export const useLedger = create<LedgerState>()(
@@ -257,6 +260,7 @@ export const useLedger = create<LedgerState>()(
       dreams: [],
       aiTypeRules: [],
       fixedDeposits: [],
+      assetFlows: [],
       stockAssets: [],
       stockInfos: [],
       templates: [],
@@ -522,6 +526,19 @@ export const useLedger = create<LedgerState>()(
 
       // 定期存款：一木的「累加至账户余额」就是直接把账户余额加上去（调整，不是流水），
       // 删除时可选「减少账户余额」扣回。用 openingBalance 作为真值，assetNumber 由它派生。
+      addAssetFlow: (patch) => set((s) => {
+        let flowId = Date.now()
+        while (s.assetFlows.some((f) => f.flowId === flowId)) flowId++
+        return {
+          assetFlows: [...s.assetFlows, {
+            flowId, assetId: patch.assetId, delta: Number(patch.delta) || 0,
+            reason: patch.reason, time: patch.time ?? NOW(),
+            bookId: patch.bookId ?? (s.currentBookId === 0 ? undefined : s.currentBookId),
+            ownerId: s.userId, updateTime: NOW()
+          }]
+        }
+      }),
+
       addFixedDeposit: (patch) => {
         const st = get()
         let depositId = Date.now()
@@ -530,12 +547,16 @@ export const useLedger = create<LedgerState>()(
         const sourceAsset = patch.assetId == null ? undefined : st.assets.find((a) => a.assetId === patch.assetId)
         const toAsset = !!patch.toAsset && !!sourceAsset
         set((s) => ({
-          assets: toAsset
-            ? s.assets.map((a) => a.assetId === patch.assetId
-              // 方向必须与按钮文案一致：勾选「累加」= 余额增加
-              ? { ...a, openingBalance: +((a.openingBalance ?? a.assetNumber) + amt).toFixed(2), updateTime: NOW() }
-              : a)
-            : s.assets,
+          // 一木：写入资产流水「新增定存」，余额由流水推导，不改期初
+          assetFlows: toAsset
+            ? [...s.assetFlows, {
+                flowId: (() => { let id = NOW(); while (s.assetFlows.some((f) => f.flowId === id)) id++; return id })(),
+                assetId: patch.assetId!, delta: amt, reason: '新增定存',
+                time: patch.startTime ?? NOW(),
+                bookId: s.currentBookId === 0 ? undefined : s.currentBookId,
+                ownerId: s.userId, updateTime: NOW()
+              }]
+            : s.assetFlows,
           fixedDeposits: [{
             depositId, depositType: patch.depositType ?? '整存整取',
             amount: amt, rate: Number(patch.rate) || 0,
@@ -553,11 +574,14 @@ export const useLedger = create<LedgerState>()(
         // 一木：删除时勾选「减少账户余额」才扣回；不勾选则余额保持
         const reduce = !!options?.reduceAsset && rec?.toAsset && rec?.assetId != null
         set((s) => ({
-          assets: reduce
-            ? s.assets.map((a) => a.assetId === rec!.assetId
-              ? { ...a, openingBalance: +((a.openingBalance ?? a.assetNumber) - rec!.amount).toFixed(2), updateTime: NOW() }
-              : a)
-            : s.assets,
+          // 一木：删除时写「删除定存」反向流水（不是抹掉历史）
+          assetFlows: reduce
+            ? [...s.assetFlows, {
+                flowId: (() => { let id = NOW(); while (s.assetFlows.some((f) => f.flowId === id)) id++; return id })(),
+                assetId: rec!.assetId!, delta: -rec!.amount, reason: '删除定存',
+                time: NOW(), bookId: rec?.bookId, ownerId: rec?.ownerId ?? s.userId, updateTime: NOW()
+              }]
+            : s.assetFlows,
           fixedDeposits: s.fixedDeposits.filter((d) => d.depositId !== depositId),
           tombstones: [...s.tombstones, { kind: 'fixedDeposit', id: String(depositId), updatedAt: NOW(),
             bookId: rec?.bookId, ownerId: rec?.ownerId ?? s.userId }]
@@ -713,6 +737,10 @@ export const useLedger = create<LedgerState>()(
         const bookExists = (id: unknown) => id != null && s.accountBooks.some((b) => String(b.bookId) === String(id))
         const tplBook = tpl.bookId != null && tpl.bookId !== 0 && bookExists(tpl.bookId) ? tpl.bookId : undefined
         const targetBook = tplBook ?? (s.currentBookId === 0 ? undefined : s.currentBookId)
+        // 只读账本：任何模板分支（账单/转账）都不允许记账，必须放在最前面
+        const roleOf = (id: string | number | undefined) => id == null ? undefined
+          : s.accountBooks.find((bk) => String(bk.bookId) === String(id))?.role
+        if (roleOf(targetBook) === 'silent') return false
 
         if (tpl.mode === 'transfer' && tpl.transfer) {
           const tr = tpl.transfer
@@ -724,11 +752,6 @@ export const useLedger = create<LedgerState>()(
           get().addTransfer({ ...tr, time: Date.now(), bookId: targetBook })
           return true
         }
-        // 只读账本（silent）不允许记账：对所有模板分支生效（含转账模板）
-        const roleOf = (id: string | number | undefined) => id == null ? undefined
-          : s.accountBooks.find((bk) => String(bk.bookId) === String(id))?.role
-        if (roleOf(targetBook) === 'silent') return false
-
         if (tpl.mode === 'bill' && tpl.bill) {
           const b = tpl.bill
           const source = Number(b.cost) || 0
@@ -971,7 +994,9 @@ export const useLedger = create<LedgerState>()(
             assetId: patch.fromAssetId,
             remark: `转账手续费${patch.remark ? '：' + patch.remark : ''}`,
             billType: 5,
-            time
+            time,
+            // 手续费必须与转账同一账本
+            bookId: patch.bookId ?? (s.currentBookId === 0 ? undefined : s.currentBookId)
           })
           billId = bill.billId
         }
@@ -1489,7 +1514,8 @@ export const useLedger = create<LedgerState>()(
           // v3：愿望清单 / 智能分类 / 定期存款
           dreams: s.dreams,
           aiTypeRules: s.aiTypeRules,
-          fixedDeposits: s.fixedDeposits
+          fixedDeposits: s.fixedDeposits,
+          assetFlows: s.assetFlows
         }
       },
 
@@ -1769,6 +1795,7 @@ export const useLedger = create<LedgerState>()(
           dreams: data.dreams ?? [],
           aiTypeRules: data.aiTypeRules ?? [],
           fixedDeposits: data.fixedDeposits ?? [],
+          assetFlows: data.assetFlows ?? [],
           seeded: true
         }))
       }

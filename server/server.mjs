@@ -886,7 +886,8 @@ const server = createServer(async (req, res) => {
         } catch { return undefined }
       }
       if (ratesCache && now - ratesCache.at < 6 * 3600_000) {
-        const extra = await baseRateFromFallback(base)
+        const cachedBase = base === 'CNY' ? 1 : ratesCache.data.rates?.[base]
+        const extra = Number.isFinite(cachedBase) && cachedBase > 0 ? undefined : await baseRateFromFallback(base)
         const out0 = toBase(ratesCache.data, base, extra)
         return out0 ? ok(res, out0) : fail(res, `获取汇率信息失败：缺少本位币 ${base} 的基准价`)
       }

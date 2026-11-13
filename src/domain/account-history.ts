@@ -1,4 +1,4 @@
-import type { Asset, Bill, Category, Lend, Refund, Reimbursement, Transfer } from '../types'
+import type { Asset, AssetFlow, Bill, Category, Lend, Refund, Reimbursement, Transfer } from '../types'
 
 export interface AccountEntry {
   key: string
@@ -7,12 +7,13 @@ export interface AccountEntry {
   delta: number
   label: string
   detail?: string
-  kind: 'bill' | 'transfer' | 'lend' | 'refund' | 'reimbursement'
+  kind: 'bill' | 'transfer' | 'lend' | 'refund' | 'reimbursement' | 'flow'
   balance?: number
 }
 
 export interface AccountHistoryInput {
   asset: Asset
+  assetFlows?: AssetFlow[]
   bills: Bill[]
   transfers: Transfer[]
   lends: Lend[]
@@ -74,6 +75,12 @@ export function accountHistory(input: AccountHistoryInput): { entries: AccountEn
   for (const r of reimbursements) {
     if (r.assetId !== asset.assetId || r.status !== 'done') continue
     entries.push({ key: 'm' + String(r.reimbursementId), time: r.settledAt ?? r.updateTime ?? 0, delta: r.number, label: '报销到账', detail: r.detail, kind: 'reimbursement' })
+  }
+
+  // 一木的资产流水（新增定存 / 删除定存等）
+  for (const f of (input.assetFlows ?? [])) {
+    if (f.assetId !== asset.assetId) continue
+    entries.push({ key: 'f' + String(f.flowId), time: f.time, delta: f.delta, label: f.reason, kind: 'flow' })
   }
 
   entries.sort((a, b) => a.time - b.time)

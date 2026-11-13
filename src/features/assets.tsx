@@ -73,6 +73,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
   const allAssetsParents = useLedger((s) => s.parentCategories)
   const transfers = useLedger((s) => s.transfers)
   const refunds = useLedger((s) => s.refunds)
+  const assetFlows = useLedger((s) => s.assetFlows ?? [])
   const reimbursements = useLedger((s) => s.reimbursements)
   const [historyAsset, setHistoryAsset] = useState<Asset | null>(null)
   const [repayForm, setRepayForm] = useState<{ lendId: number; remaining: number; amount: string; assetId: number } | null>(null)
@@ -328,7 +329,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
 
       {historyAsset && (() => {
         const { entries, opening } = accountHistory({
-          asset: historyAsset, bills, transfers, lends, refunds, reimbursements, parents: allAssetsParents
+          asset: historyAsset, assetFlows, bills, transfers, lends, refunds, reimbursements, parents: allAssetsParents
         })
         let running = opening
         return (

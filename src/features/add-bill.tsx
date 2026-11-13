@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLedger } from '../store'
 import { useSpeech } from '../ui/use-speech'
+import { lendRemaining } from '../lend'
 import { accountMoney, currencySymbol, findCurrency, hasCurrencyRate, toBase } from '../money'
 import { money, toLocalInput } from '../ui-format'
 import { CatIcon } from '../ui/icons'
@@ -43,6 +44,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
   // 债务模式（一木 AddBillActivity 的债务 tab：借出/借入/收款/还款）
   const [debtType, setDebtType] = useState<1 | 2 | 3 | 4>(1)
   const [counterparty, setCounterparty] = useState('')
+  const [parentLendId, setParentLendId] = useState<number | ''>('')
   const [cost, setCost] = useState('')
   // 语音记账：识别文本取第一个数字当金额，其余作为备注（一木 SpeechActivity 同类行为）
   // 备注变更统一入口：移动端与桌面端共用（避免只在桌面分支生效）
@@ -86,6 +88,11 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
   const [remark, setRemark] = useState('')
   const aiTypeRules = useLedger((s) => s.aiTypeRules ?? [])
   const addLend = useLedger((s) => s.addLend)
+  const repayLend = useLedger((s) => s.repayLend)
+  const lends = useLedger((s) => s.lends)
+  // 收款对应「有未收余额的借出」，还款对应「有未还余额的借入」
+  const openLends = lends.filter((l) => (debtType === 2 ? l.type === 1 : debtType === 4 ? l.type === 3 : false)
+    && lendRemaining(l, lends) > 0)
   const [time, setTime] = useState(toLocalInput(Date.now()))
   const [keypadOpen, setKeypadOpen] = useState(true)
   const [keypadField, setKeypadField] = useState<'cost' | 'fee' | 'toCost'>('cost')
@@ -129,9 +136,21 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
     if (String(curBookId) === '0') return fail('请先选择一个具体账本')
 
     if (mode === 'debt') {
+      const typeMap: Record<1 | 2 | 3 | 4, string> = { 1: '资金借出', 2: '收款', 3: '资金借入', 4: '还款' }
+      // 收款/还款必须选中原债务（一木会提示「请选择债务」）
+      if (debtType === 2 || debtType === 4) {
+        if (!parentLendId) return fail('请选择债务')
+        const parent = lends.find((l) => l.lendId === parentLendId)
+        if (!parent || lendRemaining(parent, lends) <= 0) return fail('该债务已结清')
+        if (v > lendRemaining(parent, lends)) return fail('金额超过未结余额')
+        if (!aid) return fail('请选择账户')
+        repayLend({ lendId: parent.lendId, amount: v, repaymentAssetId: aid, time: Date.now() })
+        notify(`${typeMap[debtType]} ${money(v)} 已记录，剩余 ${money(lendRemaining(parent, lends) - v)}`)
+        setCost(''); setParentLendId('')
+        return true
+      }
       if (!counterparty.trim()) return fail('请选择债务')
       if (!aid) return fail('请选择账户')
-      const typeMap: Record<1 | 2 | 3 | 4, string> = { 1: '资金借出', 2: '收款', 3: '资金借入', 4: '还款' }
       addLend({
         type: debtType, assetId: aid, counterparty: counterparty.trim(), number: v,
         time: Date.now(), remark: `${typeMap[debtType]}-${assets.find((a) => a.assetId === aid)?.assetName ?? ''}`
@@ -233,7 +252,27 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
         </div>
 
         <div className="entry-scroll">
-          {mode === 'transfer' ? <div className="entry-transfer">
+          {mode === 'debt' ? <div className="entry-transfer">
+            <div className="label">债务类型</div>
+            <div className="seg">
+              {([1, 3, 2, 4] as const).map((t) => (
+                <button key={t} type="button" className={debtType === t ? 'on' : ''} onClick={() => { setDebtType(t); setParentLendId('') }}>
+                  {t === 1 ? '资金借出' : t === 3 ? '资金借入' : t === 2 ? '收款' : '还款'}
+                </button>
+              ))}
+            </div>
+            {(debtType === 2 || debtType === 4) ? (
+              <div className="entry-transfer-field">
+                <span>债务</span>
+                <MobilePicker label="选择债务" value={String(parentLendId)}
+                  options={[{ value: '', label: '请选择债务' }, ...openLends.map((l) => ({ value: String(l.lendId), label: `${l.counterparty || '未填对方'} · 未结 ${money(lendRemaining(l, lends))}` }))]}
+                  onChange={(value) => setParentLendId(value ? Number(value) : '')} />
+              </div>
+            ) : (
+              <label>对方<input value={counterparty} placeholder="对方名称" onChange={(e) => setCounterparty(e.target.value)} /></label>
+            )}
+            <div className="entry-transfer-field"><span>账户</span><MobilePicker label="选择账户" value={String(aid)} options={assetOptions} onChange={(value) => setAid(Number(value))} /></div>
+          </div> : mode === 'transfer' ? <div className="entry-transfer">
             <div className="entry-transfer-field"><span>转出账户</span><MobilePicker label="选择转出账户" value={String(aid)} options={assetOptions} onChange={(value) => setAid(Number(value))} /></div>
             <div className="entry-transfer-arrow">↓</div>
             <div className="entry-transfer-field"><span>转入账户</span><MobilePicker label="选择转入账户" value={String(toAid)} options={assetOptions} onChange={(value) => setToAid(Number(value))} /></div>
@@ -444,8 +483,25 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
               </button>
             ))}
           </div>
-          <div className="label">债务</div>
-          <input aria-label="债务" value={counterparty} placeholder="对方名称" onChange={(e) => setCounterparty(e.target.value)} />
+          {(debtType === 2 || debtType === 4) ? (
+            <>
+              <div className="label">债务</div>
+              <select aria-label="债务" value={parentLendId} onChange={(e) => setParentLendId(e.target.value ? Number(e.target.value) : '')}>
+                <option value="">请选择债务</option>
+                {openLends.map((l) => (
+                  <option key={l.lendId} value={l.lendId}>
+                    {l.counterparty || '未填对方'} · 未结 {money(lendRemaining(l, lends))}
+                  </option>
+                ))}
+              </select>
+              {openLends.length === 0 && <p className="hint">没有未结清的债务。</p>}
+            </>
+          ) : (
+            <>
+              <div className="label">债务</div>
+              <input aria-label="债务" value={counterparty} placeholder="对方名称" onChange={(e) => setCounterparty(e.target.value)} />
+            </>
+          )}
         </div>
       )}
 

@@ -46,7 +46,8 @@ export const KIND_MAP: Record<string, [string, string]> = {
   billRelated: ['billRelated', 'relatedId'],
   dream: ['dreams', 'dreamId'],
   aiType: ['aiTypeRules', 'ruleId'],
-  fixedDeposit: ['fixedDeposits', 'depositId']
+  fixedDeposit: ['fixedDeposits', 'depositId'],
+  assetFlow: ['assetFlows', 'flowId']
 }
 
 type Entity = Record<string, unknown>

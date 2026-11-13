@@ -571,6 +571,20 @@ export interface Category {
   updateTime?: number
 }
 
+/** 一木资产流水（AssetHistory）：非账单类余额变动，如定存累加/扣回 */
+export interface AssetFlow {
+  flowId: number
+  assetId: number
+  /** 变动金额，正=增加、负=减少 */
+  delta: number
+  /** 一木用固定文案，如「新增定存」「删除定存」 */
+  reason: string
+  time: number
+  bookId?: string | number
+  ownerId?: number
+  updateTime?: number
+}
+
 export interface Transfer {
   /** 归属账本：共享账本里的事务 */
   bookId?: string | number

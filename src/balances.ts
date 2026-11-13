@@ -1,8 +1,10 @@
-import type { Asset, Bill, Category, Lend, Refund, Reimbursement, Transfer } from './types'
+import type { Asset, AssetFlow, Bill, Category, Lend, Refund, Reimbursement, Transfer } from './types'
 
 /** The amounts follow the legacy account-balance rules, including linked fee bills. */
 export interface BalanceData {
   assets: Asset[]
+  /** 资产流水（定存等非账单变动） */
+  assetFlows?: AssetFlow[]
   bills: Bill[]
   transfers: Transfer[]
   lends: Lend[]
@@ -43,6 +45,8 @@ export function movements(data: BalanceData): Map<number, number> {
   for (const reimbursement of data.reimbursements || []) {
     if (reimbursement.status === 'done') add(reimbursement.assetId, reimbursement.number)
   }
+  // 一木的资产流水（如定存累加/扣回）直接参与余额推导
+  for (const flow of data.assetFlows || []) add(flow.assetId, flow.delta)
   return result
 }
 

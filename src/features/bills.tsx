@@ -9,6 +9,7 @@ import { parseShares, splitAmounts } from '../domain/split'
 import { AssetIcon, CatIcon } from '../ui/icons'
 import { TransferEditor } from './transfer-editor'
 import { Modal } from '../ui/modal'
+import { billNetAmount } from '../bill-amount'
 import { FilteredBills } from './filtered-bills'
 import { accountMoney, fromBase, hasCurrencyRate } from '../money'
 import { resolveBillChild } from '../taxonomy'
@@ -371,7 +372,7 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
                   {(b.discountNumber ?? 0) > 0 && (
                     <s className="old-cost">{money(+(b.cost + (b.discountNumber ?? 0)).toFixed(2))}</s>
                   )}
-                  <b className={inc ? 'in' : 'out'}>{inc ? '+' : '-'}{money(b.cost)}</b>
+                  <b className={inc ? 'in' : 'out'}>{inc ? '+' : '-'}{money(inc ? b.cost : billNetAmount(b, refunds))}</b>
                 </span>
                 <div className="ledger-actions">
                   <button className="link" aria-label={`查看${p?.name ?? '账单'}明细`} onClick={() => setDetail(b)}>明细</button>
@@ -500,7 +501,7 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
             <div className="ds">{dayOf(bill.time)} {hhmm(bill.time)}</div>
             {bill.remark && <div className="ds">{bill.remark}</div>}
           </div>
-          <div className="damt">{isIncome ? '+' : '-'}{money(bill.cost)}</div>
+          <div className="damt">{isIncome ? '+' : '-'}{money(isIncome ? bill.cost : billNetAmount(bill, refunds))}</div>
           <button type="button" className="detail-close" aria-label="关闭账单详情" onClick={onClose}>×</button>
         </div>
 
