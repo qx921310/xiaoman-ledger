@@ -680,26 +680,31 @@ export const useLedger = create<LedgerState>()(
         if (!tpl) return false
         if (tpl.mode === 'transfer' && tpl.transfer) {
           // 与账单模板同口径：账本不一致、账户失效、金额非法都拒绝
-          if (tpl.bookId != null && s.currentBookId !== 0 && String(tpl.bookId) !== String(s.currentBookId)) return false
+          if (tpl.bookId != null && tpl.bookId !== 0 && s.currentBookId !== 0 && String(tpl.bookId) !== String(s.currentBookId)) return false
           const tr = tpl.transfer
           if (!tr.fromAssetId || !tr.toAssetId) return false
           if (!s.assets.some((a) => a.assetId === tr.fromAssetId) || !s.assets.some((a) => a.assetId === tr.toAssetId)) return false
           if (!(Number(tr.cost) > 0)) return false
-          get().addTransfer({ ...tr, time: Date.now(), bookId: tpl.bookId ?? (s.currentBookId === 0 ? undefined : s.currentBookId) })
+          const trTplBook = tpl.bookId === 0 ? undefined : tpl.bookId
+          const trBook = trTplBook ?? (s.currentBookId === 0 ? undefined : s.currentBookId)
+          if (trBook == null) return false        // 与账单模板同口径：账本不可解析就拒绝
+          get().addTransfer({ ...tr, time: Date.now(), bookId: trBook })
           return true
         }
         if (tpl.mode === 'bill' && tpl.bill) {
           const b = tpl.bill
           // 模板所属账本与当前账本不一致时拒绝：避免把 A 账本的模板记到 B 账本
-          if (tpl.bookId != null && s.currentBookId !== 0 && String(tpl.bookId) !== String(s.currentBookId)) return false
+          if (tpl.bookId != null && tpl.bookId !== 0 && s.currentBookId !== 0 && String(tpl.bookId) !== String(s.currentBookId)) return false
           if (s.assets.length === 0) return false         // 没有账户就不能记
-          if (b.assetId && !s.assets.some((a) => a.assetId === b.assetId)) return false  // 账户已删除
+          const wantedAsset = b.assetId != null && b.assetId !== 0 ? b.assetId : undefined
+          if (wantedAsset != null && !s.assets.some((a) => a.assetId === wantedAsset)) return false  // 账户已删除
           if (!(Number(b.cost) > 0)) return false         // 金额非法
           // 账本必须能解析：模板自身账本优先，其次当前账本；都无则拒绝（不写 bookId=0）
-          const targetBook = tpl.bookId ?? (s.currentBookId === 0 ? undefined : s.currentBookId)
+          const tplBook = tpl.bookId === 0 ? undefined : tpl.bookId
+          const targetBook = tplBook ?? (s.currentBookId === 0 ? undefined : s.currentBookId)
           if (targetBook == null) return false
           get().addBill({
-            assetId: b.assetId ?? s.assets[0]?.assetId ?? 0,
+            assetId: wantedAsset ?? s.assets[0]!.assetId,
             parentCategoryId: b.parentCategoryId ?? 7,
             childCategoryId: b.childCategoryId ?? 0,
             cost: Number(b.cost) || 0,

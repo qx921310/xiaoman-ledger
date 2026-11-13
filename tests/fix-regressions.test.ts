@@ -126,6 +126,23 @@ test('模板：无账户或账本不可解析时拒绝', () => {
   assert.equal(String(bill!.bookId), '1', '账单必须落到模板账本')
 })
 
+test('模板：assetId=0 回退到第一个账户；转账模板账本不可解析时拒绝', () => {
+  reset()
+  useLedger.setState({ currentBookId: 1, assets: [
+    { assetId: 10, assetName: '现金', assetNumber: 0, assetType: 1 },
+    { assetId: 11, assetName: '储蓄', assetNumber: 0, assetType: 1 }
+  ] } as never)
+  const tpl = st().addTemplate({ name: '默认账户', mode: 'bill', bill: { assetId: 0, parentCategoryId: 7, cost: 30 } } as never)
+  assert.equal(st().applyTemplate(tpl.templateId), true)
+  const bill = st().bills.find((b) => b.cost === 30)
+  assert.equal(bill!.assetId, 10, 'assetId=0 应回退第一个账户而不是写 0')
+
+  useLedger.setState({ currentBookId: 0 } as never)   // 全部账本视图
+  const trTpl = st().addTemplate({ name: '转账模板', mode: 'transfer', transfer: { fromAssetId: 10, toAssetId: 11, cost: 50 } } as never)
+  // 模板自身没有 bookId，且当前是全部账本 → 应拒绝而不是产生无账本转账
+  assert.equal(st().applyTemplate(trTpl.templateId), false)
+})
+
 test('生效账本：空数组=全部隐藏，未设置=全部可见', () => {
   const base = { assetId: 1, assetName: '现金', assetNumber: 0, assetType: 1, bookId: 1 } as never
   assert.equal(visibleAssets([base], 1, 1).length, 1, '未设置 showBook 时按账本归属：A 账本可见')
