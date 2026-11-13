@@ -85,7 +85,7 @@ export function BudgetManager({ onBack, notify }: { onBack: () => void; notify: 
       map.set(day, +((map.get(day) ?? 0) + billNetAmount(b, refunds)).toFixed(2))
     }
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]))
-    // eslint-disable-next-line
+
   }, [inRange, parents, refunds])
 
   const maxDay = Math.max(1, ...trend.map(([, v]) => v))

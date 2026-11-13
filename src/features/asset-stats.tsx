@@ -38,7 +38,7 @@ export function AssetStats({ onBack }: { onBack: () => void }) {
       parents, currencies, defaultCurrency
     }, now - 29 * 86400000, now)
     return pts.map((p) => ({ day: p.key.slice(5), value: p.value }))
-    // eslint-disable-next-line
+
   }, [assets, bills, transfers, lends, refunds, reimbursements, assetFlows, parents, currencies, defaultCurrency])
 
   const maxV = Math.max(...trend.map((d) => d.value), 1)
@@ -51,7 +51,7 @@ export function AssetStats({ onBack }: { onBack: () => void }) {
       map.set(a.assetType, +((map.get(a.assetType) ?? 0) + a.assetNumber * rateOf(a.currency)).toFixed(2))
     }
     return [...map.entries()].sort((a, b) => b[1] - a[1])
-    // eslint-disable-next-line
+
   }, [assets, currencies, defaultCurrency])
 
   // 理财统计：投资类账户（4 投资理财 / 11 理财账户）合计

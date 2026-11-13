@@ -76,7 +76,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
     const to = Date.now()
     return assetTrendOf({ assets, bills, transfers, lends, refunds, reimbursements, assetFlows, parents, currencies, defaultCurrency }, from, to)
       .map((p: { key: string; value: number }) => ({ label: p.key.slice(5), 净值: p.value }))
-    // eslint-disable-next-line
+
   }, [rangeBills, assets, bills, transfers, lends, refunds, reimbursements, assetFlows, parents, currencies, defaultCurrency])
 
   const daySeries = useMemo(() => {
