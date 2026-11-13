@@ -166,6 +166,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
     : autoSync?.pending ? '待同步'
     : autoSync?.lastOkAt ? new Date(autoSync.lastOkAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
     : '尚未同步'
+  const [rateBusy, setRateBusy] = useState(false)
   const setBudget = useLedger((s2) => s2.setBudget)
   const pull = usePullRefresh(async () => setHiddenOpen(true), 64,
     { pulling: '下拉进入隐藏内容', released: '松开进入隐藏内容', busy: '正在打开…' },
@@ -1369,6 +1370,27 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       </div>
 
       <h3>币种与汇率</h3>
+      <div className="row">
+        <span className="grow" />
+        <button type="button" className="link" disabled={rateBusy} onClick={async () => {
+          setRateBusy(true)
+          try {
+            const res = await fetch('/api/rates', { credentials: 'same-origin' })
+            const json = await res.json()
+            if (json.code !== 0) throw new Error(json.msg || '获取汇率信息失败')
+            const rates: Record<string, number> = json.result?.rates ?? {}
+            let n = 0
+            for (const c of useLedger.getState().currencies) {
+              if (c.code === defaultCurrency) continue
+              const v = rates[c.code]
+              if (Number.isFinite(v) && v > 0) { setCurrencyRate(c.code, v); n++ }
+            }
+            notify(n > 0 ? `已更新 ${n} 个币种汇率（${json.result?.date ?? ''}）` : '获取汇率信息失败')
+          } catch (e) {
+            notify(e instanceof Error ? e.message : '获取汇率信息失败')
+          } finally { setRateBusy(false) }
+        }}>{rateBusy ? '刷新中…' : '刷新汇率'}</button>
+      </div>
       <p className="hint">
         汇率含义：1 单位该币种 = 多少 {defaultCurrency}。记账时选外币会自动折算成本币入账。
       </p>

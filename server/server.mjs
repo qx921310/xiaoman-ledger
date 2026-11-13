@@ -315,6 +315,7 @@ function redactPrivateSnapshot(kind, payload, ownerId, bookId, viewerId) {
 const emailOk = (v) => typeof v === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
 // 写接口默认关闭：只有设置了 LEDGER_WRITE_TOKEN 且请求带 x-write-token 才允许写入。
 // 记账数据本来只存浏览器本地，服务端只是可选同步点，公开部署不该留匿名写入口。
+let ratesCache = null
 const WRITE_TOKEN = process.env.LEDGER_WRITE_TOKEN || ''
 const DIST = join(here, '..', 'dist')
 
@@ -855,6 +856,59 @@ const server = createServer(async (req, res) => {
       } catch (e) {
         return fail(res, '识别失败：' + (e?.message || '网络错误'))
       }
+    }
+
+    // 汇率：优先中国外汇交易中心（CFETS）人民币中间价，失败回退开放汇率 API
+    // 缓存 6 小时，避免每次进入页面都打外部接口
+    if (path === '/api/rates' && req.method === 'GET') {
+      const u = currentUser(req)
+      if (!u) return fail(res, '请先登录', 401)
+      const now = Date.now()
+      if (ratesCache && now - ratesCache.at < 6 * 3600_000) return ok(res, ratesCache.data)
+      const wanted = { USD: 'USD/CNY', EUR: 'EUR/CNY', GBP: 'GBP/CNY', HKD: 'HKD/CNY', AUD: 'AUD/CNY', CAD: 'CAD/CNY', SGD: 'SGD/CNY', CHF: 'CHF/CNY', '100JPY': '100JPY/CNY' }
+      const out = {}
+      let source = ''
+      let date = ''
+      try {
+        const end = new Date(); const start = new Date(end.getTime() - 6 * 86400_000)
+        const fmt = (d) => d.toISOString().slice(0, 10)
+        const list = Object.values(wanted).join(',')
+        const url = `https://www.chinamoney.com.cn/ags/ms/cm-u-bk-ccpr/CcprHisNew?startDate=${fmt(start)}&endDate=${fmt(end)}&currency=${encodeURIComponent(list)}&pageNum=1&pageSize=10`
+        const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' } })
+        const raw = await r.json()
+        const rows = raw?.records ?? []
+        const keys = String(raw?.data?.head ?? '').split(',')
+        if (r.ok && rows.length) {
+          const rec = rows[0]
+          date = rec.date
+          // 返回的 values 与 head 列顺序对应；JPY 以 100 为单位
+          const head = Array.isArray(raw?.data?.head) ? raw.data.head : keys
+          head.forEach((h, i) => {
+            const value = Number(rec.values?.[i])
+            if (!Number.isFinite(value) || value <= 0) return
+            const code = String(h).replace('/CNY', '').replace('100', '')
+            out[code] = h.startsWith('100') ? +(value / 100).toFixed(6) : value
+          })
+          source = 'cfets'
+        }
+      } catch { /* 走兜底 */ }
+      if (!Object.keys(out).length) {
+        try {
+          const r = await fetch('https://open.er-api.com/v6/latest/CNY', { headers: { 'User-Agent': 'xiaoman-ledger' } })
+          const raw = await r.json()
+          const rates = raw?.rates ?? {}
+          for (const code of Object.keys(wanted)) {
+            const per = Number(rates[code.replace('100', '')])
+            if (Number.isFinite(per) && per > 0) out[code.replace('100', '')] = +(1 / per).toFixed(6)
+          }
+          date = new Date().toISOString().slice(0, 10)
+          if (Object.keys(out).length) source = 'er-api'
+        } catch { /* 两个源都失败 */ }
+      }
+      if (!Object.keys(out).length) return fail(res, '获取汇率信息失败')
+      const data = { source, date, fetchedAt: now, rates: out }
+      ratesCache = { at: now, data }
+      return ok(res, data)
     }
 
     // 附件上传：鉴权后写入 server/data/uploads，返回可访问路径
