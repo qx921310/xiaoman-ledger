@@ -12,6 +12,7 @@ import { HiddenPage } from './hidden-page'
 import { DreamList } from './dream'
 import { AiTypeManager } from './ai-type'
 import { Guide } from './guide'
+import { BillFiles } from './bill-files'
 import { BookManager } from './books'
 import { FilteredBills } from './filtered-bills'
 import { TemplateList } from './templates'
@@ -124,6 +125,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [guideOpen, setGuideOpen] = useState(false)
   const [tplOpen, setTplOpen] = useState(false)
   const [booksOpen, setBooksOpen] = useState(false)
+  const [filesOpen, setFilesOpen] = useState(false)
   const [cycleDrill, setCycleDrill] = useState<{ title: string; cycleId: string | number } | null>(null)
   const [backupOpen, setBackupOpen] = useState(false)
   // 一木 UserInfoActivity：昵称与头像可改（本地保存，账号维度）
@@ -151,9 +153,6 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
     return n
   }, [bills])
 
-  const attachments = useMemo(() => bills.flatMap((b) =>
-    (b.files ?? []).map((f) => ({ key: `${b.billId}-${f.remotePath}`, name: f.name, url: f.remotePath, day: fullDay(b.time) }))
-  ), [bills])
 
   const attachmentCount = useMemo(
     () => bills.reduce((n, b) => n + (b.files?.length ?? 0), 0),
@@ -476,6 +475,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       {guideOpen && <Guide onBack={() => setGuideOpen(false)} />}
       {tplOpen && <TemplateList onBack={() => setTplOpen(false)} onAdd={() => { setTplOpen(false); notify('请到记账页点「存为模板」') }} notify={notify} />}
       {booksOpen && <BookManager notify={notify} onBack={() => setBooksOpen(false)} />}
+      {filesOpen && <BillFiles notify={notify} onBack={() => setFilesOpen(false)} />}
 
       {profileOpen && (
         <Modal label="个人资料" onClose={() => setProfileOpen(false)}>
@@ -575,21 +575,10 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       </div>
 
       <h3>账单文件</h3>
-      {attachmentCount === 0 && <p className="hint">还没有附件。</p>}
-      {attachmentCount > 0 && (
-        <>
-          <p className="hint">仅保留 30 天，到期销毁；导出备份不含附件文件。</p>
-          <div className="my-files">
-            {attachments.map((f) => (
-              <a key={f.key} className="row my-file" href={f.url} target="_blank" rel="noreferrer">
-                <span className="grow">{f.name}</span>
-                <span className="muted">{f.day}</span>
-              </a>
-            ))}
-          </div>
-        </>
-      )}
-
+      <div className="row">
+        <span className="grow">{attachmentCount === 0 ? '还没有附件' : `共 ${attachmentCount} 个附件`}</span>
+        <button type="button" className="link" onClick={() => setFilesOpen(true)}>查看账单图片</button>
+      </div>
       <h3>从其他记账软件迁移</h3>
       <p className="hint">
         支持 <b>一木记账导出的 Excel/CSV</b>（表头含 日期/收支类型/金额/类别/二级分类/账户）、
