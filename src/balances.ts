@@ -11,6 +11,8 @@ export interface BalanceData {
   refunds: Refund[]
   reimbursements: Reimbursement[]
   parentCategories: Category[]
+  /** 查询某币种对本位币的汇率（缺失时按 1 处理） */
+  currencyRate?: (code: string) => number
 }
 
 const round = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100
@@ -43,7 +45,12 @@ export function movements(data: BalanceData): Map<number, number> {
     if (bill) add(refund.assetId ?? bill.assetId, refund.number)
   }
   for (const reimbursement of data.reimbursements || []) {
-    if (reimbursement.status === 'done') add(reimbursement.assetId, reimbursement.number)
+    if (reimbursement.status === 'done') {
+      // 报销金额记本位币；入账到外币账户时按该账户币种折算
+      const asset = (data.assets || []).find((a) => a.assetId === reimbursement.assetId)
+      const rate = !asset?.currency ? 1 : (data.currencyRate?.(asset.currency) ?? 1)
+      add(reimbursement.assetId, reimbursement.number / rate)
+    }
   }
   // 一木的资产流水（如定存累加/扣回）直接参与余额推导
   for (const flow of data.assetFlows || []) add(flow.assetId, flow.delta)

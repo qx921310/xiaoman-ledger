@@ -53,7 +53,10 @@ export const KIND_MAP: Record<string, [string, string]> = {
 type Entity = Record<string, unknown>
 
 const idOf = (kind: string, item: Entity) =>
-  kind === 'budget' ? `${item.month}:${item.categoryId}` : kind === 'bill' ? String(item.syncId ?? item.billId) : String(item[KIND_MAP[kind][1]])
+  kind === 'budget'
+    ? ((item.type ?? 'month') === 'custom' && item.budgetId != null
+        ? `custom:${item.budgetId}`
+        : `${item.type ?? 'month'}:${item.month}:${item.categoryId}`) : kind === 'bill' ? String(item.syncId ?? item.billId) : String(item[KIND_MAP[kind][1]])
 
 export function collectRecords(): SyncRecord[] {
   const s = useLedger.getState() as unknown as Record<string, Entity[]> & { tombstones?: Array<Record<string, unknown>> }

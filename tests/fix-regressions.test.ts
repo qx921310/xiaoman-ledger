@@ -216,6 +216,7 @@ test('切账号时不会把上一个账号的资产流水带过来（跨账号�
   if (process.env.DBG_SCOPE) console.log('[dbg] assets=', JSON.stringify(st().assets), 'flows=', JSON.stringify(st().assetFlows))
   const asset = st().assets.find((a) => a.assetId === 10)
   assert.equal(asset?.assetNumber, 100, '账号 2 余额应为 100，不得被上一账号流水抬高')
+  assert.equal(asset?.openingBalance, 100, '期初也必须重算为 100，不能写成 600')
   assert.equal(st().defaultCurrency, 'CNY', '新账号的默认币种不应继承上一账号')
 })
 
@@ -282,7 +283,8 @@ test('账本「隐藏所有分类」是一次性动作：把所有分类加入�
   st().hideAllCategoriesForBook(1)
   assert.equal(st().parentCategories.filter((p) => (p.hideBook ?? []).map(String).includes('1')).length, before,
     '所有父分类都应在本账本隐藏')
-  assert.ok(st().childCategories.every((c) => c.hide === true), '子分类一并隐藏')
+  assert.ok(st().childCategories.every((c) => (c.hideBook ?? []).map(String).includes('1')),
+    '子分类只在本账本隐藏，不改全局 hide')
   // 账本本身不保存这个开关（一木 AccountBook 没有该字段）
   st().updateBookMeta('1', { showTransfer: false })
   assert.equal((st().accountBooks.find((b) => String(b.bookId) === '1') as { hideAllCategory?: boolean }).hideAllCategory, undefined)

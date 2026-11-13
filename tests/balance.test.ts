@@ -179,8 +179,9 @@ assert.equal(state().bills.find((b) => b.billId === refundedBill.billId)?.reimbu
 state().addReimbursement({ billId: refundedBill.billId, assetId: 31, number: refundedBill.cost })
 assert.equal(state().reimbursements.length, 2)
 assert.equal(balance(31), 100)
+// 报销账户是美元：5 元人民币按汇率 8 入账，只能加 0.63 美元（不是 105）
 state().settleReimbursement(state().reimbursements[0].reimbursementId)
-assert.equal(balance(31), 105)
+assert.equal(balance(31), 100.63)
 // 撤销单笔后累计值按剩余重算，而不是清零
 state().deleteReimbursement(state().reimbursements[0].reimbursementId)
 assert.equal(balance(31), 100)

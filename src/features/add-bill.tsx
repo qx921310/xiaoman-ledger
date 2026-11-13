@@ -19,9 +19,10 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
   const allParents = useLedger((s) => s.parentCategories)
   const allChildren = useLedger((s) => s.childCategories)
   // 隐藏分类：记账时不显示（一木 hide / hideBook）
-  const parents = allParents
-    .filter((p) => !p.hide || (p.hideBook?.length
-      ? !p.hideBook.some((b) => String(b) === String(curBookId)) : false))
+  // 一木：分类隐藏 = 全局 hide，或 hideBook 命中当前账本（两者都不可见）
+  const hiddenForBook = (c: { hide?: boolean; hideBook?: Array<string | number> }) =>
+    !!c.hide || (c.hideBook ?? []).some((b) => String(b) === String(curBookId))
+  const parents = allParents.filter((p) => !hiddenForBook(p))
 
   const children = allChildren.filter((c) => !c.hide)
   const allAssets = useLedger((s) => s.assets)

@@ -4,35 +4,9 @@ import { books as bookApi } from '../auth'
 import { Modal } from '../ui/modal'
 import { HiddenPage } from './hidden-page'
 import { CatIcon } from '../ui/icons'
+import { queueBookPatch, clearBookPatch, flushBookPatches } from './book-pending'
 
 // 账本图标候选（一木 activity_add_account_book 的 icon_layout；这里用自有图标集）
-const PENDING_KEY = 'xiaoman-book-pending'
-
-/** 离线时把账本改动排队，下次进入账本页自动补传 */
-const queuePending = (bookId: string, patch: Record<string, unknown>) => {
-  try {
-    const raw = localStorage.getItem(PENDING_KEY)
-    const all = raw ? JSON.parse(raw) as Record<string, Record<string, unknown>> : {}
-    all[bookId] = { ...(all[bookId] ?? {}), ...patch }
-    localStorage.setItem(PENDING_KEY, JSON.stringify(all))
-  } catch { /* 存储不可用则放弃补传 */ }
-}
-const PENDING_FLUSH_EVENT = 'xiaoman-book-flush'
-/** 任何地方都可以触发补传（登录后、联网时、进入账本页） */
-export const flushBookPending = () => { void flushPending() }
-export const notifyBookFlush = () => window.dispatchEvent(new Event(PENDING_FLUSH_EVENT))
-
-const flushPending = async () => {
-  let all: Record<string, Record<string, unknown>> = {}
-  try { all = JSON.parse(localStorage.getItem(PENDING_KEY) ?? '{}') as typeof all } catch { return 0 }
-  let done = 0
-  for (const [bookId, patch] of Object.entries(all)) {
-    try { await bookApi.update(bookId, patch as never); delete all[bookId]; done++ } catch { /* 下次再试 */ }
-  }
-  try { localStorage.setItem(PENDING_KEY, JSON.stringify(all)) } catch { /* 忽略 */ }
-  return done
-}
-
 const BOOK_ICONS = ['ic_parent_daily', 'ic_parent_food', 'ic_parent_traffic', 'ic_parent_shopping',
   'ic_parent_home', 'ic_parent_fun', 'ic_parent_medical', 'ic_parent_education']
 
@@ -53,16 +27,7 @@ export function BookManager({ notify, onBack }: { notify: (m: string) => void; o
   const [editing, setEditing] = useState<null | { bookId: string | number; name: string; icon: string; showTransfer: boolean; showStock: boolean; hideAllCategory: boolean }>(null)
   const [newIcon, setNewIcon] = useState(BOOK_ICONS[0])
   const [hidePage, setHidePage] = useState(false)
-  useEffect(() => {
-    const run = () => { void flushPending() }
-    run()
-    window.addEventListener(PENDING_FLUSH_EVENT, run)
-    window.addEventListener('online', run)
-    return () => {
-      window.removeEventListener(PENDING_FLUSH_EVENT, run)
-      window.removeEventListener('online', run)
-    }
-  }, [])
+  useEffect(() => { void flushBookPatches() }, [])
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
 
@@ -83,22 +48,15 @@ export function BookManager({ notify, onBack }: { notify: (m: string) => void; o
       setEditing((prev) => prev ? { ...prev, hideAllCategory: false } : prev)
     }
     updateBookMeta(editing.bookId, patch)
+    const serverBook = books.find((b) => String(b.bookId) === String(editing.bookId))
     try {
-      const serverBook = books.find((b) => String(b.bookId) === String(editing.bookId))
       await bookApi.update(String(editing.bookId), {
         name: patch.accountBookName, icon: patch.icon,
         showTransfer: patch.showTransfer, showStock: patch.showStock,
         baseUpdatedAt: serverBook?.updateTime ?? null
       })
       // 已成功落库：清掉该账本的离线待补，避免旧值之后覆盖新值
-      try {
-        const raw = localStorage.getItem(PENDING_KEY)
-        if (raw) {
-          const all = JSON.parse(raw) as Record<string, unknown>
-          delete all[String(editing.bookId)]
-          localStorage.setItem(PENDING_KEY, JSON.stringify(all))
-        }
-      } catch { /* 忽略 */ }
+      clearBookPatch(String(editing.bookId))
     } catch (e) {
       const msg = e instanceof Error ? e.message : ''
       if (msg.includes('其他设备')) {
@@ -106,11 +64,11 @@ export function BookManager({ notify, onBack }: { notify: (m: string) => void; o
         setEditing(null)
         return
       }
-      // 离线：本地已生效，排队等联网后补传，避免被服务端旧值覆盖
-      queuePending(String(editing.bookId), {
+      // 离线：本地已生效；入队时带上当前服务端版本，补传时同样经过并发校验
+      queueBookPatch(String(editing.bookId), {
         name: patch.accountBookName, icon: patch.icon,
         showTransfer: patch.showTransfer, showStock: patch.showStock
-      })
+      }, serverBook?.updateTime ?? null)
       notify('已本地保存，联网后自动同步')
     }
     notify('账本已更新')

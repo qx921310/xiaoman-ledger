@@ -34,6 +34,18 @@ test('区间外发生的转账也会影响走势（旧实现只减区间内账�
   assert.ok(pts.every((p) => p.value === 500), '区间内没有新变动，走势应保持 500')
 })
 
+test('手续费已有独立账单时不重复扣减', () => {
+  const assets = [{ assetId: 1, assetNumber: 90, assetType: 1 }] as never
+  // 转账 100 + 手续费 10（手续费另有账单），前一日余额应为 200，而不是 190
+  const transfers = [{ transferId: 't1', fromAssetId: 1, toAssetId: 2, cost: 100, serviceCharge: 10, billId: 'fee-1', time: at(1) }] as never
+  const bills = [{ billId: 'fee-1', assetId: 1, parentCategoryId: 7, cost: 10, time: at(1), accountAmount: 10 }] as never
+  const pts = assetTrend({ ...base, assets, bills, transfers } as never, at(2), at(0))
+  const values = pts.map((p) => p.value)
+  // 昨天之后：90；昨天之前：90 + 100 + 10（账单）= 200
+  assert.equal(values[values.length - 1], 90)
+  assert.equal(values[0], 200)
+})
+
 test('借贷与资产流水都进入走势', () => {
   const assets = [{ assetId: 1, assetNumber: 300, assetType: 1 }] as never
   const lends = [{ lendId: 1, type: 1, assetId: 1, number: 100, time: at(1) }] as never  // 昨天借出 100

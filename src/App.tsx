@@ -12,7 +12,7 @@ import { AddBill } from './features/add-bill'
 import { Home } from './features/home'
 import { Search } from './features/search'
 import { PinLock, hasPin, setPinScope } from './features/lock'
-import { notifyBookFlush } from './features/books'
+import { flushBookPatches, hasPendingBookPatches } from './features/book-pending'
 import { CalendarPage } from './features/calendar'
 import { Assets } from './features/assets'
 import { Stats } from './features/stats'
@@ -65,11 +65,23 @@ export default function App() {
   }
 
   useEffect(() => {
+    // 账本离线改动：网络恢复或页面回到前台时补传，不依赖账本页是否打开
+    const flush = () => { if (hasPendingBookPatches()) void flushBookPatches() }
+    window.addEventListener('online', flush)
+    const onVisible = () => { if (document.visibilityState === 'visible') flush() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.removeEventListener('online', flush)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [])
+
+  useEffect(() => {
     auth.me().then(async (u) => {
       if (u) {
         await initAccount(u)
-        // 登录后补传离线期间的账本改动
-        notifyBookFlush()
+        // 登录后补传离线期间的账本改动（经过服务端并发校验）
+        void flushBookPatches()
       } else setUser(null)
     })
   }, [])

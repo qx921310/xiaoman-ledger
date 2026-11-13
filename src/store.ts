@@ -196,6 +196,8 @@ interface LedgerState {
   removeCurrency: (code: string) => void
   applyRemote: (records: SyncIncoming[]) => void
   applyAccountScope: (patch: Record<string, unknown>) => void
+  /** 用目标账号的完整快照替换状态（拒绝任何上一个账号的残留） */
+  replaceAccountState: (next: Record<string, unknown>) => void
   /** 一木：隐藏该账本下的全部分类（一次性动作） */
   hideAllCategoriesForBook: (bookId: string | number) => void
   setLastSync: (t: number) => void
@@ -226,7 +228,11 @@ export const useLedger = create<LedgerState>()(
         const children = combined.childCategories.map(normalizeBuiltInChild)
         if (children.some((child: Category, index: number) => child !== combined.childCategories[index])) changes.childCategories = children
         if (!combined.assets || !combined.bills || !combined.parentCategories) { markDirty(); return changes }
-        const assets = deriveAssets(combined).map(asset => {
+        const rateOf = (code: string) => {
+          const c = (combined.currencies || []).find((x) => x.code === code)
+          return c && c.rate ? c.rate : 1
+        }
+        const assets = deriveAssets({ ...combined, currencyRate: rateOf }).map(asset => {
           const previous = state.assets.find(a => a.assetId === asset.assetId)
           if (!previous) return asset
           const { assetNumber: _balance, updateTime: _time, ...metadata } = asset
@@ -1125,9 +1131,12 @@ export const useLedger = create<LedgerState>()(
       }),
 
       // 登记报销：只落记录，钱还没到；确认到账时才进报销账户
-      addReimbursement: ({ billId, assetId, number, detail }) => set((s) => {
+      addReimbursement: ({ billId, assetId, number: rawNumber, detail }) => set((s) => {
         const bill = s.bills.find((b) => b.billId === billId)
-        if (!bill || !s.assets.some((a) => a.assetId === assetId) || !Number.isFinite(number) || number <= 0) return {}
+        const account = s.assets.find((a) => a.assetId === assetId)
+        if (!bill || !account || !Number.isFinite(rawNumber) || rawNumber <= 0) return {}
+        // 报销金额一律记本位币（与账单 cost 同口径）；入账到外币账户时才折算
+        const number = +rawNumber.toFixed(2)
         // 多次报销：累计金额不得超过原账单
         const claimed = s.reimbursements.filter((r) => r.billId === billId).reduce((sum, r) => sum + (Number(r.number) || 0), 0)
         if (number > +(bill.cost - claimed).toFixed(2)) return {}
@@ -1153,8 +1162,13 @@ export const useLedger = create<LedgerState>()(
         return {
           reimbursements: s.reimbursements.map((r) => r.reimbursementId === reimbursementId
             ? { ...r, status: 'done' as const, settledAt: NOW(), updateTime: NOW() } : r),
-          assets: s.assets.map((a) => a.assetId === rec.assetId
-            ? { ...a, assetNumber: +(a.assetNumber + rec.number).toFixed(2), updateTime: NOW() } : a)
+          assets: s.assets.map((a) => {
+            if (a.assetId !== rec.assetId) return a
+            // 报销账户可能是外币：按该账户币种把本位币金额折算后入账
+            const rate = !a.currency || a.currency === s.defaultCurrency ? 1
+              : (s.currencies.find((c) => c.code === a.currency)?.rate || 1)
+            return { ...a, assetNumber: +(a.assetNumber + rec.number / rate).toFixed(2), updateTime: NOW() }
+          })
         }
       }),
 
@@ -1531,15 +1545,18 @@ export const useLedger = create<LedgerState>()(
       /** 切账号时把目标账号没有的字段重置为初始值；必须走受控 set 以便重算余额 */
       applyAccountScope: (patch) => set(() => patch as never),
 
+      /** 用目标账号的完整快照替换整个状态（切账号用；走受控 set 以便重算余额） */
+      replaceAccountState: (next) => set(() => next as never, true),
+
       /** 一木 AddAccountBookActivity 的「隐藏所有分类」：给所有分类加上该账本的隐藏标记 */
       hideAllCategoriesForBook: (bookId) => set((s) => ({
         parentCategories: s.parentCategories.map((p) => ({
           ...p,
           hideBook: Array.from(new Set([...(p.hideBook ?? []).map(String), String(bookId)]))
         })),
+        // 一木：子分类只记「在本账本隐藏」，不改全局 hide（否则会连累其他账本）
         childCategories: s.childCategories.map((c) => ({
           ...c,
-          hide: true,
           hideBook: Array.from(new Set([...(c.hideBook ?? []).map(String), String(bookId)]))
         }))
       })),
@@ -1842,7 +1859,11 @@ export const useLedger = create<LedgerState>()(
           const { billShareInfo, ...rest } = b
           return { ...rest, billSnapshot: billShareInfo }
         })
-        return { ...snapshot, assets: deriveAssets(snapshot) }
+        const rateOf = (code: string) => {
+          const c = (snapshot.currencies || []).find((x) => x.code === code)
+          return c && c.rate ? c.rate : 1
+        }
+        return { ...snapshot, assets: deriveAssets({ ...snapshot, currencyRate: rateOf }) }
       }
     }
   )

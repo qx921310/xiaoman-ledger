@@ -46,7 +46,10 @@ const KIND_SPEC: Record<string, [string, string]> = {
 }
 
 const idOf = (kind: string, item: Record<string, unknown>) =>
-  kind === 'budget' ? `${item.month}:${item.categoryId}`
+  kind === 'budget'
+    ? ((item.type ?? 'month') === 'custom' && item.budgetId != null
+        ? `custom:${item.budgetId}`
+        : `${item.type ?? 'month'}:${item.month}:${item.categoryId}`)
     : kind === 'bill' ? String(item.syncId ?? item.billId)
       : String(item[KIND_SPEC[kind][1]])
 

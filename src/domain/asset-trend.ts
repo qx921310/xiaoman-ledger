@@ -55,8 +55,15 @@ export function assetMovements(input: TrendInput): Map<number, Array<{ time: num
     const income = kindOf(b.parentCategoryId) === 'income'
     push(b.assetId, b.time, (income ? 1 : -1) * (b.accountAmount ?? b.cost))
   }
+  // 手续费要么是独立账单、要么在转账上，不能两边都算（与 balances.movements 一致）
+  const feeBillIds = new Set(
+    input.transfers
+      .filter((t) => t.billId && input.bills.some((b) => String(b.billId) === String(t.billId)))
+      .map((t) => String(t.billId))
+  )
   for (const t of input.transfers) {
-    push(t.fromAssetId, t.time, -t.cost - (t.serviceCharge || 0))
+    const feeIsBill = t.billId != null && feeBillIds.has(String(t.billId))
+    push(t.fromAssetId, t.time, -t.cost - (feeIsBill ? 0 : (t.serviceCharge || 0)))
     push(t.toAssetId, t.time, t.toCost ?? t.cost)
   }
   for (const l of input.lends) {
