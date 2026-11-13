@@ -25,8 +25,9 @@ export function SplitManager({ onBack, notify }: { onBack: () => void; notify: (
   const [editing, setEditing] = useState<null | { groupId: number; name: string }>(null)
   const [newMemberName, setNewMemberName] = useState('')
   const [expenseOpen, setExpenseOpen] = useState(false)
-  const [form, setForm] = useState<{ title: string; amount: string; payer: number; splitType: 0 | 1 | 2; values: Record<number, string> }>(
-    { title: '', amount: '', payer: 0, splitType: 0, values: {} }
+  const today = () => new Date().toISOString().slice(0, 10)
+  const [form, setForm] = useState<{ title: string; amount: string; payer: number; splitType: 0 | 1 | 2; values: Record<number, string>; date: string }>(
+    { title: '', amount: '', payer: 0, splitType: 0, values: {}, date: today() }
   )
 
   const group = groups.find((g) => g.splitGroupId === openGroup)
@@ -76,10 +77,11 @@ export function SplitManager({ onBack, notify }: { onBack: () => void; notify: (
       amount,
       payerMemberId: form.payer || groupMembers[0]?.splitMemberId,
       splitType: form.splitType,
-      participants: picked.map((m) => ({ memberId: m.splitMemberId, value: Number(form.values[m.splitMemberId]) || 0 }))
+      participants: picked.map((m) => ({ memberId: m.splitMemberId, value: Number(form.values[m.splitMemberId]) || 0 })),
+      time: form.date ? new Date(form.date).getTime() : Date.now()
     })
     notify(ok ? '分账已记录' : '记录失败，请检查金额')
-    if (ok) { setExpenseOpen(false); setForm({ title: '', amount: '', payer: 0, splitType: 0, values: {} }) }
+    if (ok) { setExpenseOpen(false); setForm({ title: '', amount: '', payer: 0, splitType: 0, values: {}, date: today() }) }
   }
 
   // 群组列表
@@ -174,7 +176,7 @@ export function SplitManager({ onBack, notify }: { onBack: () => void; notify: (
         notify('群组已删除')
       }}>删除群组</button>
 
-      <button type="button" className="ghost wide" onClick={() => { setExpenseOpen(true); setForm({ title: '', amount: '', payer: groupMembers[0]?.splitMemberId ?? 0, splitType: 0, values: {} }) }}>
+      <button type="button" className="ghost wide" onClick={() => { setExpenseOpen(true); setForm({ title: '', amount: '', payer: groupMembers[0]?.splitMemberId ?? 0, splitType: 0, values: {}, date: today() }) }}>
         记一笔 AA
       </button>
 
@@ -201,6 +203,8 @@ export function SplitManager({ onBack, notify }: { onBack: () => void; notify: (
           <div className="label">金额</div>
           <input aria-label="AA 金额" inputMode="decimal" value={form.amount}
             onChange={(e) => setForm({ ...form, amount: e.target.value.replace(/[^\d.]/g, '') })} />
+          <div className="label">日期</div>
+          <input aria-label="AA 日期" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
           <div className="label">谁先付</div>
           <select aria-label="付款人" value={form.payer} onChange={(e) => setForm({ ...form, payer: Number(e.target.value) })}>
             {groupMembers.map((m) => <option key={m.splitMemberId} value={m.splitMemberId}>{m.name}</option>)}

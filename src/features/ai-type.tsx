@@ -22,7 +22,7 @@ export function AiTypeManager({ onBack, notify }: { onBack: () => void; notify: 
     const raw = editing.keywords.split(/[,，\s]+/).map((x) => x.trim()).filter(Boolean)
     if (!raw.length) { notify('请输入记账关键词'); return }
     if (!editing.parentId) { notify('请选择记账分类'); return }
-    addAiTypeRule({ keywords: raw, categoryId: editing.parentId })
+    addAiTypeRule({ keywords: raw, categoryId: editing.parentId, childCategoryId: editing.childId || undefined })
     notify('智能分类已添加')
     setEditing(null)
   }
@@ -77,7 +77,7 @@ export function AiTypeManager({ onBack, notify }: { onBack: () => void; notify: 
           <div key={r.ruleId} className="row">
             <CatIcon k={p?.icon} size={16} />
             <div className="grow">
-              <div>{p?.name ?? '未分类'}</div>
+              <div>{p?.name ?? '未分类'}{r.childCategoryId ? ` · ${children.find((c) => c.id === r.childCategoryId)?.name ?? ''}` : ''}</div>
               <small>{r.keywords.join('、')}</small>
             </div>
             <button type="button" className="del" onClick={() => {

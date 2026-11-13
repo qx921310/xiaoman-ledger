@@ -90,7 +90,11 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
   const onRemarkChange = (v: string) => {
     setRemark(v)
     const hit = aiTypeRules.find((r) => r.keywords.some((k) => k && v.includes(k)))
-    if (hit) { setPid(hit.categoryId); setCid(0) }
+    if (hit) {
+      // 一木：智能分类命中时优先落到子分类
+      setPid(hit.categoryId)
+      setCid(hit.childCategoryId ?? 0)
+    }
   }
   const speech = useSpeech((text) => {
     const num = text.match(/\d+(?:\.\d+)?/)
@@ -523,7 +527,11 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
           setRemark(v)
           // 智能分类：关键词命中时自动切到对应分类（人工后续修改优先）
           const hit = aiTypeRules.find((r) => r.keywords.some((k) => k && v.includes(k)))
-          if (hit) { setPid(hit.categoryId); setCid(0) }
+          if (hit) {
+      // 一木：智能分类命中时优先落到子分类
+      setPid(hit.categoryId)
+      setCid(hit.childCategoryId ?? 0)
+    }
         }} placeholder="写点什么（可留空）" />
         <button type="button" className="ghost" onClick={() => speech.listening ? speech.stop() : speech.start()}>
           {speech.listening ? '停止' : '语音'}

@@ -24,6 +24,8 @@ export function BudgetManager({ onBack, notify }: { onBack: () => void; notify: 
 
   const [period, setPeriod] = useState<Period>('month')
   const [editing, setEditing] = useState<null | { categoryId: number; amount: string; name?: string }>(null)
+  const [custom, setCustom] = useState({ start: '', end: '' })
+  const setBudgetPeriod = useLedger((s) => s.setBudget)
 
   // 期间范围：周一为一周之始（与一木周预算一致）
   const range = useMemo(() => {
@@ -115,7 +117,31 @@ export function BudgetManager({ onBack, notify }: { onBack: () => void; notify: 
         ))}
       </div>
 
-      {period === 'custom' && !range && <p className="hint">未选择自定义预算，点击选择</p>}
+      {period === 'custom' && !range && (
+        <>
+          <p className="hint">未选择自定义预算，点击选择</p>
+          <div className="row">
+            <input aria-label="自定义开始" type="date" value={custom.start}
+              onChange={(e) => setCustom({ ...custom, start: e.target.value })} />
+            <input aria-label="自定义结束" type="date" value={custom.end}
+              onChange={(e) => setCustom({ ...custom, end: e.target.value })} />
+            <button type="button" className="link" onClick={() => {
+              if (!custom.start || !custom.end) { notify('请选择开始和结束日期'); return }
+              const start = new Date(custom.start).getTime()
+              const end = new Date(custom.end).getTime() + 86400000
+              if (end <= start) { notify('结束日期不能早于开始日期'); return }
+              // 一木：自定义预算带起止时间，用 budgetId 区分多个自定义期间
+              setBudgetPeriod({
+                month: 'all', categoryId: 0, amount: totalBudget,
+                type: 'custom', budgetId: Date.now(),
+                budgetName: `${custom.start} ~ ${custom.end}`,
+                startTime: start, endTime: end
+              })
+              notify('自定义期间已保存')
+            }}>保存期间</button>
+          </div>
+        </>
+      )}
       {range && <p className="hint">{range.label}</p>}
 
       <div className="stat-cards">

@@ -143,8 +143,10 @@ export interface AiTypeRule {
   ruleId: number
   /** 关键词（多个，命中任一即归类） */
   keywords: string[]
-  /** 归类到的分类 id */
+  /** 归类到的大类 id */
   categoryId: number
+  /** 归类到的子分类 id（一木 AiType.childCategoryId） */
+  childCategoryId?: number
   icon?: string
   bookId?: string | number
   ownerId?: number

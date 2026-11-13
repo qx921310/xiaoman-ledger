@@ -365,6 +365,25 @@ test('附件可按来源删除（账单/转账/借贷），愿望支持比例储
   assert.equal(dream.ratio, 10, '比例储蓄字段应保存')
 })
 
+test('智能分类保存子分类；AA 记录可指定日期；预算支持自定义期间', () => {
+  reset()
+  st().addAiTypeRule({ keywords: ['星巴克'], categoryId: 7, childCategoryId: 71 })
+  assert.equal(st().aiTypeRules[0].childCategoryId, 71, '智能分类应保存子分类')
+
+  const g = st().addSplitGroup({ name: '同事' })
+  const m1 = st().addSplitMember(g.splitGroupId, '我', true)
+  const day = new Date(2026, 10, 1).getTime()
+  st().addSplitExpense({ splitGroupId: g.splitGroupId, amount: 100, splitType: 0,
+    participants: [{ memberId: m1.splitMemberId, value: 0 }], time: day })
+  assert.equal(st().splitExpenses[0].time, day, 'AA 记录应使用所选日期')
+
+  st().setBudget({ month: 'all', categoryId: 0, amount: 500, type: 'custom', budgetId: 1,
+    startTime: day, endTime: day + 86400000 })
+  const custom = st().budgets.find((b) => b.type === 'custom')!
+  assert.equal(custom.startTime, day)
+  assert.equal(custom.endTime, day + 86400000)
+})
+
 test('账本开关与隐藏可持久化（一木 AddAccountBookActivity 的三个开关）', () => {
   reset()
   useLedger.setState({ currentBookId: 1 } as never)
