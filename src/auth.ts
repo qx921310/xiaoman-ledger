@@ -41,11 +41,21 @@ export interface BookInfo {
   ownerId: number
   role: 'silent' | 'peer' | 'admin'
   memberNo?: number
+  /** 账本图标（一木 icon） */
+  icon?: string | null
+  /** 一木账本显示开关：1/0 或 true/false，兼容两种返回 */
+  showTransfer?: number | boolean | null
+  showStock?: number | boolean | null
+  hideAllCategory?: number | boolean | null
+  hidden?: number | boolean | null
 }
 
 export const books = {
   list: () => call('/books'),
-  create: (name: string) => call('/books/create', { method: 'POST', body: JSON.stringify({ name }) }),
+  create: (name: string, icon?: string) => call('/books/create', { method: 'POST', body: JSON.stringify({ name, icon }) }),
+  /** 账本元数据（图标/显示开关/隐藏）：与一木编辑账本一致 */
+  update: (bookId: string, patch: { name?: string; icon?: string; showTransfer?: boolean; showStock?: boolean; hideAllCategory?: boolean; hidden?: boolean }) =>
+    call('/books/update', { method: 'POST', body: JSON.stringify({ bookId, ...patch }) }),
   rename: (bookId: string, name: string) => call('/books/rename', { method: 'POST', body: JSON.stringify({ bookId, name }) }),
   invite: (bookId: string) => call('/books/invite', { method: 'POST', body: JSON.stringify({ bookId }) }),
   join: (code: string) => call('/books/join', { method: 'POST', body: JSON.stringify({ code }) }),

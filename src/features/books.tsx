@@ -32,14 +32,21 @@ export function BookManager({ notify, onBack }: { notify: (m: string) => void; o
 
   const save = async () => {
     if (!editing) return
-    updateBookMeta(editing.bookId, {
+    const patch = {
       accountBookName: editing.name.trim() || '未命名账本',
       icon: editing.icon,
       showTransfer: editing.showTransfer,
       showStock: editing.showStock,
       hideAllCategory: editing.hideAllCategory
-    })
-    try { await bookApi.rename(String(editing.bookId), editing.name.trim()) } catch { /* 离线时仅本地生效 */ }
+    }
+    updateBookMeta(editing.bookId, patch)
+    try {
+      await bookApi.update(String(editing.bookId), {
+        name: patch.accountBookName, icon: patch.icon,
+        showTransfer: patch.showTransfer, showStock: patch.showStock,
+        hideAllCategory: patch.hideAllCategory
+      })
+    } catch { /* 离线时仅本地生效，下次同步后以服务端为准 */ }
     notify('账本已更新')
     setEditing(null)
   }
@@ -56,7 +63,11 @@ export function BookManager({ notify, onBack }: { notify: (m: string) => void; o
           key: String(b.bookId ?? b.accountBookId),
           name: b.accountBookName,
           value: '已隐藏',
-          onRestore: () => { updateBookMeta(String(b.bookId), { hidden: false }); notify('账本已恢复') }
+          onRestore: () => {
+            updateBookMeta(String(b.bookId), { hidden: false })
+            void bookApi.update(String(b.bookId), { hidden: false }).catch(() => {})
+            notify('账本已恢复')
+          }
         })) }]} />
       </>
     )
@@ -85,7 +96,11 @@ export function BookManager({ notify, onBack }: { notify: (m: string) => void; o
               showTransfer: b.showTransfer !== false, showStock: b.showStock !== false,
               hideAllCategory: !!b.hideAllCategory
             })}>编辑</button>
-            <button type="button" className="del" onClick={() => { updateBookMeta(String(b.bookId), { hidden: true }); notify('账本已隐藏') }}>隐藏</button>
+            <button type="button" className="del" onClick={async () => {
+              updateBookMeta(String(b.bookId), { hidden: true })
+              try { await bookApi.update(String(b.bookId), { hidden: true }) } catch { /* 离线仅本地 */ }
+              notify('账本已隐藏')
+            }}>隐藏</button>
           </div>
         )
       })}
@@ -110,9 +125,8 @@ export function BookManager({ notify, onBack }: { notify: (m: string) => void; o
               const name = newName.trim()
               if (!name) { notify('请填写账本名称'); return }
               try {
-                const r = await bookApi.create(name)
+                const r = await bookApi.create(name, newIcon)
                 const id = r?.bookId ?? r?.accountBookId
-                // 图标与开关是本地账本元数据（服务端目前只存名称）
                 if (id) updateBookMeta(String(id), { icon: newIcon, showTransfer: true, showStock: true })
                 if (id) setBook(String(id))
                 notify('账本已创建')

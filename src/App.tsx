@@ -97,7 +97,13 @@ export default function App() {
         createTime: 0,
         bookId: b.bookId,
         ownerId: b.ownerId,
-        role: b.role
+        role: b.role,
+        // 账本元数据（一木：图标与显示开关由服务端保存，换设备不丢）
+        icon: b.icon ?? undefined,
+        showTransfer: b.showTransfer === 0 || b.showTransfer === false ? false : true,
+        showStock: b.showStock === 0 || b.showStock === false ? false : true,
+        hideAllCategory: !!(b.hideAllCategory ?? 0),
+        hidden: !!(b.hidden ?? 0)
       })))
       if (list[0]) {
         // 老账单的 bookId 是数字，统一迁到服务端第一个账本

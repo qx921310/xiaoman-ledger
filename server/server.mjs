@@ -259,8 +259,19 @@ function billNumber(bookId, recordId, userId) {
   db.prepare('INSERT INTO book_bill_numbers VALUES (?,?,?,?,?)').run(bookId, recordId, userId, memberNo, sequenceNo)
   return { creator_id: userId, member_no: memberNo, sequence_no: sequenceNo }
 }
+// 账本元数据（一木：图标 + 显示转账债务流水 / 显示理财流水 / 隐藏所有分类）
+for (const sql of [
+  "ALTER TABLE books ADD COLUMN icon TEXT",
+  "ALTER TABLE books ADD COLUMN show_transfer INTEGER DEFAULT 1",
+  "ALTER TABLE books ADD COLUMN show_stock INTEGER DEFAULT 1",
+  "ALTER TABLE books ADD COLUMN hide_all_category INTEGER DEFAULT 0",
+  "ALTER TABLE books ADD COLUMN hidden INTEGER DEFAULT 0"
+]) { try { db.exec(sql) } catch { /* 已存在 */ } }
+
 const myBooks = (userId) =>
   db.prepare(`SELECT b.book_id AS bookId, b.name, b.owner_id AS ownerId, m.role, n.member_no AS memberNo,
+      b.icon, b.show_transfer AS showTransfer, b.show_stock AS showStock,
+      b.hide_all_category AS hideAllCategory, b.hidden,
       (SELECT COUNT(*) FROM book_members x WHERE x.book_id = b.book_id) AS memberCount
     FROM books b JOIN book_members m ON m.book_id = b.book_id
     LEFT JOIN book_member_numbers n ON n.book_id=m.book_id AND n.user_id=m.user_id
@@ -476,13 +487,35 @@ const server = createServer(async (req, res) => {
       if (!user) return fail(res, '请先登录')
       const body = await readBody(req)
       const name = String(body.name || '').trim() || '新账本'
+      const icon = body.icon == null ? null : String(body.icon)
       const bookId = 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
-      db.prepare('INSERT INTO books (book_id, name, owner_id, created_at) VALUES (?,?,?,?)')
-        .run(bookId, name, user.id, Date.now())
+      db.prepare('INSERT INTO books (book_id, name, owner_id, created_at, icon) VALUES (?,?,?,?,?)')
+        .run(bookId, name, user.id, Date.now(), icon)
       db.prepare('INSERT INTO book_members (book_id, user_id, role, joined_at) VALUES (?,?,?,?)')
         .run(bookId, user.id, 'admin', Date.now())
       memberNumber(bookId, user.id)
       return ok(res, { bookId, books: myBooks(user.id) })
+    }
+
+    // 账本元数据（图标/显示开关/隐藏），与一木编辑账本一致
+    if (path === '/api/books/update' && req.method === 'POST') {
+      const user = currentUser(req)
+      if (!user) return fail(res, '请先登录')
+      const body = await readBody(req)
+      const bookId = String(body.bookId || '')
+      if (!isAdmin(roleOf(bookId, user.id))) return fail(res, '只有「管理」可以修改账本')
+      const sets = []
+      const vals = []
+      const put = (col, value) => { sets.push(`${col} = ?`); vals.push(value) }
+      if (body.name != null) put('name', String(body.name).trim() || '未命名')
+      if (body.icon != null) put('icon', String(body.icon))
+      if (body.showTransfer != null) put('show_transfer', body.showTransfer ? 1 : 0)
+      if (body.showStock != null) put('show_stock', body.showStock ? 1 : 0)
+      if (body.hideAllCategory != null) put('hide_all_category', body.hideAllCategory ? 1 : 0)
+      if (body.hidden != null) put('hidden', body.hidden ? 1 : 0)
+      if (!sets.length) return fail(res, '没有要更新的字段')
+      db.prepare(`UPDATE books SET ${sets.join(', ')} WHERE book_id = ?`).run(...vals, bookId)
+      return ok(res, { books: myBooks(user.id) })
     }
 
     if (path === '/api/books/rename' && req.method === 'POST') {
