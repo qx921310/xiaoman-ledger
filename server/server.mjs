@@ -864,8 +864,18 @@ const server = createServer(async (req, res) => {
       const u = currentUser(req)
       if (!u) return fail(res, '请先登录', 401)
       const now = Date.now()
-      if (ratesCache && now - ratesCache.at < 6 * 3600_000) return ok(res, ratesCache.data)
-      const wanted = { USD: 'USD/CNY', EUR: 'EUR/CNY', GBP: 'GBP/CNY', HKD: 'HKD/CNY', AUD: 'AUD/CNY', CAD: 'CAD/CNY', SGD: 'SGD/CNY', CHF: 'CHF/CNY', '100JPY': '100JPY/CNY' }
+      const base = String(url.searchParams.get('base') || 'CNY').toUpperCase()
+      const toBase = (raw, base) => {
+        const cnyOfBase = base === 'CNY' ? 1 : raw.rates?.[base]
+        if (base === 'CNY' || !Number.isFinite(cnyOfBase) || cnyOfBase <= 0) {
+          return { ...raw, base, rates: raw.rates }
+        }
+        const converted = {}
+        for (const [code, cny] of Object.entries(raw.rates)) converted[code] = +(cny / cnyOfBase).toFixed(6)
+        return { ...raw, base, rates: converted }
+      }
+      if (ratesCache && now - ratesCache.at < 6 * 3600_000) return ok(res, toBase(ratesCache.data, base))
+      const wanted = { USD: 'USD/CNY', EUR: 'EUR/CNY', GBP: 'GBP/CNY', HKD: 'HKD/CNY', AUD: 'AUD/CNY', CAD: 'CAD/CNY', SGD: 'SGD/CNY', CHF: 'CHF/CNY', '100JPY': '100JPY/CNY', CNY: 'CNY/CNY' }
       const out = {}
       let source = ''
       let date = ''
@@ -873,8 +883,8 @@ const server = createServer(async (req, res) => {
         const end = new Date(); const start = new Date(end.getTime() - 6 * 86400_000)
         const fmt = (d) => d.toISOString().slice(0, 10)
         const list = Object.values(wanted).join(',')
-        const url = `https://www.chinamoney.com.cn/ags/ms/cm-u-bk-ccpr/CcprHisNew?startDate=${fmt(start)}&endDate=${fmt(end)}&currency=${encodeURIComponent(list)}&pageNum=1&pageSize=10`
-        const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' } })
+        const cfetsUrl = `https://www.chinamoney.com.cn/ags/ms/cm-u-bk-ccpr/CcprHisNew?startDate=${fmt(start)}&endDate=${fmt(end)}&currency=${encodeURIComponent(list)}&pageNum=1&pageSize=10`
+        const r = await fetch(cfetsUrl, { headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' } })
         const raw = await r.json()
         const rows = raw?.records ?? []
         const keys = String(raw?.data?.head ?? '').split(',')
@@ -906,9 +916,11 @@ const server = createServer(async (req, res) => {
         } catch { /* 两个源都失败 */ }
       }
       if (!Object.keys(out).length) return fail(res, '获取汇率信息失败')
-      const data = { source, date, fetchedAt: now, rates: out }
-      ratesCache = { at: now, data }
-      return ok(res, data)
+      // 补上 CNY 自身（1 元 = 1 元），base 换算时要用它做分母
+      if (!out.CNY) out.CNY = 1
+      const raw = { source, date, fetchedAt: now, rates: out }
+      ratesCache = { at: now, data: raw }
+      return ok(res, toBase(raw, base))
     }
 
     // 附件上传：鉴权后写入 server/data/uploads，返回可访问路径

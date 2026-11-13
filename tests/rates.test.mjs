@@ -47,6 +47,14 @@ test('汇率接口：未登录 401，登录后返回 CFETS 中间价且 JPY 已�
     assert.ok(rates.USD > 1 && rates.USD < 15, `USD 汇率量级应合理，实际 ${rates.USD}`)
     assert.ok(rates.JPY > 0 && rates.JPY < 1, `JPY 应为每 1 日元兑人民币（<1），实际 ${rates.JPY}`)
     assert.equal(r.body.result.source, 'cfets', '主源应为 CFETS 中间价')
+    assert.equal(r.body.result.base, 'CNY', '默认 base 为 CNY')
+
+    // 默认币种不是人民币时：应换算成「1 单位外币 = N 该币种」
+    const usdBase = await call('/api/rates?base=USD', undefined, reg.cookie)
+    assert.equal(usdBase.body.result.base, 'USD')
+    const usdRateOfCny = usdBase.body.result.rates.CNY
+    assert.ok(usdRateOfCny > 0 && usdRateOfCny < 1, `1 元应约 0.15 美元，实际 ${usdRateOfCny}`)
+    assert.ok(Math.abs(usdRateOfCny * r.body.result.rates.USD - 1) < 0.01, '两组汇率应互为倒数')
   } finally {
     child.kill()
     await rm(temp, { recursive: true, force: true })
