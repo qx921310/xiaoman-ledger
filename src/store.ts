@@ -153,7 +153,7 @@ interface LedgerState {
   /** 一木 StockHideActivity：切换持仓的隐藏状态 */
   setStockHidden: (stockAssetId: number, hidden: boolean) => void
   /** 一木：愿望清单 */
-  addDream: (patch: { name: string; totalNum: number; startNum?: number; remark?: string; startTime?: number }) => void
+  addDream: (patch: { name: string; totalNum: number; startNum?: number; remark?: string; startTime?: number; endTime?: number; addType?: 0 | 1 | 3; addNum?: number; interval?: number }) => void
   updateDream: (dreamId: number, patch: Partial<import('./types').Dream>) => void
   deleteDream: (dreamId: number) => void
   /** 一木：自定义智能分类 */
@@ -682,7 +682,9 @@ export const useLedger = create<LedgerState>()(
         const rec: import('./types').Dream = {
           dreamId, name: patch.name ?? '', totalNum: Number(patch.totalNum) || 0,
           startNum: Number(patch.startNum) || 0, remark: patch.remark ?? '',
-          startTime: patch.startTime ?? NOW(), updateTime: NOW(), ownerId: s.userId,
+          startTime: patch.startTime ?? NOW(),
+          endTime: patch.endTime, addType: patch.addType ?? 0, addNum: patch.addNum, interval: patch.interval,
+          updateTime: NOW(), ownerId: s.userId,
           bookId: s.currentBookId === 0 ? undefined : s.currentBookId
         }
         return { dreams: [rec, ...s.dreams] }

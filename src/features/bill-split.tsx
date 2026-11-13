@@ -15,6 +15,8 @@ export function BillSplitEditor({ bill, onDone, notify }: { bill: Bill; onDone: 
   const parents = useLedger((s) => s.parentCategories)
   const children = useLedger((s) => s.childCategories)
   const assets = useLedger((s) => s.assets)
+  const refunds = useLedger((s) => s.refunds)
+  const reimbursements = useLedger((s) => s.reimbursements)
   const splitBill = useLedger((s) => s.splitBill)
 
   const [rows, setRows] = useState<SplitRow[]>([
@@ -60,6 +62,21 @@ export function BillSplitEditor({ bill, onDone, notify }: { bill: Bill; onDone: 
         <b>{money(bill.cost)}</b>
       </div>
       <p className="hint">拆出金额合计 {money(total)}{diff !== 0 ? `（与原账单相差 ${money(diff)}）` : ''}</p>
+
+      {/* 原账单信息（对齐 activity_bill_split 的展示项：标签/优惠/退款/报销/不计收支/不计预算） */}
+      <div className="cat-block">
+        <div className="row"><span className="grow muted">标签</span><span>{bill.tags?.length ? bill.tags.join('、') : '无'}</span></div>
+        {(bill.discountNumber ?? 0) > 0 && <div className="row"><span className="grow muted">优惠</span><span>{money(bill.discountNumber!)}</span></div>}
+        {refunds.some((r) => String(r.billId) === String(bill.billId)) && (
+          <div className="row"><span className="grow muted">退款</span><span>{money(refunds.filter((r) => String(r.billId) === String(bill.billId)).reduce((n, r) => n + r.number, 0))}</span></div>
+        )}
+        {reimbursements.some((r) => String(r.billId) === String(bill.billId)) && (
+          <div className="row"><span className="grow muted">报销</span><span>{money(reimbursements.filter((r) => String(r.billId) === String(bill.billId)).reduce((n, r) => n + r.number, 0))}</span></div>
+        )}
+        {(bill.notIntoTotal || bill.notIntoBudget) && (
+          <div className="row"><span className="grow muted">其他</span><span>{[bill.notIntoTotal ? '不计收支' : '', bill.notIntoBudget ? '不计预算' : ''].filter(Boolean).join(' · ')}</span></div>
+        )}
+      </div>
 
       {rows.map((r, i) => {
         const childList = children.filter((c) => c.parentId === r.parentCategoryId)

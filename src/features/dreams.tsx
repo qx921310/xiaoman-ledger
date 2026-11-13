@@ -21,6 +21,7 @@ export function DreamList({ onBack, notify }: { onBack: () => void; notify: (m: 
   const [editing, setEditing] = useState<null | {
     dreamId?: number; name: string; totalNum: string; startNum: string
     remark: string; icon: string; startTime: string
+    endTime: string; noDeadline: boolean; addType: 0 | 1 | 3; addNum: string
   }>(null)
 
   const ordered = useMemo(() => [...dreams].sort((a, b) => (a.startTime ?? 0) - (b.startTime ?? 0)), [dreams])
@@ -35,13 +36,19 @@ export function DreamList({ onBack, notify }: { onBack: () => void; notify: (m: 
     if (editing.dreamId != null) {
       updateDream(editing.dreamId, {
         name, totalNum: total, startNum: Number(editing.startNum) || 0,
-        remark: editing.remark, icon: editing.icon, startTime: start
+        remark: editing.remark, icon: editing.icon, startTime: start,
+        endTime: editing.noDeadline || !editing.endTime ? undefined : new Date(editing.endTime).getTime(),
+        addType: editing.addType,
+        addNum: editing.addType === 1 ? Number(editing.addNum) || 0 : undefined
       })
       notify('愿望已保存')
     } else {
       addDream({
         name, totalNum: total, startNum: Number(editing.startNum) || 0,
-        remark: editing.remark, startTime: start
+        remark: editing.remark, startTime: start,
+        endTime: editing.noDeadline || !editing.endTime ? undefined : new Date(editing.endTime).getTime(),
+        addType: editing.addType,
+        addNum: editing.addType === 1 ? Number(editing.addNum) || 0 : undefined
       })
       notify('愿望已创建')
     }
@@ -78,6 +85,29 @@ export function DreamList({ onBack, notify }: { onBack: () => void; notify: (m: 
         <div className="label">开始日期</div>
         <input aria-label="开始日期" type="date" value={editing.startTime}
           onChange={(e) => setEditing({ ...editing, startTime: e.target.value })} />
+        <label className="row"><input type="checkbox" checked={editing.noDeadline}
+          onChange={(e) => setEditing({ ...editing, noDeadline: e.target.checked })} /><span className="grow">无期限</span></label>
+        {!editing.noDeadline && (
+          <>
+            <div className="label">预期达成</div>
+            <input aria-label="预期达成" type="date" value={editing.endTime}
+              onChange={(e) => setEditing({ ...editing, endTime: e.target.value })} />
+          </>
+        )}
+        <div className="label">储蓄方式</div>
+        <select aria-label="储蓄方式" value={editing.addType}
+          onChange={(e) => setEditing({ ...editing, addType: Number(e.target.value) as 0 | 1 | 3 })}>
+          <option value={0}>手动存入</option>
+          <option value={1}>定期自动存入</option>
+          <option value={3}>按收入比例</option>
+        </select>
+        {editing.addType === 1 && (
+          <>
+            <div className="label">每次存入金额</div>
+            <input aria-label="每次存入金额" inputMode="decimal" value={editing.addNum}
+              onChange={(e) => setEditing({ ...editing, addNum: e.target.value.replace(/[^\d.]/g, '') })} />
+          </>
+        )}
       </>
     )
   }
@@ -89,7 +119,8 @@ export function DreamList({ onBack, notify }: { onBack: () => void; notify: (m: 
         <h3>愿望清单</h3>
         <button type="button" className="link" onClick={() => setEditing({
           name: '', totalNum: '', startNum: '', remark: '', icon: DREAM_ICONS[0],
-          startTime: new Date().toISOString().slice(0, 10)
+          startTime: new Date().toISOString().slice(0, 10),
+          endTime: '', noDeadline: true, addType: 0, addNum: ''
         })}>新增</button>
       </div>
       <p className="hint">右上角设置可将愿望清单显示在首页。</p>
@@ -99,7 +130,8 @@ export function DreamList({ onBack, notify }: { onBack: () => void; notify: (m: 
           <p className="hint">找到你想要变得富有的理由</p>
           <button type="button" className="ghost wide" onClick={() => setEditing({
             name: '', totalNum: '', startNum: '', remark: '', icon: DREAM_ICONS[0],
-            startTime: new Date().toISOString().slice(0, 10)
+            startTime: new Date().toISOString().slice(0, 10),
+            endTime: '', noDeadline: true, addType: 0, addNum: ''
           })}>添加第一个愿望</button>
         </>
       )}
@@ -119,7 +151,11 @@ export function DreamList({ onBack, notify }: { onBack: () => void; notify: (m: 
                 dreamId: d.dreamId, name: d.name, totalNum: String(d.totalNum),
                 startNum: String(d.startNum ?? 0), remark: d.remark ?? '',
                 icon: (d as { icon?: string }).icon ?? DREAM_ICONS[0],
-                startTime: d.startTime ? new Date(d.startTime).toISOString().slice(0, 10) : ''
+                startTime: d.startTime ? new Date(d.startTime).toISOString().slice(0, 10) : '',
+                endTime: d.endTime ? new Date(d.endTime).toISOString().slice(0, 10) : '',
+                noDeadline: !d.endTime,
+                addType: (d.addType ?? 0) as 0 | 1 | 3,
+                addNum: d.addNum != null ? String(d.addNum) : ''
               })}>编辑</button>
               <button type="button" className="del" onClick={() => {
                 if (!confirm(`删除愿望「${d.name}」？`)) return

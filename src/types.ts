@@ -167,7 +167,14 @@ export interface Dream {
   startTime?: number
   bookId?: string | number
   ownerId?: number
-  updateTime?: number
+  updateTime?: number  /** 预期达成日期（一木 endTime）；为空表示无期限 */
+  endTime?: number
+  /** 储蓄方式：0 手动 / 1 定期自动存入 / 3 按收入比例（一木 addType） */
+  addType?: 0 | 1 | 3
+  /** 定期/比例储蓄金额 */
+  addNum?: number
+  /** 定期周期（天） */
+  interval?: number
 }
 
 /** 一木：模板（ModuleManagerActivity / AddModuleTransferActivity） */
@@ -493,7 +500,8 @@ export interface Lend {
   time: number
   remark: string
   userId: number
-  updateTime: number
+  updateTime: number  /** 附件（一木 BillFile 支持挂到转账/借贷上） */
+  files?: BillFile[]
 }
 
 export const LEND_TYPE: Record<number, string> = {
@@ -616,7 +624,8 @@ export interface Transfer {
   remark: string
   tags: string[]
   userId: number
-  updateTime: number
+  updateTime: number  /** 附件（一木 BillFile 支持挂到转账/借贷上） */
+  files?: BillFile[]
 }
 
 export interface AccountBook {

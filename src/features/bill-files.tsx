@@ -14,17 +14,24 @@ import { fullDay } from '../ui-format'
  */
 export function BillFiles({ onBack, notify }: { onBack: () => void; notify: (m: string) => void }) {
   const bills = useLedger((s) => s.bills)
+  const transfers = useLedger((s) => s.transfers)
+  const lends = useLedger((s) => s.lends)
   const updateBill = useLedger((s) => s.updateBill)
   const [viewing, setViewing] = useState<{ name: string; url: string } | null>(null)
 
   const groups = useMemo(() => {
-    const rows = bills.flatMap((b) => (b.files ?? []).map((f) => ({
-      key: `${b.billId}-${f.remotePath || f.name}`,
-      name: f.name,
-      url: f.remotePath,
-      time: b.time,
-      size: f.fileSize ?? 0
-    })))
+    // 一木 BillFileActivity：附件可挂在账单 / 转账 / 借贷上，按所属记录的时间分组
+    const rows = [
+      ...bills.flatMap((b) => (b.files ?? []).map((f) => ({
+        key: `${b.billId}-${f.remotePath || f.name}`, name: f.name, url: f.remotePath, time: b.time, size: f.fileSize ?? 0
+      }))),
+      ...transfers.flatMap((t) => (t.files ?? []).map((f) => ({
+        key: `t-${t.transferId}-${f.remotePath || f.name}`, name: f.name, url: f.remotePath, time: t.time, size: f.fileSize ?? 0
+      }))),
+      ...lends.flatMap((l) => (l.files ?? []).map((f) => ({
+        key: `l-${l.lendId}-${f.remotePath || f.name}`, name: f.name, url: f.remotePath, time: l.time, size: f.fileSize ?? 0
+      })))
+    ]
     // 一木：没有可用路径的附件不展示
     const usable = rows.filter((r) => r.url)
     const byDay = new Map<string, typeof usable>()
@@ -34,7 +41,7 @@ export function BillFiles({ onBack, notify }: { onBack: () => void; notify: (m: 
     }
     // 一木：按天倒序
     return [...byDay.entries()].sort((a, b) => b[0].localeCompare(a[0]))
-  }, [bills])
+  }, [bills, transfers, lends])
 
   const total = groups.reduce((n, [, rows]) => n + rows.length, 0)
 
