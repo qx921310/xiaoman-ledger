@@ -11,6 +11,7 @@ import { usePullRefresh } from '../ui/use-pull-refresh'
 import { HiddenPage } from './hidden-page'
 import { AssetSankey } from './asset-sankey'
 import { FixedDepositList } from './fixed-deposit'
+import { AssetStats } from './asset-stats'
 import { accountMoney, toBase } from '../money'
 import { visibleAssets } from '../domain/asset-scope'
 import { accountHistory } from '../domain/account-history'
@@ -170,6 +171,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
   const [sankeyOpen, setSankeyOpen] = useState(false)
   const [repayOpen, setRepayOpen] = useState(false)
   const [depositOpen, setDepositOpen] = useState(false)
+  const [assetStatsOpen, setAssetStatsOpen] = useState(false)
   const [assetSearchOpen, setAssetSearchOpen] = useState(false)
   const [assetKw, setAssetKw] = useState('')
   const [remindOpen, setRemindOpen] = useState(false)
@@ -834,7 +836,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
               <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); setSankeyOpen(true) }}>资产分布</button>
               <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); openComposition('资产组成', assetRows(assets)) }}>资产组成</button>
               <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); setRemindOpen(true) }}>还款提醒</button>
-              <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); onOpenStats?.() }}>资产统计</button>
+              <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); setAssetStatsOpen(true) }}>资产统计</button>
               <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); setAssetSearchOpen(true) }}>搜索账户</button>
               <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); setBookScopeOpen(true) }}>生效账本</button>
               <button type="button" className="hm-item" onClick={() => { setSettingOpen(false); setDepositOpen(true) }}>定期存款</button>
@@ -939,6 +941,8 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
           <div className="modal-btns"><button type="button" className="ghost" onClick={() => setRemindOpen(false)}>完成</button></div>
         </Modal>
       )}
+
+      {assetStatsOpen && <AssetStats onBack={() => setAssetStatsOpen(false)} />}
 
       {depositOpen && <FixedDepositList onBack={() => setDepositOpen(false)} notify={notify} />}
 
