@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useLedger } from '../store'
 import { money } from '../ui-format'
 import { ASSET_TYPE } from '../types'
@@ -21,12 +21,17 @@ export function AssetStats({ onBack }: { onBack: () => void }) {
   const assetFlows = useLedger((s) => s.assetFlows ?? [])
   const currencies = useLedger((s) => s.currencies)
   const defaultCurrency = useLedger((s) => s.defaultCurrency)
+  const currentBookId = useLedger((s) => s.currentBookId)
+  const accountBooks = useLedger((s) => s.accountBooks)
+  const setBook = useLedger((s) => s.setBook)
+  const setBookBook = (v: string) => setBook(v === '0' ? 0 : v)
 
   const rateOf = (code?: string) => {
     if (!code || code === defaultCurrency) return 1
     const c = currencies.find((x) => x.code === code)
     return c && c.rate ? c.rate : 1
   }
+  const [pieMode, setPieMode] = useState<'type' | 'group' | 'detail'>('type')
   const total = assets.filter((a) => !a.hide && a.intoTotalAsset !== false)
     .reduce((n, a) => n + a.assetNumber * rateOf(a.currency), 0)
 
@@ -44,10 +49,25 @@ export function AssetStats({ onBack }: { onBack: () => void }) {
   const maxV = Math.max(...trend.map((d) => d.value), 1)
   const minV = Math.min(...trend.map((d) => d.value), 0)
 
-  // 资产分布：按类型汇总（饼用横向条带等同表达，避免再引图表库）
+  // 资产分布：类型 / 分组 / 明细三种口径（一木 asset_check_type/group/detail）
   const byType = useMemo(() => {
+    const visible = assets.filter((x) => !x.hide && x.intoTotalAsset !== false)
+    if (pieMode === 'detail') {
+      return visible
+        .map((a) => [a.assetId, +(a.assetNumber * rateOf(a.currency)).toFixed(2)] as [number, number])
+        .sort((a, b) => b[1] - a[1])
+    }
+    if (pieMode === 'group') {
+      // 分组口径：负债类（2/3）与资产类分开汇总，避免只看类型分不清正负
+      const map = new Map<number, number>()
+      for (const a of visible) {
+        const g = a.assetType === 2 || a.assetType === 3 ? 1 : 0
+        map.set(g, +((map.get(g) ?? 0) + a.assetNumber * rateOf(a.currency)).toFixed(2))
+      }
+      return [...map.entries()].sort((a, b) => b[1] - a[1])
+    }
     const map = new Map<number, number>()
-    for (const a of assets.filter((x) => !x.hide && x.intoTotalAsset !== false)) {
+    for (const a of visible) {
       map.set(a.assetType, +((map.get(a.assetType) ?? 0) + a.assetNumber * rateOf(a.currency)).toFixed(2))
     }
     return [...map.entries()].sort((a, b) => b[1] - a[1])
@@ -63,10 +83,16 @@ export function AssetStats({ onBack }: { onBack: () => void }) {
       <div className="subpage-head">
         <button type="button" className="link" onClick={onBack}>‹ 返回</button>
         <h3>资产统计</h3>
-        <span className="muted">近一月</span>
+        <select aria-label="账本" value={String(currentBookId)} onChange={(e) => setBookBook(e.target.value)}>
+          <option value="0">全部账本</option>
+          {accountBooks.filter((b) => !b.hidden).map((b) => (
+            <option key={String(b.bookId)} value={String(b.bookId)}>{b.accountBookName}</option>
+          ))}
+        </select>
       </div>
 
       <div className="label">资产走势 <small className="muted">（按资金流水反向推算）</small></div>
+      <div className="stats-panel-head"><span>{trend[0]?.day}</span><span>{trend[trend.length - 1]?.day}</span></div>
       <div className="stats-chart" role="img" aria-label="资产走势">
         <svg viewBox="0 0 300 96" preserveAspectRatio="none">
           <polyline
@@ -82,6 +108,11 @@ export function AssetStats({ onBack }: { onBack: () => void }) {
       </div>
 
       <div className="label">资产分布</div>
+      <div className="seg">
+        {([['type', '类型'], ['group', '分组'], ['detail', '明细']] as [string, string][]).map(([k, label]) => (
+          <button key={k} type="button" className={pieMode === k ? 'on' : ''} onClick={() => setPieMode(k as 'type' | 'group' | 'detail')}>{label}</button>
+        ))}
+      </div>
       <div className="row"><span className="grow">总资产</span><b>{money(total)}</b></div>
       {byType.map(([type, value]) => (
         <div key={type} className="bar-row">

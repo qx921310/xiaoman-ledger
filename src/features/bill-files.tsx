@@ -61,17 +61,19 @@ export function BillFiles({ onBack, notify }: { onBack: () => void; notify: (m: 
       {groups.map(([day, rows]) => (
         <div key={day} className="group">
           <div className="day"><span>{day}</span><small>{rows.length} 个</small></div>
-          <div className="file-grid">
-            {rows.map((r) => (
-              <div key={r.key} className="file-cell">
-                <button type="button" className="file-cover" aria-label={`查看 ${r.name}`} onClick={() => setViewing({ name: r.name, url: r.url })}>
-                  {/\.(png|jpe?g|webp|gif)$/i.test(r.url)
-                    ? <img src={r.url} alt={r.name} loading="lazy" />
-                    : <span className="file-ext">{(r.name.split('.').pop() ?? '').toUpperCase()}</span>}
-                </button>
-                <small className="file-name">{r.name}</small>
-                <div className="file-actions">
-                  <a className="link" href={r.url} target="_blank" rel="noreferrer">查看</a>
+          {rows.map((r) => (
+            <div key={r.key} className="file-row">
+              <button type="button" className="file-thumb" aria-label={`查看 ${r.name}`} onClick={() => setViewing({ name: r.name, url: r.url })}>
+                {/\.(png|jpe?g|webp|gif)$/i.test(r.url)
+                  ? <img src={r.url} alt={r.name} loading="lazy" />
+                  : <span className="file-ext">{(r.name.split('.').pop() ?? '').toUpperCase()}</span>}
+              </button>
+              <div className="file-meta">
+                <div className="file-name">{r.name}</div>
+                <small className="file-size">{r.size ? `${Math.max(1, Math.round(r.size / 1024))} KB` : '—'}</small>
+              </div>
+              <div className="file-actions">
+                <a className="link" href={r.url} target="_blank" rel="noreferrer" aria-label={`分享 ${r.name}`}>↗</a>
                   <button type="button" className="del" onClick={() => {
                     if (!confirm(`删除附件 ${r.name}？所属记录本身不受影响。`)) return
                     const match = (f: { remotePath: string; name: string }) => (f.remotePath || f.name) === (r.url || r.name)
@@ -91,12 +93,11 @@ export function BillFiles({ onBack, notify }: { onBack: () => void; notify: (m: 
                       if (!owner) { notify('找不到所属账单'); return }
                       setBillFiles(owner.billId, (owner.files ?? []).filter((f) => !match(f)))
                     }
-                    notify('附件已删除')
-                  }}>删</button>
-                </div>
+                  notify('附件已删除')
+                }} aria-label={`删除 ${r.name}`}>✕</button>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       ))}
 

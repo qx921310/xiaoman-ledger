@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useLedger } from '../store'
 import { money, fullDay } from '../ui-format'
+import { CatIcon } from '../ui/icons'
 import type { Bill } from '../types'
 
 /**
@@ -81,35 +82,35 @@ export function BillSplitEditor({ bill, onDone, notify }: { bill: Bill; onDone: 
       {rows.map((r, i) => {
         const childList = children.filter((c) => c.parentId === r.parentCategoryId)
         return (
-          <div key={i} className="cat-block">
-            <div className="row">
-              <span className="grow">第 {i + 1} 笔</span>
+          <div key={i} className="split-item">
+            <div className="split-row">
+              <CatIcon k={parents.find((p) => p.id === r.parentCategoryId)?.icon} size={16} />
+              <select className="split-cat" aria-label={`第 ${i + 1} 笔分类`} value={r.parentCategoryId}
+                onChange={(e) => update(i, { parentCategoryId: Number(e.target.value), childCategoryId: 0 })}>
+                {parents.filter((p) => !p.hide).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <input className="split-num" aria-label={`第 ${i + 1} 笔金额`} inputMode="decimal" value={r.num}
+                onChange={(e) => update(i, { num: e.target.value.replace(/[^\d.]/g, '') })} placeholder="0.00" />
               {rows.length > 2 && (
-                <button type="button" className="del" onClick={() => setRows((prev) => prev.filter((_, idx) => idx !== i))}>删</button>
+                <button type="button" className="del" aria-label={`删除第 ${i + 1} 笔`}
+                  onClick={() => setRows((prev) => prev.filter((_, idx) => idx !== i))}>✕</button>
               )}
             </div>
-            <div className="label">金额</div>
-            <input aria-label={`第 ${i + 1} 笔金额`} inputMode="decimal" value={r.num}
-              onChange={(e) => update(i, { num: e.target.value.replace(/[^\d.]/g, '') })} />
-            <div className="label">分类</div>
-            <select aria-label={`第 ${i + 1} 笔分类`} value={r.parentCategoryId}
-              onChange={(e) => update(i, { parentCategoryId: Number(e.target.value), childCategoryId: 0 })}>
-              {parents.filter((p) => !p.hide).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-            {childList.length > 0 && (
-              <select aria-label={`第 ${i + 1} 笔子分类`} value={r.childCategoryId}
-                onChange={(e) => update(i, { childCategoryId: Number(e.target.value) })}>
-                <option value={0}>不选子分类</option>
-                {childList.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            <div className="split-row">
+              {childList.length > 0 && (
+                <select aria-label={`第 ${i + 1} 笔子分类`} value={r.childCategoryId}
+                  onChange={(e) => update(i, { childCategoryId: Number(e.target.value) })}>
+                  <option value={0}>不选子分类</option>
+                  {childList.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              )}
+              <select aria-label={`第 ${i + 1} 笔账户`} value={r.assetId}
+                onChange={(e) => update(i, { assetId: Number(e.target.value) })}>
+                {assets.filter((a) => !a.hide).map((a) => <option key={a.assetId} value={a.assetId}>{a.simpleName || a.assetName}</option>)}
               </select>
-            )}
-            <div className="label">账户</div>
-            <select aria-label={`第 ${i + 1} 笔账户`} value={r.assetId}
-              onChange={(e) => update(i, { assetId: Number(e.target.value) })}>
-              {assets.filter((a) => !a.hide).map((a) => <option key={a.assetId} value={a.assetId}>{a.simpleName || a.assetName}</option>)}
-            </select>
-            <div className="label">备注</div>
-            <input aria-label={`第 ${i + 1} 笔备注`} value={r.remark} onChange={(e) => update(i, { remark: e.target.value })} placeholder="可选" />
+              <input aria-label={`第 ${i + 1} 笔备注`} value={r.remark} onChange={(e) => update(i, { remark: e.target.value })}
+                placeholder="备注（可选）" />
+            </div>
           </div>
         )
       })}

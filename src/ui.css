@@ -1162,3 +1162,21 @@ button.day-btn {
 .cat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-2); padding: var(--sp-2) 0; }
 .cat-cell { display: grid; place-items: center; gap: 4px; padding: var(--sp-2); border: 1px solid var(--line); background: var(--card); border-radius: var(--r-md); cursor: pointer; }
 .cat-cell.on { border-color: var(--accent); background: var(--accent-soft); }
+
+/* 账单图片列表行（对齐 item_bill_file：cover 30 / file_name 13sp / file_size 11sp / 分享 · 删除） */
+.file-row { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) 0; }
+.file-thumb {
+  width: 30px; height: 30px; flex: none; display: grid; place-items: center; overflow: hidden;
+  border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface-2); cursor: pointer; padding: 0;
+}
+.file-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.file-meta { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.file-meta .file-name { font-size: var(--font-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-size { color: var(--muted); font-size: var(--font-xs); }
+.file-actions { display: flex; align-items: center; gap: var(--sp-2); }
+
+/* 拆分项（对齐 item_bill_split：分类 / 金额 / 账户 / 备注 / 删除） */
+.split-item { display: grid; gap: 6px; padding: var(--sp-2) 0; border-bottom: 1px solid var(--line); }
+.split-row { display: flex; align-items: center; gap: 6px; }
+.split-row .split-cat { flex: 1; min-width: 0; }
+.split-num { width: 96px; text-align: right; }
