@@ -60,7 +60,7 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
 
 .main { padding: 12px 18px 40px; flex: 1; }
 .card {
-  background: var(--card); border-radius: var(--r-md); padding: 16px;
+  background: var(--card); border-radius: var(--r-md); padding: var(--page-pad);
   box-shadow: 0 1px 2px var(--shade-4), 0 8px 24px var(--shade-5);
 }
 .main, .card, .grow { min-width: 0; }
@@ -112,7 +112,7 @@ input:focus, select:focus { border-color: var(--accent); }
 
 .group { margin-top: 14px; }
 .day { color: var(--muted); font-size: var(--font-xs); margin: 10px 0 4px; }
-.row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.row { display: flex; align-items: center; gap: 10px; min-height: var(--row-h); padding: 9px 0; border-bottom: 1px solid var(--line); }
 .ledger-actions { display: flex; align-items: center; gap: 4px; flex: none; }
 .ledger-actions button { min-height: 44px; padding: 0 8px; }
 @media (max-width: 600px) {
@@ -397,9 +397,14 @@ input.color { width: 34px; height: 30px; padding: 2px; flex: none; border-radius
    目标：所有可交互控件同一套圆角、高度、边框、焦点与禁用语言
    ============================================================ */
 :root {
-  --r-sm: 8px;
-  --r-md: 12px;
-  --r-lg: 18px;
+  /* 圆角取自一木 dimens：common_radius=10dp，卡片/输入统一用它 */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 16px;
+  /* 页面左右边距取自 activity_horizontal_margin=16dp */
+  --page-pad: 16px;
+  /* 列表行高取自 def_height=50dp */
+  --row-h: 50px;
   --r-pill: 999px;
   --font-xs: .75rem;
   --font-sm: .875rem;
