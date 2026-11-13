@@ -686,46 +686,69 @@ export const useLedger = create<LedgerState>()(
         }
       }),
 
+      // 模板记账（对齐一木 r2.o / z1.J 的真实行为：
+      //  - 账本用模板自身账本，账本已不存在才回退当前账本
+      //  - 账户被删不拒绝，落到 -1（一木的「无账户」）
+      //  - 分类缺失落到「其他」
+      //  - 外币账户按汇率折算成本币，并记录原币金额
+      //  - 账单标记 billType=6（模板记账）
       applyTemplate: (templateId) => {
         const s = get()
         const tpl = s.templates.find((t) => t.templateId === templateId)
         if (!tpl) return false
+        const bookExists = (id: unknown) => id != null && s.accountBooks.some((b) => String(b.bookId) === String(id))
+        const tplBook = tpl.bookId != null && tpl.bookId !== 0 && bookExists(tpl.bookId) ? tpl.bookId : undefined
+        const targetBook = tplBook ?? (s.currentBookId === 0 ? undefined : s.currentBookId)
+
         if (tpl.mode === 'transfer' && tpl.transfer) {
-          // 与账单模板同口径：账本不一致、账户失效、金额非法都拒绝
-          if (tpl.bookId != null && tpl.bookId !== 0 && s.currentBookId !== 0 && String(tpl.bookId) !== String(s.currentBookId)) return false
           const tr = tpl.transfer
-          if (!tr.fromAssetId || !tr.toAssetId) return false
-          if (!s.assets.some((a) => a.assetId === tr.fromAssetId) || !s.assets.some((a) => a.assetId === tr.toAssetId)) return false
           if (!(Number(tr.cost) > 0)) return false
-          const trTplBook = tpl.bookId === 0 ? undefined : tpl.bookId
-          const trBook = trTplBook ?? (s.currentBookId === 0 ? undefined : s.currentBookId)
-          if (trBook == null) return false        // 与账单模板同口径：账本不可解析就拒绝
-          get().addTransfer({ ...tr, time: Date.now(), bookId: trBook })
+          if (!(Number(tr.fromAssetId) > 0) || !(Number(tr.toAssetId) > 0)) return false
+          if (tr.fromAssetId === tr.toAssetId) return false
+          get().addTransfer({ ...tr, time: Date.now(), bookId: targetBook })
           return true
         }
+        // 只读账本（silent）不允许记账，模板同样不能绕过
+        const roleOf = (id: string | number | undefined) => id == null ? undefined
+          : s.accountBooks.find((bk) => String(bk.bookId) === String(id))?.role
+        if (roleOf(targetBook) === 'silent') return false
+
         if (tpl.mode === 'bill' && tpl.bill) {
           const b = tpl.bill
-          // 模板所属账本与当前账本不一致时拒绝：避免把 A 账本的模板记到 B 账本
-          if (tpl.bookId != null && tpl.bookId !== 0 && s.currentBookId !== 0 && String(tpl.bookId) !== String(s.currentBookId)) return false
-          if (s.assets.length === 0) return false         // 没有账户就不能记
-          const wantedAsset = b.assetId != null && b.assetId !== 0 ? b.assetId : undefined
-          if (wantedAsset != null && !s.assets.some((a) => a.assetId === wantedAsset)) return false  // 账户已删除
-          if (!(Number(b.cost) > 0)) return false         // 金额非法
-          // 账本必须能解析：模板自身账本优先，其次当前账本；都无则拒绝（不写 bookId=0）
-          const tplBook = tpl.bookId === 0 ? undefined : tpl.bookId
-          const targetBook = tplBook ?? (s.currentBookId === 0 ? undefined : s.currentBookId)
-          if (targetBook == null) return false
+          const source = Number(b.cost) || 0
+          // 金额为 0 或模板被锁定：一木走「打开记账页预填」；这里返回 false 由调用方打开记账页
+          if (!(source > 0) || (tpl as { moduleLock?: boolean }).moduleLock) return false
+
+          const asset = s.assets.find((a) => a.assetId === b.assetId)
+          // 私有账户不许通过模板记进共享账本（与记账页同一校验）
+          if (asset && targetBook != null && Number(targetBook) !== 0) {
+            const book = s.accountBooks.find((bk) => String(bk.bookId) === String(targetBook))
+            const members = book?.memberCount
+            if (asset.bookId == null && members != null && members > 1) return false
+          }
+          const otherId = s.parentCategories.find((p) => p.kind === 'expense' && p.name === '其他')?.id
+            ?? s.parentCategories.find((p) => p.kind === 'expense')?.id ?? 0
+          const parentId = s.parentCategories.some((p) => p.id === b.parentCategoryId)
+            ? b.parentCategoryId : otherId
+
+          // 外币折算：模板账户币种与默认币种不同时，按两边汇率折算
+          const rateOf = (code: string) => s.currencies.find((c) => c.code === code)?.rate ?? 1
+          const assetCurrency = asset?.currency ?? s.defaultCurrency
+          const foreign = assetCurrency !== s.defaultCurrency && rateOf(assetCurrency) > 0 && rateOf(s.defaultCurrency) > 0
+          const cost = foreign ? +((source * rateOf(assetCurrency)) / rateOf(s.defaultCurrency)).toFixed(2) : source
+
           get().addBill({
-            assetId: wantedAsset ?? s.assets[0]!.assetId,
-            parentCategoryId: b.parentCategoryId ?? 7,
-            childCategoryId: b.childCategoryId ?? 0,
-            cost: Number(b.cost) || 0,
+            assetId: asset ? asset.assetId : -1,     // 一木：账户已删则记 -1（无账户）
+            parentCategoryId: parentId,
+            childCategoryId: s.childCategories.some((c) => c.id === (b.childCategoryId ?? 0)) ? (b.childCategoryId ?? 0) : 0,
+            cost,
             remark: b.remark ?? '',
             time: Date.now(),
             notIntoTotal: b.notIntoTotal,
             notIntoBudget: b.notIntoBudget,
-            // 显式带模板账本，避免「全部账本」视图下落到默认账本
-            bookId: targetBook
+            bookId: targetBook,
+            billType: 6,
+            ...(foreign ? { currencyInfo: `${assetCurrency} ${source}`, currencyAssetNumber: source } : {})
           })
           return true
         }

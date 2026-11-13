@@ -10,8 +10,8 @@ const st = () => useLedger.getState()
 const reset = () => {
   useLedger.setState({
     userId: 1, currentBookId: 0, accountBooks: [
-      { bookId: 1, name: 'A', accountBookId: 1 } as never,
-      { bookId: 2, name: 'B', accountBookId: 2 } as never
+      { accountBookId: 1, bookId: 1, accountBookName: 'A', ownerId: 1, memberCount: 1, role: 'normal' },
+      { accountBookId: 2, bookId: 2, accountBookName: 'B', ownerId: 1, memberCount: 1, role: 'normal' }
     ],
     assets: [], bills: [], lends: [], templates: [], dreams: [], aiTypeRules: [], fixedDeposits: []
   } as never)
@@ -121,43 +121,65 @@ test('还款即使不显式传账本也继承父记录账本', () => {
   assert.equal(String(child!.bookId), '1')
 })
 
-test('模板不属于当前账本时拒绝执行', () => {
+test('模板按一木行为：落到模板账本，不随当前账本漂移', () => {
   reset()
   useLedger.setState({ currentBookId: 1, assets: [{ assetId: 10, assetName: '现金', assetNumber: 0, assetType: 1 }] } as never)
   const tpl = st().addTemplate({ name: '早饭', mode: 'bill', bill: { assetId: 10, parentCategoryId: 7, cost: 12 } } as never)
   assert.equal(String(tpl.bookId), '1')
   useLedger.setState({ currentBookId: 2 } as never)
   const ok = st().applyTemplate(tpl.templateId)
-  assert.equal(ok, false, 'B 账本不能执行 A 账本模板')
+  assert.equal(ok, true, '一木允许执行，账单落到模板自身账本')
+  const bill = st().bills[0]
+  assert.equal(String(bill.bookId), '1', '必须落到 A 账本而不是当前 B')
+  assert.equal(bill.billType, 6, '模板记账标记 billType=6')
 })
 
-test('模板：无账户或账本不可解析时拒绝', () => {
+test('模板：账户已删除落到 -1、分类缺失落到其他、金额 0 不直接记账', () => {
   reset()
-  useLedger.setState({ currentBookId: 0, assets: [] } as never)   // 全部账本视图 + 无账户
-  const tpl = st().addTemplate({ name: '咖啡', mode: 'bill', bill: { assetId: 0, parentCategoryId: 7, cost: 20 } } as never)
-  assert.equal(st().applyTemplate(tpl.templateId), false, '没有账户不能记')
-  useLedger.setState({ currentBookId: 1, assets: [{ assetId: 10, assetName: '现金', assetNumber: 0, assetType: 1 }] } as never)
-  const tpl2 = st().addTemplate({ name: '咖啡2', mode: 'bill', bill: { assetId: 10, parentCategoryId: 7, cost: 20 } } as never)
-  assert.equal(st().applyTemplate(tpl2.templateId), true)
-  const bill = st().bills.find((b) => b.cost === 20)
-  assert.equal(String(bill!.bookId), '1', '账单必须落到模板账本')
+  useLedger.setState({ currentBookId: 1, assets: [] } as never)
+  const tpl = st().addTemplate({ name: '咖啡', mode: 'bill', bill: { assetId: 10, parentCategoryId: 7, cost: 20 } } as never)
+  assert.equal(st().applyTemplate(tpl.templateId), true, '一木不因账户删除而拒绝')
+  const bill = st().bills[0]
+  assert.equal(bill.assetId, -1, '账户已删按一木记 -1')
+  // 分类不存在 → 落到「其他」
+  const tpl2 = st().addTemplate({ name: '未知分类', mode: 'bill', bill: { assetId: 10, parentCategoryId: 99999, cost: 20 } } as never)
+  st().applyTemplate(tpl2.templateId)
+  const b2 = st().bills[0]
+  assert.equal(st().parentCategories.find((p) => p.id === b2.parentCategoryId)?.name, '其他')
+  // 金额 0 → 返回 false（由调用方打开记账页预填）
+  const tpl3 = st().addTemplate({ name: '零金额', mode: 'bill', bill: { assetId: 10, parentCategoryId: 7, cost: 0 } } as never)
+  assert.equal(st().applyTemplate(tpl3.templateId), false)
 })
 
-test('模板：assetId=0 回退到第一个账户；转账模板账本不可解析时拒绝', () => {
+test('模板：assetId=0 视为无账户(-1)；转账模板同一账户拒绝', () => {
   reset()
   useLedger.setState({ currentBookId: 1, assets: [
     { assetId: 10, assetName: '现金', assetNumber: 0, assetType: 1 },
     { assetId: 11, assetName: '储蓄', assetNumber: 0, assetType: 1 }
   ] } as never)
-  const tpl = st().addTemplate({ name: '默认账户', mode: 'bill', bill: { assetId: 0, parentCategoryId: 7, cost: 30 } } as never)
+  const tpl = st().addTemplate({ name: '无账户模板', mode: 'bill', bill: { assetId: 0, parentCategoryId: 7, cost: 30 } } as never)
   assert.equal(st().applyTemplate(tpl.templateId), true)
   const bill = st().bills.find((b) => b.cost === 30)
-  assert.equal(bill!.assetId, 10, 'assetId=0 应回退第一个账户而不是写 0')
+  assert.equal(bill!.assetId, -1, 'assetId=0 按一木记 -1（无账户）')
 
-  useLedger.setState({ currentBookId: 0 } as never)   // 全部账本视图
-  const trTpl = st().addTemplate({ name: '转账模板', mode: 'transfer', transfer: { fromAssetId: 10, toAssetId: 11, cost: 50 } } as never)
-  // 模板自身没有 bookId，且当前是全部账本 → 应拒绝而不是产生无账本转账
-  assert.equal(st().applyTemplate(trTpl.templateId), false)
+  const trTpl = st().addTemplate({ name: '同账户转账', mode: 'transfer', transfer: { fromAssetId: 10, toAssetId: 10, cost: 50 } } as never)
+  assert.equal(st().applyTemplate(trTpl.templateId), false, '转出转入同一账户必须拒绝')
+})
+
+test('模板不能绕过只读账本与私有账户约束', () => {
+  reset()
+  useLedger.setState({
+    currentBookId: 1,
+    accountBooks: [{ accountBookId: 1, bookId: 1, accountBookName: 'A', memberCount: 1, role: 'silent' }],
+    assets: [{ assetId: 10, assetName: '现金', assetNumber: 0, assetType: 1 }]
+  } as never)
+  const tpl = st().addTemplate({ name: '早饭', mode: 'bill', bill: { assetId: 10, parentCategoryId: 7, cost: 12 } } as never)
+  assert.equal(st().applyTemplate(tpl.templateId), false, '只读账本不能通过模板记账')
+
+  useLedger.setState({
+    accountBooks: [{ accountBookId: 1, bookId: 1, accountBookName: 'A', memberCount: 2, role: 'normal' }]
+  } as never)
+  assert.equal(st().applyTemplate(tpl.templateId), false, '私有账户不能记进多人账本')
 })
 
 test('生效账本：空数组=全部隐藏，未设置=全部可见', () => {
