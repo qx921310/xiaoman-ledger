@@ -448,11 +448,11 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         <label className="label" htmlFor="me-book-switch">当前账本</label>
         <select id="me-book-switch" value={String(currentBookId)}
           onChange={(e) => { const v = e.target.value; setBook(v === '0' ? 0 : v) }}>
-          {accountBooks.filter((b) => b.bookId != null).map((b) => (
+          {accountBooks.filter((b) => b.bookId != null && !b.hidden).map((b) => (
             <option key={String(b.bookId)} value={String(b.bookId)}>{b.accountBookName}</option>
           ))}
         </select>
-        <small className="muted">{currentBook?.role === 'admin' ? '管理' : currentBook?.role === 'peer' ? '可协作' : '只读'}</small>
+        <small className="muted">{currentBook?.hidden ? '已隐藏' : '仅自己可见'}</small>
       </div>
 
       <div className="me-sync">
@@ -802,7 +802,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
                 notify(generated > 0 ? `已绑定账本并补生成 ${generated} 笔` : '已绑定账本')
               }}>
                 <option value="">选择账本…</option>
-                {accountBooks.filter((b) => b.bookId != null).map((b) => (
+                {accountBooks.filter((b) => b.bookId != null && !b.hidden).map((b) => (
                   <option key={String(b.bookId)} value={String(b.bookId)}>{b.accountBookName}</option>
                 ))}
               </select>

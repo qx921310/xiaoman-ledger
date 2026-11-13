@@ -12,6 +12,7 @@ import { AddBill } from './features/add-bill'
 import { Home } from './features/home'
 import { Search } from './features/search'
 import { PinLock, hasPin, setPinScope } from './features/lock'
+import { notifyBookFlush } from './features/books'
 import { CalendarPage } from './features/calendar'
 import { Assets } from './features/assets'
 import { Stats } from './features/stats'
@@ -65,8 +66,11 @@ export default function App() {
 
   useEffect(() => {
     auth.me().then(async (u) => {
-      if (u) await initAccount(u)
-      else setUser(null)
+      if (u) {
+        await initAccount(u)
+        // 登录后补传离线期间的账本改动
+        notifyBookFlush()
+      } else setUser(null)
     })
   }, [])
 

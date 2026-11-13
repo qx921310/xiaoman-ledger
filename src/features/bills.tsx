@@ -133,7 +133,7 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
   const list = useMemo(() => bills
     .filter((b) => !groupedIds.has(String(b.billId)))
     // 一木「显示理财流水」关闭后，买入/卖出产生的账单不在首页与日历出现
-    .filter((b) => showStock || !/^(买入|卖出)\s/.test(b.remark ?? ''))
+    .filter((b) => showStock || b.stockInfoId == null)
     .filter(match)
     .sort((a, b) => b.time - a.time),
     [bills, month, kw, fPid, fAid, parents, currentBookId, fMin, fMax, fTag, fFrom, fTo, dateRangeActive, rangeAll, groupedIds, showStock])

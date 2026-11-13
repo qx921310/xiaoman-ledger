@@ -212,7 +212,11 @@ test('切账号时不会把上一个账号的资产流水带过来（跨账号�
   const { loadAccountData } = await import('../src/account-session')
   await loadAccountData(2)
   assert.equal(st().assetFlows?.length ?? 0, 0, '账号 2 不得继承账号 1 的流水')
-  void useLedger
+  // 关键断言：余额必须按账号 2 自己重算，而不是停在 100+500=600
+  if (process.env.DBG_SCOPE) console.log('[dbg] assets=', JSON.stringify(st().assets), 'flows=', JSON.stringify(st().assetFlows))
+  const asset = st().assets.find((a) => a.assetId === 10)
+  assert.equal(asset?.assetNumber, 100, '账号 2 余额应为 100，不得被上一账号流水抬高')
+  assert.equal(st().defaultCurrency, 'CNY', '新账号的默认币种不应继承上一账号')
 })
 
 test('资产流水身份用 UUID：同一毫秒连续新增也不撞号', () => {
@@ -228,6 +232,19 @@ test('清空数据会清掉资产流水', () => {
   assert.equal(st().assetFlows.length, 1)
   st().reset()
   assert.equal(st().assetFlows.length, 0, '清空后不得残留流水')
+})
+
+test('持仓交易账单带 stockInfoId，供理财流水开关筛选', () => {
+  reset()
+  useLedger.setState({ currentBookId: 1, assets: [
+    { assetId: 10, assetName: '证券', assetNumber: 1000, openingBalance: 1000, assetType: 4 }
+  ] } as never)
+  const asset = st().addStockAsset({ name: '沪深300ETF', code: '510300', price: 1, num: 100, cost: 100, addBill: true })
+  st().tradeStock(asset.stockAssetId, 1, 100, 100)
+  const bill = st().bills[0]
+  assert.ok(bill, '应生成账单')
+  assert.ok(bill.stockInfoId != null, '账单必须带 stockInfoId')
+  assert.match(bill.remark, /^(买入|卖出)/)
 })
 
 test('账本开关与隐藏可持久化（一木 AddAccountBookActivity 的三个开关）', () => {

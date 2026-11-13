@@ -56,6 +56,20 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
   const [cost, setCost] = useState('')
   // 语音记账：识别文本取第一个数字当金额，其余作为备注（一木 SpeechActivity 同类行为）
   // 备注变更统一入口：移动端与桌面端共用（避免只在桌面分支生效）
+
+  // 附件上传：桌面与移动端共用
+  const uploadFiles = async (list: File[]) => {
+    const added: import('../types').BillFile[] = []
+    for (const f of list) {
+      try {
+        const up = await fetch(`/api/files?name=${encodeURIComponent(f.name)}`, { method: 'POST', body: f, credentials: 'same-origin' })
+        const json = await up.json()
+        if (json.code === 0) added.push({ fileId: Date.now(), name: f.name, remotePath: json.result.url })
+      } catch { notify('附件上传失败') }
+    }
+    if (added.length) setFiles((prev) => [...prev, ...added])
+  }
+
   // 存为模板：移动端与桌面端共用
   const saveTemplate = () => {
     const costNum = evaluateAmount(cost) ?? 0
@@ -104,7 +118,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
     && lendRemaining(l, lends) > 0)
   const [time, setTime] = useState(toLocalInput(Date.now()))
   const [keypadOpen, setKeypadOpen] = useState(true)
-  const [keypadField, setKeypadField] = useState<'cost' | 'fee' | 'toCost'>('cost')
+  const [keypadField, setKeypadField] = useState<'cost' | 'fee' | 'toCost' | 'discount'>('cost')
   const [mobileKeypad, setMobileKeypad] = useState(() => window.matchMedia('(max-width: 600px)').matches)
 
   useEffect(() => {
@@ -217,6 +231,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
       return true
     })) return false
     setCost(''); setRemark(''); setCid(0); setCurrency(defaultCurrency)
+    setPickedTags([]); setDiscount(''); setFiles([]); setKeypadField('cost')
     notify(`${mode === 'expense' ? '支出' : '收入'} ${money(v)} 已记录`)
     return true
   }
@@ -247,7 +262,8 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
       holdRef.current = {}
     }
     const setKey = (key: string) => {
-      const setter = keypadField === 'fee' ? setFee : keypadField === 'toCost' ? setToCost : setCost
+      const setter = keypadField === 'fee' ? setFee : keypadField === 'toCost' ? setToCost
+        : keypadField === 'discount' ? setDiscount : setCost
       setter((value) => editAmount(value, key))
     }
     const key = (label: string, extra = '') => label === '退格'
@@ -265,7 +281,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
             {(['expense', 'income', 'transfer', 'debt'] as const).map((item, index) => <button key={item} type="button" aria-pressed={mode === item} className={mode === item ? 'on' : ''} onClick={() => switchMode(item)}>{['支出', '收入', '转账', '债务'][index]}</button>)}
           </div>
           <MobilePicker className="entry-book" label="选择账本" value={String(curBookId)} options={[
-            { value: '0', label: '全部账本' }, ...accountBooks.map((b) => ({ value: String(b.bookId ?? b.accountBookId), label: b.accountBookName }))
+            { value: '0', label: '全部账本' }, ...accountBooks.filter((b) => !b.hidden).map((b) => ({ value: String(b.bookId ?? b.accountBookId), label: b.accountBookName }))
           ]} onChange={(value) => { localStorage.setItem('xm-current-book', value); setBook(/^\d+$/.test(value) ? Number(value) : value) }} />
         </div>
 
@@ -312,7 +328,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
             )}
             {(
               <label>优惠<input value={discount} placeholder="满减金额" inputMode="none"
-                onFocus={() => { setKeypadField('cost'); setKeypadOpen(true) }}
+                onFocus={() => { setKeypadField('discount'); setKeypadOpen(true) }}
                 onChange={(e) => setDiscount(e.target.value.replace(/[^\d.]/g, ''))} /></label>
             )}
             <div className="entry-categories" aria-label="大类">
@@ -343,6 +359,11 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
               onClick={() => speech.listening ? speech.stop() : speech.start()}>
               {speech.listening ? '停' : '语'}
             </button>
+            <label className="ghost entry-file" aria-label="添加附件">
+              附
+              <input type="file" accept="image/*,application/pdf" multiple hidden
+                onChange={async (e) => { await uploadFiles(Array.from(e.target.files ?? [])); e.target.value = '' }} />
+            </label>
             {mode === 'transfer' ? <span className="entry-currency-code">{displayCurrency}</span> : <MobilePicker className="entry-currency" label="选择币种" value={currency} options={currencies.map((c) => ({ value: c.code, label: c.code, detail: c.name, icon: c.symbol }))} onChange={setCurrency} />}
             <span className="entry-symbol">{currencySymbol(currencies, displayCurrency, defaultCurrency)}</span>
             <input className="entry-value" aria-label="记账金额" value={formatAmount(cost)} placeholder="0.00" inputMode="none" onFocus={() => { setKeypadField('cost'); setKeypadOpen(true) }} onChange={(e) => setCost(e.target.value.replace(/[^\d.]/g, ''))} />
@@ -522,19 +543,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
             onChange={(e) => setDiscount(e.target.value.replace(/[^\d.]/g, ''))} />
           <div className="label">附件（图片或 PDF，可选）</div>
           <input type="file" accept="image/*,application/pdf" multiple aria-label="添加附件"
-            onChange={async (e) => {
-              const list = Array.from(e.target.files ?? [])
-              const added: import('../types').BillFile[] = []
-              for (const f of list) {
-                try {
-                  const up = await fetch(`/api/files?name=${encodeURIComponent(f.name)}`, { method: 'POST', body: f, credentials: 'same-origin' })
-                  const json = await up.json()
-                  if (json.code === 0) added.push({ fileId: Date.now(), name: f.name, remotePath: json.result.url })
-                } catch { notify('附件上传失败') }
-              }
-              if (added.length) setFiles((prev) => [...prev, ...added])
-              e.target.value = ''
-            }} />
+            onChange={async (e) => { await uploadFiles(Array.from(e.target.files ?? [])); e.target.value = '' }} />
           {files.length > 0 && <p className="hint">已添加 {files.length} 个附件（30 天后自动销毁）</p>}
         </>
       )}

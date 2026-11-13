@@ -195,6 +195,7 @@ interface LedgerState {
   addCurrency: (c: Currency) => void
   removeCurrency: (code: string) => void
   applyRemote: (records: SyncIncoming[]) => void
+  applyAccountScope: (patch: Record<string, unknown>) => void
   setLastSync: (t: number) => void
   setSessionSyncAt: (t: number) => void
   /** 处理期号冲突：内容一致才作废本地候选，被改过或有业务关联的保留并标待核对 */
@@ -369,6 +370,8 @@ export const useLedger = create<LedgerState>()(
           notIntoTotal: patch.notIntoTotal,
           notIntoBudget: patch.notIntoBudget,
           discountNumber: patch.discountNumber,
+          // 理财流水标记：持仓交易生成的账单
+          ...(patch.stockInfoId != null ? { stockInfoId: patch.stockInfoId } : {}),
           refundNum: patch.refundNum,
           poiAddress: patch.poiAddress,
           totalAddress: patch.totalAddress,
@@ -682,7 +685,9 @@ export const useLedger = create<LedgerState>()(
             parentCategoryId: 4,
             cost: amount,
             remark: `${type === 1 ? '买入' : '卖出'} ${rec.name}`,
-            time: time ?? Date.now()
+            time: time ?? Date.now(),
+            // 标记来源：理财流水开关按此字段筛选，不再依赖备注文案
+            stockInfoId: stockInfoId
           })
         }
         set((st) => ({
@@ -1521,6 +1526,8 @@ export const useLedger = create<LedgerState>()(
         }
       },
 
+      /** 切账号时把目标账号没有的字段重置为初始值；必须走受控 set 以便重算余额 */
+      applyAccountScope: (patch) => set(() => patch as never),
       setLastSync: (t) => set({ lastSync: t }),
       setSessionSyncAt: (t) => set({ sessionSyncAt: t }),
 

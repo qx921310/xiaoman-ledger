@@ -304,6 +304,8 @@ export interface Bill {
   billType: number
   /** 由哪条周期规则生成（跨设备去重用） */
   cycleId?: number | string
+  /** 由哪笔持仓交易生成（一木的理财买入卖出流水，用于「显示理财流水」开关） */
+  stockInfoId?: number
   tags: string[]
   /** 附件引用 */
   files: BillFile[]

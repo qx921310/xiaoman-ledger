@@ -17,6 +17,11 @@ const queuePending = (bookId: string, patch: Record<string, unknown>) => {
     localStorage.setItem(PENDING_KEY, JSON.stringify(all))
   } catch { /* 存储不可用则放弃补传 */ }
 }
+const PENDING_FLUSH_EVENT = 'xiaoman-book-flush'
+/** 任何地方都可以触发补传（登录后、联网时、进入账本页） */
+export const flushBookPending = () => { void flushPending() }
+export const notifyBookFlush = () => window.dispatchEvent(new Event(PENDING_FLUSH_EVENT))
+
 const flushPending = async () => {
   let all: Record<string, Record<string, unknown>> = {}
   try { all = JSON.parse(localStorage.getItem(PENDING_KEY) ?? '{}') as typeof all } catch { return 0 }
@@ -47,7 +52,16 @@ export function BookManager({ notify, onBack }: { notify: (m: string) => void; o
   const [editing, setEditing] = useState<null | { bookId: string | number; name: string; icon: string; showTransfer: boolean; showStock: boolean; hideAllCategory: boolean }>(null)
   const [newIcon, setNewIcon] = useState(BOOK_ICONS[0])
   const [hidePage, setHidePage] = useState(false)
-  useEffect(() => { void flushPending() }, [])
+  useEffect(() => {
+    const run = () => { void flushPending() }
+    run()
+    window.addEventListener(PENDING_FLUSH_EVENT, run)
+    window.addEventListener('online', run)
+    return () => {
+      window.removeEventListener(PENDING_FLUSH_EVENT, run)
+      window.removeEventListener('online', run)
+    }
+  }, [])
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
 
@@ -70,6 +84,15 @@ export function BookManager({ notify, onBack }: { notify: (m: string) => void; o
         showTransfer: patch.showTransfer, showStock: patch.showStock,
         hideAllCategory: patch.hideAllCategory
       })
+      // 已成功落库：清掉该账本的离线待补，避免旧值之后覆盖新值
+      try {
+        const raw = localStorage.getItem(PENDING_KEY)
+        if (raw) {
+          const all = JSON.parse(raw) as Record<string, unknown>
+          delete all[String(editing.bookId)]
+          localStorage.setItem(PENDING_KEY, JSON.stringify(all))
+        }
+      } catch { /* 忽略 */ }
     } catch {
       // 离线：本地已生效，排队等联网后补传，避免被服务端旧值覆盖
       queuePending(String(editing.bookId), {
