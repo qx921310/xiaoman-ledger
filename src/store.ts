@@ -136,6 +136,9 @@ interface LedgerState {
     splitType: 0 | 1 | 2; participants: Array<{ memberId: number; value: number }>; time?: number
   }) => boolean
   deleteSplitExpense: (splitExpenseId: number) => void
+  setBillFiles: (billId: string | number, files: import('./types').BillFile[]) => void
+  setTransferFiles: (transferId: string | number, files: import('./types').BillFile[]) => void
+  setLendFiles: (lendId: string | number, files: import('./types').BillFile[]) => void
   settleSplit: (splitExpenseId: number, settlement: boolean) => void
   /** 账单组：把多条账单合并成一条展示（一木 BillGroup） */
   createBillGroup: (billIds: Array<string | number>, meta?: { parentCategoryId?: number; childCategoryId?: number; remark?: string }) => boolean
@@ -153,7 +156,7 @@ interface LedgerState {
   /** 一木 StockHideActivity：切换持仓的隐藏状态 */
   setStockHidden: (stockAssetId: number, hidden: boolean) => void
   /** 一木：愿望清单 */
-  addDream: (patch: { name: string; totalNum: number; startNum?: number; remark?: string; startTime?: number; endTime?: number; addType?: 0 | 1 | 3; addNum?: number; interval?: number }) => void
+  addDream: (patch: { name: string; totalNum: number; startNum?: number; remark?: string; startTime?: number; endTime?: number; addType?: 0 | 1 | 3; addNum?: number; interval?: number; ratio?: number }) => void
   updateDream: (dreamId: number, patch: Partial<import('./types').Dream>) => void
   deleteDream: (dreamId: number) => void
   /** 一木：自定义智能分类 */
@@ -588,6 +591,17 @@ export const useLedger = create<LedgerState>()(
           bookId: s.splitExpenses.find((x) => x.splitExpenseId === splitExpenseId)?.bookId, updatedAt: NOW() }]
       })),
 
+      /** 账单图片页：按来源更新附件（账单/转账/借贷三渠道） */
+      setBillFiles: (billId, files) => set((s) => ({
+        bills: s.bills.map((b) => String(b.billId) === String(billId) ? { ...b, files, updateTime: NOW() } : b)
+      })),
+      setTransferFiles: (transferId, files) => set((s) => ({
+        transfers: s.transfers.map((t) => String(t.transferId) === String(transferId) ? { ...t, files, updateTime: NOW() } : t)
+      })),
+      setLendFiles: (lendId, files) => set((s) => ({
+        lends: s.lends.map((l) => String(l.lendId) === String(lendId) ? { ...l, files, updateTime: NOW() } : l)
+      })),
+
       settleSplit: (splitExpenseId, settlement) => set((s) => ({
         splitExpenses: s.splitExpenses.map((x) => x.splitExpenseId === splitExpenseId
           ? { ...x, settlement, updateTime: NOW() } : x)
@@ -683,7 +697,7 @@ export const useLedger = create<LedgerState>()(
           dreamId, name: patch.name ?? '', totalNum: Number(patch.totalNum) || 0,
           startNum: Number(patch.startNum) || 0, remark: patch.remark ?? '',
           startTime: patch.startTime ?? NOW(),
-          endTime: patch.endTime, addType: patch.addType ?? 0, addNum: patch.addNum, interval: patch.interval,
+          endTime: patch.endTime, addType: patch.addType ?? 0, addNum: patch.addNum, interval: patch.interval, ratio: patch.ratio,
           updateTime: NOW(), ownerId: s.userId,
           bookId: s.currentBookId === 0 ? undefined : s.currentBookId
         }

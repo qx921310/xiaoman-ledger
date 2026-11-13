@@ -16,7 +16,9 @@ export function BillFiles({ onBack, notify }: { onBack: () => void; notify: (m: 
   const bills = useLedger((s) => s.bills)
   const transfers = useLedger((s) => s.transfers)
   const lends = useLedger((s) => s.lends)
-  const updateBill = useLedger((s) => s.updateBill)
+  const setBillFiles = useLedger((s) => s.setBillFiles)
+  const setTransferFiles = useLedger((s) => s.setTransferFiles)
+  const setLendFiles = useLedger((s) => s.setLendFiles)
   const [viewing, setViewing] = useState<{ name: string; url: string } | null>(null)
 
   const groups = useMemo(() => {
@@ -71,10 +73,24 @@ export function BillFiles({ onBack, notify }: { onBack: () => void; notify: (m: 
                 <div className="file-actions">
                   <a className="link" href={r.url} target="_blank" rel="noreferrer">查看</a>
                   <button type="button" className="del" onClick={() => {
-                    if (!confirm(`删除附件 ${r.name}？账单本身不受影响。`)) return
-                    const owner = bills.find((b) => (b.files ?? []).some((f) => (f.remotePath || f.name) === (r.url || r.name)))
-                    if (!owner) { notify('找不到所属账单'); return }
-                    updateBill(owner.billId, { files: (owner.files ?? []).filter((f) => (f.remotePath || f.name) !== (r.url || r.name)) })
+                    if (!confirm(`删除附件 ${r.name}？所属记录本身不受影响。`)) return
+                    const match = (f: { remotePath: string; name: string }) => (f.remotePath || f.name) === (r.url || r.name)
+                    // 一木 BillFile 可挂在账单/转账/借贷上：按 r.key 前缀判断来源，逐个渠道找
+                    const isTransfer = r.key.startsWith('t-')
+                    const isLend = r.key.startsWith('l-')
+                    if (isTransfer) {
+                      const owner = transfers.find((t) => (t.files ?? []).some(match))
+                      if (!owner) { notify('找不到所属转账'); return }
+                      setTransferFiles(owner.transferId, (owner.files ?? []).filter((f) => !match(f)))
+                    } else if (isLend) {
+                      const owner = lends.find((l) => (l.files ?? []).some(match))
+                      if (!owner) { notify('找不到所属借贷'); return }
+                      setLendFiles(owner.lendId, (owner.files ?? []).filter((f) => !match(f)))
+                    } else {
+                      const owner = bills.find((b) => (b.files ?? []).some(match))
+                      if (!owner) { notify('找不到所属账单'); return }
+                      setBillFiles(owner.billId, (owner.files ?? []).filter((f) => !match(f)))
+                    }
                     notify('附件已删除')
                   }}>删</button>
                 </div>

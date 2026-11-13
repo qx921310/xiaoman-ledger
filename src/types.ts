@@ -175,6 +175,8 @@ export interface Dream {
   addNum?: number
   /** 定期周期（天） */
   interval?: number
+  /** 按收入比例储蓄时的比例（0-100，一木 ratio） */
+  ratio?: number
 }
 
 /** 一木：模板（ModuleManagerActivity / AddModuleTransferActivity） */

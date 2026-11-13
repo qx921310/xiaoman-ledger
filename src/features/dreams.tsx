@@ -21,7 +21,7 @@ export function DreamList({ onBack, notify }: { onBack: () => void; notify: (m: 
   const [editing, setEditing] = useState<null | {
     dreamId?: number; name: string; totalNum: string; startNum: string
     remark: string; icon: string; startTime: string
-    endTime: string; noDeadline: boolean; addType: 0 | 1 | 3; addNum: string
+    endTime: string; noDeadline: boolean; addType: 0 | 1 | 3; addNum: string; ratio: string
   }>(null)
 
   const ordered = useMemo(() => [...dreams].sort((a, b) => (a.startTime ?? 0) - (b.startTime ?? 0)), [dreams])
@@ -39,7 +39,8 @@ export function DreamList({ onBack, notify }: { onBack: () => void; notify: (m: 
         remark: editing.remark, icon: editing.icon, startTime: start,
         endTime: editing.noDeadline || !editing.endTime ? undefined : new Date(editing.endTime).getTime(),
         addType: editing.addType,
-        addNum: editing.addType === 1 ? Number(editing.addNum) || 0 : undefined
+        addNum: editing.addType === 1 ? Number(editing.addNum) || 0 : undefined,
+        ratio: editing.addType === 3 ? Number(editing.ratio) || 0 : undefined
       })
       notify('愿望已保存')
     } else {
@@ -48,7 +49,8 @@ export function DreamList({ onBack, notify }: { onBack: () => void; notify: (m: 
         remark: editing.remark, startTime: start,
         endTime: editing.noDeadline || !editing.endTime ? undefined : new Date(editing.endTime).getTime(),
         addType: editing.addType,
-        addNum: editing.addType === 1 ? Number(editing.addNum) || 0 : undefined
+        addNum: editing.addType === 1 ? Number(editing.addNum) || 0 : undefined,
+        ratio: editing.addType === 3 ? Number(editing.ratio) || 0 : undefined
       })
       notify('愿望已创建')
     }
@@ -108,6 +110,13 @@ export function DreamList({ onBack, notify }: { onBack: () => void; notify: (m: 
               onChange={(e) => setEditing({ ...editing, addNum: e.target.value.replace(/[^\d.]/g, '') })} />
           </>
         )}
+        {editing.addType === 3 && (
+          <>
+            <div className="label">按收入比例（%）</div>
+            <input aria-label="储蓄比例" inputMode="decimal" value={editing.ratio}
+              onChange={(e) => setEditing({ ...editing, ratio: e.target.value.replace(/[^\d.]/g, '') })} />
+          </>
+        )}
       </>
     )
   }
@@ -120,7 +129,7 @@ export function DreamList({ onBack, notify }: { onBack: () => void; notify: (m: 
         <button type="button" className="link" onClick={() => setEditing({
           name: '', totalNum: '', startNum: '', remark: '', icon: DREAM_ICONS[0],
           startTime: new Date().toISOString().slice(0, 10),
-          endTime: '', noDeadline: true, addType: 0, addNum: ''
+          endTime: '', noDeadline: true, addType: 0, addNum: '', ratio: ''
         })}>新增</button>
       </div>
       <p className="hint">右上角设置可将愿望清单显示在首页。</p>
@@ -131,7 +140,7 @@ export function DreamList({ onBack, notify }: { onBack: () => void; notify: (m: 
           <button type="button" className="ghost wide" onClick={() => setEditing({
             name: '', totalNum: '', startNum: '', remark: '', icon: DREAM_ICONS[0],
             startTime: new Date().toISOString().slice(0, 10),
-            endTime: '', noDeadline: true, addType: 0, addNum: ''
+            endTime: '', noDeadline: true, addType: 0, addNum: '', ratio: ''
           })}>添加第一个愿望</button>
         </>
       )}
@@ -155,7 +164,8 @@ export function DreamList({ onBack, notify }: { onBack: () => void; notify: (m: 
                 endTime: d.endTime ? new Date(d.endTime).toISOString().slice(0, 10) : '',
                 noDeadline: !d.endTime,
                 addType: (d.addType ?? 0) as 0 | 1 | 3,
-                addNum: d.addNum != null ? String(d.addNum) : ''
+                addNum: d.addNum != null ? String(d.addNum) : '',
+                ratio: d.ratio != null ? String(d.ratio) : ''
               })}>编辑</button>
               <button type="button" className="del" onClick={() => {
                 if (!confirm(`删除愿望「${d.name}」？`)) return

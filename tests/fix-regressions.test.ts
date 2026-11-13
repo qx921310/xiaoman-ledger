@@ -339,6 +339,32 @@ test('AA 分账：金额必填、至少一位参与人、按金额时合计必�
   assert.equal(e.amount, 100)
 })
 
+test('附件可按来源删除（账单/转账/借贷），愿望支持比例储蓄字段', () => {
+  reset()
+  useLedger.setState({ currentBookId: 1, assets: [
+    { assetId: 10, assetName: '现金', assetNumber: 1000, openingBalance: 1000, assetType: 1 },
+    { assetId: 11, assetName: '储蓄', assetNumber: 0, openingBalance: 0, assetType: 3 }
+  ] } as never)
+  const file = { fileId: 1, name: 'a.jpg', remotePath: '/uploads/a.jpg' }
+  const bill = st().addBill({ assetId: 10, parentCategoryId: 7, cost: 10, time: Date.now(), files: [file] })
+  st().setBillFiles(bill.billId, [])
+  assert.equal(st().bills.find((b) => b.billId === bill.billId)?.files.length, 0, '账单附件应被删除')
+
+  const transfer = st().addTransfer({ fromAssetId: 10, toAssetId: 11, cost: 10, toCost: 10, files: [file] } as never)
+  st().setTransferFiles(transfer.transferId, [])
+  assert.equal(st().transfers[0].files?.length, 0, '转账附件应被删除')
+
+  st().addLend({ type: 1, assetId: 10, counterparty: '小王', number: 10 })
+  const lend = st().lends[0]
+  st().setLendFiles(lend.lendId, [file])
+  assert.equal(st().lends[0].files?.length, 1, '借贷附件应能写入')
+
+  st().addDream({ name: '旅行', totalNum: 1000, startNum: 0, addType: 3, ratio: 10 })
+  const dream = st().dreams[0]
+  assert.equal(dream.addType, 3)
+  assert.equal(dream.ratio, 10, '比例储蓄字段应保存')
+})
+
 test('账本开关与隐藏可持久化（一木 AddAccountBookActivity 的三个开关）', () => {
   reset()
   useLedger.setState({ currentBookId: 1 } as never)
