@@ -1118,3 +1118,11 @@ button.day-btn {
   background: var(--card); border-radius: var(--r-md); color: var(--ink); cursor: pointer;
 }
 .debt-box .seg button.on { background: var(--accent-soft); border-color: var(--accent); }
+
+/* 账本图标选择（一木 activity_add_account_book 的 icon_layout） */
+.icon-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
+.icon-cell {
+  display: grid; place-items: center; padding: 8px; border: 1px solid var(--line);
+  background: var(--card); border-radius: var(--r-md); cursor: pointer;
+}
+.icon-cell.on { border-color: var(--accent); background: var(--accent-soft); }

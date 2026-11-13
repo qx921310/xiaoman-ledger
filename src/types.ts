@@ -390,6 +390,8 @@ export interface Tag {
   hide?: boolean
   /** 指定在哪些账本隐藏 */
   hideBook?: Array<string | number>
+  /** 分类归属的账本：账本开启「隐藏所有分类」时，只显示这里列出的分类 */
+  bookIds?: Array<string | number>
   positionWeight: number
   /** 修改时间，用于跨设备比较版本 */
   updateTime?: number
@@ -557,6 +559,8 @@ export interface Category {
   hide?: boolean
   /** 在指定账本隐藏 */
   hideBook?: Array<string | number>
+  /** 分类归属的账本：账本开启「隐藏所有分类」时，只显示这里列出的分类 */
+  bookIds?: Array<string | number>
   id: number
   name: string
   parentId: number

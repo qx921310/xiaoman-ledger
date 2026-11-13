@@ -184,7 +184,7 @@ interface LedgerState {
   applyImport: (plan: ImportPlan) => void
   mergeTaxonomy: () => void
   addCategory: (patch: { name: string; kind: 'expense' | 'income'; parentId: number; icon?: string; color?: string }) => Category
-  updateCategory: (id: number, patch: Partial<Pick<Category, 'name' | 'icon' | 'color' | 'bg' | 'hide' | 'positionWeight'>>) => void
+  updateCategory: (id: number, patch: Partial<Pick<Category, 'name' | 'icon' | 'color' | 'bg' | 'hide' | 'positionWeight' | 'hideBook' | 'bookIds'>>) => void
   deleteCategory: (id: number) => boolean
   moveCategory: (id: number, dir: -1 | 1) => void
   addTag: (patch: Omit<Tag, 'tagId' | 'positionWeight'> & { positionWeight?: number }) => Tag
