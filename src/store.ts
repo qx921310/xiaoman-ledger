@@ -148,8 +148,8 @@ interface LedgerState {
   addAiTypeRule: (patch: { keywords: string[]; categoryId: number }) => void
   deleteAiTypeRule: (ruleId: number) => void
   /** 一木：定期存款 */
-  addFixedDeposit: (patch: { amount: number; rate: number; termYears: number; startTime?: number; remark?: string; assetId?: number; depositType?: string }) => void
-  deleteFixedDeposit: (depositId: number) => void
+  addFixedDeposit: (patch: { amount: number; rate: number; termYears: number; startTime?: number; remark?: string; assetId?: number; depositType?: string; toAsset?: boolean }) => void
+  deleteFixedDeposit: (depositId: number, options?: { reduceAsset?: boolean }) => void
   setStockPrice: (stockAssetId: number, price: number) => void
   setStockCostMethod: (stockAssetId: number, method: 0 | 1 | 2) => void
   addTemplate: (patch: Omit<import('./types').Template, 'templateId' | 'updateTime'>) => import('./types').Template
@@ -501,20 +501,36 @@ export const useLedger = create<LedgerState>()(
       addFixedDeposit: (patch) => set((s) => {
         let depositId = Date.now()
         while (s.fixedDeposits.some((d) => d.depositId === depositId)) depositId++
+        const amt = Number(patch.amount) || 0
+        // 一木：勾选「累加至账户余额」后，账户余额增加本次定存金额
+        const toAsset = !!patch.toAsset && !!patch.assetId && patch.assetId > 0
+        // 余额由 deriveAssets(openingBalance) 派生，直接改 assetNumber 会被覆盖
+        const assets = toAsset
+          ? s.assets.map((a) => a.assetId === patch.assetId
+            ? { ...a, openingBalance: +((a.openingBalance ?? a.assetNumber) + amt).toFixed(2), updateTime: NOW() } : a)
+          : s.assets
         return {
+          assets,
           fixedDeposits: [{
             depositId, depositType: patch.depositType ?? '整存整取',
             amount: Number(patch.amount) || 0, rate: Number(patch.rate) || 0,
             termYears: Number(patch.termYears) || 1,
             startTime: patch.startTime ?? NOW(), remark: patch.remark ?? '',
-            assetId: patch.assetId, updateTime: NOW(), ownerId: s.userId,
+            assetId: patch.assetId, toAsset, updateTime: NOW(), ownerId: s.userId,
             bookId: s.currentBookId === 0 ? undefined : s.currentBookId
           }, ...s.fixedDeposits]
         }
       }),
-      deleteFixedDeposit: (depositId) => set((s) => {
+      deleteFixedDeposit: (depositId, options) => set((s) => {
         const rec = s.fixedDeposits.find((d) => d.depositId === depositId)
+        // 一木：删除时勾选「减少账户余额」则扣回
+        const reduce = !!options?.reduceAsset && rec?.toAsset && rec?.assetId
+        const assets = reduce
+          ? s.assets.map((a) => a.assetId === rec!.assetId
+            ? { ...a, openingBalance: +((a.openingBalance ?? a.assetNumber) - rec!.amount).toFixed(2), updateTime: NOW() } : a)
+          : s.assets
         return {
+          assets,
           fixedDeposits: s.fixedDeposits.filter((d) => d.depositId !== depositId),
           // 墓碑账本必须继承被删记录，而不是当前账本
           tombstones: [...s.tombstones, { kind: 'fixedDeposit', id: String(depositId), updatedAt: NOW(),

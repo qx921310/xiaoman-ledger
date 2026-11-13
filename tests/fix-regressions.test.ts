@@ -56,6 +56,29 @@ test('新实体带属主，云端同属主记录不会生成副本', () => {
   assert.equal(st().dreams.length, before, '同属主同 ID 不应新增条目')
 })
 
+test('定存勾选累加时账户余额增加，删除扣回', () => {
+  reset()
+  useLedger.setState({ assets: [{ assetId: 10, assetName: '储蓄', assetNumber: 1000, assetType: 1 }] } as never)
+  const d = st().addFixedDeposit({ amount: 500, rate: 3, termYears: 3, assetId: 10, toAsset: true })
+  assert.equal(st().assets[0].assetNumber, 1500)
+  assert.equal(st().assets[0].openingBalance, 1500, '期初余额才是真值')
+  const rec = st().fixedDeposits[0]
+  st().deleteFixedDeposit(rec.depositId, { reduceAsset: true })
+  assert.equal(st().assets[0].assetNumber, 1000, '删除时应扣回')
+  assert.equal(st().fixedDeposits.length, 0)
+  void d
+})
+
+test('定存不勾选时不改动账户余额', () => {
+  reset()
+  useLedger.setState({ assets: [{ assetId: 10, assetName: '储蓄', assetNumber: 1000, assetType: 1 }] } as never)
+  st().addFixedDeposit({ amount: 500, rate: 3, termYears: 3, assetId: 10, toAsset: false })
+  assert.equal(st().assets[0].assetNumber, 1000)
+  const rec = st().fixedDeposits[0]
+  st().deleteFixedDeposit(rec.depositId, { reduceAsset: true })
+  assert.equal(st().assets[0].assetNumber, 1000, '未累加过的定存删除时不该扣')
+})
+
 test('跨账本还款继承父借贷账本', () => {
   reset()
   useLedger.setState({ currentBookId: 1, assets: [{ assetId: 10, assetName: '现金', assetNumber: 0, assetType: 1 }] } as never)

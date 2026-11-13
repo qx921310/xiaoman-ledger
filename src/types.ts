@@ -126,6 +126,8 @@ export interface FixedDeposit {
   remark?: string
   /** 关联账单（一木 item 里带 bill_layout） */
   billId?: string | number
+  /** 新增时是否「累加至账户余额」（一木 CommonCheckboxDialog 的选项） */
+  toAsset?: boolean
   bookId?: string | number
   /** 属主：合并云端记录时用于判断「同一条」 */
   ownerId?: number

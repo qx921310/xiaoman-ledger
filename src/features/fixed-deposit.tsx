@@ -14,6 +14,9 @@ export function FixedDepositList({ onBack, notify }: { onBack: () => void; notif
   const del = useLedger((s) => s.deleteFixedDeposit)
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ amount: '', rate: '', term: '1', start: '', remark: '' })
+  const assets = useLedger((s2) => s2.assets.filter((a) => !a.hide))
+  const [assetId, setAssetId] = useState<number>(0)
+  const [toAsset, setToAsset] = useState(false)
 
   const info = (startTime: number, termYears: number, amount: number, rate: number) => {
     // 按日历整年顺延：跨闰年不出现差一天
@@ -49,7 +52,11 @@ export function FixedDepositList({ onBack, notify }: { onBack: () => void; notif
               <small>{d.depositType} · 年利率 {d.rate}% · 剩余 {remain} 天</small>
               <small>{fullDay(due)} 到期 · 预计收益 {money(income)}</small>
             </div>
-            <button type="button" className="del" onClick={() => del(d.depositId)}>删</button>
+            <button type="button" className="del" onClick={() => {
+              // 一木：删除时可选择「减少账户余额」
+              const reduce = d.toAsset ? confirm('删除定存：是否同时从账户余额中扣回本次定存金额？') : false
+              del(d.depositId, { reduceAsset: reduce })
+            }}>删</button>
           </div>
         )
       })}
@@ -77,6 +84,15 @@ export function FixedDepositList({ onBack, notify }: { onBack: () => void; notif
           <div className="label">存入日期</div>
           <input aria-label="存入日期" type="date" value={form.start}
             onChange={(e) => setForm({ ...form, start: e.target.value })} />
+          <div className="label">关联账户</div>
+          <select aria-label="关联账户" value={assetId} onChange={(e) => setAssetId(Number(e.target.value))}>
+            <option value={0}>不关联账户</option>
+            {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
+          </select>
+          <label className="row">
+            <input type="checkbox" checked={toAsset} disabled={!assetId} onChange={(e) => setToAsset(e.target.checked)} />
+            <span className="grow">累加至账户余额</span>
+          </label>
           <div className="label">备注</div>
           <input aria-label="备注" value={form.remark} onChange={(e) => setForm({ ...form, remark: e.target.value })} />
           <div className="modal-btns">
@@ -87,7 +103,9 @@ export function FixedDepositList({ onBack, notify }: { onBack: () => void; notif
               add({
                 amount, rate: Number(form.rate) || 0, termYears: Number(form.term) || 1,
                 startTime: form.start ? new Date(`${form.start}T00:00:00`).getTime() : Date.now(),
-                remark: form.remark
+                remark: form.remark,
+                assetId: assetId || undefined,
+                toAsset: toAsset && assetId > 0
               })
               setForm({ amount: '', rate: '', term: '1', start: '', remark: '' })
               setOpen(false)
