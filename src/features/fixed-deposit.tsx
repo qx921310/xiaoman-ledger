@@ -108,7 +108,7 @@ export function FixedDepositList({ onBack, notify }: { onBack: () => void; notif
                 startTime: form.start ? new Date(`${form.start}T00:00:00`).getTime() : Date.now(),
                 remark: form.remark,
                 assetId: assetId || undefined,
-                toAsset: toAsset && assetId > 0
+                toAsset: toAsset && !!assets.some((a) => a.assetId === assetId)
               })
               setForm({ amount: '', rate: '', term: '1', start: '', remark: '' })
               setOpen(false)

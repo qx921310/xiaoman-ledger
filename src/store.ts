@@ -498,36 +498,28 @@ export const useLedger = create<LedgerState>()(
           ? { ...x, settlement, updateTime: NOW() } : x)
       })),
 
-      // 定期存款：勾选「累加至账户余额」时，用一笔「现金账户 → 定存虚拟账户」的转账表达，
-      // 余额仍由流水推导（不直接改 openingBalance），删除时撤销该转账
+      // 定期存款：一木的「累加至账户余额」就是直接把账户余额加上去（调整，不是流水），
+      // 删除时可选「减少账户余额」扣回。用 openingBalance 作为真值，assetNumber 由它派生。
       addFixedDeposit: (patch) => {
         const st = get()
         let depositId = Date.now()
         while (st.fixedDeposits.some((d) => d.depositId === depositId)) depositId++
         const amt = Number(patch.amount) || 0
-        const toAsset = !!patch.toAsset && !!patch.assetId && patch.assetId > 0
-        let virtualAssetId: number | undefined
-        let transferId: string | number | undefined
-        if (toAsset) {
-          // 虚拟「定存账户」：隐藏，只在资产分布里体现这笔钱去了哪
-          virtualAssetId = -depositId
-          st.addAsset({
-            assetId: virtualAssetId, assetName: `定存 ${amt}`, assetType: 9, hide: true,
-            assetNumber: 0, openingBalance: 0, intoTotal: 1
-          } as never)
-          const tr = get().addTransfer({
-            fromAssetId: patch.assetId!, toAssetId: virtualAssetId,
-            cost: amt, time: patch.startTime ?? NOW(), remark: '存入定期存款'
-          })
-          transferId = tr.transferId
-        }
+        const sourceAsset = patch.assetId == null ? undefined : st.assets.find((a) => a.assetId === patch.assetId)
+        const toAsset = !!patch.toAsset && !!sourceAsset
         set((s) => ({
+          assets: toAsset
+            ? s.assets.map((a) => a.assetId === patch.assetId
+              // 方向必须与按钮文案一致：勾选「累加」= 余额增加
+              ? { ...a, openingBalance: +((a.openingBalance ?? a.assetNumber) + amt).toFixed(2), updateTime: NOW() }
+              : a)
+            : s.assets,
           fixedDeposits: [{
             depositId, depositType: patch.depositType ?? '整存整取',
             amount: amt, rate: Number(patch.rate) || 0,
             termYears: Number(patch.termYears) || 1,
             startTime: patch.startTime ?? NOW(), remark: patch.remark ?? '',
-            assetId: patch.assetId, toAsset, virtualAssetId, transferId,
+            assetId: patch.assetId, toAsset,
             updateTime: NOW(), ownerId: s.userId,
             bookId: s.currentBookId === 0 ? undefined : s.currentBookId
           }, ...s.fixedDeposits]
@@ -536,14 +528,14 @@ export const useLedger = create<LedgerState>()(
       deleteFixedDeposit: (depositId, options) => {
         const st = get()
         const rec = st.fixedDeposits.find((d) => d.depositId === depositId)
-        // 删除时默认撤销对应转账（钱回到原账户），与「余额由流水推导」保持一致
-        if (rec?.transferId != null && options?.reduceAsset !== false) {
-          get().deleteTransfer(rec.transferId)
-        }
-        if (rec?.virtualAssetId != null) {
-          get().deleteAsset(rec.virtualAssetId)
-        }
+        // 一木：删除时勾选「减少账户余额」才扣回；不勾选则余额保持
+        const reduce = !!options?.reduceAsset && rec?.toAsset && rec?.assetId != null
         set((s) => ({
+          assets: reduce
+            ? s.assets.map((a) => a.assetId === rec!.assetId
+              ? { ...a, openingBalance: +((a.openingBalance ?? a.assetNumber) - rec!.amount).toFixed(2), updateTime: NOW() }
+              : a)
+            : s.assets,
           fixedDeposits: s.fixedDeposits.filter((d) => d.depositId !== depositId),
           tombstones: [...s.tombstones, { kind: 'fixedDeposit', id: String(depositId), updatedAt: NOW(),
             bookId: rec?.bookId, ownerId: rec?.ownerId ?? s.userId }]
@@ -703,12 +695,14 @@ export const useLedger = create<LedgerState>()(
         if (tpl.mode === 'transfer' && tpl.transfer) {
           const tr = tpl.transfer
           if (!(Number(tr.cost) > 0)) return false
-          if (!(Number(tr.fromAssetId) > 0) || !(Number(tr.toAssetId) > 0)) return false
+          const hasFrom = s.assets.some((a) => a.assetId === tr.fromAssetId)
+          const hasTo = s.assets.some((a) => a.assetId === tr.toAssetId)
+          if (!hasFrom || !hasTo) return false
           if (tr.fromAssetId === tr.toAssetId) return false
           get().addTransfer({ ...tr, time: Date.now(), bookId: targetBook })
           return true
         }
-        // 只读账本（silent）不允许记账，模板同样不能绕过
+        // 只读账本（silent）不允许记账：对所有模板分支生效（含转账模板）
         const roleOf = (id: string | number | undefined) => id == null ? undefined
           : s.accountBooks.find((bk) => String(bk.bookId) === String(id))?.role
         if (roleOf(targetBook) === 'silent') return false
@@ -1525,8 +1519,13 @@ export const useLedger = create<LedgerState>()(
 
       addTag: (patch) => {
         const parent = patch.parentTagId != null ? get().tags.find((t) => t.tagId === patch.parentTagId) : undefined
+        const st0 = get()
+        const used = new Set(st0.tags.map((t) => String(t.tagId)))
+        // 用确定性递增代替「时间戳+随机」，并显式检查占用，避免两条标签拿到同一 ID
+        let tagId = Math.max(NOW(), ...st0.tags.map((t) => t.tagId).filter(Number.isFinite), 0) + 1
+        while (used.has(String(tagId))) tagId++
         const tag: Tag = {
-          tagId: NOW() + Math.floor(Math.random() * 1000),
+          tagId,
           name: patch.name,
           color: patch.color || DEFAULT_TAG_COLOR,
           parentTagId: patch.parentTagId,
@@ -1564,10 +1563,12 @@ export const useLedger = create<LedgerState>()(
         const missing = [...new Set(names.map((n) => n.trim()).filter(Boolean))].filter((n) => !have.has(n))
         if (!missing.length) return 0
         const palette = [DEFAULT_TAG_COLOR, '#F8C8B0', '#CFE3F7', '#D9F0C8', '#E6D9F7', '#F7D9E6']
-        let i = s.tags.length
+        const i = s.tags.length
+        let nextId = Math.max(NOW(), ...s.tags.map((t) => t.tagId).filter(Number.isFinite), 0) + 1
+        const used = new Set(s.tags.map((t) => String(t.tagId)))
         set((st) => ({
           tags: [...st.tags, ...missing.map((n) => ({
-            tagId: NOW() + (i++),
+            tagId: (() => { while (used.has(String(nextId))) nextId++; used.add(String(nextId)); return nextId++ })(),
             name: n,
             color: palette[i % palette.length],
             positionWeight: i

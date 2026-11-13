@@ -55,6 +55,17 @@ test('汇率接口：未登录 401，登录后返回 CFETS 中间价且 JPY 已�
     const usdRateOfCny = usdBase.body.result.rates.CNY
     assert.ok(usdRateOfCny > 0 && usdRateOfCny < 1, `1 元应约 0.15 美元，实际 ${usdRateOfCny}`)
     assert.ok(Math.abs(usdRateOfCny * r.body.result.rates.USD - 1) < 0.01, '两组汇率应互为倒数')
+
+    // 主源不覆盖的本位币（MYR）：要么给正确换算，要么明确失败，绝不能带错标签成功
+    const myr = await call('/api/rates?base=MYR', undefined, reg.cookie)
+    if (myr.body.code === 0) {
+      const r1 = myr.body.result
+      assert.equal(r1.base, 'MYR')
+      const oneUsdInMyr = r1.rates.USD
+      assert.ok(oneUsdInMyr > 3, `1 美元应约 4.4 马币，实际 ${oneUsdInMyr}（若返回 7 左右即为错把人民币当马币）`)
+    } else {
+      assert.match(String(myr.body.msg), /本位币/, '失败时须说明缺本位币基准价')
+    }
   } finally {
     child.kill()
     await rm(temp, { recursive: true, force: true })

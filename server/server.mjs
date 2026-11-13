@@ -865,16 +865,31 @@ const server = createServer(async (req, res) => {
       if (!u) return fail(res, '请先登录', 401)
       const now = Date.now()
       const base = String(url.searchParams.get('base') || 'CNY').toUpperCase()
-      const toBase = (raw, base) => {
-        const cnyOfBase = base === 'CNY' ? 1 : raw.rates?.[base]
-        if (base === 'CNY' || !Number.isFinite(cnyOfBase) || cnyOfBase <= 0) {
-          return { ...raw, base, rates: raw.rates }
-        }
+      // 只有拿得到本位币的 CNY 价才允许换算，否则返回 null 由调用方报错
+      const toBase = (raw, base, extraBaseRate) => {
+        const cnyOfBase = base === 'CNY' ? 1 : (raw.rates?.[base] ?? extraBaseRate)
+        if (base === 'CNY') return { ...raw, base, rates: raw.rates }
+        if (!Number.isFinite(cnyOfBase) || cnyOfBase <= 0) return null
         const converted = {}
         for (const [code, cny] of Object.entries(raw.rates)) converted[code] = +(cny / cnyOfBase).toFixed(6)
+        converted[base] = 1
         return { ...raw, base, rates: converted }
       }
-      if (ratesCache && now - ratesCache.at < 6 * 3600_000) return ok(res, toBase(ratesCache.data, base))
+      // 本位币不在主源列表里（如 MYR/THB/TWD）时，从兜底源单独取它的 CNY 价
+      const baseRateFromFallback = async (code) => {
+        if (!code || code === 'CNY') return undefined
+        try {
+          const r = await fetch('https://open.er-api.com/v6/latest/CNY', { headers: { 'User-Agent': 'xiaoman-ledger' } })
+          const raw = await r.json()
+          const per = Number(raw?.rates?.[code])
+          return Number.isFinite(per) && per > 0 ? +(1 / per).toFixed(6) : undefined
+        } catch { return undefined }
+      }
+      if (ratesCache && now - ratesCache.at < 6 * 3600_000) {
+        const extra = await baseRateFromFallback(base)
+        const out0 = toBase(ratesCache.data, base, extra)
+        return out0 ? ok(res, out0) : fail(res, `获取汇率信息失败：缺少本位币 ${base} 的基准价`)
+      }
       const wanted = { USD: 'USD/CNY', EUR: 'EUR/CNY', GBP: 'GBP/CNY', HKD: 'HKD/CNY', AUD: 'AUD/CNY', CAD: 'CAD/CNY', SGD: 'SGD/CNY', CHF: 'CHF/CNY', '100JPY': '100JPY/CNY', CNY: 'CNY/CNY' }
       const out = {}
       let source = ''
@@ -920,7 +935,9 @@ const server = createServer(async (req, res) => {
       if (!out.CNY) out.CNY = 1
       const raw = { source, date, fetchedAt: now, rates: out }
       ratesCache = { at: now, data: raw }
-      return ok(res, toBase(raw, base))
+      const extra = await baseRateFromFallback(base)
+      const out1 = toBase(raw, base, extra)
+      return out1 ? ok(res, out1) : fail(res, `获取汇率信息失败：缺少本位币 ${base} 的基准价`)
     }
 
     // 附件上传：鉴权后写入 server/data/uploads，返回可访问路径

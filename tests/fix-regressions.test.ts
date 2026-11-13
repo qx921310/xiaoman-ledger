@@ -71,29 +71,29 @@ test('旧记录无属主时认领云端属主，不产生副本', () => {
   assert.equal(st().dreams[0].ownerId, 1)
 })
 
-test('定存累加用转账表达：有流水、余额下降、期初不变，删除后回滚', () => {
+test('定存累加：余额增加（与文案同向），删除扣回', () => {
   reset()
   useLedger.setState({ assets: [{ assetId: 10, assetName: '储蓄', assetNumber: 1000, openingBalance: 1000, assetType: 1 }] } as never)
   st().addFixedDeposit({ amount: 500, rate: 3, termYears: 3, assetId: 10, toAsset: true })
   const deposit = st().fixedDeposits[0]
-  assert.ok(deposit.transferId != null, '必须生成对应转账')
-  assert.equal(st().assets.find((a) => a.assetId === 10)!.openingBalance, 1000, '期初不得被改动')
-  assert.equal(st().assets.find((a) => a.assetId === 10)!.assetNumber, 500, '余额应减少（由流水推导）')
-  assert.equal(st().transfers.length, 1, '账户流水里必须有这条')
-  st().deleteFixedDeposit(deposit.depositId)
+  assert.equal(deposit.toAsset, true)
+  assert.equal(st().assets.find((a) => a.assetId === 10)!.assetNumber, 1500, '勾选累加后余额应增加')
+  st().deleteFixedDeposit(deposit.depositId, { reduceAsset: true })
   assert.equal(st().fixedDeposits.length, 0)
-  assert.equal(st().transfers.length, 0, '删除时应撤销转账')
-  assert.equal(st().assets.find((a) => a.assetId === 10)!.assetNumber, 1000, '余额回到原值')
+  assert.equal(st().assets.find((a) => a.assetId === 10)!.assetNumber, 1000, '删除并扣回后回到原值')
 })
 
-test('定存不勾选时不产生流水也不动余额', () => {
+test('定存不勾选时不改余额；删除时选择不扣回也保持余额', () => {
   reset()
   useLedger.setState({ assets: [{ assetId: 10, assetName: '储蓄', assetNumber: 1000, openingBalance: 1000, assetType: 1 }] } as never)
   st().addFixedDeposit({ amount: 500, rate: 3, termYears: 3, assetId: 10, toAsset: false })
-  assert.equal(st().transfers.length, 0)
-  assert.equal(st().assets[0].assetNumber, 1000)
-  st().deleteFixedDeposit(st().fixedDeposits[0].depositId)
-  assert.equal(st().assets[0].assetNumber, 1000)
+  assert.equal(st().assets[0].assetNumber, 1000, '不勾选累加则余额不变')
+  st().addFixedDeposit({ amount: 500, rate: 3, termYears: 3, assetId: 10, toAsset: true })
+  assert.equal(st().assets[0].assetNumber, 1500)
+  // 删除时选择「不扣回」：余额保持 1500，且不留悬空流水
+  st().deleteFixedDeposit(st().fixedDeposits[0].depositId, { reduceAsset: false })
+  assert.equal(st().assets[0].assetNumber, 1500)
+  assert.equal(st().transfers.length, 0, '不应再产生指向已删虚拟账户的转账')
 })
 
 test('跨账本还款继承父借贷账本', () => {
@@ -175,6 +175,30 @@ test('债务记账：借出减少余额、借入增加余额、记录对方与�
   assert.equal(st().lends[0].counterparty, '张三')
   st().addLend({ type: 3, assetId: 10, counterparty: '李四', number: 300, remark: '资金借入-现金' })
   assert.equal(st().assets[0].assetNumber, 1100, '借入应增加账户余额')
+})
+
+test('连续新建标签不会撞 ID', () => {
+  reset()
+  const ids = new Set<number>()
+  for (let i = 0; i < 30; i++) ids.add(st().addTag({ name: `标签${i}` }).tagId)
+  assert.equal(ids.size, 30, '30 个标签应有 30 个不同 ID')
+  assert.equal(st().tags.length, 30)
+})
+
+test('属主认领不跨账本：不同账本的同一 ID 记录保持两条', () => {
+  reset()
+  useLedger.setState({ currentBookId: 1 } as never)
+  st().addDream({ name: 'A账本愿望', totalNum: 100, startNum: 0 })
+  const rec = st().dreams[0]
+  const before = st().dreams.length
+  // 云端同 ID 但属于另一账本、另一属主：不能被认领覆盖
+  st().applyRemote([{
+    kind: 'dream', id: String(rec.dreamId), ownerId: 2, updatedAt: Date.now() + 1000,
+    versionAuthoritative: true,
+    payload: { ...rec, ownerId: 2, bookId: 2, name: 'B账本同ID' }
+  }] as never)
+  assert.ok(st().dreams.length >= before, '不同账本应保留为两条，而不是被覆盖成一条')
+  assert.ok(st().dreams.some((d) => d.name === 'A账本愿望'), 'A 账本记录不能被覆盖')
 })
 
 test('模板不能绕过只读账本与私有账户约束', () => {
