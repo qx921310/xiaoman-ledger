@@ -58,6 +58,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
   const [fee, setFee] = useState('')
   const [toCost, setToCost] = useState('')
   const [remark, setRemark] = useState('')
+  const aiTypeRules = useLedger((s) => s.aiTypeRules ?? [])
   const [time, setTime] = useState(toLocalInput(Date.now()))
   const [keypadOpen, setKeypadOpen] = useState(true)
   const [keypadField, setKeypadField] = useState<'cost' | 'fee' | 'toCost'>('cost')
@@ -352,7 +353,13 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
 
       <div className="label">备注</div>
       <div className="row">
-        <input className="grow" aria-label="备注" value={remark} onChange={(e) => setRemark(e.target.value)} placeholder="写点什么（可留空）" />
+        <input className="grow" aria-label="备注" value={remark} onChange={(e) => {
+          const v = e.target.value
+          setRemark(v)
+          // 智能分类：关键词命中时自动切到对应分类（人工后续修改优先）
+          const hit = aiTypeRules.find((r) => r.keywords.some((k) => k && v.includes(k)))
+          if (hit) { setPid(hit.categoryId); setCid(0) }
+        }} placeholder="写点什么（可留空）" />
         <button type="button" className="ghost" onClick={() => speech.listening ? speech.stop() : speech.start()}>
           {speech.listening ? '停止' : '语音'}
         </button>

@@ -15,7 +15,7 @@ import { billNetAmount } from '../bill-amount'
 import { resolveBillChild } from '../taxonomy'
 import { summarizeBills } from '../bill-summary'
 
-export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleView = false }: {
+export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleView = false, focusBillId, onFocusHandled }: {
   me?: { id: number; email: string }
   onAdd?: () => void
   embedded?: boolean
@@ -23,6 +23,9 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
   rangeAll?: boolean
   /** 一木「视图」菜单：简约 / 详细 */
   simpleView?: boolean
+  /** 搜索命中后要直接打开的账单 */
+  focusBillId?: string | number | null
+  onFocusHandled?: () => void
 }) {
   const bills = useLedger((s) => s.bills)
   const transfers = useLedger((s) => s.transfers)
@@ -62,6 +65,13 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
     return next
   })
   const exitSelect = () => { setSelecting(false); setPicked(new Set()) }
+  // 搜索命中：直接打开对应账单详情
+  useEffect(() => {
+    if (focusBillId == null) return
+    const target = bills.find((b) => String(b.billId) === String(focusBillId))
+    if (target) setDetail(target)
+    onFocusHandled?.()
+  }, [focusBillId, bills, onFocusHandled])
   const billGroups = useLedger((s) => s.billGroups)
   const dissolveBillGroup = useLedger((s) => s.dissolveBillGroup)
   const [kw, setKw] = useState('')
@@ -86,7 +96,7 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
   const match = (b: Bill) => {
     // 指定了日期范围时按范围过滤，不再受月份限制
     if (!rangeAll && !dateRangeActive && monthOf(b.time) !== month) return false
-    if (currentBookId !== 0 && b.bookId !== currentBookId) return false
+    if (currentBookId !== 0 && String(b.bookId) !== String(currentBookId)) return false
     if (fPid && b.parentCategoryId !== fPid) return false
     if (fAid && b.assetId !== fAid) return false
     // 金额范围（按账单金额，含边界）
@@ -114,9 +124,9 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
   const groupsInList = useMemo(() => {
     const inBook = billGroups.filter((g) => currentBookId === 0 || String(g.bookId ?? '') === String(currentBookId))
     return inBook.filter((g) => g.billList.some((id) => bills.some((b) => String(b.billId) === String(id) && match(b))))
-  }, [billGroups, bills, currentBookId])
+  }, [billGroups, bills, currentBookId, rangeAll, month, kw, fPid, fAid, fMin, fMax, fTag, fFrom, fTo, parents, dateRangeActive])
   const groupedIds = useMemo(() => new Set(groupsInList.flatMap((g) => g.billList.map(String))), [groupsInList])
-  const list = useMemo(() => bills.filter((b) => !groupedIds.has(String(b.billId))).filter(match).sort((a, b) => b.time - a.time), [bills, month, kw, fPid, fAid, parents, currentBookId, fMin, fMax, fTag, fFrom, fTo, dateRangeActive])
+  const list = useMemo(() => bills.filter((b) => !groupedIds.has(String(b.billId))).filter(match).sort((a, b) => b.time - a.time), [bills, month, kw, fPid, fAid, parents, currentBookId, fMin, fMax, fTag, fFrom, fTo, dateRangeActive, rangeAll, groupedIds])
 
   const tList = useMemo(() => transfers.filter((t) => {
     if (!rangeAll && !dateRangeActive && monthOf(t.time) !== month) return false

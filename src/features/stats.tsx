@@ -53,7 +53,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
   const spentOf = (cid: number) => cid === 0 ? monthSummary.budget : (monthSummary.budgetByCategory.get(cid) ?? 0)
   const limitOf = (b: { amount: number; addNum?: number }) => (b.amount ?? 0) + (b.addNum ?? 0)
   const monthBudgets = budgets.filter((b) => !b.hide && b.month === 'all' && (b.type ?? 'month') === 'month')
-  const yearBudgets = budgets.filter((b) => b.month === 'all' && b.type === 'year')
+  const yearBudgets = budgets.filter((b) => !b.hide && b.month === 'all' && b.type === 'year')
   const totalBudget = limitOf(monthBudgets.find((b) => b.categoryId === 0) ?? { amount: 0 })
   const catBudgets = monthBudgets.filter((b) => b.categoryId !== 0)
   // 每日支出序列（一木普通页柱状图：按日看收支）
@@ -110,7 +110,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
   const totalYearBudget = limitOf(yearBudgets.find((b) => b.categoryId === 0) ?? { amount: 0 })
 
   // 自定义区间预算：按起止日期统计区间内支出
-  const customBudgets = budgets.filter((b) => b.type === 'custom' && b.startTime && b.endTime)
+  const customBudgets = budgets.filter((b) => !b.hide && b.type === 'custom' && b.startTime && b.endTime)
   const customSpend = (b: { startTime?: number; endTime?: number; categoryId: number }) => {
     const from = b.startTime ?? 0
     const to = b.endTime ?? Number.MAX_SAFE_INTEGER
@@ -494,7 +494,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
 
       {mods['资产走势'] && (
         <>
-          <div className="label">资产走势</div>
+          <div className="label">资产走势 <small className="muted">（估算：以当前余额回推）</small></div>
           <div className="stats-chart" role="img" aria-label="资产走势折线图">
             <ResponsiveContainer width="100%" height={180}>
               <LineChart data={assetTrend}>

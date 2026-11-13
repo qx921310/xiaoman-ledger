@@ -874,8 +874,8 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
           {assets.map((a) => {
             const allBooks = accountBooks.map((b) => String(b.bookId))
             const cur = String(bookScopeId)
-            // showBook 为空数组 = 全部账本可见
-            const scope = a.showBook && a.showBook.length ? a.showBook.map(String) : allBooks
+            // showBook 未设置 = 全部账本可见；空数组 = 全部账本隐藏（两者语义不同）
+            const scope = a.showBook == null ? allBooks : a.showBook.map(String)
             const shown = scope.includes(cur)
             return (
               <label key={a.assetId} className="row asset-scope-row">
@@ -883,7 +883,8 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
                 <input type="checkbox" checked={shown} onChange={(e) => {
                   const next = new Set(scope)
                   if (e.target.checked) next.add(cur); else next.delete(cur)
-                  updateAsset({ ...a, showBook: next.size >= allBooks.length ? [] : [...next] })
+                  // 覆盖全部账本时回写 undefined（=全部可见）；否则写具体列表（可能是空 = 全隐藏）
+                  updateAsset({ ...a, showBook: next.size >= allBooks.length ? undefined : [...next] })
                 }} />
               </label>
             )

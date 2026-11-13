@@ -127,6 +127,8 @@ export interface FixedDeposit {
   /** 关联账单（一木 item 里带 bill_layout） */
   billId?: string | number
   bookId?: string | number
+  /** 属主：合并云端记录时用于判断「同一条」 */
+  ownerId?: number
   updateTime?: number
 }
 
@@ -139,6 +141,7 @@ export interface AiTypeRule {
   categoryId: number
   icon?: string
   bookId?: string | number
+  ownerId?: number
   updateTime?: number
 }
 
@@ -157,6 +160,7 @@ export interface Dream {
   /** 开始日期 */
   startTime?: number
   bookId?: string | number
+  ownerId?: number
   updateTime?: number
 }
 

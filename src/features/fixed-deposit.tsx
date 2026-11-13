@@ -15,9 +15,11 @@ export function FixedDepositList({ onBack, notify }: { onBack: () => void; notif
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ amount: '', rate: '', term: '1', start: '', remark: '' })
 
-  const yearMs = 365 * 86400000
   const info = (startTime: number, termYears: number, amount: number, rate: number) => {
-    const due = startTime + termYears * yearMs
+    // 按日历整年顺延：跨闰年不出现差一天
+    const dueDate = new Date(startTime)
+    dueDate.setFullYear(dueDate.getFullYear() + Math.max(1, termYears))
+    const due = dueDate.getTime()
     const remain = Math.max(0, Math.ceil((due - Date.now()) / 86400000))
     const income = +(amount * (rate / 100) * termYears).toFixed(2)
     return { due, remain, income }

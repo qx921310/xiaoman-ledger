@@ -1,19 +1,22 @@
 import { useMemo, useState } from 'react'
 import { useLedger } from '../store'
 import { summarizeBills } from '../bill-summary'
-import { money } from '../ui-format'
+import { money, monthOf } from '../ui-format'
 import { Bills } from './bills'
 import { usePullRefresh } from '../ui/use-pull-refresh'
 import { syncNowImmediate } from '../sync-auto'
 
 /** 首页：本月汇总 + 预算卡 + 记账入口 + 流水（照一木的单列结构） */
-export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot }: {
+export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot, focusBillId, onFocusHandled }: {
   me?: { id: number; email: string }
   onAdd: () => void
   onOpenStats?: () => void
   onSearch?: () => void
   onMore?: () => void
   onScreenshot?: () => void
+  /** 搜索命中后要打开的账单 */
+  focusBillId?: string | number | null
+  onFocusHandled?: () => void
 }) {
   const bills = useLedger((s) => s.bills)
   const parents = useLedger((s) => s.parentCategories)
@@ -25,12 +28,12 @@ export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot }:
     return book?.role === 'silent'
   })
 
-  const month = new Date().toISOString().slice(0, 7)
+  const month = monthOf(Date.now())
   const inBook = useMemo(
     () => bills.filter((b) => bookId === 0 || String(b.bookId) === String(bookId)),
     [bills, bookId]
   )
-  const monthBills = useMemo(() => inBook.filter((b) => new Date(b.time).toISOString().slice(0, 7) === month), [inBook, month])
+  const monthBills = useMemo(() => inBook.filter((b) => monthOf(b.time) === month), [inBook, month])
   const summary = useMemo(() => summarizeBills(monthBills, parents, refunds), [monthBills, parents, refunds])
 
   // 总预算：本月 categoryId=0 的额度，缺省回落到 all
@@ -197,7 +200,8 @@ export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot }:
 
       {modules.flow && <div className="home-flow">
         <div className="hf-head">流水</div>
-        <Bills me={me} onAdd={onAdd} embedded rangeAll={rangeAll} simpleView={simpleView} />
+        <Bills me={me} onAdd={onAdd} embedded rangeAll={rangeAll} simpleView={simpleView}
+          focusBillId={focusBillId} onFocusHandled={onFocusHandled} />
       </div>}
     </section>
   )

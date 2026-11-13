@@ -11,7 +11,7 @@ import { AuthScreen } from './features/auth'
 import { AddBill } from './features/add-bill'
 import { Home } from './features/home'
 import { Search } from './features/search'
-import { PinLock, hasPin } from './features/lock'
+import { PinLock, hasPin, setPinScope } from './features/lock'
 import { CalendarPage } from './features/calendar'
 import { Assets } from './features/assets'
 import { Stats } from './features/stats'
@@ -22,6 +22,14 @@ type Tab = 'home' | 'calendar' | 'assets' | 'stats' | 'me' | 'add'
 export default function App() {
   const [user, setUser] = useState<User | null | undefined>(undefined)
   const [locked, setLocked] = useState(() => hasPin())
+  // 切后台/切回前台重新上锁（一木同类行为：离开即锁）
+  useEffect(() => {
+    if (!hasPin()) return
+    const onHide = () => { setLocked(true) }
+    const onVis = () => { if (document.visibilityState === 'hidden') onHide() }
+    document.addEventListener('visibilitychange', onVis)
+    return () => document.removeEventListener('visibilitychange', onVis)
+  }, [user?.id])
   const [syncWarning, setSyncWarning] = useState('')
   const multiTabHandle = useRef<ReturnType<typeof startMultiTab> | null>(null)
 
@@ -63,7 +71,8 @@ export default function App() {
     try {
       const r = await syncNow()
       const warn = r.denied ? `${r.denied} 条记录未能推送，请到设置页检查同步结果。` : ''
-      setSyncWarning(warn || (r.conflictsKept ? `有 ${r.conflictsKept} 笔同期账单内容不同，已保留并在列表里标为待核对。` : ''))
+      const kept = Number(r.conflictsKept ?? 0) + Number(r.conflicts ?? 0)
+      setSyncWarning(warn || (kept ? `有 ${kept} 条记录待核对（冲突或未推送），请到设置页处理。` : ''))
       console.log('[sync] 自动同步完成', r)
     } catch (e) {
       console.warn('[sync] 自动同步失败（可手动重试）', e)
@@ -134,6 +143,7 @@ export default function App() {
   }
 
   if (user === undefined) return <div className="boot" role="status">加载中…</div>
+  if (user) setPinScope(user.id)
   if (user && locked) return <PinLock onUnlock={() => setLocked(false)} />
   if (user === null) return <AuthScreen onAuthed={afterAuth} />
   return <Shell user={user} onLogout={logout} syncWarning={syncWarning} dismissSyncWarning={() => setSyncWarning('')} />
@@ -143,6 +153,7 @@ export default function App() {
 function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User; onLogout: () => void; syncWarning: string; dismissSyncWarning: () => void }) {
   const [tab, setTab] = useState<Tab>('home')
   const [searchOpen, setSearchOpen] = useState(false)
+  const [focusBillId, setFocusBillId] = useState<string | number | null>(null)
   const changeTab = (next: Tab) => { setSearchOpen(false); setTab(next) }
   const mergeTaxonomy = useLedger((s) => s.mergeTaxonomy)
 
@@ -161,7 +172,7 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User
   const synced = useLedger((s) => s.sessionSyncAt)
   useEffect(() => {
     if (seededAsset.current) return
-    if (!synced) return           // 未完成首次同步：不假定云端为空
+    if (!(synced && synced > 0)) return   // 未开始(-0)或拉取失败(-1)：都不假定云端为空
     if (assets.length > 0) return
     seededAsset.current = true
     addAsset({ assetName: '现金', assetType: 1, assetNumber: 0, intoTotal: 1 } as never)
@@ -200,7 +211,8 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User
       <main className="main">
         {syncWarning && <div className="warn" role="alert">{syncWarning} <button className="link" onClick={() => { setTab('me'); dismissSyncWarning() }}>查看同步</button></div>}
         {searchOpen && (
-          <Search onClose={() => setSearchOpen(false)} onPick={() => setSearchOpen(false)} />
+          <Search onClose={() => setSearchOpen(false)}
+            onPick={(id) => { setSearchOpen(false); setFocusBillId(id); setTab('home') }} />
         )}
         {!searchOpen && tab === 'home' && (
           <Home me={user} onAdd={() => setTab('add')}
@@ -210,7 +222,9 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User
             onScreenshot={() => {
               setTab('me')
               setTimeout(() => document.getElementById('ocr-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
-            }} />
+            }}
+            focusBillId={focusBillId}
+            onFocusHandled={() => setFocusBillId(null)} />
         )}
         {tab === 'calendar' && (
           <CalendarPage onAddBill={() => setTab('add')} onOpenMonthBills={() => setTab('home')} />

@@ -107,7 +107,7 @@ interface LedgerState {
   bindCycleBook: (cycleId: number | string, bookId: string | number) => void
   dedupeCycleBills: () => number
   runCycles: () => number
-  addLend: (patch: { type: 1 | 2 | 3 | 4; assetId: number; counterparty: string; number: number; interest?: number; repaymentAssetId?: number; time?: number; remark?: string; parentLendId?: number }) => void
+  addLend: (patch: { type: 1 | 2 | 3 | 4; assetId: number; counterparty: string; number: number; interest?: number; repaymentAssetId?: number; time?: number; remark?: string; parentLendId?: number; bookId?: string | number }) => void
   repayLend: (patch: { lendId: number; amount: number; repaymentAssetId?: number; time?: number }) => void
   deleteLend: (lendId: number) => void
   addRefund: (patch: { billId: string | number; number: number; assetId?: number; baseAmount?: number }) => void
@@ -507,30 +507,38 @@ export const useLedger = create<LedgerState>()(
             amount: Number(patch.amount) || 0, rate: Number(patch.rate) || 0,
             termYears: Number(patch.termYears) || 1,
             startTime: patch.startTime ?? NOW(), remark: patch.remark ?? '',
-            assetId: patch.assetId, updateTime: NOW(),
+            assetId: patch.assetId, updateTime: NOW(), ownerId: s.userId,
             bookId: s.currentBookId === 0 ? undefined : s.currentBookId
           }, ...s.fixedDeposits]
         }
       }),
-      deleteFixedDeposit: (depositId) => set((s) => ({
-        fixedDeposits: s.fixedDeposits.filter((d) => d.depositId !== depositId),
-        tombstones: [...s.tombstones, { kind: 'fixedDeposit', id: String(depositId), updatedAt: NOW(),
-          bookId: s.currentBookId === 0 ? undefined : s.currentBookId }]
-      })),
+      deleteFixedDeposit: (depositId) => set((s) => {
+        const rec = s.fixedDeposits.find((d) => d.depositId === depositId)
+        return {
+          fixedDeposits: s.fixedDeposits.filter((d) => d.depositId !== depositId),
+          // 墓碑账本必须继承被删记录，而不是当前账本
+          tombstones: [...s.tombstones, { kind: 'fixedDeposit', id: String(depositId), updatedAt: NOW(),
+            bookId: rec?.bookId, ownerId: rec?.ownerId ?? s.userId }]
+        }
+      }),
 
       addAiTypeRule: (patch) => set((s) => {
         let ruleId = Date.now()
         while (s.aiTypeRules.some((r) => r.ruleId === ruleId)) ruleId++
         return {
           aiTypeRules: [{ ruleId, keywords: patch.keywords, categoryId: patch.categoryId,
-            updateTime: NOW(), bookId: s.currentBookId === 0 ? undefined : s.currentBookId }, ...s.aiTypeRules]
+            updateTime: NOW(), ownerId: s.userId,
+            bookId: s.currentBookId === 0 ? undefined : s.currentBookId }, ...s.aiTypeRules]
         }
       }),
-      deleteAiTypeRule: (ruleId) => set((s) => ({
-        aiTypeRules: s.aiTypeRules.filter((r) => r.ruleId !== ruleId),
-        tombstones: [...s.tombstones, { kind: 'aiType', id: String(ruleId), updatedAt: NOW(),
-          bookId: s.currentBookId === 0 ? undefined : s.currentBookId }]
-      })),
+      deleteAiTypeRule: (ruleId) => set((s) => {
+        const rec = s.aiTypeRules.find((r) => r.ruleId === ruleId)
+        return {
+          aiTypeRules: s.aiTypeRules.filter((r) => r.ruleId !== ruleId),
+          tombstones: [...s.tombstones, { kind: 'aiType', id: String(ruleId), updatedAt: NOW(),
+            bookId: rec?.bookId, ownerId: rec?.ownerId ?? s.userId }]
+        }
+      }),
 
       addDream: (patch) => set((s) => {
         let dreamId = Date.now()
@@ -538,7 +546,7 @@ export const useLedger = create<LedgerState>()(
         const rec: import('./types').Dream = {
           dreamId, name: patch.name ?? '', totalNum: Number(patch.totalNum) || 0,
           startNum: Number(patch.startNum) || 0, remark: patch.remark ?? '',
-          startTime: patch.startTime ?? NOW(), updateTime: NOW(),
+          startTime: patch.startTime ?? NOW(), updateTime: NOW(), ownerId: s.userId,
           bookId: s.currentBookId === 0 ? undefined : s.currentBookId
         }
         return { dreams: [rec, ...s.dreams] }
@@ -546,11 +554,14 @@ export const useLedger = create<LedgerState>()(
       updateDream: (dreamId, patch) => set((s) => ({
         dreams: s.dreams.map((d) => d.dreamId === dreamId ? { ...d, ...patch, updateTime: NOW() } : d)
       })),
-      deleteDream: (dreamId) => set((s) => ({
-        dreams: s.dreams.filter((d) => d.dreamId !== dreamId),
-        tombstones: [...s.tombstones, { kind: 'dream', id: String(dreamId), updatedAt: NOW(),
-          bookId: s.currentBookId === 0 ? undefined : s.currentBookId }]
-      })),
+      deleteDream: (dreamId) => set((s) => {
+        const rec = s.dreams.find((d) => d.dreamId === dreamId)
+        return {
+          dreams: s.dreams.filter((d) => d.dreamId !== dreamId),
+          tombstones: [...s.tombstones, { kind: 'dream', id: String(dreamId), updatedAt: NOW(),
+            bookId: rec?.bookId, ownerId: rec?.ownerId ?? s.userId }]
+        }
+      }),
 
       setStockHidden: (stockAssetId, hidden) => set((s) => ({
         stockAssets: s.stockAssets.map((st) => st.stockAssetId === stockAssetId
@@ -657,6 +668,11 @@ export const useLedger = create<LedgerState>()(
         }
         if (tpl.mode === 'bill' && tpl.bill) {
           const b = tpl.bill
+          // 模板所属账本与当前账本不一致时拒绝：避免把 A 账本的模板记到 B 账本
+          if (tpl.bookId != null && s.currentBookId !== 0 && String(tpl.bookId) !== String(s.currentBookId)) return false
+          const asset = s.assets.find((a) => a.assetId === b.assetId)
+          if (b.assetId && !asset) return false          // 账户已删除
+          if (!(Number(b.cost) > 0)) return false         // 金额非法
           get().addBill({
             assetId: b.assetId ?? s.assets[0]?.assetId ?? 0,
             parentCategoryId: b.parentCategoryId ?? 7,
@@ -1134,7 +1150,7 @@ export const useLedger = create<LedgerState>()(
       },
 
       // 借出 -、借入 +、收回 +、还款 -；删除则反向冲正
-      addLend: ({ type, assetId, counterparty, number, interest, repaymentAssetId, time, remark, parentLendId }) => set((s) => {
+      addLend: ({ type, assetId, counterparty, number, interest, repaymentAssetId, time, remark, parentLendId, bookId }) => set((s) => {
         const amt = Number(number) || 0
         if (amt <= 0 || !assetId) return {}
         // 借出/借入走 assetId；收回/还款优先走 repaymentAssetId
@@ -1145,8 +1161,8 @@ export const useLedger = create<LedgerState>()(
         while (s.lends.some((l) => l.lendId === lendId)) lendId++
         const rec: Lend = {
           lendId,
-          // 借贷参与余额计算，必须带账本，否则服务端返回 book-required 且另一设备余额不一致
-          bookId: s.currentBookId === 0 ? undefined : s.currentBookId,
+          // 借贷参与余额计算，必须带账本；还款记录继承父记录的账本，不随当前账本漂移
+          bookId: bookId !== undefined ? bookId : (s.currentBookId === 0 ? undefined : s.currentBookId),
           type, assetId, counterparty: counterparty ?? '',
           number: amt,
           interest: Number(interest) || 0,
@@ -1171,6 +1187,8 @@ export const useLedger = create<LedgerState>()(
         const remaining = lendRemaining(parent, s.lends)
         if (amt <= 0 || amt > remaining) return
         s.addLend({
+          // 账本继承父借贷：跨账本还款时不能落到当前账本
+          bookId: parent.bookId,
           type: parent.type === 1 ? 2 : 4,
           assetId: parent.repaymentAssetId ?? parent.assetId,
           counterparty: parent.counterparty,
@@ -1378,7 +1396,11 @@ export const useLedger = create<LedgerState>()(
           homeLoans: s.homeLoans,
           instalments: s.instalments,
           billGroups: s.billGroups,
-          billRelated: s.billRelated
+          billRelated: s.billRelated,
+          // v3：愿望清单 / 智能分类 / 定期存款
+          dreams: s.dreams,
+          aiTypeRules: s.aiTypeRules,
+          fixedDeposits: s.fixedDeposits
         }
       },
 
@@ -1648,6 +1670,9 @@ export const useLedger = create<LedgerState>()(
           instalments: data.instalments ?? [],
           billGroups: data.billGroups ?? [],
           billRelated: data.billRelated ?? [],
+          dreams: data.dreams ?? [],
+          aiTypeRules: data.aiTypeRules ?? [],
+          fixedDeposits: data.fixedDeposits ?? [],
           seeded: true
         }))
       }

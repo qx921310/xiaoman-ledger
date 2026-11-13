@@ -1,15 +1,23 @@
 import { useState } from 'react'
 
 const KEY = 'xiaoman-gesture-pin'
+// 按账号隔离：同一浏览器多账号各自独立
+let scope = ''
+export const setPinScope = (userId: number | string) => { scope = String(userId) }
+const keyOf = () => (scope ? `${KEY}:${scope}` : KEY)
 
 export const hasPin = () => {
-  try { return !!localStorage.getItem(KEY) } catch { return false }
+  try { return !!localStorage.getItem(keyOf()) } catch { return false }
 }
 export const setPin = (pin: string) => {
-  try { localStorage.setItem(KEY, pin) } catch { /* 忽略 */ }
+  try { localStorage.setItem(keyOf(), pin) } catch { /* 忽略 */ }
 }
 export const clearPin = () => {
-  try { localStorage.removeItem(KEY) } catch { /* 忽略 */ }
+  try { localStorage.removeItem(keyOf()) } catch { /* 忽略 */ }
+}
+/** 校验输入的 PIN 是否与已设置的相同（关闭手势密码前必须验证） */
+export const verifyPin = (pin: string) => {
+  try { return localStorage.getItem(keyOf()) === pin } catch { return false }
 }
 
 /**
@@ -20,7 +28,7 @@ export const clearPin = () => {
 export function PinLock({ onUnlock }: { onUnlock: () => void }) {
   const [pin, setInput] = useState('')
   const [err, setErr] = useState('')
-  const expected = (() => { try { return localStorage.getItem(KEY) ?? '' } catch { return '' } })()
+  const expected = (() => { try { return localStorage.getItem(keyOf()) ?? '' } catch { return '' } })()
 
   const submit = (value: string) => {
     if (value === expected) { onUnlock(); return }

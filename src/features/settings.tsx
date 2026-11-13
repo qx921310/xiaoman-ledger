@@ -14,7 +14,7 @@ import { AiTypeManager } from './ai-type'
 import { Guide } from './guide'
 import { FilteredBills } from './filtered-bills'
 import { TemplateList } from './templates'
-import { hasPin, setPin, clearPin } from './lock'
+import { hasPin, setPin, clearPin, verifyPin } from './lock'
 import { usePullRefresh } from '../ui/use-pull-refresh'
 import { ROLE_LABEL } from '../ui/roles'
 import { validateBackup } from '../backup'
@@ -162,6 +162,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
 
   const syncLine = autoSync?.running ? '同步中…'
     : autoSync?.lastError ? '同步失败'
+    : (autoSync?.incomplete ?? 0) > 0 ? `${autoSync?.incomplete} 条待核对`
     : autoSync?.pending ? '待同步'
     : autoSync?.lastOkAt ? new Date(autoSync.lastOkAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
     : '尚未同步'
@@ -558,7 +559,12 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
             if (key === 'guide') { setGuideOpen(true); return }
             if (key === 'tpl') { setTplOpen(true); return }
             if (key === 'gesture') {
-              if (hasPin()) { if (confirm('关闭手势密码？')) { clearPin(); notify('已关闭手势密码') } }
+              if (hasPin()) {
+                const p0 = prompt('请输入当前手势密码以关闭')
+                if (p0 == null) return
+                if (!verifyPin(p0)) { notify('密码不正确'); return }
+                clearPin(); notify('已关闭手势密码')
+              }
               else {
                 const p1 = prompt('设置 4 位数字密码')
                 if (p1 && /^\d{4}$/.test(p1)) { setPin(p1); notify('手势密码已设置') }
