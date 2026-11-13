@@ -177,6 +177,19 @@ test('债务记账：借出减少余额、借入增加余额、记录对方与�
   assert.equal(st().assets[0].assetNumber, 1100, '借入应增加账户余额')
 })
 
+test('统一记账出口：只读账本、非法金额、账户不存在都被拦下', () => {
+  reset()
+  useLedger.setState({ currentBookId: 1, assets: [{ assetId: 10, assetName: '现金', assetNumber: 0, assetType: 1 }],
+    accountBooks: [{ accountBookId: 1, bookId: 1, accountBookName: 'A', memberCount: 1, role: 'silent' }] } as never)
+  assert.throws(() => st().addBill({ assetId: 10, parentCategoryId: 7, cost: 10 }), /只读/)
+  useLedger.setState({ accountBooks: [{ accountBookId: 1, bookId: 1, accountBookName: 'A', memberCount: 1, role: 'normal' }] } as never)
+  assert.throws(() => st().addBill({ assetId: 10, parentCategoryId: 7, cost: 0 }), /金额/)
+  assert.throws(() => st().addBill({ assetId: 999, parentCategoryId: 7, cost: 10 }), /账户不存在/)
+  // -1 是一木的「无账户」哨兵，允许
+  st().addBill({ assetId: -1, parentCategoryId: 7, cost: 10 })
+  assert.equal(st().bills.length, 1)
+})
+
 test('连续新建标签不会撞 ID', () => {
   reset()
   const ids = new Set<number>()

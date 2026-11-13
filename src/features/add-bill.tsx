@@ -121,6 +121,9 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
 
   const submit = (): boolean => {
     const fail = (message: string) => { notify(message); return false }
+    const guard = (fn: () => boolean): boolean => {
+      try { return fn() } catch (e) { notify(e instanceof Error ? e.message : '记账失败'); return false }
+    }
     const v = evaluateAmount(cost)
     if (v == null || v <= 0) return fail('请输入有效金额')
     if (String(curBookId) === '0') return fail('请先选择一个具体账本')
@@ -165,14 +168,17 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
     if (!hasCurrencyRate(currency, currencies, defaultCurrency)) return fail(`请先设置 ${currency} 汇率`)
     if (!hasCurrencyRate(accountCurrency, currencies, defaultCurrency)) return fail(`请先设置 ${accountCurrency} 汇率`)
     const foreign = currency !== defaultCurrency
-    addBill({
-      cost: foreign ? toBase(v, currency, currencies, defaultCurrency) : v,
-      currencyInfo: foreign ? currency : undefined,
-      currencyAssetNumber: foreign ? v : undefined,
-      parentCategoryId: cur, childCategoryId: cid,
-      assetId: aid, remark, time: new Date(time).getTime(), billType: 2,
-      notIntoTotal, notIntoBudget
-    })
+    if (!guard(() => {
+      addBill({
+        cost: foreign ? toBase(v, currency, currencies, defaultCurrency) : v,
+        currencyInfo: foreign ? currency : undefined,
+        currencyAssetNumber: foreign ? v : undefined,
+        parentCategoryId: cur, childCategoryId: cid,
+        assetId: aid, remark, time: new Date(time).getTime(), billType: 2,
+        notIntoTotal, notIntoBudget
+      })
+      return true
+    })) return false
     setCost(''); setRemark(''); setCid(0); setCurrency(defaultCurrency)
     notify(`${mode === 'expense' ? '支出' : '收入'} ${money(v)} 已记录`)
     return true

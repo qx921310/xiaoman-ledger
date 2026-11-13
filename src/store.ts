@@ -300,6 +300,28 @@ export const useLedger = create<LedgerState>()(
 
       addBill: (patch) => {
         const s = get()
+        // 公共校验：一木所有记账入口（记账页/模板/周期/分期）都走同一个保存函数，
+        // 所以这里集中校验，任何调用方都无法绕过
+        const check = (): string | null => {
+          const cost = Number(patch.cost ?? 0)
+          if (!(cost > 0)) return '金额必须大于 0'
+          const bookId = patch.bookId ?? (s.currentBookId === 0 ? undefined : s.currentBookId)
+          if (bookId != null) {
+            const book = s.accountBooks.find((bk) => String(bk.bookId) === String(bookId))
+            if (book?.role === 'silent') return '当前账本只读，不能记账'
+            const assetId = patch.assetId
+            // -1 是一木的「无账户」哨兵，不算非法账户
+            if (assetId != null && assetId !== -1 && !s.assets.some((a) => a.assetId === assetId)) return '账户不存在'
+            if (assetId != null && assetId !== -1) {
+              const asset = s.assets.find((a) => a.assetId === assetId)!
+              const members = book?.memberCount
+              if (asset.bookId == null && members != null && members > 1 && Number(bookId) !== 0) return '私有账户不能记进共享账本'
+            }
+          }
+          return null
+        }
+        const problem = check()
+        if (problem) throw new Error(problem)
         let identity = newBillIdentity()
         while (s.bills.some((b) => b.billId === identity.billId)) identity = newBillIdentity()
         const billId = patch.billId ?? identity.billId
@@ -731,7 +753,8 @@ export const useLedger = create<LedgerState>()(
           const foreign = assetCurrency !== s.defaultCurrency && rateOf(assetCurrency) > 0 && rateOf(s.defaultCurrency) > 0
           const cost = foreign ? +((source * rateOf(assetCurrency)) / rateOf(s.defaultCurrency)).toFixed(2) : source
 
-          get().addBill({
+          try {
+            get().addBill({
             assetId: asset ? asset.assetId : -1,     // 一木：账户已删则记 -1（无账户）
             parentCategoryId: parentId,
             childCategoryId: s.childCategories.some((c) => c.id === (b.childCategoryId ?? 0)) ? (b.childCategoryId ?? 0) : 0,
@@ -743,7 +766,8 @@ export const useLedger = create<LedgerState>()(
             bookId: targetBook,
             billType: 6,
             ...(foreign ? { currencyInfo: `${assetCurrency} ${source}`, currencyAssetNumber: source } : {})
-          })
+            })
+          } catch { return false }
           return true
         }
         return false
