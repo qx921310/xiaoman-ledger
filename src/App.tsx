@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLedger } from './store'
 import { auth, books as bookApi, setCurrentUid, type BookInfo, type User } from './auth'
 import { loadAccountData } from './account-session'
@@ -168,6 +168,13 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User
   const assets = useLedger((s) => s.assets)
   const addAsset = useLedger((s) => s.addAsset)
   const seededAsset = useRef(false)
+  // 确定性种子 id：同一账号在任何设备上算出的值相同（不走时间戳，避免并发各建一条）
+  const seedCashId = useMemo(() => {
+    const uid = String(user?.id ?? 0)
+    let h = 2166136261
+    for (const ch of `cash:${uid}`) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619) }
+    return -Math.abs(h >>> 0)    // 负数，避开时间戳正数区间
+  }, [user?.id])
   // 必须等首次同步完成再判断，否则新设备在拉取云端数据前会各自建一个「现金」，导致重复
   const synced = useLedger((s) => s.sessionSyncAt)
   useEffect(() => {
@@ -175,8 +182,10 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User
     if (!(synced && synced > 0)) return   // 未开始(-0)或拉取失败(-1)：都不假定云端为空
     if (assets.length > 0) return
     seededAsset.current = true
-    addAsset({ assetName: '现金', assetType: 1, assetNumber: 0, intoTotal: 1 } as never)
-  }, [synced, assets.length, addAsset])
+    // 用按用户确定的 id 做幂等种子：两台空设备同时首次登录会生成同一个 assetId，
+    // 同步后按 id 收敛成一条，而不是各建一条「现金」
+    addAsset({ assetId: seedCashId, assetName: '现金', assetType: 1, assetNumber: 0, intoTotal: 1 } as never)
+  }, [synced, assets.length, addAsset, seedCashId])
   // 补生成周期账单：必须等首次同步拉完，否则两台设备会各自生成同一期
   const sessionSyncAt = useLedger((s) => s.sessionSyncAt)
   const cyclesRan = useRef(false)

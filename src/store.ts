@@ -165,7 +165,7 @@ interface LedgerState {
   linkBills: (a: string | number, b: string | number) => boolean
   unlinkBills: (relatedId: number) => void
   updateBill: (billId: string | number, patch: Partial<Bill>) => void
-  addTransfer: (patch: { transferId?: number | string; fromAssetId: number; toAssetId: number; cost: number; toCost?: number; serviceCharge?: number; time?: number; remark?: string }) => Transfer
+  addTransfer: (patch: { transferId?: number | string; fromAssetId: number; toAssetId: number; cost: number; toCost?: number; serviceCharge?: number; time?: number; remark?: string; bookId?: string | number }) => Transfer
   updateTransfer: (transferId: number | string, patch: Partial<Pick<Transfer, 'fromAssetId' | 'toAssetId' | 'cost' | 'toCost' | 'serviceCharge' | 'time' | 'remark'>>) => void
   addAsset: (patch: Partial<Asset>) => void
   deleteAsset: (assetId: number) => void
@@ -679,16 +679,25 @@ export const useLedger = create<LedgerState>()(
         const tpl = s.templates.find((t) => t.templateId === templateId)
         if (!tpl) return false
         if (tpl.mode === 'transfer' && tpl.transfer) {
-          get().addTransfer({ ...tpl.transfer, time: Date.now() })
+          // 与账单模板同口径：账本不一致、账户失效、金额非法都拒绝
+          if (tpl.bookId != null && s.currentBookId !== 0 && String(tpl.bookId) !== String(s.currentBookId)) return false
+          const tr = tpl.transfer
+          if (!tr.fromAssetId || !tr.toAssetId) return false
+          if (!s.assets.some((a) => a.assetId === tr.fromAssetId) || !s.assets.some((a) => a.assetId === tr.toAssetId)) return false
+          if (!(Number(tr.cost) > 0)) return false
+          get().addTransfer({ ...tr, time: Date.now(), bookId: tpl.bookId ?? (s.currentBookId === 0 ? undefined : s.currentBookId) })
           return true
         }
         if (tpl.mode === 'bill' && tpl.bill) {
           const b = tpl.bill
           // 模板所属账本与当前账本不一致时拒绝：避免把 A 账本的模板记到 B 账本
           if (tpl.bookId != null && s.currentBookId !== 0 && String(tpl.bookId) !== String(s.currentBookId)) return false
-          const asset = s.assets.find((a) => a.assetId === b.assetId)
-          if (b.assetId && !asset) return false          // 账户已删除
+          if (s.assets.length === 0) return false         // 没有账户就不能记
+          if (b.assetId && !s.assets.some((a) => a.assetId === b.assetId)) return false  // 账户已删除
           if (!(Number(b.cost) > 0)) return false         // 金额非法
+          // 账本必须能解析：模板自身账本优先，其次当前账本；都无则拒绝（不写 bookId=0）
+          const targetBook = tpl.bookId ?? (s.currentBookId === 0 ? undefined : s.currentBookId)
+          if (targetBook == null) return false
           get().addBill({
             assetId: b.assetId ?? s.assets[0]?.assetId ?? 0,
             parentCategoryId: b.parentCategoryId ?? 7,
@@ -697,7 +706,9 @@ export const useLedger = create<LedgerState>()(
             remark: b.remark ?? '',
             time: Date.now(),
             notIntoTotal: b.notIntoTotal,
-            notIntoBudget: b.notIntoBudget
+            notIntoBudget: b.notIntoBudget,
+            // 显式带模板账本，避免「全部账本」视图下落到默认账本
+            bookId: targetBook
           })
           return true
         }
@@ -909,8 +920,8 @@ export const useLedger = create<LedgerState>()(
 
         const t: Transfer = {
           transferId,
-          // 账本作用域：清空账本、多人共享都要按 bookId 命中，缺了会被当成个人记录
-          bookId: s.currentBookId,
+          // 账本作用域：优先用显式传入（模板/调用方），否则当前账本；0 视为未归属
+          bookId: patch.bookId ?? (s.currentBookId === 0 ? undefined : s.currentBookId),
           fromAssetId: patch.fromAssetId,
           toAssetId: patch.toAssetId,
           cost: Number(patch.cost),

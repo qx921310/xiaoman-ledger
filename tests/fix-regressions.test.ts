@@ -114,6 +114,18 @@ test('模板不属于当前账本时拒绝执行', () => {
   assert.equal(ok, false, 'B 账本不能执行 A 账本模板')
 })
 
+test('模板：无账户或账本不可解析时拒绝', () => {
+  reset()
+  useLedger.setState({ currentBookId: 0, assets: [] } as never)   // 全部账本视图 + 无账户
+  const tpl = st().addTemplate({ name: '咖啡', mode: 'bill', bill: { assetId: 0, parentCategoryId: 7, cost: 20 } } as never)
+  assert.equal(st().applyTemplate(tpl.templateId), false, '没有账户不能记')
+  useLedger.setState({ currentBookId: 1, assets: [{ assetId: 10, assetName: '现金', assetNumber: 0, assetType: 1 }] } as never)
+  const tpl2 = st().addTemplate({ name: '咖啡2', mode: 'bill', bill: { assetId: 10, parentCategoryId: 7, cost: 20 } } as never)
+  assert.equal(st().applyTemplate(tpl2.templateId), true)
+  const bill = st().bills.find((b) => b.cost === 20)
+  assert.equal(String(bill!.bookId), '1', '账单必须落到模板账本')
+})
+
 test('生效账本：空数组=全部隐藏，未设置=全部可见', () => {
   const base = { assetId: 1, assetName: '现金', assetNumber: 0, assetType: 1, bookId: 1 } as never
   assert.equal(visibleAssets([base], 1, 1).length, 1, '未设置 showBook 时按账本归属：A 账本可见')
