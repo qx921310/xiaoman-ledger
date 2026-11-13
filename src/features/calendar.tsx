@@ -14,6 +14,14 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
   const currencies = useLedger((s) => s.currencies)
   const defaultCurrency = useLedger((s) => s.defaultCurrency)
   const bookId = useLedger((s) => s.currentBookId)
+  const accountBooks = useLedger((s) => s.accountBooks)
+  // 多选账本：选中多个时跨账本汇总；为空则跟随当前账本
+  const [pickedBooks, setPickedBooks] = useState<string[]>([])
+  const [bookPickOpen, setBookPickOpen] = useState(false)
+  const inScope = (b: { bookId?: string | number }) =>
+    pickedBooks.length > 0
+      ? pickedBooks.includes(String(b.bookId))
+      : (bookId === 0 || String(b.bookId) === String(bookId))
   const [cursor, setCursor] = useState(() => new Date())
   const [picked, setPicked] = useState<string | null>(null)
   // 一木 CalendarLayout 支持月/周切换
@@ -33,7 +41,7 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
   const daily = useMemo(() => {
     const map = new Map<string, { income: number; expense: number; count: number }>()
     for (const b of bills) {
-      if (bookId !== 0 && String(b.bookId) !== String(bookId)) continue
+      if (!inScope(b)) continue
       const d = new Date(b.time)
       if (d.getFullYear() !== cursor.getFullYear() || d.getMonth() !== cursor.getMonth()) continue
       const key = fullDay(b.time)
@@ -47,7 +55,7 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
       map.set(key, row)
     }
     return map
-  }, [bills, bookId, cursor, kindOf, refunds])
+  }, [bills, bookId, pickedBooks, cursor, kindOf, refunds])
 
   const year = cursor.getFullYear()
   const monthIdx = cursor.getMonth()
@@ -105,7 +113,7 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
     if (date.getFullYear() === year && date.getMonth() === monthIdx) return daily.get(fullDay(date.getTime())) ?? { income: 0, expense: 0, count: 0 }
     let income = 0, expense = 0, count = 0
     for (const b of bills) {
-      if (bookId !== 0 && String(b.bookId) !== String(bookId)) continue
+      if (!inScope(b)) continue
       if (fullDay(b.time) !== fullDay(date.getTime())) continue
       if (!b.notIntoTotal) {
         if (kindOf.get(b.parentCategoryId) === 'income') income = +(income + b.cost).toFixed(2)
@@ -207,7 +215,30 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
           {onAddBill && <button type="button" className="cal-add" onClick={onAddBill}>记一笔</button>}
         </div>
       </div>
-        {menuOpen && (
+        {bookPickOpen && (
+        <div className="menu-mask" onClick={() => setBookPickOpen(false)}>
+          <div className="home-menu" role="dialog" aria-label="多选账本" onClick={(e) => e.stopPropagation()}>
+            <div className="hm-label">多选账本（不选=跟随当前账本）</div>
+            {accountBooks.map((b) => {
+              const id = String(b.bookId ?? b.accountBookId)
+              return (
+                <label key={id} className="row hm-check">
+                  <span className="grow">{b.accountBookName ?? `账本 ${id}`}</span>
+                  <input type="checkbox" checked={pickedBooks.includes(id)} onChange={(e) => {
+                    setPickedBooks((prev) => e.target.checked ? [...prev, id] : prev.filter((x) => x !== id))
+                  }} />
+                </label>
+              )
+            })}
+            <div className="modal-btns">
+              <button type="button" className="ghost" onClick={() => setPickedBooks([])}>跟随当前账本</button>
+              <button type="button" className="primary" onClick={() => setBookPickOpen(false)}>完成</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {menuOpen && (
         <div className="menu-mask" onClick={() => setMenuOpen(false)}>
           <div className="home-menu" role="dialog" aria-label="日历更多" onClick={(e) => e.stopPropagation()}>
             <div className="hm-group">
@@ -217,7 +248,9 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
               <button type="button" className={showLunar ? 'on' : ''} onClick={() => setShowLunar(!showLunar)}>农历{showLunar ? '开' : '关'}</button>
               <button type="button" className={showAmount ? 'on' : ''} onClick={() => setShowAmount(!showAmount)}>收支{showAmount ? '开' : '关'}</button>
             </div>
-              <button type="button" className="hm-item muted" disabled>多选账本（暂未实现）</button>
+              <button type="button" className="hm-item" onClick={() => { setMenuOpen(false); setBookPickOpen(true) }}>
+                多选账本{pickedBooks.length ? `（已选 ${pickedBooks.length}）` : ''}
+              </button>
             </div>
             <div className="hm-group">
               <div className="hm-label">热力背景</div>
