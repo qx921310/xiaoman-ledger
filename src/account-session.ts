@@ -1,5 +1,6 @@
 import { adoptAnonymousData, setCurrentUid } from './auth'
 import { useLedger } from './store'
+import { movements as movementsOf } from './balances'
 
 /**
  * 切换账号：把状态**整体**换成目标账号自己的快照。
@@ -24,9 +25,17 @@ export async function loadAccountData(uid: number): Promise<void> {
   // 全新账号：整体回到初始状态，连默认币种都不继承
   const merged: Record<string, unknown> = snapshot ? { ...initial, ...snapshot } : { ...initial }
 
-  // openingBalance 是派生缓存：不信任快照里的值，按 assetNumber 重推
+  // 期初余额是已确定的真相：只要它与「余额 − 该账号自己的流水」一致就原样保留。
+  // 只有在缺少期初，或它与余额对不上（旧版本污染 / 过期缓存）时，才按余额反推一次。
   const assets = Array.isArray(merged.assets) ? merged.assets as Array<Record<string, unknown>> : []
+  const movements = movementsOf({ ...initial, ...merged } as never)
   merged.assets = assets.map((a) => {
+    const id = Number(a.assetId)
+    const movement = movements.get(id) ?? 0
+    const balance = Number(a.assetNumber) || 0
+    const opening = a.openingBalance
+    const trusted = Number.isFinite(opening) && Math.abs((Number(opening) + movement) - balance) < 0.01
+    if (trusted) return a
     const { openingBalance: _drop, ...rest } = a
     return rest
   })

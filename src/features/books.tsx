@@ -4,7 +4,7 @@ import { books as bookApi } from '../auth'
 import { Modal } from '../ui/modal'
 import { HiddenPage } from './hidden-page'
 import { CatIcon } from '../ui/icons'
-import { queueBookPatch, clearBookPatch, flushBookPatches } from './book-pending'
+import { queueBookPatch, clearBookPatch, flushBookPatches, conflictOf, resolveConflictKeepLocal, resolveConflictUseServer } from './book-pending'
 
 // 账本图标候选（一木 activity_add_account_book 的 icon_layout；这里用自有图标集）
 const BOOK_ICONS = ['ic_parent_daily', 'ic_parent_food', 'ic_parent_traffic', 'ic_parent_shopping',
@@ -27,7 +27,12 @@ export function BookManager({ notify, onBack }: { notify: (m: string) => void; o
   const [editing, setEditing] = useState<null | { bookId: string | number; name: string; icon: string; showTransfer: boolean; showStock: boolean; hideAllCategory: boolean }>(null)
   const [newIcon, setNewIcon] = useState(BOOK_ICONS[0])
   const [hidePage, setHidePage] = useState(false)
-  useEffect(() => { void flushBookPatches() }, [])
+  const [conflicts, setConflicts] = useState<string[]>([])
+  useEffect(() => {
+    void flushBookPatches().then(() => {
+      setConflicts(books.filter((b) => String(b.bookId) && conflictOf(String(b.bookId))).map((b) => String(b.bookId)))
+    })
+  }, [books])
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
 
@@ -104,6 +109,30 @@ export function BookManager({ notify, onBack }: { notify: (m: string) => void; o
         <h3>账本管理</h3>
         <button type="button" className="link" onClick={() => setCreating(true)}>新增</button>
       </div>
+
+      {conflicts.length > 0 && (
+        <div className="card">
+          <p className="hint">{conflicts.length} 个账本在别的设备上改过，本地也有未同步的改动。请选择保留哪一份。</p>
+          {conflicts.map((id) => {
+            const row = books.find((b) => String(b.bookId) === id)
+            return (
+              <div key={id} className="row">
+                <span className="grow">{row?.accountBookName ?? id}</span>
+                <button type="button" className="link" onClick={async () => {
+                  const ok = await resolveConflictKeepLocal(id)
+                  notify(ok ? '已用本地内容覆盖' : '覆盖失败，请联网后重试')
+                  setConflicts((prev) => prev.filter((x) => x !== id))
+                }}>保留本地</button>
+                <button type="button" className="del" onClick={() => {
+                  resolveConflictUseServer(id)
+                  notify('已放弃本地改动，以服务端为准')
+                  setConflicts((prev) => prev.filter((x) => x !== id))
+                }}>用云端</button>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {visible.map((b) => {
         const active = String(b.bookId) === String(currentBookId)

@@ -182,6 +182,14 @@ assert.equal(balance(31), 100)
 // 报销账户是美元：5 元人民币按汇率 8 入账，只能加 0.63 美元（不是 105）
 state().settleReimbursement(state().reimbursements[0].reimbursementId)
 assert.equal(balance(31), 100.63)
+// 入账金额必须在结算那一刻冻结：之后只改汇率，余额不能变
+state().setCurrencyRate('USD', 4)
+assert.equal(balance(31), 100.63, '改汇率不得改变已到账金额')
+state().setCurrencyRate('USD', 16)
+assert.equal(balance(31), 100.63, '汇率反向往回调也一样')
+const settled = state().reimbursements.find((r) => r.status === 'done')!
+assert.equal(settled.accountAmount, 0.63, '应记录冻结后的入账金额')
+assert.equal(settled.accountCurrency, 'USD')
 // 撤销单笔后累计值按剩余重算，而不是清零
 state().deleteReimbursement(state().reimbursements[0].reimbursementId)
 assert.equal(balance(31), 100)

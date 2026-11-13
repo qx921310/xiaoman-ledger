@@ -46,10 +46,14 @@ export function movements(data: BalanceData): Map<number, number> {
   }
   for (const reimbursement of data.reimbursements || []) {
     if (reimbursement.status === 'done') {
-      // 报销金额记本位币；入账到外币账户时按该账户币种折算
-      const asset = (data.assets || []).find((a) => a.assetId === reimbursement.assetId)
-      const rate = !asset?.currency ? 1 : (data.currencyRate?.(asset.currency) ?? 1)
-      add(reimbursement.assetId, reimbursement.number / rate)
+      // 入账金额已在结算时冻结（accountAmount）；历史数据没有冻结值时按当时汇率折算一次
+      if (Number.isFinite(reimbursement.accountAmount)) {
+        add(reimbursement.assetId, reimbursement.accountAmount!)
+      } else {
+        const asset = (data.assets || []).find((a) => a.assetId === reimbursement.assetId)
+        const rate = !asset?.currency ? 1 : (data.currencyRate?.(asset.currency) ?? 1)
+        add(reimbursement.assetId, reimbursement.number / rate)
+      }
     }
   }
   // 一木的资产流水（如定存累加/扣回）直接参与余额推导

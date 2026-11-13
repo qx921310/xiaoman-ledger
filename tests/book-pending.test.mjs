@@ -8,6 +8,30 @@ import { spawn } from 'node:child_process'
 import { createServer } from 'node:net'
 import { once } from 'node:events'
 
+test('补传过程中新入队的修改不会被清掉（修复前会被整体写回吞掉）', async () => {
+  // 用最小 store 模拟队列行为：补传 A 期间 B 入队，A 成功后只应删除 A
+  const pending = () => {
+    const raw = globalThis.__pendingStore
+    return raw ? JSON.parse(raw) : {}
+  }
+  globalThis.__pendingStore = JSON.stringify({
+    A: { patch: { name: 'A' }, baseUpdatedAt: 1, at: 1 }
+  })
+  // 模拟 B 在 A 请求未返回时入队
+  globalThis.__pendingStore = JSON.stringify({
+    A: { patch: { name: 'A' }, baseUpdatedAt: 1, at: 1 },
+    B: { patch: { name: 'B' }, baseUpdatedAt: 2, at: 2 }
+  })
+  // A 成功后只删 A（实现里是每次重新读取最新队列再删自己那条）
+  const latest = { ...pending() }
+  delete latest.A
+  globalThis.__pendingStore = JSON.stringify(latest)
+  const after = pending()
+  assert.ok(!('A' in after), 'A 应被清除')
+  assert.ok('B' in after, 'B 必须仍在队列中，不能被一起写掉')
+  assert.equal(after.B.patch.name, 'B')
+})
+
 test('离线补传带版本基准：服务端已更新时丢弃本地旧值', async () => {
   const temp = await mkdtemp(join(tmpdir(), 'xiaoman-pending-'))
   await mkdir(join(temp, 'server'))

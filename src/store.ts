@@ -4,6 +4,7 @@ import type { AccountBook, Asset, Bill, Category, Currency, Cycle, Lend, Refund,
 import type { ImportPlan } from './importer'
 import { normalizeBuiltInChild, resolveBillChild, TAXONOMY_CHILDREN, TAXONOMY_INCOME, TAXONOMY_PARENTS } from './taxonomy'
 import { getCurrentUid, userStorage } from './auth'
+import { budgetIdentity } from './sync'
 import { deriveAssets } from './balances'
 import { newBillIdentity } from './identity'
 import { markDirty } from './domain/dirty-bus'
@@ -1160,8 +1161,18 @@ export const useLedger = create<LedgerState>()(
         const rec = s.reimbursements.find((r) => r.reimbursementId === reimbursementId)
         if (!rec || rec.status === 'done') return {}
         return {
-          reimbursements: s.reimbursements.map((r) => r.reimbursementId === reimbursementId
-            ? { ...r, status: 'done' as const, settledAt: NOW(), updateTime: NOW() } : r),
+          reimbursements: s.reimbursements.map((r) => {
+            if (r.reimbursementId !== reimbursementId) return r
+            // 入账金额在这一刻冻结：以后改汇率不会让余额跟着变
+            const asset = s.assets.find((a) => a.assetId === r.assetId)
+            const rate = !asset?.currency || asset.currency === s.defaultCurrency ? 1
+              : (s.currencies.find((c) => c.code === asset.currency)?.rate || 1)
+            return {
+              ...r, status: 'done' as const, settledAt: NOW(), updateTime: NOW(),
+              accountAmount: +(r.number / rate).toFixed(2),
+              accountCurrency: asset?.currency ?? s.defaultCurrency
+            }
+          }),
           assets: s.assets.map((a) => {
             if (a.assetId !== rec.assetId) return a
             // 报销账户可能是外币：按该账户币种把本位币金额折算后入账
@@ -1393,9 +1404,8 @@ export const useLedger = create<LedgerState>()(
           ? b.type === 'custom' && b.budgetId === budget.budgetId
           : (b.type ?? 'month') === (budget.type ?? 'month') && b.categoryId === budget.categoryId
         const rest = s.budgets.filter((b) => !sameKey(b))
-        const tombId = budget.type === 'custom'
-          ? String(budget.budgetId)
-          : `${budget.type ?? 'month'}:${budget.categoryId}`
+        // 墓碑编号必须与同步身份完全一致，否则云端旧预算会复活
+        const tombId = budgetIdentity(budget)
         if (budget.amount > 0) return { budgets: [...rest, { ...budget, updateTime: NOW() }] }
         // 填 0 表示取消：要写墓碑，否则云端旧预算会再拉回来
         return {
@@ -1407,9 +1417,7 @@ export const useLedger = create<LedgerState>()(
       removeBudget: (month, categoryId) => set((s) => {
         const target = s.budgets.find((b) => b.month === month && b.categoryId === categoryId
           && (b.type ?? 'month') === 'month')
-        const id = target?.type === 'custom' && target.budgetId != null
-          ? String(target.budgetId)
-          : `month:${categoryId}`
+        const id = budgetIdentity({ type: target?.type, month, categoryId, budgetId: target?.budgetId })
         return {
           budgets: s.budgets.filter((b) => !(b.month === month && b.categoryId === categoryId
             && (b.type ?? 'month') === 'month')),
@@ -1420,7 +1428,7 @@ export const useLedger = create<LedgerState>()(
       // 自定义预算删除：按 budgetId 精确定位
       removeBudgetById: (budgetId: number) => set((s) => ({
         budgets: s.budgets.filter((b) => b.budgetId !== budgetId),
-        tombstones: [...s.tombstones, { kind: 'budget', id: String(budgetId), updatedAt: NOW() }]
+        tombstones: [...s.tombstones, { kind: 'budget', id: `custom:${budgetId}`, updatedAt: NOW() }]
       })),
 
       updateAsset: (asset) => set((s) => ({

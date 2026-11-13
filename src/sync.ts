@@ -52,11 +52,16 @@ export const KIND_MAP: Record<string, [string, string]> = {
 
 type Entity = Record<string, unknown>
 
+/** 预算的稳定身份：周期 + 月份 + 分类；自定义预算用 budgetId。墓碑编号也用它。 */
+export function budgetIdentity(item: { type?: string; month?: string; categoryId?: number; budgetId?: number }) {
+  if ((item.type ?? 'month') === 'custom' && item.budgetId != null) return `custom:${item.budgetId}`
+  return `${item.type ?? 'month'}:${item.month}:${item.categoryId}`
+}
+
 const idOf = (kind: string, item: Entity) =>
   kind === 'budget'
-    ? ((item.type ?? 'month') === 'custom' && item.budgetId != null
-        ? `custom:${item.budgetId}`
-        : `${item.type ?? 'month'}:${item.month}:${item.categoryId}`) : kind === 'bill' ? String(item.syncId ?? item.billId) : String(item[KIND_MAP[kind][1]])
+    ? budgetIdentity(item as { type?: string; month?: string; categoryId?: number; budgetId?: number })
+    : kind === 'bill' ? String(item.syncId ?? item.billId) : String(item[KIND_MAP[kind][1]])
 
 export function collectRecords(): SyncRecord[] {
   const s = useLedger.getState() as unknown as Record<string, Entity[]> & { tombstones?: Array<Record<string, unknown>> }

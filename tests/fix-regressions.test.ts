@@ -263,6 +263,18 @@ test('持仓交易账单带 stockInfoId，供理财流水开关筛选', () => {
   assert.match(bill.remark, /^(买入|卖出)/)
 })
 
+test('预算删除墓碑编号与同步身份一致（周预算不能被云端旧值复活）', async () => {
+  reset()
+  st().setBudget({ month: 'all', categoryId: 7, amount: 100, type: 'week' })
+  const { budgetIdentity } = await import('../src/sync')
+  const live = st().budgets.find((b) => b.categoryId === 7)!
+  const identity = budgetIdentity(live)
+  st().setBudget({ month: 'all', categoryId: 7, amount: 0, type: 'week' })
+  const stone = st().tombstones.filter((t) => t.kind === 'budget').at(-1)!
+  assert.equal(stone.id, identity, '墓碑编号必须等于同步身份')
+  assert.match(identity, /^week:all:7$/)
+})
+
 test('账本开关与隐藏可持久化（一木 AddAccountBookActivity 的三个开关）', () => {
   reset()
   useLedger.setState({ currentBookId: 1 } as never)

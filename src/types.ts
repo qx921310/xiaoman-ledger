@@ -372,6 +372,10 @@ export interface Reimbursement {
   detail: string
   /** pending=登记待报销，done=已到账（钱已进报销账户），ended=用户主动结束 */
   status: 'pending' | 'done' | 'ended'
+  /** 到账时真正加进账户的金额（账户币种），入账瞬间冻结，之后改汇率不影响余额 */
+  accountAmount?: number
+  /** 上述金额对应的账户币种 */
+  accountCurrency?: string
   settledAt?: number
   userId: number
   updateTime: number

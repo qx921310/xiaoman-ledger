@@ -74,7 +74,9 @@ export function accountHistory(input: AccountHistoryInput): { entries: AccountEn
 
   for (const r of reimbursements) {
     if (r.assetId !== asset.assetId || r.status !== 'done') continue
-    entries.push({ key: 'm' + String(r.reimbursementId), time: r.settledAt ?? r.updateTime ?? 0, delta: r.number, label: '报销到账', detail: r.detail, kind: 'reimbursement' })
+    // 到账金额以冻结值为准（外币账户不能直接显示本位币金额）
+    const amount = Number.isFinite(r.accountAmount) ? r.accountAmount! : r.number
+    entries.push({ key: 'm' + String(r.reimbursementId), time: r.settledAt ?? r.updateTime ?? 0, delta: amount, label: '报销到账', detail: r.detail, kind: 'reimbursement' })
   }
 
   // 一木的资产流水（新增定存 / 删除定存等）
