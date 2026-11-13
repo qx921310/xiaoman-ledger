@@ -12,7 +12,7 @@ import type { Bill } from '../types'
  * 共用同一套骨架，按 kind 决定汇总卡与走势口径，避免三份重复实现。
  */
 export function StatsDetail({ kind, title, bills, onBack }: {
-  kind: 'category' | 'tag' | 'account'
+  kind: 'category' | 'tag' | 'account' | 'day'
   title: string
   bills: Bill[]
   onBack: () => void
@@ -82,7 +82,7 @@ export function StatsDetail({ kind, title, bills, onBack }: {
       )}
 
       {/* 走势（分类、标签页），账户页不画 */}
-      {kind !== 'account' && trend.length > 0 && (
+      {kind !== 'account' && kind !== 'day' && trend.length > 0 && (
         <div className="stats-chart" role="img" aria-label="收支走势">
           <svg viewBox="0 0 300 96" preserveAspectRatio="none">
             {trend.map(([day, v], i) => {
@@ -106,7 +106,7 @@ export function StatsDetail({ kind, title, bills, onBack }: {
         </div>
       )}
 
-      {rows.length === 0 && <p className="hint">这个时间范围没有账单。</p>}
+      {rows.length === 0 && <p className="hint">{kind === 'day' ? '没有任何账单' : '这个时间范围没有账单。'}</p>}
 
       {groups.map(([day, list]) => (
         <div key={day} className="group">

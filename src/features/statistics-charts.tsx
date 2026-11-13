@@ -36,7 +36,7 @@ export function CategoryChart({ title, rows, onPick }: { title: string; rows: Ca
   </section>
 }
 
-export function TrendChart({ points }: { points: ChartPoint[] }) {
+export function TrendChart({ points, onPickDay }: { points: ChartPoint[]; onPickDay?: (key: string) => void }) {
   const [selected, setSelected] = useState('')
   useEffect(() => { setSelected(points.find((p) => p.income || p.expense)?.key ?? points[0]?.key ?? '') }, [points])
   const current = points.find((p) => p.key === selected) ?? points[0]
@@ -64,6 +64,7 @@ export function TrendChart({ points }: { points: ChartPoint[] }) {
       <select aria-label="查看趋势日期" value={current?.key ?? ''} onChange={(e) => setSelected(e.target.value)}>{points.map((p) => <option key={p.key} value={p.key}>{p.key}</option>)}</select>
       {current && <span>支出 <b className="out">{money(current.expense)}</b> · 收入 <b className="in">{money(current.income)}</b></span>}
     </div>
-    <details className="stats-report"><summary>查看收支报表</summary><div className="stats-report-scroll"><table><thead><tr><th>日期</th><th>收入</th><th>支出</th><th>结余</th></tr></thead><tbody>{points.map((p) => <tr key={p.key}><td>{p.key}</td><td>{money(p.income)}</td><td>{money(p.expense)}</td><td>{money(p.income - p.expense)}</td></tr>)}</tbody></table></div></details>
+    <details className="stats-report"><summary>查看收支报表</summary><div className="stats-report-scroll"><table><thead><tr><th>日期</th><th>收入</th><th>支出</th><th>结余</th></tr></thead><tbody>{points.map((p) => <tr key={p.key} onClick={onPickDay ? () => onPickDay(p.key) : undefined}
+              style={onPickDay ? { cursor: 'pointer' } : undefined}><td>{p.key}</td><td>{money(p.income)}</td><td>{money(p.expense)}</td><td>{money(p.income - p.expense)}</td></tr>)}</tbody></table></div></details>
   </section>
 }

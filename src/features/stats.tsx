@@ -126,7 +126,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
   const MODULES = ['支出占比', '支出数据', '收支统计', '收支对比', '标签占比', '标签数据', '资产走势', '账户收支', '本月总结', '报表统计', '成员收支'] as const
   const [modOpen, setModOpen] = useState(false)
   const [drill, setDrill] = useState<{ title: string; catId: number } | null>(null)
-  const [detail, setDetail] = useState<{ kind: 'category' | 'tag' | 'account'; title: string; bills: typeof bills } | null>(null)
+  const [detail, setDetail] = useState<{ kind: 'category' | 'tag' | 'account' | 'day'; title: string; bills: typeof bills } | null>(null)
   const [mods, setMods] = useState<Record<string, boolean>>(() => {
     const base: Record<string, boolean> = {}
     for (const m of MODULES) base[m] = !['报表统计', '成员收支', '资产走势'].includes(m)
@@ -230,7 +230,16 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
         范围合计：支出 {money(rangeSummary.expense)} · 收入 {money(rangeSummary.income)} · 结余 {money(rangeSummary.income - rangeSummary.expense)}（{rangeBills.length} 笔）
       </p>
 
-      <TrendChart points={trend} />
+      <TrendChart points={trend} onPickDay={(key) => {
+        // 一木 activity_statistics_bill_info：点某天看当天账单
+        const billsOfDay = rangeBills.filter((b) => {
+          const d = new Date(b.time)
+          const label = month.slice(5, 7) === String(d.getMonth() + 1).padStart(2, '0')
+            ? `${d.getDate()}` : `${d.getMonth() + 1}-${d.getDate()}`
+          return key === label || key === `${d.getMonth() + 1}-${d.getDate()}`
+        })
+        setDetail({ kind: 'day', title: key, bills: billsOfDay })
+      }} />
       <CategoryChart title="支出分类" rows={expenseRows} onPick={(id, name) => setDrill({ title: name, catId: id })} />
       <CategoryChart title="收入分类" rows={incomeRows} onPick={(id, name) => setDrill({ title: name, catId: id })} />
 
