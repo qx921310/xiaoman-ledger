@@ -49,6 +49,9 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
   // 债务模式（一木 AddBillActivity 的债务 tab：借出/借入/收款/还款）
   const [debtType, setDebtType] = useState<1 | 2 | 3 | 4>(1)
   const [counterparty, setCounterparty] = useState('')
+  const [pickedTags, setPickedTags] = useState<string[]>([])
+  const [discount, setDiscount] = useState('')
+  const [files, setFiles] = useState<import('../types').BillFile[]>([])
   const [parentLendId, setParentLendId] = useState<number | ''>('')
   const [cost, setCost] = useState('')
   // 语音记账：识别文本取第一个数字当金额，其余作为备注（一木 SpeechActivity 同类行为）
@@ -92,6 +95,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
   const [toCost, setToCost] = useState('')
   const [remark, setRemark] = useState('')
   const aiTypeRules = useLedger((s) => s.aiTypeRules ?? [])
+  const allTags = useLedger((s) => s.tags.filter((t) => !t.hide))
   const addLend = useLedger((s) => s.addLend)
   const repayLend = useLedger((s) => s.repayLend)
   const lends = useLedger((s) => s.lends)
@@ -199,7 +203,11 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
         currencyAssetNumber: foreign ? v : undefined,
         parentCategoryId: cur, childCategoryId: cid,
         assetId: aid, remark, time: new Date(time).getTime(), billType: 2,
-        notIntoTotal, notIntoBudget
+        notIntoTotal, notIntoBudget,
+        // 一木 AddBillActivity：标签、优惠金额、附件随账单保存
+        tags: pickedTags,
+        discountNumber: Number(discount) > 0 ? Number(discount) : undefined,
+        files
       })
       return true
     })) return false
@@ -284,6 +292,24 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
             <label>到账金额<input value={toCost} placeholder="留空与转出相同" inputMode="none" onFocus={() => { setKeypadField('toCost'); setKeypadOpen(true) }} onChange={(e) => setToCost(e.target.value.replace(/[^\d.]/g, ''))} /></label>
             <label>手续费<input value={fee} placeholder="0.00" inputMode="none" onFocus={() => { setKeypadField('fee'); setKeypadOpen(true) }} onChange={(e) => setFee(e.target.value.replace(/[^\d.]/g, ''))} /></label>
           </div> : <>
+            {allTags.length > 0 && (
+              <div className="entry-tags">
+                {allTags.map((t) => {
+                  const on = pickedTags.includes(t.name)
+                  return (
+                    <button key={t.tagId} type="button" className={on ? 'tag-chip on' : 'tag-chip'}
+                      onClick={() => setPickedTags((prev) => on ? prev.filter((x) => x !== t.name) : [...prev, t.name])}>
+                      {t.name}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+            {(
+              <label>优惠<input value={discount} placeholder="满减金额" inputMode="none"
+                onFocus={() => { setKeypadField('cost'); setKeypadOpen(true) }}
+                onChange={(e) => setDiscount(e.target.value.replace(/[^\d.]/g, ''))} /></label>
+            )}
             <div className="entry-categories" aria-label="大类">
               {list.map((p) => <button key={p.id} type="button" aria-pressed={p.id === cur} className={'entry-category' + (p.id === cur ? ' on' : '')} onClick={() => {
                   setPid(p.id)
@@ -465,6 +491,48 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
         </button>
       </div>
       {speech.unsupported && <p className="hint">当前浏览器不支持语音识别。</p>}
+
+      {/* 一木 AddBillActivity：标签选择 */}
+      {mode !== 'transfer' && mode !== 'debt' && allTags.length > 0 && (
+        <>
+          <div className="label">标签</div>
+          <div className="tag-pick">
+            {allTags.map((t) => {
+              const on = pickedTags.includes(t.name)
+              return (
+                <button key={t.tagId} type="button" className={on ? 'tag-chip on' : 'tag-chip'}
+                  onClick={() => setPickedTags((prev) => on ? prev.filter((x) => x !== t.name) : [...prev, t.name])}>
+                  {t.name}
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
+
+      {mode !== 'transfer' && mode !== 'debt' && (
+        <>
+          <div className="label">优惠金额（可选，本币）</div>
+          <input aria-label="优惠金额" inputMode="decimal" value={discount} placeholder="例如商家满减 10"
+            onChange={(e) => setDiscount(e.target.value.replace(/[^\d.]/g, ''))} />
+          <div className="label">附件（图片或 PDF，可选）</div>
+          <input type="file" accept="image/*,application/pdf" multiple aria-label="添加附件"
+            onChange={async (e) => {
+              const list = Array.from(e.target.files ?? [])
+              const added: import('../types').BillFile[] = []
+              for (const f of list) {
+                try {
+                  const up = await fetch(`/api/files?name=${encodeURIComponent(f.name)}`, { method: 'POST', body: f, credentials: 'same-origin' })
+                  const json = await up.json()
+                  if (json.code === 0) added.push({ fileId: Date.now(), name: f.name, remotePath: json.result.url })
+                } catch { notify('附件上传失败') }
+              }
+              if (added.length) setFiles((prev) => [...prev, ...added])
+              e.target.value = ''
+            }} />
+          {files.length > 0 && <p className="hint">已添加 {files.length} 个附件（30 天后自动销毁）</p>}
+        </>
+      )}
 
       {mode !== 'transfer' && (
         <div className="entry-attrs">

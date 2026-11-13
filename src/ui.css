@@ -1126,3 +1126,11 @@ button.day-btn {
   background: var(--card); border-radius: var(--r-md); cursor: pointer;
 }
 .icon-cell.on { border-color: var(--accent); background: var(--accent-soft); }
+
+/* 记账页标签选择（一木 AddBillActivity 的 tag_list） */
+.tag-pick, .entry-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag-chip {
+  padding: 4px 10px; border: 1px solid var(--line); border-radius: var(--r-pill);
+  background: var(--card); color: var(--ink); font-size: var(--font-sm); cursor: pointer;
+}
+.tag-chip.on { background: var(--accent-soft); border-color: var(--accent); }
