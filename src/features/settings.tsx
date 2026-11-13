@@ -1375,7 +1375,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         <button type="button" className="link" disabled={rateBusy} onClick={async () => {
           setRateBusy(true)
           try {
-            const res = await fetch('/api/rates', { credentials: 'same-origin' })
+            const res = await fetch(`/api/rates?base=${encodeURIComponent(defaultCurrency)}`, { credentials: 'same-origin' })
             const json = await res.json()
             if (json.code !== 0) throw new Error(json.msg || '获取汇率信息失败')
             const rates: Record<string, number> = json.result?.rates ?? {}
