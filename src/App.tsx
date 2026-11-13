@@ -21,15 +21,19 @@ type Tab = 'home' | 'calendar' | 'assets' | 'stats' | 'me' | 'add'
 
 export default function App() {
   const [user, setUser] = useState<User | null | undefined>(undefined)
-  const [locked, setLocked] = useState(() => hasPin())
+  // 冷启动时账号作用域尚未确定，不能在这一刻判断 hasPin()；等 user 就绪后再上锁
+  const [locked, setLocked] = useState(false)
+  useEffect(() => {
+    if (!user) return
+    setPinScope(user.id)
+    setLocked(hasPin())
+  }, [user?.id])
   // 切后台/切回前台重新上锁（一木同类行为：离开即锁）
   useEffect(() => {
-    if (!hasPin()) return
-    const onHide = () => { setLocked(true) }
-    const onVis = () => { if (document.visibilityState === 'hidden') onHide() }
+    const onVis = () => { if (document.visibilityState === 'hidden' && hasPin()) setLocked(true) }
     document.addEventListener('visibilitychange', onVis)
     return () => document.removeEventListener('visibilitychange', onVis)
-  }, [user?.id])
+  }, [])
   const [syncWarning, setSyncWarning] = useState('')
   const multiTabHandle = useRef<ReturnType<typeof startMultiTab> | null>(null)
 
@@ -143,7 +147,6 @@ export default function App() {
   }
 
   if (user === undefined) return <div className="boot" role="status">加载中…</div>
-  if (user) setPinScope(user.id)
   if (user && locked) return <PinLock onUnlock={() => setLocked(false)} />
   if (user === null) return <AuthScreen onAuthed={afterAuth} />
   return <Shell user={user} onLogout={logout} syncWarning={syncWarning} dismissSyncWarning={() => setSyncWarning('')} />

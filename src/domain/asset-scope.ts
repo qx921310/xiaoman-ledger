@@ -10,8 +10,9 @@ const sameBook = (a: string | number | undefined, b: string | number) =>
  */
 export function visibleAssets(assets: Asset[], bookId: string | number, me?: number): Asset[] {
   return assets.filter((a) => {
-    // 显式设置了 showBook（含空数组=全部隐藏）时以它为准（一木的 showBook 语义）
-    if (Array.isArray(a.showBook)) {
+    // 新版「全部隐藏」用独立字段表达；showBook 空数组保持旧版语义（=未设置）
+    if (a.showBookNone) return false
+    if (a.showBook?.length) {
       if (Number(bookId) === 0) return true
       if (!a.showBook.some((b) => String(b) === String(bookId))) return false
       return a.bookId != null || me == null || a.ownerId == null || Number(a.ownerId) === Number(me)

@@ -129,6 +129,11 @@ export function mergeRemote(s: MergeableState, records: SyncIncoming[], now = Da
       TAXONOMY_CHILDREN.some((c) => c.id === r.payload!.id && c.parentId === r.payload!.parentId && c.name === r.payload!.name) &&
       !!localRow && localRow.parentId === r.payload!.parentId && localRow.name === r.payload!.name
 
+    // 旧版本创建的记录没有属主：视为「同一份数据」，认领云端属主后原地合并，
+    // 不能因为本地属主为空就判成两个人各自的数据而改号插入第二条
+    if (idx >= 0 && !OWNERLESS.has(r.kind) && ownerOf(arr[idx]) === 0 && ownerOf(r.payload) !== 0) {
+      arr[idx] = { ...arr[idx], ownerId: ownerOf(r.payload) }
+    }
     if (!OWNERLESS.has(r.kind) && idx >= 0 && !sameBuiltInChild && (r.kind !== 'bill' || (!arr[idx].syncId && !r.payload.syncId)) && ownerOf(arr[idx]) !== ownerOf(r.payload)) {
       // 同 ID 但属主不同：不覆盖，顺位换一个空闲 ID，两条并存
       const idField = k[1]

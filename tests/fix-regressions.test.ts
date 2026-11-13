@@ -56,27 +56,44 @@ test('新实体带属主，云端同属主记录不会生成副本', () => {
   assert.equal(st().dreams.length, before, '同属主同 ID 不应新增条目')
 })
 
-test('定存勾选累加时账户余额增加，删除扣回', () => {
+test('旧记录无属主时认领云端属主，不产生副本', () => {
   reset()
-  useLedger.setState({ assets: [{ assetId: 10, assetName: '储蓄', assetNumber: 1000, assetType: 1 }] } as never)
-  const d = st().addFixedDeposit({ amount: 500, rate: 3, termYears: 3, assetId: 10, toAsset: true })
-  assert.equal(st().assets[0].assetNumber, 1500)
-  assert.equal(st().assets[0].openingBalance, 1500, '期初余额才是真值')
-  const rec = st().fixedDeposits[0]
-  st().deleteFixedDeposit(rec.depositId, { reduceAsset: true })
-  assert.equal(st().assets[0].assetNumber, 1000, '删除时应扣回')
-  assert.equal(st().fixedDeposits.length, 0)
-  void d
+  st().addDream({ name: '旅行', totalNum: 1000, startNum: 0 })
+  const rec = st().dreams[0]
+  // 模拟旧版本数据：清掉属主
+  useLedger.setState({ dreams: [{ ...rec, ownerId: undefined }] } as never)
+  const before = st().dreams.length
+  st().applyRemote([{
+    kind: 'dream', id: String(rec.dreamId), ownerId: 1, updatedAt: Date.now(), versionAuthoritative: true,
+    payload: { ...rec, ownerId: 1 }
+  }] as never)
+  assert.equal(st().dreams.length, before, '旧记录应认领属主而不是变成两条')
+  assert.equal(st().dreams[0].ownerId, 1)
 })
 
-test('定存不勾选时不改动账户余额', () => {
+test('定存累加用转账表达：有流水、余额下降、期初不变，删除后回滚', () => {
   reset()
-  useLedger.setState({ assets: [{ assetId: 10, assetName: '储蓄', assetNumber: 1000, assetType: 1 }] } as never)
+  useLedger.setState({ assets: [{ assetId: 10, assetName: '储蓄', assetNumber: 1000, openingBalance: 1000, assetType: 1 }] } as never)
+  st().addFixedDeposit({ amount: 500, rate: 3, termYears: 3, assetId: 10, toAsset: true })
+  const deposit = st().fixedDeposits[0]
+  assert.ok(deposit.transferId != null, '必须生成对应转账')
+  assert.equal(st().assets.find((a) => a.assetId === 10)!.openingBalance, 1000, '期初不得被改动')
+  assert.equal(st().assets.find((a) => a.assetId === 10)!.assetNumber, 500, '余额应减少（由流水推导）')
+  assert.equal(st().transfers.length, 1, '账户流水里必须有这条')
+  st().deleteFixedDeposit(deposit.depositId)
+  assert.equal(st().fixedDeposits.length, 0)
+  assert.equal(st().transfers.length, 0, '删除时应撤销转账')
+  assert.equal(st().assets.find((a) => a.assetId === 10)!.assetNumber, 1000, '余额回到原值')
+})
+
+test('定存不勾选时不产生流水也不动余额', () => {
+  reset()
+  useLedger.setState({ assets: [{ assetId: 10, assetName: '储蓄', assetNumber: 1000, openingBalance: 1000, assetType: 1 }] } as never)
   st().addFixedDeposit({ amount: 500, rate: 3, termYears: 3, assetId: 10, toAsset: false })
+  assert.equal(st().transfers.length, 0)
   assert.equal(st().assets[0].assetNumber, 1000)
-  const rec = st().fixedDeposits[0]
-  st().deleteFixedDeposit(rec.depositId, { reduceAsset: true })
-  assert.equal(st().assets[0].assetNumber, 1000, '未累加过的定存删除时不该扣')
+  st().deleteFixedDeposit(st().fixedDeposits[0].depositId)
+  assert.equal(st().assets[0].assetNumber, 1000)
 })
 
 test('跨账本还款继承父借贷账本', () => {
@@ -147,8 +164,11 @@ test('生效账本：空数组=全部隐藏，未设置=全部可见', () => {
   const base = { assetId: 1, assetName: '现金', assetNumber: 0, assetType: 1, bookId: 1 } as never
   assert.equal(visibleAssets([base], 1, 1).length, 1, '未设置 showBook 时按账本归属：A 账本可见')
   assert.equal(visibleAssets([base], 2, 1).length, 0, '未设置 showBook 时按账本归属：B 账本不可见')
-  const hidden = { ...base, showBook: [] } as never
-  assert.equal(visibleAssets([hidden], 1, 1).length, 0, '空数组应全部隐藏')
+  // 旧版空数组 = 未设置 = 全部可见（不能原地改写旧语义）
+  const legacy = { ...base, showBook: [] } as never
+  assert.equal(visibleAssets([legacy], 1, 1).length, 1, '旧版空数组仍视为全部可见')
+  const hidden = { ...base, showBookNone: true } as never
+  assert.equal(visibleAssets([hidden], 1, 1).length, 0, 'showBookNone 才是全部隐藏')
   const onlyA = { ...base, showBook: [1] } as never
   assert.equal(visibleAssets([onlyA], 2, 1).length, 0, '仅在 A 账本可见时 B 账本看不到')
 })

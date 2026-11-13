@@ -42,6 +42,29 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
   const [mode, setMode] = useState<'expense' | 'income' | 'transfer'>('expense')
   const [cost, setCost] = useState('')
   // 语音记账：识别文本取第一个数字当金额，其余作为备注（一木 SpeechActivity 同类行为）
+  // 备注变更统一入口：移动端与桌面端共用（避免只在桌面分支生效）
+  // 存为模板：移动端与桌面端共用
+  const saveTemplate = () => {
+    const costNum = evaluateAmount(cost) ?? 0
+    if (!(costNum > 0) || !pid) return notify('先把金额和分类填好')
+    const aid2 = aid || assets[0]?.assetId || 0
+    if (!aid2) return notify('请先选择账户')
+    addTemplate({
+      name: remark.trim() || (parents.find((p) => p.id === pid)?.name ?? '模板'),
+      mode: 'bill',
+      bill: {
+        assetId: aid2, parentCategoryId: pid, childCategoryId: cid,
+        cost: costNum, remark, notIntoTotal, notIntoBudget
+      }
+    })
+    notify('已存为模板')
+  }
+
+  const onRemarkChange = (v: string) => {
+    setRemark(v)
+    const hit = aiTypeRules.find((r) => r.keywords.some((k) => k && v.includes(k)))
+    if (hit) { setPid(hit.categoryId); setCid(0) }
+  }
   const speech = useSpeech((text) => {
     const num = text.match(/\d+(?:\.\d+)?/)
     if (num) setCost(num[0])
@@ -215,7 +238,13 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
 
         <div className="entry-bottom">
           <div className="entry-amount-row">
-            <input className="entry-remark" aria-label="备注" value={remark} placeholder="写备注…" onFocus={() => setKeypadOpen(false)} onBlur={() => setKeypadOpen(true)} onChange={(e) => setRemark(e.target.value)} />
+            <input className="entry-remark" aria-label="备注" value={remark} placeholder="写备注…"
+              onFocus={() => setKeypadOpen(false)} onBlur={() => setKeypadOpen(true)}
+              onChange={(e) => onRemarkChange(e.target.value)} />
+            <button type="button" className="ghost" aria-label="语音"
+              onClick={() => speech.listening ? speech.stop() : speech.start()}>
+              {speech.listening ? '停' : '语'}
+            </button>
             {mode === 'transfer' ? <span className="entry-currency-code">{displayCurrency}</span> : <MobilePicker className="entry-currency" label="选择币种" value={currency} options={currencies.map((c) => ({ value: c.code, label: c.code, detail: c.name, icon: c.symbol }))} onChange={setCurrency} />}
             <span className="entry-symbol">{currencySymbol(currencies, displayCurrency, defaultCurrency)}</span>
             <input className="entry-value" aria-label="记账金额" value={formatAmount(cost)} placeholder="0.00" inputMode="none" onFocus={() => { setKeypadField('cost'); setKeypadOpen(true) }} onChange={(e) => setCost(e.target.value.replace(/[^\d.]/g, ''))} />
@@ -238,6 +267,9 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
             {key('7')}{key('8')}{key('9')}<div className="entry-operators">{key('×')}{key('÷')}</div>
             <button type="button" className="key-control" disabled={readOnly} onClick={() => { submit() }}>再记</button>{key('0')}{key('.')}
             <button type="button" className="key-finish" disabled={readOnly} onClick={() => { if (submit()) onClose?.() }}>完成</button>
+            {mode !== 'transfer' && (
+              <button type="button" className="ghost" aria-label="存为模板" onClick={saveTemplate}>存模板</button>
+            )}
           </div>}
         </div>
       </section>
@@ -391,19 +423,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
         }}>存为转账模板</button>
       )}
       {mode !== 'transfer' && (
-        <button className="ghost wide" onClick={() => {
-          const costNum = evaluateAmount(cost) ?? 0
-          if (!(costNum > 0) || !aid || !cur) return notify('先把金额、分类和账户填好')
-          addTemplate({
-            name: remark.trim() || (parents.find((p) => p.id === cur)?.name ?? '模板'),
-            mode: 'bill',
-            bill: {
-              assetId: aid, parentCategoryId: cur, childCategoryId: cid,
-              cost: costNum, remark, notIntoTotal, notIntoBudget
-            }
-          })
-          notify('已存为模板')
-        }}>存为模板</button>
+        <button className="ghost wide" onClick={saveTemplate}>存为模板</button>
       )}
       <button className="primary" disabled={readOnly} onClick={() => { submit() }}>{mode === 'transfer' ? '确认转账' : '记一笔'}</button>
     </section>

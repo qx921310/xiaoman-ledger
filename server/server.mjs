@@ -643,7 +643,7 @@ const server = createServer(async (req, res) => {
         if (!bookId && existing.length) bookId = existing[0].book_id || null
         if (v2 && !bookId && ['bill', 'transfer', 'lend', 'refund', 'reimbursement', 'cycle',
           'splitGroup', 'splitMember', 'splitExpense', 'template', 'homeLoan', 'instalment',
-          'stockAsset', 'stockInfo', 'billGroup', 'billRelated'].includes(r.kind)) { reject('book-required'); continue }
+          'stockAsset', 'stockInfo', 'billGroup', 'billRelated', 'fixedDeposit'].includes(r.kind)) { reject('book-required'); continue }
         if (existing.some(e => e.book_id && bookId && e.book_id !== String(bookId))) { reject('scope-conflict'); continue }
         // 记录存在于别人的账本里、而我不是成员 → 直接拒绝，避免写出一条无意义的私有墓碑
         if (!bookId && existing.some((e) => e.user_id !== user.id && e.book_id)) { reject('permission-denied'); continue }

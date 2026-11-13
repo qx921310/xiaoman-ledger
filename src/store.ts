@@ -498,45 +498,57 @@ export const useLedger = create<LedgerState>()(
           ? { ...x, settlement, updateTime: NOW() } : x)
       })),
 
-      addFixedDeposit: (patch) => set((s) => {
+      // 定期存款：勾选「累加至账户余额」时，用一笔「现金账户 → 定存虚拟账户」的转账表达，
+      // 余额仍由流水推导（不直接改 openingBalance），删除时撤销该转账
+      addFixedDeposit: (patch) => {
+        const st = get()
         let depositId = Date.now()
-        while (s.fixedDeposits.some((d) => d.depositId === depositId)) depositId++
+        while (st.fixedDeposits.some((d) => d.depositId === depositId)) depositId++
         const amt = Number(patch.amount) || 0
-        // 一木：勾选「累加至账户余额」后，账户余额增加本次定存金额
         const toAsset = !!patch.toAsset && !!patch.assetId && patch.assetId > 0
-        // 余额由 deriveAssets(openingBalance) 派生，直接改 assetNumber 会被覆盖
-        const assets = toAsset
-          ? s.assets.map((a) => a.assetId === patch.assetId
-            ? { ...a, openingBalance: +((a.openingBalance ?? a.assetNumber) + amt).toFixed(2), updateTime: NOW() } : a)
-          : s.assets
-        return {
-          assets,
+        let virtualAssetId: number | undefined
+        let transferId: string | number | undefined
+        if (toAsset) {
+          // 虚拟「定存账户」：隐藏，只在资产分布里体现这笔钱去了哪
+          virtualAssetId = -depositId
+          st.addAsset({
+            assetId: virtualAssetId, assetName: `定存 ${amt}`, assetType: 9, hide: true,
+            assetNumber: 0, openingBalance: 0, intoTotal: 1
+          } as never)
+          const tr = get().addTransfer({
+            fromAssetId: patch.assetId!, toAssetId: virtualAssetId,
+            cost: amt, time: patch.startTime ?? NOW(), remark: '存入定期存款'
+          })
+          transferId = tr.transferId
+        }
+        set((s) => ({
           fixedDeposits: [{
             depositId, depositType: patch.depositType ?? '整存整取',
-            amount: Number(patch.amount) || 0, rate: Number(patch.rate) || 0,
+            amount: amt, rate: Number(patch.rate) || 0,
             termYears: Number(patch.termYears) || 1,
             startTime: patch.startTime ?? NOW(), remark: patch.remark ?? '',
-            assetId: patch.assetId, toAsset, updateTime: NOW(), ownerId: s.userId,
+            assetId: patch.assetId, toAsset, virtualAssetId, transferId,
+            updateTime: NOW(), ownerId: s.userId,
             bookId: s.currentBookId === 0 ? undefined : s.currentBookId
           }, ...s.fixedDeposits]
+        }))
+      },
+      deleteFixedDeposit: (depositId, options) => {
+        const st = get()
+        const rec = st.fixedDeposits.find((d) => d.depositId === depositId)
+        // 删除时默认撤销对应转账（钱回到原账户），与「余额由流水推导」保持一致
+        if (rec?.transferId != null && options?.reduceAsset !== false) {
+          get().deleteTransfer(rec.transferId)
         }
-      }),
-      deleteFixedDeposit: (depositId, options) => set((s) => {
-        const rec = s.fixedDeposits.find((d) => d.depositId === depositId)
-        // 一木：删除时勾选「减少账户余额」则扣回
-        const reduce = !!options?.reduceAsset && rec?.toAsset && rec?.assetId
-        const assets = reduce
-          ? s.assets.map((a) => a.assetId === rec!.assetId
-            ? { ...a, openingBalance: +((a.openingBalance ?? a.assetNumber) - rec!.amount).toFixed(2), updateTime: NOW() } : a)
-          : s.assets
-        return {
-          assets,
+        if (rec?.virtualAssetId != null) {
+          get().deleteAsset(rec.virtualAssetId)
+        }
+        set((s) => ({
           fixedDeposits: s.fixedDeposits.filter((d) => d.depositId !== depositId),
-          // 墓碑账本必须继承被删记录，而不是当前账本
           tombstones: [...s.tombstones, { kind: 'fixedDeposit', id: String(depositId), updatedAt: NOW(),
             bookId: rec?.bookId, ownerId: rec?.ownerId ?? s.userId }]
-        }
-      }),
+        }))
+      },
 
       addAiTypeRule: (patch) => set((s) => {
         let ruleId = Date.now()

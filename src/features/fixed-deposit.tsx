@@ -17,6 +17,7 @@ export function FixedDepositList({ onBack, notify }: { onBack: () => void; notif
   const assets = useLedger((s2) => s2.assets.filter((a) => !a.hide))
   const [assetId, setAssetId] = useState<number>(0)
   const [toAsset, setToAsset] = useState(false)
+  const currentBookId = useLedger((s2) => s2.currentBookId)
 
   const info = (startTime: number, termYears: number, amount: number, rate: number) => {
     // 按日历整年顺延：跨闰年不出现差一天
@@ -100,6 +101,8 @@ export function FixedDepositList({ onBack, notify }: { onBack: () => void; notif
             <button type="button" className="primary" onClick={() => {
               const amount = Number(form.amount) || 0
               if (amount <= 0) { notify('请填写存入金额'); return }
+              // 定存涉及资金流水，属账本数据：必须先在具体账本里
+              if (currentBookId === 0) { notify('请先切换到具体账本再新增定存'); return }
               add({
                 amount, rate: Number(form.rate) || 0, termYears: Number(form.term) || 1,
                 startTime: form.start ? new Date(`${form.start}T00:00:00`).getTime() : Date.now(),

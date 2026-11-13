@@ -128,6 +128,10 @@ export interface FixedDeposit {
   billId?: string | number
   /** 新增时是否「累加至账户余额」（一木 CommonCheckboxDialog 的选项） */
   toAsset?: boolean
+  /** 虚拟定存账户（隐藏资产），用于让这笔钱有去处 */
+  virtualAssetId?: number
+  /** 对应的转账记录：余额由流水推导，删除时撤销该转账 */
+  transferId?: string | number
   bookId?: string | number
   /** 属主：合并云端记录时用于判断「同一条」 */
   ownerId?: number
@@ -537,6 +541,8 @@ export interface Asset {
   shareQuotaAsset?: number
   /** 在哪些账本显示；为空表示按 bookId/私有规则 */
   showBook?: Array<string | number>
+  /** 新版「全部账本都隐藏」标记（与 showBook 分开，避免改写旧数据语义） */
+  showBookNone?: boolean
   /** 账单日 / 还款日（1-28） */
   inAccountDate?: number
   outAccountDate?: number
