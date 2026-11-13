@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLedger } from '../store'
 import { books as bookApi } from '../auth'
 import { Modal } from '../ui/modal'
@@ -6,6 +6,28 @@ import { HiddenPage } from './hidden-page'
 import { CatIcon } from '../ui/icons'
 
 // 账本图标候选（一木 activity_add_account_book 的 icon_layout；这里用自有图标集）
+const PENDING_KEY = 'xiaoman-book-pending'
+
+/** 离线时把账本改动排队，下次进入账本页自动补传 */
+const queuePending = (bookId: string, patch: Record<string, unknown>) => {
+  try {
+    const raw = localStorage.getItem(PENDING_KEY)
+    const all = raw ? JSON.parse(raw) as Record<string, Record<string, unknown>> : {}
+    all[bookId] = { ...(all[bookId] ?? {}), ...patch }
+    localStorage.setItem(PENDING_KEY, JSON.stringify(all))
+  } catch { /* 存储不可用则放弃补传 */ }
+}
+const flushPending = async () => {
+  let all: Record<string, Record<string, unknown>> = {}
+  try { all = JSON.parse(localStorage.getItem(PENDING_KEY) ?? '{}') as typeof all } catch { return 0 }
+  let done = 0
+  for (const [bookId, patch] of Object.entries(all)) {
+    try { await bookApi.update(bookId, patch as never); delete all[bookId]; done++ } catch { /* 下次再试 */ }
+  }
+  try { localStorage.setItem(PENDING_KEY, JSON.stringify(all)) } catch { /* 忽略 */ }
+  return done
+}
+
 const BOOK_ICONS = ['ic_parent_daily', 'ic_parent_food', 'ic_parent_traffic', 'ic_parent_shopping',
   'ic_parent_home', 'ic_parent_fun', 'ic_parent_medical', 'ic_parent_education']
 
@@ -21,9 +43,11 @@ export function BookManager({ notify, onBack }: { notify: (m: string) => void; o
   const currentBookId = useLedger((s) => s.currentBookId)
   const setBook = useLedger((s) => s.setBook)
   const updateBookMeta = useLedger((s) => s.updateBookMeta)
+  const setAccountBooks = useLedger((s) => s.setAccountBooks)
   const [editing, setEditing] = useState<null | { bookId: string | number; name: string; icon: string; showTransfer: boolean; showStock: boolean; hideAllCategory: boolean }>(null)
   const [newIcon, setNewIcon] = useState(BOOK_ICONS[0])
   const [hidePage, setHidePage] = useState(false)
+  useEffect(() => { void flushPending() }, [])
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
 
@@ -46,7 +70,15 @@ export function BookManager({ notify, onBack }: { notify: (m: string) => void; o
         showTransfer: patch.showTransfer, showStock: patch.showStock,
         hideAllCategory: patch.hideAllCategory
       })
-    } catch { /* 离线时仅本地生效，下次同步后以服务端为准 */ }
+    } catch {
+      // 离线：本地已生效，排队等联网后补传，避免被服务端旧值覆盖
+      queuePending(String(editing.bookId), {
+        name: patch.accountBookName, icon: patch.icon,
+        showTransfer: patch.showTransfer, showStock: patch.showStock,
+        hideAllCategory: patch.hideAllCategory
+      })
+      notify('已本地保存，联网后自动同步')
+    }
     notify('账本已更新')
     setEditing(null)
   }
@@ -127,8 +159,29 @@ export function BookManager({ notify, onBack }: { notify: (m: string) => void; o
               try {
                 const r = await bookApi.create(name, newIcon)
                 const id = r?.bookId ?? r?.accountBookId
-                if (id) updateBookMeta(String(id), { icon: newIcon, showTransfer: true, showStock: true })
-                if (id) setBook(String(id))
+                if (id) {
+                  // 服务端返回当前账号全部账本：直接用最新列表，避免本地不更新
+                  const fresh = (r as { books?: Array<Record<string, unknown>> }).books
+                  if (Array.isArray(fresh)) {
+                    setAccountBooks(fresh.map((b) => ({
+                      accountBookId: 0, accountBookName: String(b.name ?? ''), userId: 0, createTime: 0,
+                      bookId: String(b.bookId ?? ''), ownerId: b.ownerId as number | undefined,
+                      role: b.role as never,
+                      icon: (b.icon as string | null) ?? undefined,
+                      showTransfer: !(b.showTransfer === 0 || b.showTransfer === false),
+                      showStock: !(b.showStock === 0 || b.showStock === false),
+                      hideAllCategory: !!(b.hideAllCategory ?? 0),
+                      hidden: !!(b.hidden ?? 0)
+                    })))
+                  } else {
+                    // 服务端未返回列表时，本地先补一条，保证界面立刻可见
+                    setAccountBooks([...books, {
+                      accountBookId: 0, accountBookName: name, userId: 0, createTime: 0,
+                      bookId: String(id), icon: newIcon, showTransfer: true, showStock: true
+                    } as never])
+                  }
+                  setBook(String(id))
+                }
                 notify('账本已创建')
                 setNewName(''); setCreating(false)
               } catch { notify('新建账本失败，请联网后重试') }

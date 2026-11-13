@@ -192,6 +192,11 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
     if (leaksPrivateAccount(assets.find((a) => a.assetId === aid), curBookId, accountBooks, meId)) {
       return fail('该账户是私有账户，记到多人账本会让成员看到；请先设为共享或换账户')
     }
+    // 分类必须在当前可见列表里，且与收支方向一致（隐藏所有分类后不得回退到不可见分类）
+    const visible = parents.find((p) => p.id === cur)
+    if (!visible) return fail('请选择当前账本可用的分类')
+    if (mode === 'expense' && visible.kind !== 'expense') return fail('支出请选择支出分类')
+    if (mode === 'income' && visible.kind !== 'income') return fail('收入请选择收入分类')
     const accountCurrency = assets.find((a) => a.assetId === aid)?.currency
     if (!hasCurrencyRate(currency, currencies, defaultCurrency)) return fail(`请先设置 ${currency} 汇率`)
     if (!hasCurrencyRate(accountCurrency, currencies, defaultCurrency)) return fail(`请先设置 ${accountCurrency} 汇率`)

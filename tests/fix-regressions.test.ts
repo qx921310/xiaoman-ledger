@@ -199,6 +199,37 @@ test('统一记账出口：只读账本、非法金额、账户不存在都被�
   assert.equal(st().bills.length, 1)
 })
 
+test('切账号时不会把上一个账号的资产流水带过来（跨账号隔离）', async () => {
+  reset()
+  useLedger.setState({ assets: [{ assetId: 10, assetName: '现金', assetNumber: 100, openingBalance: 100, assetType: 1 }] } as never)
+  // 账号 1：一条 +500 流水
+  st().addAssetFlow({ assetId: 10, delta: 500, reason: '新增定存' })
+  assert.equal(st().assetFlows.length, 1)
+  // 模拟账号 2 的持久化数据：旧版本没有 assetFlows 键
+  const legacy = { version: 0, state: { assets: [{ assetId: 10, assetName: '现金', assetNumber: 100, assetType: 1 }], bills: [] } }
+  localStorage.setItem('xiaoman-data:2', JSON.stringify(legacy))
+  // 切账号：必须先回到初始状态再 rehydrate
+  const { loadAccountData } = await import('../src/account-session')
+  await loadAccountData(2)
+  assert.equal(st().assetFlows?.length ?? 0, 0, '账号 2 不得继承账号 1 的流水')
+  void useLedger
+})
+
+test('资产流水身份用 UUID：同一毫秒连续新增也不撞号', () => {
+  reset()
+  for (let i = 0; i < 20; i++) st().addAssetFlow({ assetId: 10, delta: 1, reason: '新增定存' })
+  const ids = new Set(st().assetFlows.map((f) => String(f.flowId)))
+  assert.equal(ids.size, 20, '20 条流水应有 20 个不同身份')
+})
+
+test('清空数据会清掉资产流水', () => {
+  reset()
+  st().addAssetFlow({ assetId: 10, delta: 100, reason: '新增定存' })
+  assert.equal(st().assetFlows.length, 1)
+  st().reset()
+  assert.equal(st().assetFlows.length, 0, '清空后不得残留流水')
+})
+
 test('账本开关与隐藏可持久化（一木 AddAccountBookActivity 的三个开关）', () => {
   reset()
   useLedger.setState({ currentBookId: 1 } as never)

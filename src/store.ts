@@ -527,8 +527,9 @@ export const useLedger = create<LedgerState>()(
       // 定期存款：一木的「累加至账户余额」就是直接把账户余额加上去（调整，不是流水），
       // 删除时可选「减少账户余额」扣回。用 openingBalance 作为真值，assetNumber 由它派生。
       addAssetFlow: (patch) => set((s) => {
-        let flowId = Date.now()
-        while (s.assetFlows.some((f) => f.flowId === flowId)) flowId++
+        // 用 UUID 做身份：两台设备同一毫秒各自新增也不会撞号
+        let flowId: number | string = globalThis.crypto?.randomUUID?.() ?? Date.now()
+        while (s.assetFlows.some((f) => String(f.flowId) === String(flowId))) flowId = `f-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
         return {
           assetFlows: [...s.assetFlows, {
             flowId, assetId: patch.assetId, delta: Number(patch.delta) || 0,
@@ -550,7 +551,7 @@ export const useLedger = create<LedgerState>()(
           // 一木：写入资产流水「新增定存」，余额由流水推导，不改期初
           assetFlows: toAsset
             ? [...s.assetFlows, {
-                flowId: (() => { let id = NOW(); while (s.assetFlows.some((f) => f.flowId === id)) id++; return id })(),
+                flowId: globalThis.crypto?.randomUUID?.() ?? `f-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
                 assetId: patch.assetId!, delta: amt, reason: '新增定存',
                 time: patch.startTime ?? NOW(),
                 bookId: s.currentBookId === 0 ? undefined : s.currentBookId,
@@ -577,7 +578,7 @@ export const useLedger = create<LedgerState>()(
           // 一木：删除时写「删除定存」反向流水（不是抹掉历史）
           assetFlows: reduce
             ? [...s.assetFlows, {
-                flowId: (() => { let id = NOW(); while (s.assetFlows.some((f) => f.flowId === id)) id++; return id })(),
+                flowId: globalThis.crypto?.randomUUID?.() ?? `f-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
                 assetId: rec!.assetId!, delta: -rec!.amount, reason: '删除定存',
                 time: NOW(), bookId: rec?.bookId, ownerId: rec?.ownerId ?? s.userId, updateTime: NOW()
               }]
@@ -1472,6 +1473,7 @@ export const useLedger = create<LedgerState>()(
         dreams: [],
       aiTypeRules: [],
       fixedDeposits: [],
+      assetFlows: [],
       stockAssets: [], stockInfos: [], templates: [],
         homeLoans: [], instalments: [],
         billGroups: [], billRelated: [],

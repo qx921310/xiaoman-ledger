@@ -577,7 +577,8 @@ export interface Category {
 
 /** 一木资产流水（AssetHistory）：非账单类余额变动，如定存累加/扣回 */
 export interface AssetFlow {
-  flowId: number
+  /** 流水号：新记录用 UUID 字符串，兼容历史数字 */
+  flowId: number | string
   assetId: number
   /** 变动金额，正=增加、负=减少 */
   delta: number
