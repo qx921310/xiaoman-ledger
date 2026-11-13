@@ -66,7 +66,11 @@ export default function App() {
 
   useEffect(() => {
     // 账本离线改动：网络恢复或页面回到前台时补传，不依赖账本页是否打开
-    const flush = () => { if (hasPendingBookPatches()) void flushBookPatches() }
+    const flush = () => {
+      void hasPendingBookPatches()
+        .then((yes) => (yes ? flushBookPatches() : null))
+        .catch((e) => setSyncWarning(e instanceof Error ? e.message : '账本同步失败'))
+    }
     window.addEventListener('online', flush)
     const onVisible = () => { if (document.visibilityState === 'visible') flush() }
     document.addEventListener('visibilitychange', onVisible)
@@ -81,7 +85,7 @@ export default function App() {
       if (u) {
         await initAccount(u)
         // 登录后补传离线期间的账本改动（经过服务端并发校验）
-        void flushBookPatches()
+        void flushBookPatches().catch((e) => setSyncWarning(e instanceof Error ? e.message : '账本同步失败'))
       } else setUser(null)
     })
   }, [])

@@ -75,7 +75,7 @@ export function assetMovements(input: TrendInput): Map<number, Array<{ time: num
     push(r.assetId ?? bill?.assetId ?? 0, r.updateTime ?? bill?.time ?? 0, r.number)
   }
   for (const r of input.reimbursements) {
-    if (r.status === 'done') push(r.assetId, r.settledAt ?? r.updateTime ?? 0, r.number)
+    if (r.status === 'done') push(r.assetId, r.settledAt ?? r.updateTime ?? 0, r.accountAmount ?? r.number)
   }
   for (const f of input.assetFlows) push(f.assetId, f.time, f.delta)
   return out

@@ -4,7 +4,7 @@ import { books as bookApi } from '../auth'
 import { Modal } from '../ui/modal'
 import { HiddenPage } from './hidden-page'
 import { CatIcon } from '../ui/icons'
-import { queueBookPatch, clearBookPatch, flushBookPatches, conflictOf, resolveConflictKeepLocal, resolveConflictUseServer } from './book-pending'
+import { queueBookPatch, flushBookPatches, conflictOf, resolveConflictKeepLocal, resolveConflictUseServer } from './book-pending'
 
 // 账本图标候选（一木 activity_add_account_book 的 icon_layout；这里用自有图标集）
 const BOOK_ICONS = ['ic_parent_daily', 'ic_parent_food', 'ic_parent_traffic', 'ic_parent_shopping',
@@ -29,9 +29,14 @@ export function BookManager({ notify, onBack }: { notify: (m: string) => void; o
   const [hidePage, setHidePage] = useState(false)
   const [conflicts, setConflicts] = useState<string[]>([])
   useEffect(() => {
-    void flushBookPatches().then(() => {
-      setConflicts(books.filter((b) => String(b.bookId) && conflictOf(String(b.bookId))).map((b) => String(b.bookId)))
-    })
+    void flushBookPatches().then(async () => {
+      const rows = await Promise.all(books.map(async (b) => {
+        const id = String(b.bookId)
+        if (!id) return null
+        return (await conflictOf(id)) ? id : null
+      }))
+      setConflicts(rows.filter((x): x is string => !!x))
+    }).catch((e) => notify(e instanceof Error ? e.message : '账本同步失败'))
   }, [books])
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
@@ -47,36 +52,22 @@ export function BookManager({ notify, onBack }: { notify: (m: string) => void; o
       showTransfer: editing.showTransfer,
       showStock: editing.showStock
     }
+    const serverBook = books.find((b) => String(b.bookId) === String(editing.bookId))
+    const id = String(editing.bookId)
+    try {
+      await queueBookPatch(id, { name: patch.accountBookName, icon: patch.icon,
+        showTransfer: patch.showTransfer, showStock: patch.showStock }, serverBook?.updateTime ?? null)
+    } catch (e) { notify(e instanceof Error ? e.message : '无法安全保存账本'); return }
     if (editing.hideAllCategory) {
-      // 一木：勾选后把所有分类在该账本隐藏（一次性动作，账本本身不存这个开关）
       hideAllCategoriesForBook(editing.bookId)
       setEditing((prev) => prev ? { ...prev, hideAllCategory: false } : prev)
     }
     updateBookMeta(editing.bookId, patch)
-    const serverBook = books.find((b) => String(b.bookId) === String(editing.bookId))
-    try {
-      await bookApi.update(String(editing.bookId), {
-        name: patch.accountBookName, icon: patch.icon,
-        showTransfer: patch.showTransfer, showStock: patch.showStock,
-        baseUpdatedAt: serverBook?.updateTime ?? null
-      })
-      // 已成功落库：清掉该账本的离线待补，避免旧值之后覆盖新值
-      clearBookPatch(String(editing.bookId))
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : ''
-      if (msg.includes('其他设备')) {
-        notify('该账本已在其他设备更新，请返回后重新进入再改')
-        setEditing(null)
-        return
-      }
-      // 离线：本地已生效；入队时带上当前服务端版本，补传时同样经过并发校验
-      queueBookPatch(String(editing.bookId), {
-        name: patch.accountBookName, icon: patch.icon,
-        showTransfer: patch.showTransfer, showStock: patch.showStock
-      }, serverBook?.updateTime ?? null)
-      notify('已本地保存，联网后自动同步')
-    }
-    notify('账本已更新')
+    const result = await flushBookPatches()
+    if (await conflictOf(id)) {
+      setConflicts((prev) => [...new Set([...prev, id])])
+      notify('账本有冲突，请核对')
+    } else notify(result.sent ? '账本已更新' : '已本地保存，联网后自动同步')
     setEditing(null)
   }
 
@@ -92,10 +83,12 @@ export function BookManager({ notify, onBack }: { notify: (m: string) => void; o
           key: String(b.bookId ?? b.accountBookId),
           name: b.accountBookName,
           value: '已隐藏',
-          onRestore: () => {
-            updateBookMeta(String(b.bookId), { hidden: false })
-            void bookApi.update(String(b.bookId), { hidden: false }).catch(() => {})
-            notify('账本已恢复')
+          onRestore: async () => {
+            const id = String(b.bookId)
+            try { await queueBookPatch(id, { hidden: false }, b.updateTime ?? null) }
+            catch (e) { notify(e instanceof Error ? e.message : '无法安全保存账本'); return }
+            updateBookMeta(id, { hidden: false })
+            void flushBookPatches().then((r) => notify(r.conflicted ? '账本有冲突，请核对' : r.sent ? '账本已恢复' : '已本地恢复，联网后同步'))
           }
         })) }]} />
       </>
@@ -121,12 +114,19 @@ export function BookManager({ notify, onBack }: { notify: (m: string) => void; o
                 <button type="button" className="link" onClick={async () => {
                   const ok = await resolveConflictKeepLocal(id)
                   notify(ok ? '已用本地内容覆盖' : '覆盖失败，请联网后重试')
-                  setConflicts((prev) => prev.filter((x) => x !== id))
+                  if (ok) setConflicts((prev) => prev.filter((x) => x !== id))
                 }}>保留本地</button>
-                <button type="button" className="del" onClick={() => {
-                  resolveConflictUseServer(id)
-                  notify('已放弃本地改动，以服务端为准')
-                  setConflicts((prev) => prev.filter((x) => x !== id))
+                <button type="button" className="del" onClick={async () => {
+                  try {
+                    const b = await resolveConflictUseServer(id)
+                    if (!b) { notify('账本已改变，请重新核对'); return }
+                    updateBookMeta(id, { accountBookName: b.name, icon: b.icon ?? undefined,
+                      showTransfer: b.showTransfer !== 0 && b.showTransfer !== false,
+                      showStock: b.showStock !== 0 && b.showStock !== false,
+                      hidden: !!b.hidden, updateTime: b.updatedAt ?? undefined })
+                    notify('已使用云端内容')
+                    setConflicts((prev) => prev.filter((x) => x !== id))
+                  } catch { notify('读取云端失败，请联网后重试') }
                 }}>用云端</button>
               </div>
             )
@@ -150,9 +150,11 @@ export function BookManager({ notify, onBack }: { notify: (m: string) => void; o
               hideAllCategory: !!b.hideAllCategory
             })}>编辑</button>
             <button type="button" className="del" onClick={async () => {
+              try { await queueBookPatch(String(b.bookId), { hidden: true }, b.updateTime ?? null) }
+              catch (e) { notify(e instanceof Error ? e.message : '无法安全保存账本'); return }
               updateBookMeta(String(b.bookId), { hidden: true })
-              try { await bookApi.update(String(b.bookId), { hidden: true }) } catch { /* 离线仅本地 */ }
-              notify('账本已隐藏')
+              const r = await flushBookPatches()
+              notify(r.conflicted ? '账本有冲突，请核对' : r.sent ? '账本已隐藏' : '已本地隐藏，联网后同步')
             }}>隐藏</button>
           </div>
         )

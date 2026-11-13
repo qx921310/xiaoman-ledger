@@ -19,6 +19,7 @@ import { planInstalment, planLoan } from '../domain/loan'
 import { holdingValue, totalProfit } from '../domain/stock'
 import { IconPicker } from '../ui/icon-picker'
 import { lendRemaining, lendTotals } from '../lend'
+import { unresolvedReimbursementAssets } from '../balances'
 
 /** 图标 key → 中文名，用于选择按钮上显示 */
 function iconLabel(key: string): string {
@@ -76,6 +77,8 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
   const refunds = useLedger((s) => s.refunds)
   const assetFlows = useLedger((s) => s.assetFlows ?? [])
   const reimbursements = useLedger((s) => s.reimbursements)
+  const unresolvedRates = unresolvedReimbursementAssets({ assets: allAssets, bills, transfers, lends, refunds, reimbursements,
+    parentCategories: allAssetsParents, defaultCurrency, currencyRate: (code) => currencies.find((c) => c.code === code)?.rate })
   const [historyAsset, setHistoryAsset] = useState<Asset | null>(null)
   const [repayForm, setRepayForm] = useState<{ lendId: number; remaining: number; amount: string; assetId: number } | null>(null)
   const [lendForm, setLendForm] = useState<{ type: 1 | 2 | 3 | 4; assetId: number; counterparty: string; number: string; interest: string; repaymentAssetId: number; remark: string } | null>(null)
@@ -219,6 +222,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
 
   return (
     <section ref={rootRef} className={screen === 'assets' ? 'card' : 'card subpage'}>
+      {unresolvedRates.size > 0 && <p className="warn" role="status">部分历史报销缺少到账金额和汇率，相关账户暂显示上次余额，请设置汇率并核对。</p>}
       {(hiddenPull.progress > 0 || hiddenPull.busy) && screen === 'assets' && (
         <div className="pull-tip" role="status" aria-live="polite">
           {hiddenPull.busy ? hiddenPull.text.busy : hiddenPull.progress >= 1 ? hiddenPull.text.released : hiddenPull.text.pulling}

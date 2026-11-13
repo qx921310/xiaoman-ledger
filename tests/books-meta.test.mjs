@@ -56,6 +56,16 @@ test('账本图标与三个开关可保存并在重新拉取时返回', async ()
     assert.equal(Number(after.showStock), 0, '显示理财流水=关')
     assert.equal(Number(after.hideAllCategory), 1, '隐藏所有分类=开')
     assert.equal(after.icon, 'ic_parent_traffic', '图标仍在')
+
+    // 服务端已经提交但客户端丢失响应：同一操作重试必须返回原确认。
+    const replayBody = { bookId: book.bookId, hidden: true, baseUpdatedAt: after.updatedAt, operationId: 'book-operation-12345' }
+    const first = await call('/api/books/update', replayBody, cookie)
+    const replay = await call('/api/books/update', replayBody, cookie)
+    assert.equal(first.body.code, 0)
+    assert.equal(replay.body.code, 0)
+    assert.equal(replay.body.result.operationUpdatedAt, first.body.result.operationUpdatedAt)
+    const changed = await call('/api/books/update', { ...replayBody, hidden: false }, cookie)
+    assert.notEqual(changed.body.code, 0, '同一操作编号不能用于不同内容')
   } finally {
     const exited = once(child, 'exit').catch(() => {})
     child.kill()

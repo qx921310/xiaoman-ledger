@@ -28,8 +28,10 @@ async function call(path: string, init?: RequestInit) {
   const data = await res.json().catch(() => ({ code: 1, msg: '响应不是 JSON' }))
   if (data.code !== 0) {
     // 服务端明确拒绝（含 401）→ 真正的未登录/无权限
-    const err = new Error(data.msg || '请求失败') as Error & { status?: number }
+    // errorCode 是服务端稳定错误码（BOOK_CONFLICT 等）；msg 只用于展示
+    const err = new Error(data.msg || '操作失败') as Error & { status?: number; errorCode?: string }
     err.status = res.status
+    err.errorCode = typeof data.errorCode === 'string' ? data.errorCode : undefined
     throw err
   }
   return data.result
@@ -56,7 +58,7 @@ export const books = {
   list: () => call('/books'),
   create: (name: string, icon?: string) => call('/books/create', { method: 'POST', body: JSON.stringify({ name, icon }) }),
   /** 账本元数据（图标/显示开关/隐藏）：与一木编辑账本一致 */
-  update: (bookId: string, patch: { name?: string; icon?: string; showTransfer?: boolean; showStock?: boolean; hideAllCategory?: boolean; hidden?: boolean; baseUpdatedAt?: number | null }) =>
+  update: (bookId: string, patch: { name?: string; icon?: string; showTransfer?: boolean; showStock?: boolean; hideAllCategory?: boolean; hidden?: boolean; baseUpdatedAt?: number | null; operationId?: string }) =>
     call('/books/update', { method: 'POST', body: JSON.stringify({ bookId, ...patch }) }),
   rename: (bookId: string, name: string) => call('/books/rename', { method: 'POST', body: JSON.stringify({ bookId, name }) }),
   invite: (bookId: string) => call('/books/invite', { method: 'POST', body: JSON.stringify({ bookId }) }),

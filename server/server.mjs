@@ -268,6 +268,22 @@ for (const sql of [
   "ALTER TABLE books ADD COLUMN hidden INTEGER DEFAULT 0",
   "ALTER TABLE books ADD COLUMN updated_at INTEGER DEFAULT 0"
 ]) { try { db.exec(sql) } catch { /* 已存在 */ } }
+db.exec(`CREATE TABLE IF NOT EXISTS book_update_operations (
+  user_id INTEGER NOT NULL, operation_id TEXT NOT NULL, fingerprint TEXT NOT NULL,
+  book_id TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY(user_id, operation_id)
+)`)
+db.exec('CREATE INDEX IF NOT EXISTS idx_book_ops_updated ON book_update_operations(updated_at)')
+// 回执保留 90 天：设备离线更久时无法证明请求结果，客户端必须保留草稿并提示核对，
+// 服务端不会把它当成新操作直接覆盖（缺回执 → 按 baseUpdatedAt 判冲突）。
+const RECEIPT_TTL_MS = 90 * 24 * 3600 * 1000
+const pruneBookOperations = () => {
+  try {
+    db.prepare('DELETE FROM book_update_operations WHERE updated_at < ?').run(Date.now() - RECEIPT_TTL_MS)
+  } catch { /* 清理失败不影响请求 */ }
+}
+// 不用定时器：定时器会让数据库句柄一直打开，测试结束时临时库无法删除（Windows EBUSY）。
+// 改为启动时清理一次 + 每 200 次账本更新顺手清理一次。
+let bookUpdateCount = 0
 
 const myBooks = (userId) =>
   db.prepare(`SELECT b.book_id AS bookId, b.name, b.owner_id AS ownerId, m.role, n.member_no AS memberNo,
@@ -372,7 +388,8 @@ const send = (res, code, body) => {
   res.end(JSON.stringify(body))
 }
 const ok = (res, result) => send(res, 200, { code: 0, result })
-const fail = (res, msg) => send(res, 200, { code: 1, msg })
+/** 失败响应：code 是给程序看的稳定错误码，msg 只用于展示 */
+const fail = (res, msg, code = 'ERROR') => send(res, 200, { code: 1, errorCode: code, msg })
 
 const readBody = (req) => new Promise((resolve) => {
   let buf = ''
@@ -504,34 +521,52 @@ const server = createServer(async (req, res) => {
       if (!user) return fail(res, '请先登录')
       const body = await readBody(req)
       const bookId = String(body.bookId || '')
-      if (!isAdmin(roleOf(bookId, user.id))) return fail(res, '只有「管理」可以修改账本')
+      if (!isAdmin(roleOf(bookId, user.id))) return fail(res, '只有「管理」可以修改账本', 'BOOK_FORBIDDEN')
+      const operationId = body.operationId == null ? null : String(body.operationId)
+      if (operationId && (operationId.length < 8 || operationId.length > 128)) return fail(res, '操作编号不合法', 'BAD_OPERATION_ID')
+      const fingerprint = operationId ? sha(JSON.stringify(body)) : null
+      if (operationId) {
+        const prior = db.prepare('SELECT fingerprint,book_id,updated_at FROM book_update_operations WHERE user_id=? AND operation_id=?').get(user.id, operationId)
+        if (prior) {
+          if (prior.fingerprint !== fingerprint) return fail(res, '操作编号已被其他内容使用', 'OPERATION_ID_REUSED')
+          return ok(res, { books: myBooks(user.id), operationUpdatedAt: prior.updated_at })
+        }
+      }
       const sets = []
       const vals = []
       const put = (col, value) => { sets.push(`${col} = ?`); vals.push(value) }
       // 一木：账本名称不能为空、同名账本不能重复
       if (body.name != null) {
         const nextName = String(body.name).trim()
-        if (!nextName) return fail(res, '账本名称不能为空')
+        if (!nextName) return fail(res, '账本名称不能为空', 'BOOK_NAME_EMPTY')
         const dup = db.prepare('SELECT 1 FROM books b JOIN book_members m ON m.book_id=b.book_id WHERE m.user_id=? AND b.name=? AND b.book_id<>?')
           .get(user.id, nextName, bookId)
-        if (dup) return fail(res, '账本已经存在')
+        if (dup) return fail(res, '账本已经存在', 'BOOK_NAME_TAKEN')
         put('name', nextName)
       }
       // 并发：客户端带 baseUpdatedAt 时，服务端已更新过则拒绝，避免旧设备覆盖新值
       if (body.baseUpdatedAt != null) {
         const row = db.prepare('SELECT updated_at FROM books WHERE book_id = ?').get(bookId)
         const serverAt = Number(row?.updated_at ?? 0)
-        if (serverAt > Number(body.baseUpdatedAt)) return fail(res, '该账本已在其他设备更新，请刷新后再改')
+        if (serverAt > Number(body.baseUpdatedAt)) return fail(res, '该账本已在其他设备更新，请刷新后再改', 'BOOK_CONFLICT')
       }
       if (body.icon != null) put('icon', String(body.icon))
       if (body.showTransfer != null) put('show_transfer', body.showTransfer ? 1 : 0)
       if (body.showStock != null) put('show_stock', body.showStock ? 1 : 0)
       if (body.hideAllCategory != null) put('hide_all_category', body.hideAllCategory ? 1 : 0)
       if (body.hidden != null) put('hidden', body.hidden ? 1 : 0)
-      if (!sets.length) return fail(res, '没有要更新的字段')
-      put('updated_at', Date.now())
-      db.prepare(`UPDATE books SET ${sets.join(', ')} WHERE book_id = ?`).run(...vals, bookId)
-      return ok(res, { books: myBooks(user.id) })
+      if (!sets.length) return fail(res, '没有要更新的字段', 'BOOK_NOT_CHANGED')
+      if (++bookUpdateCount % 200 === 0) pruneBookOperations()
+      const previous = db.prepare('SELECT updated_at FROM books WHERE book_id=?').get(bookId)
+      const updatedAt = Math.max(Date.now(), Number(previous?.updated_at ?? 0) + 1)
+      put('updated_at', updatedAt)
+      db.exec('BEGIN IMMEDIATE')
+      try {
+        db.prepare(`UPDATE books SET ${sets.join(', ')} WHERE book_id = ?`).run(...vals, bookId)
+        if (operationId) db.prepare('INSERT INTO book_update_operations(user_id,operation_id,fingerprint,book_id,updated_at) VALUES (?,?,?,?,?)').run(user.id, operationId, fingerprint, bookId, updatedAt)
+        db.exec('COMMIT')
+      } catch (e) { db.exec('ROLLBACK'); throw e }
+      return ok(res, { books: myBooks(user.id), operationUpdatedAt: updatedAt })
     }
 
     if (path === '/api/books/rename' && req.method === 'POST') {

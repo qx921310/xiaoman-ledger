@@ -11,11 +11,26 @@ export interface BalanceData {
   refunds: Refund[]
   reimbursements: Reimbursement[]
   parentCategories: Category[]
-  /** 查询某币种对本位币的汇率（缺失时按 1 处理） */
-  currencyRate?: (code: string) => number
+  defaultCurrency?: string
+  /** 查询某币种对本位币的汇率；缺失时不推测 */
+  currencyRate?: (code: string) => number | undefined
 }
 
 const round = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100
+
+/** 历史报销没有原币快照且缺少汇率时，保留缓存并提示核对。 */
+export function unresolvedReimbursementAssets(data: BalanceData): Set<number> {
+  const ids = new Set<number>()
+  for (const r of data.reimbursements || []) {
+    if (r.status !== 'done' || Number.isFinite(r.accountAmount)) continue
+    const asset = data.assets.find((a) => a.assetId === r.assetId)
+    const code = asset?.currency
+    if (!code || code === (data.defaultCurrency ?? 'CNY')) continue
+    const rate = data.currencyRate?.(code)
+    if (!Number.isFinite(rate) || rate! <= 0) ids.add(r.assetId)
+  }
+  return ids
+}
 
 export function movements(data: BalanceData): Map<number, number> {
   const result = new Map<number, number>()
@@ -51,8 +66,9 @@ export function movements(data: BalanceData): Map<number, number> {
         add(reimbursement.assetId, reimbursement.accountAmount!)
       } else {
         const asset = (data.assets || []).find((a) => a.assetId === reimbursement.assetId)
-        const rate = !asset?.currency ? 1 : (data.currencyRate?.(asset.currency) ?? 1)
-        add(reimbursement.assetId, reimbursement.number / rate)
+        const code = asset?.currency
+        const rate = !code || code === (data.defaultCurrency ?? 'CNY') ? 1 : data.currencyRate?.(code)
+        if (rate != null && Number.isFinite(rate) && rate > 0) add(reimbursement.assetId, reimbursement.number / rate)
       }
     }
   }
@@ -64,7 +80,9 @@ export function movements(data: BalanceData): Map<number, number> {
 /** Migration uses the balance and transactions from the same snapshot. */
 export function deriveAssets(data: BalanceData): Asset[] {
   const delta = movements(data)
+  const unresolved = unresolvedReimbursementAssets(data)
   return (data.assets || []).map(asset => {
+    if (unresolved.has(asset.assetId)) return asset
     const movement = delta.get(asset.assetId) || 0
     const openingBalance = Number.isFinite(asset.openingBalance)
       ? asset.openingBalance! : round((Number(asset.assetNumber) || 0) - movement)

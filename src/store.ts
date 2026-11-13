@@ -17,7 +17,7 @@ import { mergeTaxonomyState } from './domain/taxonomy-merge'
 import { serializeShares, splitAmounts } from './domain/split'
 import { planInstalment } from './domain/loan'
 import { applyBuyWithLot, applySellByMethod } from './domain/stock'
-import { fromBase, toBase } from './money'
+import { fromBase, hasCurrencyRate, toBase } from './money'
 import { validateBackup } from './backup'
 import { addRefundChanges, deleteRefundChanges } from './refund-operations'
 import { DEFAULT_TAG_COLOR } from './default-colors'
@@ -99,7 +99,7 @@ interface LedgerState {
   addBill: (patch: Partial<Bill>) => Bill
   deleteTransfer: (transferId: number | string) => void
   addReimbursement: (patch: { billId: string | number; assetId: number; number: number; detail?: string }) => void
-  settleReimbursement: (reimbursementId: number) => void
+  settleReimbursement: (reimbursementId: number) => boolean
   deleteReimbursement: (reimbursementId: number) => void
   endReimbursement: (billId: string | number) => void
   addCycle: (patch: Omit<Cycle, 'cycleId' | 'generated' | 'userId' | 'updateTime' | 'enabled'> & { enabled?: boolean }) => void
@@ -231,7 +231,7 @@ export const useLedger = create<LedgerState>()(
         if (!combined.assets || !combined.bills || !combined.parentCategories) { markDirty(); return changes }
         const rateOf = (code: string) => {
           const c = (combined.currencies || []).find((x) => x.code === code)
-          return c && c.rate ? c.rate : 1
+          return c && Number.isFinite(c.rate) && c.rate > 0 ? c.rate : undefined
         }
         const assets = deriveAssets({ ...combined, currencyRate: rateOf }).map(asset => {
           const previous = state.assets.find(a => a.assetId === asset.assetId)
@@ -1157,7 +1157,14 @@ export const useLedger = create<LedgerState>()(
         }
       }),
 
-      settleReimbursement: (reimbursementId) => set((s) => {
+      settleReimbursement: (reimbursementId) => {
+        const before = get()
+        const pending = before.reimbursements.find((r) => r.reimbursementId === reimbursementId)
+        const account = before.assets.find((a) => a.assetId === pending?.assetId)
+        if (!pending || pending.status === 'done' || !account || !hasCurrencyRate(account.currency, before.currencies, before.defaultCurrency)) return false
+        const rate = !account.currency || account.currency === before.defaultCurrency ? 1
+          : before.currencies.find((c) => c.code === account.currency)!.rate
+        set((s) => {
         const rec = s.reimbursements.find((r) => r.reimbursementId === reimbursementId)
         if (!rec || rec.status === 'done') return {}
         return {
@@ -1165,8 +1172,6 @@ export const useLedger = create<LedgerState>()(
             if (r.reimbursementId !== reimbursementId) return r
             // 入账金额在这一刻冻结：以后改汇率不会让余额跟着变
             const asset = s.assets.find((a) => a.assetId === r.assetId)
-            const rate = !asset?.currency || asset.currency === s.defaultCurrency ? 1
-              : (s.currencies.find((c) => c.code === asset.currency)?.rate || 1)
             return {
               ...r, status: 'done' as const, settledAt: NOW(), updateTime: NOW(),
               accountAmount: +(r.number / rate).toFixed(2),
@@ -1176,12 +1181,12 @@ export const useLedger = create<LedgerState>()(
           assets: s.assets.map((a) => {
             if (a.assetId !== rec.assetId) return a
             // 报销账户可能是外币：按该账户币种把本位币金额折算后入账
-            const rate = !a.currency || a.currency === s.defaultCurrency ? 1
-              : (s.currencies.find((c) => c.code === a.currency)?.rate || 1)
             return { ...a, assetNumber: +(a.assetNumber + rec.number / rate).toFixed(2), updateTime: NOW() }
           })
         }
-      }),
+        })
+        return true
+      },
 
       // 结束报销：账单标记结束，同时把待报销记录收口，避免待办列表残留
       endReimbursement: (billId) => set((s) => ({
@@ -1869,7 +1874,7 @@ export const useLedger = create<LedgerState>()(
         })
         const rateOf = (code: string) => {
           const c = (snapshot.currencies || []).find((x) => x.code === code)
-          return c && c.rate ? c.rate : 1
+          return c && Number.isFinite(c.rate) && c.rate > 0 ? c.rate : undefined
         }
         return { ...snapshot, assets: deriveAssets({ ...snapshot, currencyRate: rateOf }) }
       }

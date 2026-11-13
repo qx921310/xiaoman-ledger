@@ -10,7 +10,7 @@
     "api": "node server/server.mjs",
     "typecheck": "tsc --noEmit",
     "test": "npm run test:balances && npm run test:sync-identities && npm run test:account-session && npm run test:statistics && npm run test:privacy-ocr && npm run test:category-order && npm run test:multidevice && npm run test:concurrency && npm run test:auto-sync && npm run test:offline && npm run test:multi-tab && npm run test:no-self-loop && npm run test:session-epoch && npm run test:sync-v2 && npm run test:cr-v2",
-    "check": "npm run typecheck && npm test && npm run icons:check && npm run ui:tokens && npm run ui:contrast && npm run lint && npm run build && npm run test:fixes && npm run test:seed && npm run test:rates && npm run test:books && npm run test:trend && npm run test:pending",
+    "check": "npm run typecheck && npm test && npm run icons:check && npm run ui:tokens && npm run ui:contrast && npm run lint && npm run build && npm run test:fixes && npm run test:seed && npm run test:rates && npm run test:books && npm run test:trend && npm run test:pending && npm run test:reliability",
     "icons": "node scripts/icon-manifest.mjs --write",
     "icons:check": "node scripts/icon-manifest.mjs",
     "ui:tokens": "node scripts/ui-tokens.mjs",
@@ -39,7 +39,8 @@
     "test:rates": "node tests/rates.test.mjs",
     "test:books": "node tests/books-meta.test.mjs",
     "test:trend": "node tests/run-asset-trend.cjs",
-    "test:pending": "node tests/book-pending.test.mjs"
+    "test:pending": "node tests/book-pending.test.mjs",
+    "test:reliability": "node tests/run-reliability.cjs"
   },
   "dependencies": {
     "browser-image-compression": "^2.0.2",
@@ -55,6 +56,7 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "eslint": "^9.39.4",
+    "fake-indexeddb": "^6.2.8",
     "typescript": "^5.5.4",
     "typescript-eslint": "^8.72.2",
     "vite": "^5.4.2"

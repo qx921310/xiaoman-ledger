@@ -24,7 +24,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
     !!c.hide || (c.hideBook ?? []).some((b) => String(b) === String(curBookId))
   const parents = allParents.filter((p) => !hiddenForBook(p))
 
-  const children = allChildren.filter((c) => !c.hide)
+  const children = allChildren.filter((c) => !hiddenForBook(c))
   const allAssets = useLedger((s) => s.assets)
   const meId = useLedger((s) => s.userId)
   const assets = visibleAssets(allAssets, curBookId, meId)

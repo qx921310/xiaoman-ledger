@@ -865,7 +865,7 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
                   {r.assetId ? ' → ' + (assets.find((a) => a.assetId === r.assetId)?.assetName ?? '报销账户') : ''}
                 </span>
                 {r.status === 'pending' && (
-                  <button className="link" onClick={() => settleReimbursement(r.reimbursementId)}>确认到账</button>
+                  <button className="link" onClick={() => { if (!settleReimbursement(r.reimbursementId)) alert('无法确认到账，请检查账户和汇率。') }}>确认到账</button>
                 )}
                 <button className="del" onClick={() => deleteReimbursement(r.reimbursementId)}>撤销</button>
               </div>
