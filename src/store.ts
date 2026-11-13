@@ -130,6 +130,12 @@ interface LedgerState {
   deleteSplitMember: (splitMemberId: number) => void
   /** 按一木规则生成分摊并落库到 SplitExpense + 账单 billShareInfo */
   applySplit: (billId: string | number, splitGroupId: number, splitType: 0 | 1 | 2, values?: Record<number, number>, payerMemberId?: number) => boolean
+  /** 一木 SplitExpenseEditActivity：独立 AA 支出（金额/参与人/每人金额） */
+  addSplitExpense: (patch: {
+    splitGroupId: number; title?: string; amount: number; payerMemberId?: number
+    splitType: 0 | 1 | 2; participants: Array<{ memberId: number; value: number }>; time?: number
+  }) => boolean
+  deleteSplitExpense: (splitExpenseId: number) => void
   settleSplit: (splitExpenseId: number, settlement: boolean) => void
   /** 账单组：把多条账单合并成一条展示（一木 BillGroup） */
   createBillGroup: (billIds: Array<string | number>, meta?: { parentCategoryId?: number; childCategoryId?: number; remark?: string }) => boolean
@@ -534,6 +540,53 @@ export const useLedger = create<LedgerState>()(
         }))
         return true
       },
+
+      /** 一木 SplitExpenseEditActivity：独立 AA 支出（不挂账单） */
+      addSplitExpense: (patch) => {
+        const s = get()
+        const members = s.splitMembers.filter((m) => m.splitGroupId === patch.splitGroupId)
+        const amount = +Number(patch.amount).toFixed(2)
+        if (!(amount > 0)) return false
+        const picked = patch.participants.filter((p) => members.some((m) => m.splitMemberId === p.memberId))
+        if (!picked.length) return false
+        const sum = +picked.reduce((n, p) => n + Number(p.value || 0), 0).toFixed(2)
+        // 「每人金额合计 X，与总额 Y 不一致」
+        if (patch.splitType === 1 && sum !== amount) return false
+        let shares = picked.map((p) => ({ memberId: p.memberId, value: Number(p.value) || 0 }))
+        if (patch.splitType === 0) {
+          const each = +(amount / picked.length).toFixed(2)
+          shares = picked.map((p, i) => ({ memberId: p.memberId, value: i === 0 ? +(amount - each * (picked.length - 1)).toFixed(2) : each }))
+        }
+        if (patch.splitType === 2) {
+          const total = picked.reduce((n, p) => n + (Number(p.value) || 0), 0) || 1
+          let acc = 0
+          shares = picked.map((p, i) => {
+            const last = i === picked.length - 1
+            const value = last ? +(amount - acc).toFixed(2) : +((Number(p.value) || 0) / total * amount).toFixed(2)
+            if (!last) acc = +(acc + value).toFixed(2)
+            return { memberId: p.memberId, value }
+          })
+        }
+        let splitExpenseId = Date.now()
+        while (s.splitExpenses.some((x) => x.splitExpenseId === splitExpenseId)) splitExpenseId++
+        const expense: import('./types').SplitExpense = {
+          splitExpenseId, splitGroupId: patch.splitGroupId, sourceBillId: 0,
+          title: patch.title?.trim() || 'AA 支出', amount,
+          payerMemberId: patch.payerMemberId ?? picked[0].memberId,
+          splitType: patch.splitType, shares, settlement: false,
+          time: patch.time ?? NOW(), userId: s.userId,
+          bookId: s.currentBookId === 0 ? undefined : s.currentBookId, updateTime: NOW()
+        }
+        set((st) => ({ splitExpenses: [expense, ...st.splitExpenses] }))
+        return true
+      },
+
+      /** 删除 AA 分账记录 */
+      deleteSplitExpense: (splitExpenseId) => set((s) => ({
+        splitExpenses: s.splitExpenses.filter((x) => x.splitExpenseId !== splitExpenseId),
+        tombstones: [...s.tombstones, { kind: 'splitExpense', id: String(splitExpenseId),
+          bookId: s.splitExpenses.find((x) => x.splitExpenseId === splitExpenseId)?.bookId, updatedAt: NOW() }]
+      })),
 
       settleSplit: (splitExpenseId, settlement) => set((s) => ({
         splitExpenses: s.splitExpenses.map((x) => x.splitExpenseId === splitExpenseId

@@ -9,12 +9,13 @@ import { money, fullDay } from '../ui-format'
 
 const APP_VERSION = 'v0.1.0'
 import { HiddenPage } from './hidden-page'
-import { DreamList } from './dream'
 import { AiTypeManager } from './ai-type'
 import { Guide } from './guide'
 import { BillFiles } from './bill-files'
 import { BookManager } from './books'
 import { BudgetManager } from './budget'
+import { SplitManager } from './split'
+import { DreamList } from './dreams'
 import { FilteredBills } from './filtered-bills'
 import { TemplateList } from './templates'
 import { hasPin, setPin, clearPin, verifyPin } from './lock'
@@ -128,6 +129,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [booksOpen, setBooksOpen] = useState(false)
   const [filesOpen, setFilesOpen] = useState(false)
   const [budgetOpen, setBudgetOpen] = useState(false)
+  const [splitOpen, setSplitOpen] = useState(false)
   const [cycleDrill, setCycleDrill] = useState<{ title: string; cycleId: string | number } | null>(null)
   const [backupOpen, setBackupOpen] = useState(false)
   // 一木 UserInfoActivity：昵称与头像可改（本地保存，账号维度）
@@ -466,7 +468,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       </div>
 
 
-      {dreamOpen && <DreamList onBack={() => setDreamOpen(false)} />}
+      {dreamOpen && <DreamList notify={notify} onBack={() => setDreamOpen(false)} />}
       {aiTypeOpen && <AiTypeManager onBack={() => setAiTypeOpen(false)} notify={notify} />}
       {cycleDrill && (
         <FilteredBills title={cycleDrill.title}
@@ -479,6 +481,9 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       {booksOpen && <BookManager notify={notify} onBack={() => setBooksOpen(false)} />}
       {filesOpen && <BillFiles notify={notify} onBack={() => setFilesOpen(false)} />}
       {budgetOpen && <BudgetManager notify={notify} onBack={() => setBudgetOpen(false)} />}
+      {splitOpen && <SplitManager notify={notify} onBack={() => setSplitOpen(false)} />}
+      {dreamOpen && <DreamList notify={notify} onBack={() => setDreamOpen(false)} />}
+      {aiTypeOpen && <AiTypeManager notify={notify} onBack={() => setAiTypeOpen(false)} />}
 
       {profileOpen && (
         <Modal label="个人资料" onClose={() => setProfileOpen(false)}>
@@ -524,6 +529,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
           ['周期记账', 'cycle'],
           ['账本管理', 'book'],
           ['预算管理', 'budget'],
+          ['AA 分账', 'split'],
           ['模板记账', 'tpl'],
           ['标签管理', 'tag'],
           ['分类管理', 'cat'],
@@ -531,7 +537,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
           ['导入导出', 'import'],
           ['主题设置', 'theme'],
           ['使用指南', 'guide'],
-          ['梦想清单', 'dream'],
+          ['愿望清单', 'dream'],
           ['更多应用', 'apps'],
           ['关于', 'about'],
         ] as Array<[string, string]>).map(([label, key]) => (

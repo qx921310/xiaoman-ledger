@@ -1,67 +1,92 @@
 import { useState } from 'react'
 import { useLedger } from '../store'
-import { Modal } from '../ui/modal'
+import { CatIcon } from '../ui/icons'
 
 /**
- * 自定义智能分类（对应一木 CategoryKeyManagerActivity / AddAiTypeActivity）
- * 结构：tip + 「开始添加」+ 规则列表（关键词 → 类别），新增弹窗：关键词 + 类别
- * 一木的 item_ai_type：type_icon + type(类别) + text_list(关键词)
+ * 智能分类（对齐一木 activity_self_ai_type / activity_add_ai_type / AddCategoryKeyActivity）
+ * 列表：空态提示 + 「开始添加」；每项显示类别图标、类别名、关键词
+ * 编辑：关键词 / 类别（大类 + 子分类）
+ * 校验原文：「请输入记账关键词」「请选择记账分类」
  */
 export function AiTypeManager({ onBack, notify }: { onBack: () => void; notify: (m: string) => void }) {
-  const rules = useLedger((s) => s.aiTypeRules ?? [])
+  const rules = useLedger((s) => s.aiTypeRules)
   const parents = useLedger((s) => s.parentCategories)
-  const addRule = useLedger((s) => s.addAiTypeRule)
-  const delRule = useLedger((s) => s.deleteAiTypeRule)
-  const [open, setOpen] = useState(false)
-  const [kw, setKw] = useState('')
-  const [catId, setCatId] = useState<number>(parents[0]?.id ?? 1)
+  const children = useLedger((s) => s.childCategories)
+  const addAiTypeRule = useLedger((s) => s.addAiTypeRule)
+  const deleteAiTypeRule = useLedger((s) => s.deleteAiTypeRule)
 
-  const catName = (id: number) => parents.find((p) => p.id === id)?.name ?? '未分类'
+  const [editing, setEditing] = useState<null | { ruleId?: number; keywords: string; parentId: number; childId: number }>(null)
+
+  const save = () => {
+    if (!editing) return
+    const raw = editing.keywords.split(/[,，\s]+/).map((x) => x.trim()).filter(Boolean)
+    if (!raw.length) { notify('请输入记账关键词'); return }
+    if (!editing.parentId) { notify('请选择记账分类'); return }
+    addAiTypeRule({ keywords: raw, categoryId: editing.parentId })
+    notify('智能分类已添加')
+    setEditing(null)
+  }
+
+  if (editing) {
+    const childList = children.filter((c) => c.parentId === editing.parentId)
+    return (
+      <>
+        <div className="subpage-head">
+          <button type="button" className="link" onClick={() => setEditing(null)}>‹ 返回</button>
+          <h3>新增智能分类</h3>
+          <button type="button" className="link" onClick={save}>完成</button>
+        </div>
+        <div className="label">关键词</div>
+        <input aria-label="记账关键词" value={editing.keywords}
+          onChange={(e) => setEditing({ ...editing, keywords: e.target.value })} placeholder="多个关键词用逗号分隔" />
+        <div className="label">类别</div>
+        <select aria-label="记账分类" value={editing.parentId}
+          onChange={(e) => setEditing({ ...editing, parentId: Number(e.target.value), childId: 0 })}>
+          <option value={0}>请选择分类</option>
+          {parents.filter((p) => !p.hide).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+        {childList.length > 0 && (
+          <select aria-label="子分类" value={editing.childId} onChange={(e) => setEditing({ ...editing, childId: Number(e.target.value) })}>
+            <option value={0}>不选子分类</option>
+            {childList.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        )}
+      </>
+    )
+  }
 
   return (
     <>
       <div className="subpage-head">
         <button type="button" className="link" onClick={onBack}>‹ 返回</button>
-        <h3>自定义智能分类</h3>
-        <button type="button" className="link" onClick={() => setOpen(true)}>开始添加</button>
+        <h3>智能分类</h3>
+        <button type="button" className="link" onClick={() => setEditing({ keywords: '', parentId: 0, childId: 0 })}>新增</button>
       </div>
-
-      <p className="hint">关键词命中时自动归到对应类别。</p>
+      <p className="hint">记账时识别到关键词会自动选中对应分类。</p>
 
       {rules.length === 0 && (
-        <button type="button" className="primary" onClick={() => setOpen(true)}>开始添加</button>
+        <>
+          <p className="hint">还没有智能分类规则。</p>
+          <button type="button" className="ghost wide" onClick={() => setEditing({ keywords: '', parentId: 0, childId: 0 })}>开始添加</button>
+        </>
       )}
 
-      {rules.map((r) => (
-        <div key={r.ruleId} className="row">
-          <div className="grow">
-            <div>{catName(r.categoryId)}</div>
-            <small>{r.keywords.join('、')}</small>
+      {rules.map((r) => {
+        const p = parents.find((x) => x.id === r.categoryId)
+        return (
+          <div key={r.ruleId} className="row">
+            <CatIcon k={p?.icon} size={16} />
+            <div className="grow">
+              <div>{p?.name ?? '未分类'}</div>
+              <small>{r.keywords.join('、')}</small>
+            </div>
+            <button type="button" className="del" onClick={() => {
+              if (!confirm(`删除「${p?.name ?? '该规则'}」的智能分类？`)) return
+              deleteAiTypeRule(r.ruleId)
+            }}>删</button>
           </div>
-          <button type="button" className="del" onClick={() => delRule(r.ruleId)}>删</button>
-        </div>
-      ))}
-
-      {open && (
-        <Modal label="新增智能分类" onClose={() => setOpen(false)}>
-          <h3>新增智能分类</h3>
-          <div className="label">关键词</div>
-          <input aria-label="关键词" placeholder="多个关键词用逗号分隔" value={kw} onChange={(e) => setKw(e.target.value)} />
-          <div className="label">类别</div>
-          <select aria-label="类别" value={catId} onChange={(e) => setCatId(Number(e.target.value))}>
-            {parents.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-          <div className="modal-btns">
-            <button type="button" className="ghost" onClick={() => setOpen(false)}>取消</button>
-            <button type="button" className="primary" onClick={() => {
-              const list = kw.split(/[,，、\s]+/).map((x) => x.trim()).filter(Boolean)
-              if (!list.length) { notify('请填写关键词'); return }
-              addRule({ keywords: list, categoryId: catId })
-              setKw(''); setOpen(false)
-            }}>保存</button>
-          </div>
-        </Modal>
-      )}
+        )
+      })}
     </>
   )
 }

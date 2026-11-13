@@ -250,6 +250,8 @@ export interface SplitExpense {
   payerMemberId: number
   /** 0 均分 / 1 按金额 / 2 按份额 */
   splitType: 0 | 1 | 2
+  /** 参与人分摊明细（一木 SplitExpense.shares，字符串形式 memberId:value） */
+  shares?: SplitShareEntry[]
   /** 是否已结算 */
   settlement: boolean
   time: number

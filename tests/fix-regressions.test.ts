@@ -321,6 +321,24 @@ test('账单拆分：按一木规则拆成多笔并用组合关联，优惠按�
   assert.equal(st().splitBill(single.billId, [{ num: 50, parentCategoryId: 7 }]), false)
 })
 
+test('AA 分账：金额必填、至少一位参与人、按金额时合计必须等于总额', () => {
+  reset()
+  const g = st().addSplitGroup({ name: '周末' })
+  const m1 = st().addSplitMember(g.splitGroupId, '我', true)
+  const m2 = st().addSplitMember(g.splitGroupId, '小王')
+  // 金额非法
+  assert.equal(st().addSplitExpense({ splitGroupId: g.splitGroupId, amount: 0, splitType: 0, participants: [{ memberId: m1.splitMemberId, value: 1 }] }), false)
+  // 没有参与人
+  assert.equal(st().addSplitExpense({ splitGroupId: g.splitGroupId, amount: 100, splitType: 0, participants: [] }), false)
+  // 按金额且合计不一致
+  assert.equal(st().addSplitExpense({ splitGroupId: g.splitGroupId, amount: 100, splitType: 1, participants: [{ memberId: m1.splitMemberId, value: 60 }] }), false)
+  // 均分：100 → 50/50
+  assert.equal(st().addSplitExpense({ splitGroupId: g.splitGroupId, amount: 100, splitType: 0, participants: [{ memberId: m1.splitMemberId, value: 0 }, { memberId: m2.splitMemberId, value: 0 }] }), true)
+  const e = st().splitExpenses[0]
+  assert.deepEqual(e.shares?.map((s) => s.value).sort((a, b) => a - b), [50, 50])
+  assert.equal(e.amount, 100)
+})
+
 test('账本开关与隐藏可持久化（一木 AddAccountBookActivity 的三个开关）', () => {
   reset()
   useLedger.setState({ currentBookId: 1 } as never)
