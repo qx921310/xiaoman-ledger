@@ -166,6 +166,17 @@ test('模板：assetId=0 视为无账户(-1)；转账模板同一账户拒绝', 
   assert.equal(st().applyTemplate(trTpl.templateId), false, '转出转入同一账户必须拒绝')
 })
 
+test('债务记账：借出减少余额、借入增加余额、记录对方与类型', () => {
+  reset()
+  useLedger.setState({ currentBookId: 1, assets: [{ assetId: 10, assetName: '现金', assetNumber: 1000, openingBalance: 1000, assetType: 1 }] } as never)
+  st().addLend({ type: 1, assetId: 10, counterparty: '张三', number: 200, remark: '资金借出-现金' })
+  assert.equal(st().assets[0].assetNumber, 800, '借出应减少账户余额')
+  assert.equal(st().lends[0].type, 1)
+  assert.equal(st().lends[0].counterparty, '张三')
+  st().addLend({ type: 3, assetId: 10, counterparty: '李四', number: 300, remark: '资金借入-现金' })
+  assert.equal(st().assets[0].assetNumber, 1100, '借入应增加账户余额')
+})
+
 test('模板不能绕过只读账本与私有账户约束', () => {
   reset()
   useLedger.setState({

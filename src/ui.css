@@ -1109,3 +1109,12 @@ button.day-btn {
   width: 100%; border: 0; background: transparent; text-align: left;
   font: inherit; color: inherit; cursor: pointer; display: flex; justify-content: space-between;
 }
+
+/* 记账页债务模式（对齐 AddBillActivity 的债务 tab） */
+.debt-box { display: grid; gap: var(--sp-1); }
+.debt-box .seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.debt-box .seg button {
+  flex: 1 1 auto; padding: 6px 10px; border: 1px solid var(--line);
+  background: var(--card); border-radius: var(--r-md); color: var(--ink); cursor: pointer;
+}
+.debt-box .seg button.on { background: var(--accent-soft); border-color: var(--accent); }

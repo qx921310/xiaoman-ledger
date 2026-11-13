@@ -11,7 +11,6 @@ import { TransferEditor } from './transfer-editor'
 import { Modal } from '../ui/modal'
 import { FilteredBills } from './filtered-bills'
 import { accountMoney, fromBase, hasCurrencyRate } from '../money'
-import { billNetAmount } from '../bill-amount'
 import { resolveBillChild } from '../taxonomy'
 import { summarizeBills } from '../bill-summary'
 
@@ -372,7 +371,7 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
                   {(b.discountNumber ?? 0) > 0 && (
                     <s className="old-cost">{money(+(b.cost + (b.discountNumber ?? 0)).toFixed(2))}</s>
                   )}
-                  <b className={inc ? 'in' : 'out'}>{inc ? '+' : '-'}{money(inc ? b.cost : billNetAmount(b, refunds))}</b>
+                  <b className={inc ? 'in' : 'out'}>{inc ? '+' : '-'}{money(b.cost)}</b>
                 </span>
                 <div className="ledger-actions">
                   <button className="link" aria-label={`查看${p?.name ?? '账单'}明细`} onClick={() => setDetail(b)}>明细</button>
@@ -399,6 +398,7 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
         <BillDetail
           bill={bills.find((b) => b.billId === detail.billId)!}
           me={me}
+          readOnly={readOnly}
           onClose={() => setDetail(null)}
           onEdit={() => { setEditing(bills.find((b) => b.billId === detail.billId) ?? detail); setDetail(null) }}
         />
@@ -433,8 +433,10 @@ function DetailToggle({ label, on, onToggle }: { label: string; on: boolean; onT
   </div>
 }
 
-function BillDetail({ bill, me, onClose, onEdit }: {
+function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
   bill: Bill; me?: { id: number; email: string }
+  /** 只读账本（角色 silent）里不能报销/退款/删除/编辑 */
+  readOnly?: boolean
   onClose: () => void; onEdit: () => void
 }) {
   const parents = useLedger((s) => s.parentCategories)
@@ -498,7 +500,7 @@ function BillDetail({ bill, me, onClose, onEdit }: {
             <div className="ds">{dayOf(bill.time)} {hhmm(bill.time)}</div>
             {bill.remark && <div className="ds">{bill.remark}</div>}
           </div>
-          <div className="damt">{isIncome ? '+' : '-'}{money(isIncome ? bill.cost : billNetAmount(bill, refunds))}</div>
+          <div className="damt">{isIncome ? '+' : '-'}{money(bill.cost)}</div>
           <button type="button" className="detail-close" aria-label="关闭账单详情" onClick={onClose}>×</button>
         </div>
 
@@ -654,10 +656,11 @@ function BillDetail({ bill, me, onClose, onEdit }: {
       )}
 
       <div className="bill-page-actions">
-        <button className="ghost" onClick={() => setClaimOpen(true)}>报销</button>
-        <button className="ghost" onClick={() => setRefundOpen(true)}>退款</button>
-        <button className="ghost" onClick={() => { del(bill.billId); onClose() }}>删除</button>
-        <button className="primary" onClick={onEdit}>编辑</button>
+        {!readOnly && <button className="ghost" onClick={() => setClaimOpen(true)}>报销</button>}
+        {!readOnly && <button className="ghost" onClick={() => setRefundOpen(true)}>退款</button>}
+        {!readOnly && <button className="ghost" onClick={() => { del(bill.billId); onClose() }}>删除</button>}
+        {!readOnly && <button className="primary" onClick={onEdit}>编辑</button>}
+        {readOnly && <span className="muted">当前账本只读，不能修改账单</span>}
       </div>
     </section>
   )

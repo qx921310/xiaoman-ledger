@@ -39,7 +39,10 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
   const currencies = useLedger((s) => s.currencies)
   const defaultCurrency = useLedger((s) => s.defaultCurrency)
   const [currency, setCurrency] = useState(defaultCurrency)
-  const [mode, setMode] = useState<'expense' | 'income' | 'transfer'>('expense')
+  const [mode, setMode] = useState<'expense' | 'income' | 'transfer' | 'debt'>('expense')
+  // 债务模式（一木 AddBillActivity 的债务 tab：借出/借入/收款/还款）
+  const [debtType, setDebtType] = useState<1 | 2 | 3 | 4>(1)
+  const [counterparty, setCounterparty] = useState('')
   const [cost, setCost] = useState('')
   // 语音记账：识别文本取第一个数字当金额，其余作为备注（一木 SpeechActivity 同类行为）
   // 备注变更统一入口：移动端与桌面端共用（避免只在桌面分支生效）
@@ -82,6 +85,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
   const [toCost, setToCost] = useState('')
   const [remark, setRemark] = useState('')
   const aiTypeRules = useLedger((s) => s.aiTypeRules ?? [])
+  const addLend = useLedger((s) => s.addLend)
   const [time, setTime] = useState(toLocalInput(Date.now()))
   const [keypadOpen, setKeypadOpen] = useState(true)
   const [keypadField, setKeypadField] = useState<'cost' | 'fee' | 'toCost'>('cost')
@@ -105,7 +109,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
   const cur = list.some((p) => p.id === pid) ? pid : (list[0]?.id ?? 7)
   const subs = sortCategories(children.filter((c) => c.parentId === cur))
 
-  const switchMode = (m: 'expense' | 'income' | 'transfer') => {
+  const switchMode = (m: 'expense' | 'income' | 'transfer' | 'debt') => {
     setMode(m)
     setKeypadField('cost')
     // 切到支出/收入时，父分类跟着换，并自动选中它的第一个子分类
@@ -120,6 +124,19 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
     const v = evaluateAmount(cost)
     if (v == null || v <= 0) return fail('请输入有效金额')
     if (String(curBookId) === '0') return fail('请先选择一个具体账本')
+
+    if (mode === 'debt') {
+      if (!counterparty.trim()) return fail('请选择债务')
+      if (!aid) return fail('请选择账户')
+      const typeMap: Record<1 | 2 | 3 | 4, string> = { 1: '资金借出', 2: '收款', 3: '资金借入', 4: '还款' }
+      addLend({
+        type: debtType, assetId: aid, counterparty: counterparty.trim(), number: v,
+        time: Date.now(), remark: `${typeMap[debtType]}-${assets.find((a) => a.assetId === aid)?.assetName ?? ''}`
+      })
+      notify(`${typeMap[debtType]} ${money(v)} 已记录`)
+      setCost(''); setCounterparty('')
+      return true
+    }
 
     if (mode === 'transfer') {
       if (!aid || !toAid) return fail('请选择转出和转入账户')
@@ -202,7 +219,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
         <div className="entry-toolbar">
           <button className="entry-back" type="button" aria-label="返回账单" onClick={onClose}>‹</button>
           <div className="entry-tabs">
-            {(['expense', 'income', 'transfer'] as const).map((item, index) => <button key={item} type="button" aria-pressed={mode === item} className={mode === item ? 'on' : ''} onClick={() => switchMode(item)}>{['支出', '收入', '转账'][index]}</button>)}
+            {(['expense', 'income', 'transfer', 'debt'] as const).map((item, index) => <button key={item} type="button" aria-pressed={mode === item} className={mode === item ? 'on' : ''} onClick={() => switchMode(item)}>{['支出', '收入', '转账', '债务'][index]}</button>)}
           </div>
           <MobilePicker className="entry-book" label="选择账本" value={String(curBookId)} options={[
             { value: '0', label: '全部账本' }, ...accountBooks.map((b) => ({ value: String(b.bookId ?? b.accountBookId), label: b.accountBookName }))
@@ -282,6 +299,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
         <button className={mode === 'expense' ? 'on' : ''} onClick={() => switchMode('expense')}>支出</button>
         <button className={mode === 'income' ? 'on' : ''} onClick={() => switchMode('income')}>收入</button>
         <button className={mode === 'transfer' ? 'on' : ''} onClick={() => switchMode('transfer')}>转账</button>
+        <button className={mode === 'debt' ? 'on' : ''} onClick={() => switchMode('debt')}>债务</button>
       </div>
 
       <div className="amount">
@@ -410,6 +428,21 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
           </label>
         </div>
       )}
+      {mode === 'debt' && (
+        <div className="debt-box">
+          <div className="label">债务类型</div>
+          <div className="seg">
+            {([1, 3, 2, 4] as const).map((t) => (
+              <button key={t} type="button" className={debtType === t ? 'on' : ''} onClick={() => setDebtType(t)}>
+                {t === 1 ? '资金借出' : t === 3 ? '资金借入' : t === 2 ? '收款' : '还款'}
+              </button>
+            ))}
+          </div>
+          <div className="label">债务</div>
+          <input aria-label="债务" value={counterparty} placeholder="对方名称" onChange={(e) => setCounterparty(e.target.value)} />
+        </div>
+      )}
+
       {mode === 'transfer' && (
         <button className="ghost wide" onClick={() => {
           const v = evaluateAmount(cost) ?? 0
