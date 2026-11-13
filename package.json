@@ -10,7 +10,7 @@
     "api": "node server/server.mjs",
     "typecheck": "tsc --noEmit",
     "test": "npm run test:balances && npm run test:sync-identities && npm run test:account-session && npm run test:statistics && npm run test:privacy-ocr && npm run test:category-order && npm run test:multidevice && npm run test:concurrency && npm run test:auto-sync && npm run test:offline && npm run test:multi-tab && npm run test:no-self-loop && npm run test:session-epoch && npm run test:sync-v2 && npm run test:cr-v2",
-    "check": "npm run typecheck && npm test && npm run icons:check && npm run ui:tokens && npm run ui:contrast && npm run lint && npm run build && npm run test:fixes && npm run test:seed && npm run test:rates && npm run test:books",
+    "check": "npm run typecheck && npm test && npm run icons:check && npm run ui:tokens && npm run ui:contrast && npm run lint && npm run build && npm run test:fixes && npm run test:seed && npm run test:rates && npm run test:books && npm run test:trend",
     "icons": "node scripts/icon-manifest.mjs --write",
     "icons:check": "node scripts/icon-manifest.mjs",
     "ui:tokens": "node scripts/ui-tokens.mjs",
@@ -37,7 +37,8 @@
     "test:fixes": "node tests/run-fix-regressions.cjs",
     "test:seed": "node tests/concurrent-seed.test.mjs",
     "test:rates": "node tests/rates.test.mjs",
-    "test:books": "node tests/books-meta.test.mjs"
+    "test:books": "node tests/books-meta.test.mjs",
+    "test:trend": "node tests/run-asset-trend.cjs"
   },
   "dependencies": {
     "browser-image-compression": "^2.0.2",

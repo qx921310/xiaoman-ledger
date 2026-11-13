@@ -1,8 +1,9 @@
 import { useMemo } from 'react'
 import { useLedger } from '../store'
-import { money, fullDay } from '../ui-format'
+import { money } from '../ui-format'
 import { ASSET_TYPE } from '../types'
 import { AssetSankey } from './asset-sankey'
+import { assetTrend } from '../domain/asset-trend'
 
 /**
  * 资产统计（对齐一木 activity_assets_statistics.xml，26 个 id）
@@ -13,6 +14,11 @@ export function AssetStats({ onBack }: { onBack: () => void }) {
   const assets = useLedger((s) => s.assets)
   const bills = useLedger((s) => s.bills)
   const parents = useLedger((s) => s.parentCategories)
+  const transfers = useLedger((s) => s.transfers)
+  const lends = useLedger((s) => s.lends)
+  const refunds = useLedger((s) => s.refunds)
+  const reimbursements = useLedger((s) => s.reimbursements)
+  const assetFlows = useLedger((s) => s.assetFlows ?? [])
   const currencies = useLedger((s) => s.currencies)
   const defaultCurrency = useLedger((s) => s.defaultCurrency)
 
@@ -24,35 +30,16 @@ export function AssetStats({ onBack }: { onBack: () => void }) {
   const total = assets.filter((a) => !a.hide && a.intoTotalAsset !== false)
     .reduce((n, a) => n + a.assetNumber * rateOf(a.currency), 0)
 
-  // 近一月走势：以当前总资产为终点，按天回推（与统计页同一口径，页面标注估算）
+  // 近一月走势：按真实资金流水反向推算（转账/借贷/退款/报销/定存都计入）
   const trend = useMemo(() => {
-    const days: Array<{ day: string; value: number }> = []
-    const now = new Date()
-    let running = +total.toFixed(2)
-    for (let i = 29; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i)
-      const key = fullDay(d.getTime())
-      const dayNet = bills.filter((b) => fullDay(b.time) === key && b.notIntoTotal !== true)
-        .reduce((n, b) => {
-          const income = parents.find((p) => p.id === b.parentCategoryId)?.kind === 'income'
-          const delta = income ? b.cost : -b.cost
-          return n + delta
-        }, 0)
-      if (i === 29) {
-        // 起点用「当前 - 区间净变动」反推
-        const rangeNet = bills.filter((b) => b.time >= d.getTime() && b.notIntoTotal !== true)
-          .reduce((n, b) => {
-            const income = parents.find((p) => p.id === b.parentCategoryId)?.kind === 'income'
-            return n + (income ? b.cost : -b.cost)
-          }, 0)
-        running = +(total - rangeNet).toFixed(2)
-      }
-      days.push({ day: key.slice(5), value: +running.toFixed(2) })
-      running += dayNet
-    }
-    return days
+    const now = Date.now()
+    const pts = assetTrend({
+      assets, bills, transfers, lends, refunds, reimbursements, assetFlows,
+      parents, currencies, defaultCurrency
+    }, now - 29 * 86400000, now)
+    return pts.map((p) => ({ day: p.key.slice(5), value: p.value }))
     // eslint-disable-next-line
-  }, [bills, parents, total])
+  }, [assets, bills, transfers, lends, refunds, reimbursements, assetFlows, parents, currencies, defaultCurrency])
 
   const maxV = Math.max(...trend.map((d) => d.value), 1)
   const minV = Math.min(...trend.map((d) => d.value), 0)
@@ -79,7 +66,7 @@ export function AssetStats({ onBack }: { onBack: () => void }) {
         <span className="muted">近一月</span>
       </div>
 
-      <div className="label">资产走势 <small className="muted">（估算：以当前余额回推）</small></div>
+      <div className="label">资产走势 <small className="muted">（按资金流水反向推算）</small></div>
       <div className="stats-chart" role="img" aria-label="资产走势">
         <svg viewBox="0 0 300 96" preserveAspectRatio="none">
           <polyline

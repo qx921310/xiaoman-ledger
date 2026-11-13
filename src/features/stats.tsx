@@ -13,12 +13,18 @@ import { statisticsBounds, chartTrend, categoryDistribution } from '../domain/st
 import { CategoryChart, TrendChart } from './statistics-charts'
 import { AssetSankey } from './asset-sankey'
 import { StatsDetail } from './stats-detail'
+import { assetTrend as assetTrendOf } from '../domain/asset-trend'
 import { Modal } from '../ui/modal'
 import { IMPORTED_CATEGORY_COLOR } from '../default-colors'
 
 export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
   const bills = useLedger((s) => s.bills)
   const refunds = useLedger((s) => s.refunds)
+  const defaultCurrency = useLedger((s) => s.defaultCurrency)
+  const currencies = useLedger((s) => s.currencies)
+  const assetFlows = useLedger((s) => s.assetFlows ?? [])
+  const reimbursements = useLedger((s) => s.reimbursements)
+  const transfers = useLedger((s) => s.transfers)
   const lends = useLedger((s) => s.lends)
   const userId = useLedger((s) => s.userId)
   const currentBookId = useLedger((s) => s.currentBookId)
@@ -57,31 +63,21 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
   const totalBudget = limitOf(monthBudgets.find((b) => b.categoryId === 0) ?? { amount: 0 })
   const catBudgets = monthBudgets.filter((b) => b.categoryId !== 0)
   // 每日支出序列（一木普通页柱状图：按日看收支）
-  // 资产走势：当前净资产为终点，按区间内每日净收支回推（一木「资产走势」模块）
+  // 资产走势：按真实资金流水反向推算（转账/借贷/退款/报销/定存都计入）
   const assetTrend = useMemo(() => {
-    const dayNet = new Map<string, number>()
-    for (const b of rangeBills) {
-      if (b.notIntoTotal) continue
-      const d = new Date(b.time)
-      const key = `${d.getMonth() + 1}/${d.getDate()}`
-      const income = parents.find((p) => p.id === b.parentCategoryId)?.kind === 'income'
-      const delta = income ? b.cost : -billNetAmount(b, refunds)
-      dayNet.set(key, +((dayNet.get(key) ?? 0) + delta).toFixed(2))
+    const list = rangeBills
+    if (!list.length) {
+      const now = Date.now()
+      return assetTrendOf({ assets, bills: [] as never, transfers: [], lends: [], refunds: [], reimbursements: [], assetFlows: [], parents, currencies, defaultCurrency }, now - 7 * 86400000, now)
+        .map((p: { key: string; value: number }) => ({ label: p.key.slice(5), 净值: p.value }))
     }
-    const keys = [...dayNet.keys()].sort((a, b) => {
-      const [am, ad] = a.split('/').map(Number)
-      const [bm, bd] = b.split('/').map(Number)
-      return am - bm || ad - bd
-    })
-    const total = assets.reduce((n, a) => n + (a.intoTotalAsset !== false && !a.hide ? a.assetNumber : 0), 0)
-    let running = total
-    const out: Array<{ label: string; 净值: number }> = []
-    for (let i = keys.length - 1; i >= 0; i--) {
-      out.unshift({ label: keys[i], 净值: +running.toFixed(2) })
-      running -= dayNet.get(keys[i]) ?? 0
-    }
-    return out
-  }, [rangeBills, parents, refunds, assets])
+    const times = list.map((b) => b.time)
+    const from = Math.min(...times) - 86400000
+    const to = Date.now()
+    return assetTrendOf({ assets, bills, transfers, lends, refunds, reimbursements, assetFlows, parents, currencies, defaultCurrency }, from, to)
+      .map((p: { key: string; value: number }) => ({ label: p.key.slice(5), 净值: p.value }))
+    // eslint-disable-next-line
+  }, [rangeBills, assets, bills, transfers, lends, refunds, reimbursements, assetFlows, parents, currencies, defaultCurrency])
 
   const daySeries = useMemo(() => {
     const map = new Map<string, number>()
