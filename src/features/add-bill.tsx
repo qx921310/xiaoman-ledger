@@ -19,13 +19,10 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
   const allParents = useLedger((s) => s.parentCategories)
   const allChildren = useLedger((s) => s.childCategories)
   // 隐藏分类：记账时不显示（一木 hide / hideBook）
-  const curBookRow = accountBooks.find((b) => String(b.bookId) === String(curBookId))
   const parents = allParents
     .filter((p) => !p.hide || (p.hideBook?.length
       ? !p.hideBook.some((b) => String(b) === String(curBookId)) : false))
-    // 一木「隐藏所有分类」：账本没分配过分类时，只显示明确属于本账本的分类
-    .filter((p) => !curBookRow?.hideAllCategory
-      || (p.bookIds ?? []).some((b) => String(b) === String(curBookId)))
+
   const children = allChildren.filter((c) => !c.hide)
   const allAssets = useLedger((s) => s.assets)
   const meId = useLedger((s) => s.userId)

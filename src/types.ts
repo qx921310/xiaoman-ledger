@@ -638,6 +638,8 @@ export interface AccountBook {
   showStock?: boolean
   /** 账本隐藏（账本隐藏页可恢复） */
   hidden?: boolean
+  /** 最后更新时间（一木 AccountBook.updateTime：跨设备并发以它为准） */
+  updateTime?: number
   /** 从账本切换器隐藏 */
   hide?: boolean
   /** 该账本不计入总资产统计 */

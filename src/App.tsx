@@ -107,7 +107,8 @@ export default function App() {
         showTransfer: b.showTransfer === 0 || b.showTransfer === false ? false : true,
         showStock: b.showStock === 0 || b.showStock === false ? false : true,
         hideAllCategory: !!(b.hideAllCategory ?? 0),
-        hidden: !!(b.hidden ?? 0)
+        hidden: !!(b.hidden ?? 0),
+        updateTime: b.updatedAt ?? undefined
       })))
       if (list[0]) {
         // 老账单的 bookId 是数字，统一迁到服务端第一个账本

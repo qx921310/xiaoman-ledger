@@ -48,13 +48,15 @@ export interface BookInfo {
   showStock?: number | boolean | null
   hideAllCategory?: number | boolean | null
   hidden?: number | boolean | null
+  /** 账本最后更新时间（一木 AccountBook.updateTime，用于并发保护） */
+  updatedAt?: number | null
 }
 
 export const books = {
   list: () => call('/books'),
   create: (name: string, icon?: string) => call('/books/create', { method: 'POST', body: JSON.stringify({ name, icon }) }),
   /** 账本元数据（图标/显示开关/隐藏）：与一木编辑账本一致 */
-  update: (bookId: string, patch: { name?: string; icon?: string; showTransfer?: boolean; showStock?: boolean; hideAllCategory?: boolean; hidden?: boolean }) =>
+  update: (bookId: string, patch: { name?: string; icon?: string; showTransfer?: boolean; showStock?: boolean; hideAllCategory?: boolean; hidden?: boolean; baseUpdatedAt?: number | null }) =>
     call('/books/update', { method: 'POST', body: JSON.stringify({ bookId, ...patch }) }),
   rename: (bookId: string, name: string) => call('/books/rename', { method: 'POST', body: JSON.stringify({ bookId, name }) }),
   invite: (bookId: string) => call('/books/invite', { method: 'POST', body: JSON.stringify({ bookId }) }),

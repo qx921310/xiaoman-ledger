@@ -259,17 +259,18 @@ test('账本开关与隐藏可持久化（一木 AddAccountBookActivity 的三�
   assert.equal(st().accountBooks.find((b) => String(b.bookId) === '1')!.hidden, false)
 })
 
-test('账本「隐藏所有分类」：只显示被分配到本账本的分类', () => {
+test('账本「隐藏所有分类」是一次性动作：把所有分类加入该账本的 hideBook', () => {
   reset()
   useLedger.setState({ currentBookId: 1 } as never)
-  const cats = st().parentCategories.filter((p) => p.kind === 'expense').slice(0, 2)
-  assert.ok(cats.length === 2)
-  st().updateCategory(cats[0].id, { bookIds: [1] })
-  st().updateBookMeta('1', { hideAllCategory: true })
-  const book = st().accountBooks.find((b) => String(b.bookId) === '1')!
-  const visible = st().parentCategories.filter((p) => !book.hideAllCategory
-    || (p.bookIds ?? []).some((b) => String(b) === '1'))
-  assert.deepEqual(visible.map((p) => p.id), [cats[0].id], '只应剩被分配到本账本的分类')
+  const before = st().parentCategories.length
+  assert.ok(before > 0)
+  st().hideAllCategoriesForBook(1)
+  assert.equal(st().parentCategories.filter((p) => (p.hideBook ?? []).map(String).includes('1')).length, before,
+    '所有父分类都应在本账本隐藏')
+  assert.ok(st().childCategories.every((c) => c.hide === true), '子分类一并隐藏')
+  // 账本本身不保存这个开关（一木 AccountBook 没有该字段）
+  st().updateBookMeta('1', { showTransfer: false })
+  assert.equal((st().accountBooks.find((b) => String(b.bookId) === '1') as { hideAllCategory?: boolean }).hideAllCategory, undefined)
 })
 
 test('连续新建标签不会撞 ID', () => {

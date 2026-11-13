@@ -49,6 +49,7 @@ export function BookManager({ notify, onBack }: { notify: (m: string) => void; o
   const setBook = useLedger((s) => s.setBook)
   const updateBookMeta = useLedger((s) => s.updateBookMeta)
   const setAccountBooks = useLedger((s) => s.setAccountBooks)
+  const hideAllCategoriesForBook = useLedger((s) => s.hideAllCategoriesForBook)
   const [editing, setEditing] = useState<null | { bookId: string | number; name: string; icon: string; showTransfer: boolean; showStock: boolean; hideAllCategory: boolean }>(null)
   const [newIcon, setNewIcon] = useState(BOOK_ICONS[0])
   const [hidePage, setHidePage] = useState(false)
@@ -74,15 +75,20 @@ export function BookManager({ notify, onBack }: { notify: (m: string) => void; o
       accountBookName: editing.name.trim() || '未命名账本',
       icon: editing.icon,
       showTransfer: editing.showTransfer,
-      showStock: editing.showStock,
-      hideAllCategory: editing.hideAllCategory
+      showStock: editing.showStock
+    }
+    if (editing.hideAllCategory) {
+      // 一木：勾选后把所有分类在该账本隐藏（一次性动作，账本本身不存这个开关）
+      hideAllCategoriesForBook(editing.bookId)
+      setEditing((prev) => prev ? { ...prev, hideAllCategory: false } : prev)
     }
     updateBookMeta(editing.bookId, patch)
     try {
+      const serverBook = books.find((b) => String(b.bookId) === String(editing.bookId))
       await bookApi.update(String(editing.bookId), {
         name: patch.accountBookName, icon: patch.icon,
         showTransfer: patch.showTransfer, showStock: patch.showStock,
-        hideAllCategory: patch.hideAllCategory
+        baseUpdatedAt: serverBook?.updateTime ?? null
       })
       // 已成功落库：清掉该账本的离线待补，避免旧值之后覆盖新值
       try {
@@ -93,12 +99,17 @@ export function BookManager({ notify, onBack }: { notify: (m: string) => void; o
           localStorage.setItem(PENDING_KEY, JSON.stringify(all))
         }
       } catch { /* 忽略 */ }
-    } catch {
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : ''
+      if (msg.includes('其他设备')) {
+        notify('该账本已在其他设备更新，请返回后重新进入再改')
+        setEditing(null)
+        return
+      }
       // 离线：本地已生效，排队等联网后补传，避免被服务端旧值覆盖
       queuePending(String(editing.bookId), {
         name: patch.accountBookName, icon: patch.icon,
-        showTransfer: patch.showTransfer, showStock: patch.showStock,
-        hideAllCategory: patch.hideAllCategory
+        showTransfer: patch.showTransfer, showStock: patch.showStock
       })
       notify('已本地保存，联网后自动同步')
     }

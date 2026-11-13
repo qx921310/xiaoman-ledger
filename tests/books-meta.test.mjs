@@ -64,3 +64,71 @@ test('账本图标与三个开关可保存并在重新拉取时返回', async ()
     await rm(temp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
   }
 })
+
+// 一木 AddAccountBookActivity / EditAccountBookActivity：名称不能为空、不能重名；
+// AccountBook 有 updateTime，并发时应以服务端较新值为准并拒绝旧设备覆盖。
+test('账本名称唯一与服务端并发保护', async () => {
+  const { mkdtemp, mkdir, copyFile, rm } = await import('node:fs/promises')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const { spawn } = await import('node:child_process')
+  const { createServer } = await import('node:net')
+  const { once } = await import('node:events')
+  const temp = await mkdtemp(join(tmpdir(), 'xiaoman-books2-'))
+  await mkdir(join(temp, 'server'))
+  await copyFile('server/server.mjs', join(temp, 'server', 'server.mjs'))
+  const probe = createServer()
+  probe.listen(0, '127.0.0.1')
+  await once(probe, 'listening')
+  const port = probe.address().port
+  await new Promise((resolve, reject) => probe.close((err) => (err ? reject(err) : resolve())))
+  const child = spawn(process.execPath, [join(temp, 'server', 'server.mjs')], {
+    env: { ...process.env, PORT: String(port), DATA_DIR: join(temp, 'data') }, stdio: ['ignore', 'pipe', 'pipe']
+  })
+  try {
+    await Promise.race([
+      once(child.stdout, 'data'),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000).unref())
+    ])
+    const base = `http://127.0.0.1:${port}`
+    const call = async (path, data, cookie) => {
+      const res = await fetch(base + path, {
+        method: data === undefined ? 'GET' : 'POST',
+        headers: { ...(cookie ? { cookie } : {}), ...(data ? { 'content-type': 'application/json' } : {}) },
+        body: data ? JSON.stringify(data) : undefined
+      })
+      return { body: await res.json(), cookie: res.headers.get('set-cookie')?.split(';')[0] }
+    }
+    const reg = await call('/api/auth/register', { email: 'book2@xiaoman.test', password: 'book-pass-123' })
+    const cookie = reg.cookie
+    const a = await call('/api/books/create', { name: '账本甲' }, cookie)
+    const b = await call('/api/books/create', { name: '账本乙' }, cookie)
+    const bookA = a.body.result.bookId
+    const bookB = b.body.result.bookId
+
+    const empty = await call('/api/books/update', { bookId: bookA, name: '   ' }, cookie)
+    assert.notEqual(empty.body.code, 0, '空名称必须拒绝')
+    assert.match(String(empty.body.msg), /名称/)
+
+    const dup = await call('/api/books/update', { bookId: bookA, name: '账本乙' }, cookie)
+    assert.notEqual(dup.body.code, 0, '重名必须拒绝')
+    assert.match(String(dup.body.msg), /已经存在/)
+
+    let list = (await call('/api/books', undefined, cookie)).body.result.books
+    const baseAt = Number(list.find((x) => x.bookId === bookB).updatedAt)
+    // 设备 1 更新成功 → 服务端 updatedAt 变新
+    const first = await call('/api/books/update', { bookId: bookB, name: '账本乙-新', baseUpdatedAt: baseAt }, cookie)
+    assert.equal(first.body.code, 0)
+    // 设备 2 用旧基准再改 → 必须被拒绝，不能覆盖设备 1 的结果
+    const stale = await call('/api/books/update', { bookId: bookB, name: '账本乙-旧设备', baseUpdatedAt: baseAt }, cookie)
+    assert.notEqual(stale.body.code, 0, '旧设备的更新必须被拒绝')
+    list = (await call('/api/books', undefined, cookie)).body.result.books
+    assert.equal(list.find((x) => x.bookId === bookB).name, '账本乙-新', '不得被旧设备覆盖')
+  } finally {
+    const exited = once(child, 'exit').catch(() => {})
+    child.kill()
+    await exited
+    await new Promise((r) => setTimeout(r, 200))
+    await rm(temp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
+  }
+})

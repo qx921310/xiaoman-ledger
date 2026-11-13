@@ -1022,10 +1022,11 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
                   onChange={(e) => updateCategory(p.id, { color: e.target.value })} />
                 <button className="link" aria-label={`${p.name} 在本账本${(p.bookIds ?? []).some((b) => String(b) === String(currentBookId)) ? '可用（点击移出）' : '不可用（点击加入）'}`}
                   onClick={() => {
-                    const list = (p.bookIds ?? []).map(String)
                     const id = String(currentBookId)
-                    updateCategory(p.id, { bookIds: list.includes(id) ? list.filter((x) => x !== id) : [...list, id] })
-                  }}>{(p.bookIds ?? []).some((b) => String(b) === String(currentBookId)) ? '本账本✓' : '本账本'}</button>
+                    const list = (p.hideBook ?? []).map(String)
+                    // 一木的分类隐藏：把该账本加入/移出 hideBook
+                    updateCategory(p.id, { hideBook: list.includes(id) ? list.filter((x) => x !== id) : [...list, id] })
+                  }}>{(p.hideBook ?? []).some((b) => String(b) === String(currentBookId)) ? '本账本隐藏' : '本账本显示'}</button>
                 <button className="link" aria-label={`${p.name} 上移`} onClick={() => moveVisibleCategory(p.id, -1)}>↑</button>
                 <button className="link" aria-label={`${p.name} 下移`} onClick={() => moveVisibleCategory(p.id, 1)}>↓</button>
                 <button className="del" aria-label={`删除分类 ${p.name}`} onClick={() => {

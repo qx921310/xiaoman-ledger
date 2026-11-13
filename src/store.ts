@@ -196,6 +196,8 @@ interface LedgerState {
   removeCurrency: (code: string) => void
   applyRemote: (records: SyncIncoming[]) => void
   applyAccountScope: (patch: Record<string, unknown>) => void
+  /** 一木：隐藏该账本下的全部分类（一次性动作） */
+  hideAllCategoriesForBook: (bookId: string | number) => void
   setLastSync: (t: number) => void
   setSessionSyncAt: (t: number) => void
   /** 处理期号冲突：内容一致才作废本地候选，被改过或有业务关联的保留并标待核对 */
@@ -1528,6 +1530,19 @@ export const useLedger = create<LedgerState>()(
 
       /** 切账号时把目标账号没有的字段重置为初始值；必须走受控 set 以便重算余额 */
       applyAccountScope: (patch) => set(() => patch as never),
+
+      /** 一木 AddAccountBookActivity 的「隐藏所有分类」：给所有分类加上该账本的隐藏标记 */
+      hideAllCategoriesForBook: (bookId) => set((s) => ({
+        parentCategories: s.parentCategories.map((p) => ({
+          ...p,
+          hideBook: Array.from(new Set([...(p.hideBook ?? []).map(String), String(bookId)]))
+        })),
+        childCategories: s.childCategories.map((c) => ({
+          ...c,
+          hide: true,
+          hideBook: Array.from(new Set([...(c.hideBook ?? []).map(String), String(bookId)]))
+        }))
+      })),
       setLastSync: (t) => set({ lastSync: t }),
       setSessionSyncAt: (t) => set({ sessionSyncAt: t }),
 

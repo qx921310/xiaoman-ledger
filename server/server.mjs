@@ -265,12 +265,13 @@ for (const sql of [
   "ALTER TABLE books ADD COLUMN show_transfer INTEGER DEFAULT 1",
   "ALTER TABLE books ADD COLUMN show_stock INTEGER DEFAULT 1",
   "ALTER TABLE books ADD COLUMN hide_all_category INTEGER DEFAULT 0",
-  "ALTER TABLE books ADD COLUMN hidden INTEGER DEFAULT 0"
+  "ALTER TABLE books ADD COLUMN hidden INTEGER DEFAULT 0",
+  "ALTER TABLE books ADD COLUMN updated_at INTEGER DEFAULT 0"
 ]) { try { db.exec(sql) } catch { /* 已存在 */ } }
 
 const myBooks = (userId) =>
   db.prepare(`SELECT b.book_id AS bookId, b.name, b.owner_id AS ownerId, m.role, n.member_no AS memberNo,
-      b.icon, b.show_transfer AS showTransfer, b.show_stock AS showStock,
+      b.icon, b.updated_at AS updatedAt, b.show_transfer AS showTransfer, b.show_stock AS showStock,
       b.hide_all_category AS hideAllCategory, b.hidden,
       (SELECT COUNT(*) FROM book_members x WHERE x.book_id = b.book_id) AS memberCount
     FROM books b JOIN book_members m ON m.book_id = b.book_id
@@ -489,8 +490,8 @@ const server = createServer(async (req, res) => {
       const name = String(body.name || '').trim() || '新账本'
       const icon = body.icon == null ? null : String(body.icon)
       const bookId = 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
-      db.prepare('INSERT INTO books (book_id, name, owner_id, created_at, icon) VALUES (?,?,?,?,?)')
-        .run(bookId, name, user.id, Date.now(), icon)
+      db.prepare('INSERT INTO books (book_id, name, owner_id, created_at, icon, updated_at) VALUES (?,?,?,?,?,?)')
+        .run(bookId, name, user.id, Date.now(), icon, Date.now())
       db.prepare('INSERT INTO book_members (book_id, user_id, role, joined_at) VALUES (?,?,?,?)')
         .run(bookId, user.id, 'admin', Date.now())
       memberNumber(bookId, user.id)
@@ -507,13 +508,28 @@ const server = createServer(async (req, res) => {
       const sets = []
       const vals = []
       const put = (col, value) => { sets.push(`${col} = ?`); vals.push(value) }
-      if (body.name != null) put('name', String(body.name).trim() || '未命名')
+      // 一木：账本名称不能为空、同名账本不能重复
+      if (body.name != null) {
+        const nextName = String(body.name).trim()
+        if (!nextName) return fail(res, '账本名称不能为空')
+        const dup = db.prepare('SELECT 1 FROM books b JOIN book_members m ON m.book_id=b.book_id WHERE m.user_id=? AND b.name=? AND b.book_id<>?')
+          .get(user.id, nextName, bookId)
+        if (dup) return fail(res, '账本已经存在')
+        put('name', nextName)
+      }
+      // 并发：客户端带 baseUpdatedAt 时，服务端已更新过则拒绝，避免旧设备覆盖新值
+      if (body.baseUpdatedAt != null) {
+        const row = db.prepare('SELECT updated_at FROM books WHERE book_id = ?').get(bookId)
+        const serverAt = Number(row?.updated_at ?? 0)
+        if (serverAt > Number(body.baseUpdatedAt)) return fail(res, '该账本已在其他设备更新，请刷新后再改')
+      }
       if (body.icon != null) put('icon', String(body.icon))
       if (body.showTransfer != null) put('show_transfer', body.showTransfer ? 1 : 0)
       if (body.showStock != null) put('show_stock', body.showStock ? 1 : 0)
       if (body.hideAllCategory != null) put('hide_all_category', body.hideAllCategory ? 1 : 0)
       if (body.hidden != null) put('hidden', body.hidden ? 1 : 0)
       if (!sets.length) return fail(res, '没有要更新的字段')
+      put('updated_at', Date.now())
       db.prepare(`UPDATE books SET ${sets.join(', ')} WHERE book_id = ?`).run(...vals, bookId)
       return ok(res, { books: myBooks(user.id) })
     }
