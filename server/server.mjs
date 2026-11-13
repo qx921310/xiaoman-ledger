@@ -527,45 +527,54 @@ const server = createServer(async (req, res) => {
       return ok(res, { books: myBooks(user.id) })
     }
 
-    if (path === '/api/books/invite' && req.method === 'POST') {
-      const user = currentUser(req)
-      if (!user) return fail(res, '请先登录')
-      const { bookId } = await readBody(req)
-      if (!isAdmin(roleOf(bookId, user.id))) return fail(res, '只有「管理」可以邀请成员')
-      const count = db.prepare('SELECT COUNT(*) AS n FROM book_members WHERE book_id = ?').get(bookId).n
-      if (count >= 6) return fail(res, '一个账本最多 6 人')
-      const code = Array.from({ length: 6 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('')
-      const now = Date.now()
-      db.prepare('DELETE FROM invites WHERE book_id = ?').run(bookId)
-      db.prepare('INSERT INTO invites (code, book_id, created_by, expires_at) VALUES (?,?,?,?)')
-        .run(code, bookId, user.id, now + 24 * 3600 * 1000)
-      return ok(res, { code, expiresAt: now + 24 * 3600 * 1000 })
-    }
+/* 共享账本已停用（产品决定不做共享账本；book_members 表保留用于成员号）
+if (path === '/api/books/invite' && req.method === 'POST') {
+  const user = currentUser(req)
+  if (!user) return fail(res, '请先登录')
+  const { bookId } = await readBody(req)
+  if (!isAdmin(roleOf(bookId, user.id))) return fail(res, '只有「管理」可以邀请成员')
+  const count = db.prepare('SELECT COUNT(*) AS n FROM book_members WHERE book_id = ?').get(bookId).n
+  if (count >= 6) return fail(res, '一个账本最多 6 人')
+  const code = Array.from({ length: 6 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('')
+  const now = Date.now()
+  db.prepare('DELETE FROM invites WHERE book_id = ?').run(bookId)
+  db.prepare('INSERT INTO invites (code, book_id, created_by, expires_at) VALUES (?,?,?,?)')
+    .run(code, bookId, user.id, now + 24 * 3600 * 1000)
+  return ok(res, { code, expiresAt: now + 24 * 3600 * 1000 })
+}
+*/
 
-    if (path === '/api/books/join' && req.method === 'POST') {
-      const user = currentUser(req)
-      if (!user) return fail(res, '请先登录')
-      const { code } = await readBody(req)
-      const inv = db.prepare('SELECT * FROM invites WHERE code = ?').get(String(code || '').trim().toUpperCase())
-      if (!inv) return fail(res, '邀请码不存在')
-      if (inv.expires_at < Date.now()) return fail(res, '邀请码已过期')
-      const exists = roleOf(inv.book_id, user.id)
-      if (exists) return ok(res, { bookId: inv.book_id, already: true, books: myBooks(user.id) })
-      const count = db.prepare('SELECT COUNT(*) AS n FROM book_members WHERE book_id = ?').get(inv.book_id).n
-      if (count >= 6) return fail(res, '这个账本已经满 6 人')
-      db.prepare('INSERT INTO book_members (book_id, user_id, role, joined_at) VALUES (?,?,?,?)')
-        .run(inv.book_id, user.id, 'silent', Date.now())
-      memberNumber(inv.book_id, user.id)
-      return ok(res, { bookId: inv.book_id, books: myBooks(user.id) })
-    }
 
-    if (path === '/api/books/members' && req.method === 'GET') {
-      const user = currentUser(req)
-      if (!user) return fail(res, '请先登录')
-      const bookId = new URL(req.url, 'http://x').searchParams.get('bookId')
-      if (!roleOf(bookId, user.id)) return fail(res, '不在这个账本里')
-      return ok(res, { members: bookMembers(bookId) })
-    }
+
+/* 共享账本已停用（产品决定不做共享账本；book_members 表保留用于成员号）
+if (path === '/api/books/join' && req.method === 'POST') {
+  const user = currentUser(req)
+  if (!user) return fail(res, '请先登录')
+  const { code } = await readBody(req)
+  const inv = db.prepare('SELECT * FROM invites WHERE code = ?').get(String(code || '').trim().toUpperCase())
+  if (!inv) return fail(res, '邀请码不存在')
+  if (inv.expires_at < Date.now()) return fail(res, '邀请码已过期')
+  const exists = roleOf(inv.book_id, user.id)
+  if (exists) return ok(res, { bookId: inv.book_id, already: true, books: myBooks(user.id) })
+  const count = db.prepare('SELECT COUNT(*) AS n FROM book_members WHERE book_id = ?').get(inv.book_id).n
+  if (count >= 6) return fail(res, '这个账本已经满 6 人')
+  db.prepare('INSERT INTO book_members (book_id, user_id, role, joined_at) VALUES (?,?,?,?)')
+    .run(inv.book_id, user.id, 'silent', Date.now())
+  memberNumber(inv.book_id, user.id)
+  return ok(res, { bookId: inv.book_id, books: myBooks(user.id) })
+}
+*/
+
+
+
+if (path === '/api/books/members' && req.method === 'GET') {
+  const user = currentUser(req)
+  if (!user) return fail(res, '请先登录')
+  const bookId = new URL(req.url, 'http://x').searchParams.get('bookId')
+  if (!roleOf(bookId, user.id)) return fail(res, '不在这个账本里')
+  return ok(res, { members: bookMembers(bookId) })
+}
+
 
     if (path === '/api/books/role' && req.method === 'POST') {
       const user = currentUser(req)
