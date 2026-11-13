@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLedger } from '../store'
 import type { Cycle } from '../types'
 import type { ImportPlan } from '../importer'
-import { books as bookApi, type BookInfo } from '../auth'
+import { books as bookApi } from '../auth'
 import { syncNow, getVersionedConflicts, getVersionedRecovery, keepLocalConflict, acceptRemoteConflict, previewVersionedConflict } from '../sync'
 import { syncNowImmediate, getLastSyncResult, subscribeAutoSync, type AutoSyncState } from '../sync-auto'
 import { money, fullDay } from '../ui-format'
@@ -12,13 +12,12 @@ import { HiddenPage } from './hidden-page'
 import { DreamList } from './dream'
 import { AiTypeManager } from './ai-type'
 import { Guide } from './guide'
+import { BookManager } from './books'
 import { FilteredBills } from './filtered-bills'
 import { TemplateList } from './templates'
 import { hasPin, setPin, clearPin, verifyPin } from './lock'
 import { usePullRefresh } from '../ui/use-pull-refresh'
-import { ROLE_LABEL } from '../ui/roles'
 import { validateBackup } from '../backup'
-import { DEFAULT_BOOK_COLOR } from '../default-colors'
 import { CHILD_ICONS, PARENT_ICONS } from '../ui/category-icons'
 import { dateKey, pendingDates } from '../cycle-dates'
 import { Modal } from '../ui/modal'
@@ -124,6 +123,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [aiTypeOpen, setAiTypeOpen] = useState(false)
   const [guideOpen, setGuideOpen] = useState(false)
   const [tplOpen, setTplOpen] = useState(false)
+  const [booksOpen, setBooksOpen] = useState(false)
   const [cycleDrill, setCycleDrill] = useState<{ title: string; cycleId: string | number } | null>(null)
   const [backupOpen, setBackupOpen] = useState(false)
   // 一木 UserInfoActivity：昵称与头像可改（本地保存，账号维度）
@@ -188,22 +188,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [newTagParent, setNewTagParent] = useState('')
   const setBook = useLedger((s) => s.setBook)
   const updateBookMeta = useLedger((s) => s.updateBookMeta)
-  const [members, setMembers] = useState<{ userId: number; role: string; email: string }[]>([])
-  const [invite, setInvite] = useState<{ code: string; expiresAt: number } | null>(null)
   const currentBook = accountBooks.find((b) => b.bookId && String(b.bookId) === String(currentBookId))
-  const reloadBooks = async () => {
-    const r = await bookApi.list()
-    useLedger.getState().setAccountBooks((r?.books ?? []).map((b: BookInfo) => ({
-      accountBookId: 0, accountBookName: b.name, userId: 0, createTime: 0,
-      bookId: b.bookId, ownerId: b.ownerId, role: b.role
-    })))
-  }
-  useEffect(() => {
-    if (!currentBook?.bookId) return
-    bookApi.members(String(currentBook.bookId))
-      .then((r) => setMembers(r.members))
-      .catch(() => setMembers([]))
-  }, [currentBook?.bookId])
   const lastSync = useLedger((s) => s.lastSync)
   const runSync = async () => {
     setSyncing(true)
@@ -490,6 +475,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
 
       {guideOpen && <Guide onBack={() => setGuideOpen(false)} />}
       {tplOpen && <TemplateList onBack={() => setTplOpen(false)} onAdd={() => { setTplOpen(false); notify('请到记账页点「存为模板」') }} notify={notify} />}
+      {booksOpen && <BookManager notify={notify} onBack={() => setBooksOpen(false)} />}
 
       {profileOpen && (
         <Modal label="个人资料" onClose={() => setProfileOpen(false)}>
@@ -1015,150 +1001,12 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         <button className="danger" onClick={() => { reset(); notify('已清空') }}>清空数据</button>
       </div>
 
-      <h3>账本与成员</h3>
-      <p className="hint">
-        共享账本支持 2–6 人共记共看。角色：<b>静默</b>只读、<b>同伴</b>可增删改账单、<b>管理</b>可改名/邀请/清空/删账本。
-      </p>
-      {accountBooks.filter((b) => b.bookId).map((b) => {
-        const active = String(b.bookId) === String(currentBookId)
-        return (
-          <div key={String(b.bookId)} className="row">
-            <div className="grow">
-              <div>
-                {b.accountBookName}
-                <span className="tag">{ROLE_LABEL[b.role ?? ''] ?? b.role}</span>
-                {active && <span className="tag ok">当前</span>}
-              </div>
-              <small>{b.ownerId === me?.id ? '我创建的' : `创建者 #${b.ownerId}`}</small>
-              <div className="row2" style={{ marginTop: 6 }}>
-                <input aria-label={`${b.accountBookName} 颜色`} className="color" type="color"
-                  value={b.color ?? DEFAULT_BOOK_COLOR}
-                  onChange={(e) => updateBookMeta(String(b.bookId), { color: e.target.value })} />
-                <select aria-label={`${b.accountBookName} 图标`} value={b.icon ?? ''}
-                  onChange={(e) => updateBookMeta(String(b.bookId), { icon: e.target.value || undefined })}>
-                  <option value="">默认图标</option>
-                  {['ic_asset_wallet','ic_asset_savings_card','ic_asset_cash','ic_asset_investment','ic_asset_fixed_deposit'].map((k) => (
-                    <option key={k} value={k}>{k.replace('ic_asset_', '')}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <button className="link" onClick={() => { setBook(String(b.bookId)); localStorage.setItem('xm-current-book', String(b.bookId)) }}>进入</button>
-          </div>
-        )
-      })}
-      <div className="btns">
-        <button onClick={async () => {
-          const name = prompt('新账本名称', '家庭账本')
-          if (!name) return
-          await bookApi.create(name)
-          await reloadBooks()
-          notify('账本已创建')
-        }}>新建账本</button>
-        <button onClick={async () => {
-          const code = prompt('输入邀请码')
-          if (!code) return
-          try {
-            await bookApi.join(code.trim().toUpperCase())
-            await reloadBooks()
-            notify('已加入账本')
-          } catch (e) { notify(errorMessage(e, '加入失败')) }
-        }}>加入账本</button>
+      <h3>账本</h3>
+      <p className="hint">账本只属于你自己，同一账号可多设备登录同一账本。</p>
+      <div className="row">
+        <span className="grow">共 {accountBooks.filter((b) => !b.hidden).length} 个账本（已隐藏 {accountBooks.filter((b) => b.hidden).length} 个）</span>
+        <button type="button" className="link" onClick={() => setBooksOpen(true)}>账本管理</button>
       </div>
-
-      {currentBook && (
-        <div className="row">
-          <div className="grow">
-            <div>当前：{currentBook.accountBookName}</div>
-            <small>我的角色：{ROLE_LABEL[currentBook.role ?? ''] ?? currentBook.role}</small>
-          </div>
-          {currentBook.role === 'admin' && (
-            <button className="ghost tiny" onClick={async () => {
-              try {
-                const r = await bookApi.invite(String(currentBook.bookId))
-                setInvite({ code: r.code, expiresAt: r.expiresAt })
-                notify(`邀请码 ${r.code}`)
-              } catch (e) { notify(errorMessage(e, '生成失败')) }
-            }}>生成邀请码</button>
-          )}
-        </div>
-      )}
-      {currentBook && currentBook.role === 'admin' && (
-        <div className="btns">
-          <button onClick={async () => {
-            const name = prompt('账本名称', currentBook.accountBookName)
-            if (!name) return
-            await bookApi.rename(String(currentBook.bookId), name)
-            await reloadBooks()
-            notify('已重命名')
-          }}>重命名</button>
-          <button onClick={async () => {
-            if (!confirm('清空这个账本里的所有账单？操作不可撤销')) return
-            try {
-              const r = await bookApi.clear(String(currentBook.bookId))
-              try {
-                await syncNow()
-                notify(`已清空 ${r.removed} 条云端记录；本地未同步的内容会保留并提示核对`)
-              } catch {
-                notify(`已清空 ${r.removed} 条云端记录，同步未完成，请联网后重试`)
-              }
-            } catch (e) { notify(errorMessage(e, '失败')) }
-          }}>清空账本</button>
-          {me?.id === currentBook.ownerId && (
-            <button className="danger" onClick={async () => {
-              if (!confirm('删除这个账本？所有成员都会失去它')) return
-              try {
-                await bookApi.remove(String(currentBook.bookId))
-                await reloadBooks()
-                notify('账本已删除')
-              } catch (e) { notify(errorMessage(e, '失败')) }
-            }}>删除账本</button>
-          )}
-        </div>
-      )}
-
-      {currentBook && currentBook.role !== 'admin' && currentBook.role && (
-        <button className="ghost wide" onClick={async () => {
-          if (!confirm('退出这个账本？你的历史账单会保留在账本里')) return
-          await bookApi.leave(String(currentBook.bookId))
-          await reloadBooks()
-          notify('已退出账本')
-        }}>退出账本</button>
-      )}
-
-      {members.length > 0 && (
-        <>
-          <div className="label">成员（{members.length}/6）</div>
-          {members.map((m) => (
-            <div key={m.userId} className="row">
-              <div className="grow">
-                <div>{m.email}{m.userId === me?.id ? '（我）' : ''}</div>
-                <small>{ROLE_LABEL[m.role] ?? m.role}</small>
-              </div>
-              {currentBook?.role === 'admin' && m.userId !== currentBook.ownerId && (
-                <select aria-label={`${m.email} 的角色`} value={m.role} onChange={async (e) => {
-                  await bookApi.setRole(String(currentBook.bookId), m.userId, e.target.value)
-                  setMembers((await bookApi.members(String(currentBook.bookId))).members)
-                }}>
-                  <option value="silent">静默</option>
-                  <option value="peer">同伴</option>
-                  <option value="admin">管理</option>
-                </select>
-              )}
-            </div>
-          ))}
-        </>
-      )}
-
-      {invite && (
-        <div className="invite">
-          <div>
-            <span className="code">{invite.code}</span>
-            <small>有效期至 {new Date(invite.expiresAt).toLocaleString('zh-CN')}</small>
-          </div>
-          <button className="link" onClick={() => setInvite(null)}>收起</button>
-        </div>
-      )}
 
       <h3>分类</h3>
       <p className="hint">已有账单使用的分类不能删除。</p>
@@ -1439,7 +1287,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       </div>
       {lastSync > 0 && <p className="hint">上次同步：{new Date(lastSync).toLocaleString('zh-CN')}</p>}
       {syncMsg && <p className="hint">{syncMsg}</p>}
-      {syncConflicts.length > 0 && <div className="warn" role="status">
+      {syncConflicts.length > 0 && <div className="warn" role="status" id="sync-conflicts">
         <p>以下记录的本机版本已保留。建议先导出 JSON 备份；选择本机版本会尝试覆盖该记录的当前云端版本。</p>
         {syncBlocked > 0 && (
           <p className="hint">另有 {syncBlocked} 条记录关联到下面待核对的对象，已暂停上传；处理完冲突后会自动补传。</p>

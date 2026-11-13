@@ -623,6 +623,14 @@ export interface AccountBook {
   color?: string
   /** 排序权重，小的靠前 */
   positionWeight?: number
+  /** 一木「隐藏所有分类」：新账本从空白分类开始 */
+  hideAllCategory?: boolean
+  /** 一木「显示转账债务流水」：首页/日历是否显示转账、还款、债务记录 */
+  showTransfer?: boolean
+  /** 一木「显示理财流水」：首页/日历是否显示买入卖出 */
+  showStock?: boolean
+  /** 账本隐藏（账本隐藏页可恢复） */
+  hidden?: boolean
   /** 从账本切换器隐藏 */
   hide?: boolean
   /** 该账本不计入总资产统计 */

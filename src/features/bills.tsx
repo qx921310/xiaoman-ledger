@@ -57,6 +57,10 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
   const [month, setMonth] = useState(monthOf(Date.now()))
   // 一木列表支持多选（item_bill_main_list 的 radio_button）
   const [drill, setDrill] = useState<{ title: string; ids: string[] } | null>(null)
+  const curBook = useLedger((st) => st.accountBooks.find((bk) => String(bk.bookId) === String(st.currentBookId)))
+  // 一木账本开关：关闭后首页/日历不显示转账债务流水、理财买入卖出流水
+  const showTransfer = curBook?.showTransfer !== false
+  const showStock = curBook?.showStock !== false
   const [selecting, setSelecting] = useState(false)
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const togglePick = (id: string) => setPicked((prev) => {
@@ -126,9 +130,16 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
     return inBook.filter((g) => g.billList.some((id) => bills.some((b) => String(b.billId) === String(id) && match(b))))
   }, [billGroups, bills, currentBookId, rangeAll, month, kw, fPid, fAid, fMin, fMax, fTag, fFrom, fTo, parents, dateRangeActive])
   const groupedIds = useMemo(() => new Set(groupsInList.flatMap((g) => g.billList.map(String))), [groupsInList])
-  const list = useMemo(() => bills.filter((b) => !groupedIds.has(String(b.billId))).filter(match).sort((a, b) => b.time - a.time), [bills, month, kw, fPid, fAid, parents, currentBookId, fMin, fMax, fTag, fFrom, fTo, dateRangeActive, rangeAll, groupedIds])
+  const list = useMemo(() => bills
+    .filter((b) => !groupedIds.has(String(b.billId)))
+    // 一木「显示理财流水」关闭后，买入/卖出产生的账单不在首页与日历出现
+    .filter((b) => showStock || !/^(买入|卖出)\s/.test(b.remark ?? ''))
+    .filter(match)
+    .sort((a, b) => b.time - a.time),
+    [bills, month, kw, fPid, fAid, parents, currentBookId, fMin, fMax, fTag, fFrom, fTo, dateRangeActive, rangeAll, groupedIds, showStock])
 
   const tList = useMemo(() => transfers.filter((t) => {
+    if (!showTransfer) return false
     if (!rangeAll && !dateRangeActive && monthOf(t.time) !== month) return false
     if (currentBookId !== 0 && (t.bookId === undefined || String(t.bookId) !== String(currentBookId))) return false
     if (fAid && t.fromAssetId !== fAid && t.toAssetId !== fAid) return false

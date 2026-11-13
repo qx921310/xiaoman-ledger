@@ -199,6 +199,18 @@ test('统一记账出口：只读账本、非法金额、账户不存在都被�
   assert.equal(st().bills.length, 1)
 })
 
+test('账本开关与隐藏可持久化（一木 AddAccountBookActivity 的三个开关）', () => {
+  reset()
+  useLedger.setState({ currentBookId: 1 } as never)
+  st().updateBookMeta('1', { showTransfer: false, showStock: false, hidden: true })
+  const book = st().accountBooks.find((b) => String(b.bookId) === '1')!
+  assert.equal(book.showTransfer, false)
+  assert.equal(book.showStock, false)
+  assert.equal(book.hidden, true)
+  st().updateBookMeta('1', { hidden: false })
+  assert.equal(st().accountBooks.find((b) => String(b.bookId) === '1')!.hidden, false)
+})
+
 test('连续新建标签不会撞 ID', () => {
   reset()
   const ids = new Set<number>()

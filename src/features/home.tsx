@@ -183,7 +183,7 @@ export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot, f
             </div>
             <div className="hm-group">
               <button type="button" className="hm-item" onClick={() => { setMenuOpen(false); onScreenshot?.() }} disabled={!onScreenshot}>AI 截图识别</button>
-              <button type="button" className="hm-item" onClick={() => { setMenuOpen(false); onMore?.() }}>共享账本</button>
+              <button type="button" className="hm-item" onClick={() => { setMenuOpen(false); onMore?.() }}>多设备同步</button>
               <button type="button" className="hm-item" onClick={() => { setMenuOpen(false); onMore?.() }}>模板记账</button>
               <button type="button" className="hm-item" onClick={() => { setMenuOpen(false); onMore?.() }}>预算管理</button>
               <button type="button" className="hm-item" onClick={() => { setMenuOpen(false); onScreenshot?.() }}>截图导入</button>
