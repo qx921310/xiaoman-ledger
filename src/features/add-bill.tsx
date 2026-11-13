@@ -49,6 +49,8 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
   const [pickedTags, setPickedTags] = useState<string[]>([])
   const [discount, setDiscount] = useState('')
   const [files, setFiles] = useState<import('../types').BillFile[]>([])
+  /** 报销账户：选中即表示这笔要报销（一木 bill.reimbursement + Reimbursement 记录） */
+  const [claimAssetId, setClaimAssetId] = useState(0)
   const [parentLendId, setParentLendId] = useState<number | ''>('')
   const [cost, setCost] = useState('')
   // 语音记账：识别文本取第一个数字当金额，其余作为备注（一木 SpeechActivity 同类行为）
@@ -108,6 +110,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
   const aiTypeRules = useLedger((s) => s.aiTypeRules ?? [])
   const allTags = useLedger((s) => s.tags.filter((t) => !t.hide))
   const addLend = useLedger((s) => s.addLend)
+  const addReimbursement = useLedger((s) => s.addReimbursement)
   const repayLend = useLedger((s) => s.repayLend)
   const lends = useLedger((s) => s.lends)
   // 收款对应「有未收余额的借出」，还款对应「有未还余额的借入」
@@ -213,7 +216,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
     if (!hasCurrencyRate(accountCurrency, currencies, defaultCurrency)) return fail(`请先设置 ${accountCurrency} 汇率`)
     const foreign = currency !== defaultCurrency
     if (!guard(() => {
-      addBill({
+      const created = addBill({
         cost: foreign ? toBase(v, currency, currencies, defaultCurrency) : v,
         currencyInfo: foreign ? currency : undefined,
         currencyAssetNumber: foreign ? v : undefined,
@@ -225,10 +228,14 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
         discountNumber: Number(discount) > 0 ? Number(discount) : undefined,
         files
       })
+      // 一木：选了报销账户就同时登记一条待报销记录
+      if (claimAssetId) {
+        addReimbursement({ billId: created.billId, assetId: claimAssetId, number: created.cost })
+      }
       return true
     })) return false
     setCost(''); setRemark(''); setCid(0); setCurrency(defaultCurrency)
-    setPickedTags([]); setDiscount(''); setFiles([]); setKeypadField('cost')
+    setPickedTags([]); setDiscount(''); setFiles([]); setClaimAssetId(0); setKeypadField('cost')
     notify(`${mode === 'expense' ? '支出' : '收入'} ${money(v)} 已记录`)
     return true
   }
@@ -310,6 +317,14 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
             <label>到账金额<input value={toCost} placeholder="留空与转出相同" inputMode="none" onFocus={() => { setKeypadField('toCost'); setKeypadOpen(true) }} onChange={(e) => setToCost(e.target.value.replace(/[^\d.]/g, ''))} /></label>
             <label>手续费<input value={fee} placeholder="0.00" inputMode="none" onFocus={() => { setKeypadField('fee'); setKeypadOpen(true) }} onChange={(e) => setFee(e.target.value.replace(/[^\d.]/g, ''))} /></label>
           </div> : <>
+            {mode === 'expense' && (
+              <div className="entry-transfer-field">
+                <span>报销</span>
+                <MobilePicker label="选择报销账户" value={String(claimAssetId)}
+                  options={[{ value: '0', label: '不报销' }, ...assets.map((a) => ({ value: String(a.assetId), label: a.simpleName || a.assetName }))]}
+                  onChange={(value) => setClaimAssetId(Number(value))} />
+              </div>
+            )}
             {allTags.length > 0 && (
               <div className="entry-tags">
                 {allTags.map((t) => {
@@ -516,6 +531,17 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
       {speech.unsupported && <p className="hint">当前浏览器不支持语音识别。</p>}
 
       {/* 一木 AddBillActivity：标签选择 */}
+      {mode === 'expense' && (
+        <>
+          <div className="label">报销账户（可选）</div>
+          <select aria-label="报销账户" value={claimAssetId} onChange={(e) => setClaimAssetId(Number(e.target.value))}>
+            <option value={0}>不报销</option>
+            {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
+          </select>
+          {claimAssetId > 0 && <p className="hint">钱到账后可在账单详情里确认报销。</p>}
+        </>
+      )}
+
       {mode !== 'transfer' && mode !== 'debt' && allTags.length > 0 && (
         <>
           <div className="label">标签</div>

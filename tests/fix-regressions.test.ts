@@ -234,6 +234,21 @@ test('清空数据会清掉资产流水', () => {
   assert.equal(st().assetFlows.length, 0, '清空后不得残留流水')
 })
 
+test('记账时选报销账户会登记待报销并标记账单', () => {
+  reset()
+  useLedger.setState({ currentBookId: 1, assets: [
+    { assetId: 10, assetName: '现金', assetNumber: 1000, openingBalance: 1000, assetType: 1 },
+    { assetId: 11, assetName: '公司报销', assetNumber: 0, openingBalance: 0, assetType: 6 }
+  ] } as never)
+  const bill = st().addBill({ assetId: 10, parentCategoryId: 7, cost: 88, time: Date.now() })
+  st().addReimbursement({ billId: bill.billId, assetId: 11, number: 88 })
+  const saved = st().bills.find((b) => b.billId === bill.billId)!
+  assert.equal(st().reimbursements.length, 1, '应生成待报销记录')
+  assert.equal(st().reimbursements[0].status, 'pending')
+  assert.ok(saved.isReimbursement === 1, '账单应标记为待报销')
+  assert.equal(saved.reimbursementNum, 88)
+})
+
 test('持仓交易账单带 stockInfoId，供理财流水开关筛选', () => {
   reset()
   useLedger.setState({ currentBookId: 1, assets: [
