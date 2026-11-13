@@ -1151,3 +1151,9 @@ button.day-btn {
   border-radius: var(--r-lg); padding: var(--sp-3); display: grid; gap: var(--sp-2);
 }
 .file-viewer img { width: 100%; height: auto; border-radius: var(--r-md); }
+
+/* 统计明细页汇总卡（对齐 activity_category_statistics 的四项统计） */
+.stat-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-2); padding: var(--sp-2) 0; }
+.stat-cards > div { display: grid; gap: 2px; }
+.stat-cards small { color: var(--muted); font-size: var(--font-sm); }
+.stat-cards b { font-size: var(--font-md); }

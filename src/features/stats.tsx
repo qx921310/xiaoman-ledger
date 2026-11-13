@@ -12,7 +12,7 @@ import { byAsset, byTag } from '../domain/stats-breakdown'
 import { statisticsBounds, chartTrend, categoryDistribution } from '../domain/statistics-charts'
 import { CategoryChart, TrendChart } from './statistics-charts'
 import { AssetSankey } from './asset-sankey'
-import { FilteredBills } from './filtered-bills'
+import { StatsDetail } from './stats-detail'
 import { Modal } from '../ui/modal'
 import { IMPORTED_CATEGORY_COLOR } from '../default-colors'
 
@@ -126,6 +126,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
   const MODULES = ['支出占比', '支出数据', '收支统计', '收支对比', '标签占比', '标签数据', '资产走势', '账户收支', '本月总结', '报表统计', '成员收支'] as const
   const [modOpen, setModOpen] = useState(false)
   const [drill, setDrill] = useState<{ title: string; catId: number } | null>(null)
+  const [detail, setDetail] = useState<{ kind: 'category' | 'tag' | 'account'; title: string; bills: typeof bills } | null>(null)
   const [mods, setMods] = useState<Record<string, boolean>>(() => {
     const base: Record<string, boolean> = {}
     for (const m of MODULES) base[m] = !['报表统计', '成员收支', '资产走势'].includes(m)
@@ -165,9 +166,13 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
   return (
     <section className="card">
       {drill && (
-        <FilteredBills title={drill.title}
+        <StatsDetail kind="category" title={drill.title}
           bills={rangeBills.filter((b) => b.parentCategoryId === drill.catId)}
           onBack={() => setDrill(null)} />
+      )}
+      {detail && (
+        <StatsDetail kind={detail.kind} title={detail.title} bills={detail.bills}
+          onBack={() => setDetail(null)} />
       )}
       {!drill && (<>
       <div className="label">时间范围</div>
@@ -543,12 +548,13 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
         <>
           <div className="label">按账户</div>
           {assetRows.map((r) => (
-            <div key={r.assetId} className="bar-row">
+            <button key={r.assetId} type="button" className="bar-row"
+              onClick={() => setDetail({ kind: 'account', title: r.name, bills: rangeBills.filter((b) => b.assetId === r.assetId) })}>
               <span className="bar-name">{r.name}</span>
               <div className="bar-track"><div className="bar" style={{ width: `${(r.expense / Math.max(1, assetRows[0].expense)) * 100}%`, background: 'var(--accent)' }} /></div>
               <span className="bar-val">{money(r.expense)}</span>
               <span className="bar-pct">{r.income ? '+' + money(r.income) : ''}</span>
-            </div>
+            </button>
           ))}
         </>
       )}
@@ -557,12 +563,13 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
         <>
           <div className="label">按标签</div>
           {tagRows.map((r) => (
-            <div key={r.name} className="bar-row">
+            <button key={r.name} type="button" className="bar-row"
+              onClick={() => setDetail({ kind: 'tag', title: `#${r.name}`, bills: rangeBills.filter((b) => (b.tags ?? []).includes(r.name)) })}>
               <span className="bar-name">#{r.name}</span>
               <div className="bar-track"><div className="bar" style={{ width: `${(r.amount / Math.max(1, tagRows[0].amount)) * 100}%`, background: 'var(--accent-soft)' }} /></div>
               <span className="bar-val">{money(r.amount)}</span>
               <span className="bar-pct" />
-            </div>
+            </button>
           ))}
         </>
       )}
