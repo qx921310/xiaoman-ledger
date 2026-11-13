@@ -13,6 +13,7 @@ export function AiTypeManager({ onBack, notify }: { onBack: () => void; notify: 
   const parents = useLedger((s) => s.parentCategories)
   const children = useLedger((s) => s.childCategories)
   const addAiTypeRule = useLedger((s) => s.addAiTypeRule)
+  const updateAiTypeRule = useLedger((s) => s.updateAiTypeRule)
   const deleteAiTypeRule = useLedger((s) => s.deleteAiTypeRule)
 
   const [editing, setEditing] = useState<null | { ruleId?: number; keywords: string; parentId: number; childId: number }>(null)
@@ -22,8 +23,13 @@ export function AiTypeManager({ onBack, notify }: { onBack: () => void; notify: 
     const raw = editing.keywords.split(/[,，\s]+/).map((x) => x.trim()).filter(Boolean)
     if (!raw.length) { notify('请输入记账关键词'); return }
     if (!editing.parentId) { notify('请选择记账分类'); return }
-    addAiTypeRule({ keywords: raw, categoryId: editing.parentId, childCategoryId: editing.childId || undefined })
-    notify('智能分类已添加')
+    if (editing.ruleId != null) {
+      updateAiTypeRule(editing.ruleId, { keywords: raw, categoryId: editing.parentId, childCategoryId: editing.childId || undefined })
+      notify('智能分类已更新')
+    } else {
+      addAiTypeRule({ keywords: raw, categoryId: editing.parentId, childCategoryId: editing.childId || undefined })
+      notify('智能分类已添加')
+    }
     setEditing(null)
   }
 
@@ -33,7 +39,7 @@ export function AiTypeManager({ onBack, notify }: { onBack: () => void; notify: 
       <>
         <div className="subpage-head">
           <button type="button" className="link" onClick={() => setEditing(null)}>‹ 返回</button>
-          <h3>新增智能分类</h3>
+          <h3>{editing.ruleId ? '编辑智能分类' : '新增智能分类'}</h3>
           <button type="button" className="link" onClick={save}>完成</button>
         </div>
         <div className="label">关键词</div>
@@ -80,6 +86,9 @@ export function AiTypeManager({ onBack, notify }: { onBack: () => void; notify: 
               <div>{p?.name ?? '未分类'}{r.childCategoryId ? ` · ${children.find((c) => c.id === r.childCategoryId)?.name ?? ''}` : ''}</div>
               <small>{r.keywords.join('、')}</small>
             </div>
+            <button type="button" className="link" onClick={() => setEditing({
+              ruleId: r.ruleId, keywords: r.keywords.join('、'), parentId: r.categoryId, childId: r.childCategoryId ?? 0
+            })}>编辑</button>
             <button type="button" className="del" onClick={() => {
               if (!confirm(`删除「${p?.name ?? '该规则'}」的智能分类？`)) return
               deleteAiTypeRule(r.ruleId)

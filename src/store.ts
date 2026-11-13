@@ -161,6 +161,7 @@ interface LedgerState {
   deleteDream: (dreamId: number) => void
   /** 一木：自定义智能分类 */
   addAiTypeRule: (patch: { keywords: string[]; categoryId: number; childCategoryId?: number }) => void
+  updateAiTypeRule: (ruleId: number, patch: Partial<import('./types').AiTypeRule>) => void
   deleteAiTypeRule: (ruleId: number) => void
   /** 一木：定期存款 */
   addFixedDeposit: (patch: { amount: number; rate: number; termYears: number; startTime?: number; remark?: string; assetId?: number; depositType?: string; toAsset?: boolean }) => void
@@ -682,6 +683,9 @@ export const useLedger = create<LedgerState>()(
             bookId: s.currentBookId === 0 ? undefined : s.currentBookId }, ...s.aiTypeRules]
         }
       }),
+      updateAiTypeRule: (ruleId, patch) => set((s) => ({
+        aiTypeRules: s.aiTypeRules.map((r) => r.ruleId === ruleId ? { ...r, ...patch, updateTime: NOW() } : r)
+      })),
       deleteAiTypeRule: (ruleId) => set((s) => {
         const rec = s.aiTypeRules.find((r) => r.ruleId === ruleId)
         return {

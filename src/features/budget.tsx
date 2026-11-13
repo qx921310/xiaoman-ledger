@@ -25,6 +25,7 @@ export function BudgetManager({ onBack, notify }: { onBack: () => void; notify: 
   const [period, setPeriod] = useState<Period>('month')
   const [editing, setEditing] = useState<null | { categoryId: number; amount: string; name?: string }>(null)
   const [custom, setCustom] = useState({ start: '', end: '' })
+  const [customId, setCustomId] = useState<number | null>(null)
   const setBudgetPeriod = useLedger((s) => s.setBudget)
 
   // 期间范围：周一为一周之始（与一木周预算一致）
@@ -41,13 +42,15 @@ export function BudgetManager({ onBack, notify }: { onBack: () => void; notify: 
       return { start: start.getTime(), end: new Date(now.getFullYear() + 1, 0, 1).getTime(), label: `${now.getFullYear()} 年` }
     }
     if (period === 'custom') {
-      const custom = budgets.find((b) => b.type === 'custom' && b.startTime && b.endTime)
-      if (custom) return { start: custom.startTime!, end: custom.endTime!, label: `${fullDay(custom.startTime!)} ~ ${fullDay(custom.endTime!)}` }
+      // 多个自定义期间时按选中项取范围，默认取最近保存的一个
+      const list = budgets.filter((b) => b.type === 'custom' && b.startTime && b.endTime)
+      const picked = list.find((b) => b.budgetId === customId) ?? list[list.length - 1]
+      if (picked) return { start: picked.startTime!, end: picked.endTime!, label: `${fullDay(picked.startTime!)} ~ ${fullDay(picked.endTime!)}` }
       return null
     }
     const start = new Date(now.getFullYear(), now.getMonth(), 1)
     return { start: start.getTime(), end: new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime(), label: monthOf(Date.now()) }
-  }, [period, budgets])
+  }, [period, budgets, customId])
 
   const inRange = useMemo(() => bills.filter((b) => {
     if (currentBookId !== 0 && String(b.bookId) !== String(currentBookId)) return false
@@ -120,6 +123,13 @@ export function BudgetManager({ onBack, notify }: { onBack: () => void; notify: 
       {period === 'custom' && !range && (
         <>
           <p className="hint">未选择自定义预算，点击选择</p>
+          {budgets.filter((b) => b.type === 'custom' && b.startTime && b.endTime).length > 1 && (
+            <select aria-label="选择自定义期间" value={customId ?? ''} onChange={(e) => setCustomId(Number(e.target.value))}>
+              {budgets.filter((b) => b.type === 'custom' && b.startTime && b.endTime).map((b) => (
+                <option key={b.budgetId} value={b.budgetId}>{b.budgetName ?? `${fullDay(b.startTime!)} ~ ${fullDay(b.endTime!)}`}</option>
+              ))}
+            </select>
+          )}
           <div className="row">
             <input aria-label="自定义开始" type="date" value={custom.start}
               onChange={(e) => setCustom({ ...custom, start: e.target.value })} />

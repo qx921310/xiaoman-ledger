@@ -384,6 +384,22 @@ test('智能分类保存子分类；AA 记录可指定日期；预算支持自�
   assert.equal(custom.endTime, day + 86400000)
 })
 
+test('智能分类可编辑；预算可保存多个自定义期间', () => {
+  reset()
+  st().addAiTypeRule({ keywords: ['奶茶'], categoryId: 7, childCategoryId: 71 })
+  const rule = st().aiTypeRules[0]
+  st().updateAiTypeRule(rule.ruleId, { keywords: ['奶茶', '咖啡'], childCategoryId: 72 })
+  const edited = st().aiTypeRules[0]
+  assert.deepEqual(edited.keywords, ['奶茶', '咖啡'])
+  assert.equal(edited.childCategoryId, 72)
+
+  const day = new Date(2026, 10, 1).getTime()
+  st().setBudget({ month: 'all', categoryId: 0, amount: 100, type: 'custom', budgetId: 11, startTime: day, endTime: day + 86400000 })
+  st().setBudget({ month: 'all', categoryId: 0, amount: 200, type: 'custom', budgetId: 12, startTime: day + 86400000, endTime: day + 2 * 86400000 })
+  const ids = st().budgets.filter((b) => b.type === 'custom').map((b) => b.budgetId)
+  assert.ok(ids.includes(11) && ids.includes(12), `两个自定义期间都应保留，实际 ${JSON.stringify(ids)}`)
+})
+
 test('账本开关与隐藏可持久化（一木 AddAccountBookActivity 的三个开关）', () => {
   reset()
   useLedger.setState({ currentBookId: 1 } as never)
