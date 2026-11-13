@@ -130,7 +130,7 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
 
   const tList = useMemo(() => transfers.filter((t) => {
     if (!rangeAll && !dateRangeActive && monthOf(t.time) !== month) return false
-    if (currentBookId !== 0 && t.bookId !== undefined && String(t.bookId) !== String(currentBookId)) return false
+    if (currentBookId !== 0 && (t.bookId === undefined || String(t.bookId) !== String(currentBookId))) return false
     if (fAid && t.fromAssetId !== fAid && t.toAssetId !== fAid) return false
     if (fPid) return false
     // 金额范围同样作用于转账本金

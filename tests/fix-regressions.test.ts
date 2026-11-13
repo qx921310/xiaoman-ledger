@@ -92,6 +92,18 @@ test('跨账本还款继承父借贷账本', () => {
   assert.equal(String(child!.bookId), '1', '还款记录必须跟随父记录账本')
 })
 
+test('还款即使不显式传账本也继承父记录账本', () => {
+  reset()
+  useLedger.setState({ currentBookId: 1, assets: [{ assetId: 10, assetName: '现金', assetNumber: 0, assetType: 1 }] } as never)
+  st().addLend({ type: 1, assetId: 10, counterparty: '李四', number: 200 })
+  const parent = st().lends[0]
+  useLedger.setState({ currentBookId: 2 } as never)
+  // 直接调 addLend 且不传 bookId：仍须落到父记录的 A 账本
+  st().addLend({ type: 2, assetId: 10, counterparty: '李四', number: 50, parentLendId: parent.lendId })
+  const child = st().lends.find((l) => l.parentLendId === parent.lendId)
+  assert.equal(String(child!.bookId), '1')
+})
+
 test('模板不属于当前账本时拒绝执行', () => {
   reset()
   useLedger.setState({ currentBookId: 1, assets: [{ assetId: 10, assetName: '现金', assetNumber: 0, assetType: 1 }] } as never)

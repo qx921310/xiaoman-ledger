@@ -1175,10 +1175,14 @@ export const useLedger = create<LedgerState>()(
         // 同一毫秒内连续登记会撞 id，顺延保证唯一（父记录与还款记录常在同一次点击内创建）
         let lendId = Date.now()
         while (s.lends.some((l) => l.lendId === lendId)) lendId++
+        // 有父记录时必须继承父记录账本；调用方漏传也不能漂移到当前账本
+        const parentBook = parentLendId != null ? s.lends.find((l) => l.lendId === parentLendId)?.bookId : undefined
         const rec: Lend = {
           lendId,
           // 借贷参与余额计算，必须带账本；还款记录继承父记录的账本，不随当前账本漂移
-          bookId: bookId !== undefined ? bookId : (s.currentBookId === 0 ? undefined : s.currentBookId),
+          bookId: bookId !== undefined ? bookId
+            : parentLendId != null ? parentBook
+            : (s.currentBookId === 0 ? undefined : s.currentBookId),
           type, assetId, counterparty: counterparty ?? '',
           number: amt,
           interest: Number(interest) || 0,
