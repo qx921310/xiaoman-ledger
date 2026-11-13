@@ -12,6 +12,7 @@ import { Modal } from '../ui/modal'
 import { billNetAmount } from '../bill-amount'
 import { FilteredBills } from './filtered-bills'
 import { BillGroupEditor } from './bill-group'
+import { BillSplitEditor } from './bill-split'
 import { accountMoney, fromBase, hasCurrencyRate } from '../money'
 import { resolveBillChild } from '../taxonomy'
 import { summarizeBills } from '../bill-summary'
@@ -82,6 +83,7 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
   const [editingGroup, setEditingGroup] = useState<number | null>(null)
   const [tip, setTip] = useState('')
   const [creatingGroup, setCreatingGroup] = useState(false)
+  const [splitting, setSplitting] = useState<Bill | null>(null)
   const [kw, setKw] = useState('')
   const [fPid, setFPid] = useState(0)
   const [fAid, setFAid] = useState(0)
@@ -191,6 +193,16 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
       <FilteredBills title={drill.title}
         bills={bills.filter((b) => drill.ids.includes(String(b.billId)))}
         onBack={() => setDrill(null)} />
+    )
+  }
+
+  if (splitting) {
+    return (
+      <>
+        {tip && <p className="hint" role="status">{tip}</p>}
+        <BillSplitEditor bill={splitting} notify={setTip}
+          onDone={() => { setSplitting(null); setTip('') }} />
+      </>
     )
   }
 
@@ -410,6 +422,7 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
                 <div className="ledger-actions">
                   <button className="link" aria-label={`查看${p?.name ?? '账单'}明细`} onClick={() => setDetail(b)}>明细</button>
                   {!readOnly && <button className="link" aria-label={`编辑${p?.name ?? '账单'}`} onClick={() => setEditing(b)}>编辑</button>}
+                  {!readOnly && <button className="link" aria-label={`拆分${p?.name ?? '账单'}`} onClick={() => setSplitting(b)}>拆分</button>}
                   {!readOnly && <button className="link" aria-label={`复制${p?.name ?? '账单'}`} onClick={() => duplicate(b.billId)}>复制</button>}
                   {!readOnly && <button className="del" aria-label={`删除${p?.name ?? '账单'}`} onClick={() => removeWithUndo(b)}>删除</button>}
                 </div>

@@ -295,6 +295,32 @@ test('账单组合：可按一木编辑页写入分类/备注，编辑后合计�
   assert.equal(st().bills.length, 3, '解散组合不影响账单本身')
 })
 
+test('账单拆分：按一木规则拆成多笔并用组合关联，优惠按比例分摊', () => {
+  reset()
+  useLedger.setState({ currentBookId: 1, assets: [
+    { assetId: 10, assetName: '现金', assetNumber: 1000, openingBalance: 1000, assetType: 1 }
+  ] } as never)
+  const bill = st().addBill({ assetId: 10, parentCategoryId: 7, cost: 100, time: Date.now(), discountNumber: 10 })
+  // 金额为 0 的分录应被剔除
+  const ok = st().splitBill(bill.billId, [
+    { num: 60, parentCategoryId: 7 },
+    { num: 0, parentCategoryId: 7 },
+    { num: 40, parentCategoryId: 8 }
+  ])
+  assert.equal(ok, true)
+  assert.equal(st().bills.length, 2, '应拆成两笔（0 元那笔被剔除）')
+  const group = st().billGroups[0]
+  assert.equal(group.billList.length, 2, '拆出的账单应被组合关联')
+  assert.equal(group.totalNumber, 100, '合计应等于原账单')
+  const costs = st().bills.map((b) => b.cost).sort((a, b) => a - b)
+  assert.deepEqual(costs, [40, 60])
+  const discounts = st().bills.reduce((n, b) => n + (b.discountNumber ?? 0), 0)
+  assert.equal(+discounts.toFixed(2), 10, '优惠应被完整分摊，不多不少')
+  // 不足两笔时拒绝
+  const single = st().addBill({ assetId: 10, parentCategoryId: 7, cost: 50, time: Date.now() })
+  assert.equal(st().splitBill(single.billId, [{ num: 50, parentCategoryId: 7 }]), false)
+})
+
 test('账本开关与隐藏可持久化（一木 AddAccountBookActivity 的三个开关）', () => {
   reset()
   useLedger.setState({ currentBookId: 1 } as never)

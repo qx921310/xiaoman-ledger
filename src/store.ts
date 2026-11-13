@@ -133,6 +133,8 @@ interface LedgerState {
   settleSplit: (splitExpenseId: number, settlement: boolean) => void
   /** 账单组：把多条账单合并成一条展示（一木 BillGroup） */
   createBillGroup: (billIds: Array<string | number>, meta?: { parentCategoryId?: number; childCategoryId?: number; remark?: string }) => boolean
+  /** 一木 BillSplitActivity：把一笔账单拆成多笔（底层是 BillGroup） */
+  splitBill: (billId: string | number, parts: Array<{ num: number; parentCategoryId?: number; childCategoryId?: number; assetId?: number; remark?: string }>) => boolean
   /** 编辑账单组合（分类 / 子分类 / 备注 / 成员） */
   updateBillGroup: (billGroupId: number, patch: Partial<import('./types').BillGroup>) => void
   dissolveBillGroup: (billGroupId: number) => void
@@ -895,6 +897,77 @@ export const useLedger = create<LedgerState>()(
       dissolveBillGroup: (billGroupId) => set((s) => ({
         billGroups: s.billGroups.filter((g) => g.billGroupId !== billGroupId)
       })),
+
+      /**
+       * 一木 BillSplitActivity：把一笔账单拆成多笔（底层用 BillGroup 关联）。
+       * 规则（反编译取证）：
+       *  · 金额为 0 的分录先剔除，剩余不足两笔 → 拒绝；
+       *  · 第一笔沿用原账单，其余新建；分类/子分类/备注/账户逐笔写入；
+       *  · 优惠金额按比例分摊，最后一笔取余数；
+       *  · 原账单有报销时，后续每笔生成一条待报销记录。
+       */
+      splitBill: (billId, parts) => {
+        const s = get()
+        const origin = s.bills.find((b) => String(b.billId) === String(billId))
+        if (!origin) return false
+        const valid = parts.filter((p) => Number(p.num) > 0)
+        if (valid.length < 2) return false
+        const total = +valid.reduce((n, p) => n + Number(p.num), 0).toFixed(2)
+        const discount = Math.abs(origin.discountNumber ?? 0)
+        let allocated = 0
+        const created = valid.map((p, i) => {
+          const cost = +Number(p.num).toFixed(2)
+          const last = i === valid.length - 1
+          // 优惠按金额占比分摊，最后一笔取余数，保证合计不变
+          const share = discount > 0
+            ? (last ? +(discount - allocated).toFixed(2) : +(cost * discount / total).toFixed(2))
+            : undefined
+          if (share != null && !last) allocated = +(allocated + share).toFixed(2)
+          if (i === 0) {
+            // 第一笔沿用原账单
+            return { billId: origin.billId, created: false, cost, share, p }
+          }
+          const bill = get().addBill({
+            assetId: p.assetId ?? origin.assetId,
+            parentCategoryId: p.parentCategoryId ?? origin.parentCategoryId,
+            childCategoryId: p.childCategoryId,
+            cost,
+            time: origin.time,
+            remark: p.remark ?? origin.remark,
+            bookId: origin.bookId,
+            discountNumber: share,
+            notIntoTotal: origin.notIntoTotal,
+            notIntoBudget: origin.notIntoBudget,
+            currencyInfo: origin.currencyInfo
+          })
+          return { billId: bill.billId, created: true, cost, share, p }
+        })
+        // 原账单改为第一笔的内容
+        const first = created[0]
+        get().updateBill(origin.billId, {
+          parentCategoryId: first.p.parentCategoryId ?? origin.parentCategoryId,
+          childCategoryId: first.p.childCategoryId,
+          assetId: first.p.assetId ?? origin.assetId,
+          cost: first.cost,
+          remark: first.p.remark ?? origin.remark,
+          discountNumber: first.share
+        })
+        // 原账单有报销：为后续每笔补一条待报销
+        if (origin.isReimbursement === 1) {
+          const claim = s.reimbursements.find((r) => String(r.billId) === String(origin.billId) && r.status !== 'ended')
+          if (claim) {
+            for (const row of created.slice(1)) {
+              get().addReimbursement({ billId: row.billId, assetId: claim.assetId, number: row.cost, detail: claim.detail })
+            }
+          }
+        }
+        // 用 BillGroup 关联拆出的账单（一木 b0.C(group, ids)）
+        return get().createBillGroup(created.map((c) => c.billId), {
+          parentCategoryId: origin.parentCategoryId,
+          childCategoryId: origin.childCategoryId,
+          remark: origin.remark
+        })
+      },
 
       /** 一木 BillGroupActivity：编辑组合的分类 / 子分类 / 备注 / 成员 */
       updateBillGroup: (billGroupId, patch) => set((s) => ({
