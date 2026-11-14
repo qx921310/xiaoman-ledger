@@ -130,7 +130,8 @@ const clickByText = async (text, file) => {
   })()`)
   await sleep(1200)
   await cdp.shot(file)
-  const snippet = await cdp.evaluate("document.body.innerText.replace(/\\s+/g,' ').slice(0,240)")
+  const textLimit = Number(process.env.SHOT_TEXT ?? 900)
+  const snippet = await cdp.evaluate(`document.body.innerText.replace(/\\s+/g,' ').slice(0, ${textLimit})`)
   console.log(ok ? `点击「${text}」` : `未找到「${text}」`, '｜正文:', snippet)
 }
 for (const [i, step] of steps.entries()) {

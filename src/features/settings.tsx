@@ -608,6 +608,23 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       </div>
       </>)}
 
+      <h3>实用工具</h3>
+      <div className="my-grid">
+        {([
+          ['AA 分账', () => setSplitOpen(true)],
+          ['模板记账', () => setTplOpen(true)],
+          ['账单图片', () => setFilesOpen(true)],
+          ['智能分类', () => setAiTypeOpen(true)],
+          ['愿望清单', () => setDreamOpen(true)],
+          ['房贷计算', () => setMortgageOpen(true)],
+          ['利率换算', () => setRateOpen(true)],
+          ['理财收益', () => setInvestOpen(true)],
+          ['个税计算', () => setTaxOpen(true)],
+        ] as Array<[string, () => void]>).map(([label, run]) => (
+          <button key={label} type="button" className="my-grid-item" onClick={run}>{label}</button>
+        ))}
+      </div>
+
       {meScreen === 'data' && (<>
       <button type="button" className="link" onClick={() => setMeScreen(null)}>‹ 返回我的</button>
       <h3>数据</h3>
@@ -1030,23 +1047,6 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       <div className="btns">
         <button onClick={() => { seed(); notify('已填充演示数据') }}>填充演示数据</button>
         <button className="danger" onClick={() => { reset(); notify('已清空') }}>清空数据</button>
-      </div>
-
-      <h3>实用工具</h3>
-      <div className="my-grid">
-        {([
-          ['AA 分账', () => setSplitOpen(true)],
-          ['模板记账', () => setTplOpen(true)],
-          ['账单图片', () => setFilesOpen(true)],
-          ['智能分类', () => setAiTypeOpen(true)],
-          ['愿望清单', () => setDreamOpen(true)],
-          ['房贷计算', () => setMortgageOpen(true)],
-          ['利率换算', () => setRateOpen(true)],
-          ['理财收益', () => setInvestOpen(true)],
-          ['个税计算', () => setTaxOpen(true)],
-        ] as Array<[string, () => void]>).map(([label, run]) => (
-          <button key={label} type="button" className="my-grid-item" onClick={run}>{label}</button>
-        ))}
       </div>
 
       <button type="button" className="link" onClick={() => setMeScreen(null)}>‹ 返回我的</button>
