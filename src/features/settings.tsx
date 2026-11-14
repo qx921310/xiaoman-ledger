@@ -131,6 +131,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [budgetOpen, setBudgetOpen] = useState(false)
   const [splitOpen, setSplitOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
+  const [meScreen, setMeScreen] = useState<'book' | 'cat' | 'tag' | null>(null)
   const [cycleDrill, setCycleDrill] = useState<{ title: string; cycleId: string | number } | null>(null)
   const [backupOpen, setBackupOpen] = useState(false)
   // 一木 UserInfoActivity：昵称与头像可改（本地保存，账号维度）
@@ -562,9 +563,9 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
               if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
               else notify('暂未找到该区块')
             }
-            if (key === 'book') { jump('sec-book'); return }
-            if (key === 'cat') { jump('sec-cat'); return }
-            if (key === 'tag') { jump('sec-tag'); return }
+            if (key === 'book') { setMeScreen('book'); window.scrollTo({ top: 0 }); return }
+            if (key === 'cat') { setMeScreen('cat'); window.scrollTo({ top: 0 }); return }
+            if (key === 'tag') { setMeScreen('tag'); window.scrollTo({ top: 0 }); return }
             if (key === 'cycle') { jump('sec-cycle'); return }
             if (key === 'backup' || key === 'import') { jump('sec-data'); return }
             if (key === 'dream') { setDreamOpen(true); return }
@@ -1027,14 +1028,20 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         ))}
       </div>
 
-      <h3 id="sec-book">账本</h3>
+      <button type="button" className="link" onClick={() => setMeScreen(null)}>‹ 返回我的</button>
+      {meScreen === 'book' && (<>
+      <button type="button" className="link" onClick={() => setMeScreen(null)}>‹ 返回我的</button>
+      <h3>账本</h3>
       <p className="hint">账本只属于你自己，同一账号可多设备登录同一账本。</p>
       <div className="row">
         <span className="grow">共 {accountBooks.filter((b) => !b.hidden).length} 个账本（已隐藏 {accountBooks.filter((b) => b.hidden).length} 个）</span>
         <button type="button" className="link" onClick={() => setBooksOpen(true)}>账本管理</button>
       </div>
 
-      <h3 id="sec-cat">分类</h3>
+      </>)}
+      {meScreen === 'cat' && (<>
+      <button type="button" className="link" onClick={() => setMeScreen(null)}>‹ 返回我的</button>
+      <h3>分类</h3>
       <p className="hint">已有账单使用的分类不能删除。</p>
       {(['expense', 'income'] as const).map((kind) => (
         <div key={kind}>
@@ -1133,6 +1140,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         </Modal>
       )}
 
+      </>)}
       <h3>模板</h3>
       <p className="hint"></p>
       {templates.length === 0 && <p className="hint">还没有模板。</p>}
@@ -1215,8 +1223,10 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         )
       })}
 
+      {meScreen === 'tag' && (<>
+      <button type="button" className="link" onClick={() => setMeScreen(null)}>‹ 返回我的</button>
       <div className="pane-head">
-        <h3 id="sec-tag">标签管理</h3>
+        <h3>标签管理</h3>
         <button type="button" className="link" onClick={() => setAddingTag(true)}>新增</button>
       </div>
       {tags.length === 0 && <p className="hint"></p>}
@@ -1261,6 +1271,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         }}>添加标签</button>
       </div>}
 
+      </>)}
       <h3>币种与汇率</h3>
       <div className="row">
         <span className="grow" />
