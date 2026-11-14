@@ -528,6 +528,8 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
   const [claimAsset, setClaimAsset] = useState(0)
   const [moreOpen, setMoreOpen] = useState(false)
   const [tagSheet, setTagSheet] = useState(false)
+  const [splitting, setSplitting] = useState(false)
+  const addTemplate = useLedger((st) => st.addTemplate)
   const [claimAmt, setClaimAmt] = useState('')
   const instalment = instalments.find((i) => String(i.billId) === String(bill.billId))
   useEffect(() => {
@@ -547,6 +549,20 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
         <button type="button" className="link" aria-label="更多操作" onClick={() => setMoreOpen((v) => !v)}>⋯</button>
         {moreOpen && (
           <div className="detail-menu" role="menu">
+            <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); setSplitting(true) }}>账单拆分</button>
+            <button type="button" role="menuitem" onClick={() => {
+              setMoreOpen(false)
+              addTemplate({
+                name: `${p?.name ?? '账单'}模板`,
+                parentCategoryId: bill.parentCategoryId,
+                childCategoryId: bill.childCategoryId,
+                assetId: bill.assetId,
+                cost: bill.cost,
+                remark: bill.remark,
+                billType: bill.billType
+              } as never)
+              alert('已存为模板')
+            }}>转为模板</button>
             <button type="button" role="menuitem" className="danger" onClick={() => {
               setMoreOpen(false)
               if (confirm('删除这笔账单？')) { del(bill.billId); onClose() }
@@ -728,6 +744,10 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
             <div className="sheet-ft"><button type="button" className="ghost" onClick={() => setTagSheet(false)}>完成</button></div>
           </div>
         </div>
+      )}
+
+      {splitting && (
+        <BillSplitEditor bill={bill} notify={(m) => alert(m)} onDone={() => { setSplitting(false); onClose() }} />
       )}
 
       {refundOpen && (
