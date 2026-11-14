@@ -1340,3 +1340,15 @@ button.day-btn {
 .sheet-link { background: transparent; border: 0; color: var(--accent); font-size: var(--font-sm); cursor: pointer; }
 .sheet-sort, .sheet-plus { color: var(--ink); font-size: var(--font-lg); line-height: 1; }
 .sheet-sub { padding: 0 16px 6px; font-size: var(--font-xs); }
+
+/* 账单详情：底部固定操作条（左退款 / 右编辑，对齐一木） */
+.bill-page { padding-bottom: 84px; }
+.detail-bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  background: var(--card); border-top: 1px solid var(--line);
+}
+.db-refund, .db-edit { flex: 1; height: 46px; border-radius: var(--r-md); font-size: var(--font-md); cursor: pointer; }
+.db-refund { background: transparent; border: 1px solid var(--line); color: var(--danger-ink); }
+.db-edit { background: var(--accent); border: 0; color: var(--card); }

@@ -709,6 +709,10 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
         {!readOnly && <button className="primary" onClick={onEdit}>编辑</button>}
         {readOnly && <span className="muted">当前账本只读，不能修改账单</span>}
       </div>
+      <div className="detail-bar">
+        <button type="button" className="db-refund" onClick={() => { setRefundAmt(''); setRefundOpen(true) }}>退款</button>
+        <button type="button" className="db-edit" onClick={onEdit}>编辑</button>
+      </div>
     </section>
   )
 }
