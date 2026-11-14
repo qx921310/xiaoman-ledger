@@ -51,7 +51,7 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
   const tags = allTags.filter((t) => !t.hide)
   const tagsByName = useMemo(() => new Map(tags.map((t) => [t.name, t])), [tags])
   const accountBooks = useLedger((s) => s.accountBooks)
-  const myRole = accountBooks.find((b) => b.bookId && String(b.bookId) === String(currentBookId))?.role
+  const myRole = accountBooks.find((b) => String(b.bookId ?? b.accountBookId ?? '') === String(currentBookId))?.role
   const readOnly = myRole === 'silent'
   const updateTransfer = useLedger((s) => s.updateTransfer)
   const [editingTransfer, setEditingTransfer] = useState<Transfer | null>(null)
@@ -233,7 +233,7 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
       </div>
       )}
 
-      {!embedded && (
+      {!embedded && !readOnly && (
         <div className="row">
           <span className="grow muted">把多笔账单合并成一条展示</span>
           <button type="button" className="link" onClick={() => setCreatingGroup(true)}>账单组合</button>
@@ -291,8 +291,8 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
               </div>
             ))}
             <div className="row">
-              <button className="link" onClick={() => setEditingGroup(g.billGroupId)}>编辑组合</button>
-              <button className="link" onClick={() => dissolveBillGroup(g.billGroupId)}>解散账单组</button>
+              {!readOnly && <button className="link" onClick={() => setEditingGroup(g.billGroupId)}>编辑组合</button>}
+              {!readOnly && <button className="link" onClick={() => { if (!dissolveBillGroup(g.billGroupId)) setTip('删除失败：当前账本只读') }}>解散账单组</button>}
             </div>
           </div>
         )
@@ -308,7 +308,7 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
                 const all = new Set<string>([...list.map((b) => String(b.billId)), ...tList.map((t) => String(t.transferId))])
                 setPicked(picked.size === all.size ? new Set() : all)
               }}>{picked.size === list.length + tList.length ? '取消全选' : '全选'}</button>
-              <button type="button" className="del" disabled={picked.size === 0} onClick={() => {
+              <button type="button" className="del" disabled={readOnly || picked.size === 0} onClick={() => {
                 if (!confirm(`删除选中的 ${picked.size} 条记录？`)) return
                 for (const id of picked) {
                   if (list.some((b) => String(b.billId) === id)) del(id)
@@ -364,8 +364,8 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
                   </div>
                   <b className="neutral">{money(t.cost)}</b>
                   <div className="ledger-actions">
-                    <button className="link" aria-label="编辑转账" onClick={() => setEditingTransfer(t)}>编辑</button>
-                    <button className="del" aria-label="删除转账" onClick={() => delTransfer(t.transferId)}>删除</button>
+                    {!readOnly && <button className="link" aria-label="编辑转账" onClick={() => setEditingTransfer(t)}>编辑</button>}
+                    {!readOnly && <button className="del" aria-label="删除转账" onClick={() => { if (!delTransfer(t.transferId)) setTip('删除失败：当前账本只读') }}>删除</button>}
                   </div>
                 </div>
               )
@@ -433,10 +433,11 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
         )
       })}
 
+      {tip && <p className="hint" role="status">{tip}</p>}
       {undoBill && (
         <div className="undo-bar" role="status">
           <span>已删除 1 笔</span>
-          <button className="link" onClick={() => { restore(undoBill); setUndoBill(null) }}>撤销</button>
+          <button className="link" disabled={!!readOnly} onClick={() => { restore(undoBill); setUndoBill(null) }}>撤销</button>
           <button className="del" aria-label="关闭提示" onClick={() => setUndoBill(null)}>×</button>
         </div>
       )}
@@ -455,13 +456,13 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
         <TransferEditor
           transfer={editingTransfer}
           onClose={() => setEditingTransfer(null)}
-          onSave={(patch) => { updateTransfer(editingTransfer.transferId, patch); setEditingTransfer(null) }}
+          onSave={(patch) => { if (!updateTransfer(editingTransfer.transferId, patch)) setTip('保存失败：当前账本只读'); else setEditingTransfer(null) }}
         />
       )}
 
       {editing && (
         <EditBill bill={editing} onClose={() => setEditing(null)} onSave={(patch) => {
-          updateBill(editing.billId, patch)
+        if (!updateBill(editing.billId, patch)) { alert('保存失败：账本只读，或金额小于已退款金额'); return }
           setEditing(null)
         }} />
       )}
@@ -800,7 +801,7 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
                 time: refundDate ? new Date(`${refundDate}T12:00:00`).getTime() : Date.now(),
                 remark: refundRemark
               })
-              if (!ok) { alert('退款失败：金额超过可退额度，或该账户汇率未设置'); return }
+              if (!ok) { alert('退款失败：账本只读、账单不可退、金额超过可退额度，或该账户汇率未设置'); return }
               setRefundAmt(''); setRefundRemark(''); setRefundOpen(false)
             }}>✓</button>
           </div>
@@ -810,8 +811,8 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
               <input aria-label="退款金额" inputMode="decimal" value={refundAmt} placeholder="请输入金额"
                 onChange={(e) => setRefundAmt(e.target.value.replace(/[^\d.]/g, ''))} />
             </div>
-            {Number(refundAmt) > 0 && (a?.currency ?? defaultCurrency) !== defaultCurrency && (
-              <div className="rp-sub">折合 {currencySymbol(currencies, defaultCurrency, defaultCurrency)}{toBase(Number(refundAmt), a?.currency ?? defaultCurrency, currencies, defaultCurrency).toFixed(2)}</div>
+            {Number(refundAmt) > 0 && (assets.find((x) => x.assetId === (refundAsset || bill.assetId))?.currency ?? defaultCurrency) !== defaultCurrency && (
+              <div className="rp-sub">折合 {currencySymbol(currencies, defaultCurrency, defaultCurrency)}{toBase(Number(refundAmt), assets.find((x) => x.assetId === (refundAsset || bill.assetId))?.currency ?? defaultCurrency, currencies, defaultCurrency).toFixed(2)}</div>
             )}
             <div className="rp-field">
               <span>备注</span>
@@ -841,7 +842,9 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
               const v = Number(claimAmt) || 0
               if (v <= 0) { alert('请输入报销金额'); return }
               if (!claimAsset) { alert('请选择报销账户'); return }
-              addReimbursement({ billId: bill.billId, assetId: claimAsset, number: v })
+              if (!addReimbursement({ billId: bill.billId, assetId: claimAsset, number: v })) {
+                alert('报销失败：账本只读，或金额超过可报销额度'); return
+              }
               setClaimAmt(''); setClaimOpen(false)
             }}>✓</button>
           </div>
@@ -1067,7 +1070,7 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
                 {r.status === 'pending' && (
                   <button className="link" onClick={() => { if (!settleReimbursement(r.reimbursementId)) alert('无法确认到账，请检查账户和汇率。') }}>确认到账</button>
                 )}
-                <button className="del" onClick={() => deleteReimbursement(r.reimbursementId)}>撤销</button>
+                <button className="del" onClick={() => { if (!deleteReimbursement(r.reimbursementId)) alert('撤销失败：当前账本只读') }}>撤销</button>
               </div>
             ))}
             {claimRemaining > 0 && (
@@ -1082,14 +1085,14 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
             {bill.reimbursementEnd ? (
               <p className="hint">报销流程已结束（不再等待报销）。</p>
             ) : (
-              <button className="ghost wide" onClick={() => { endReimbursement(bill.billId); onSave({ reimbursementEnd: true }) }}>
+              <button className="ghost wide" onClick={() => { if (!endReimbursement(bill.billId)) { alert('操作失败：当前账本只读'); return } onSave({ reimbursementEnd: true }) }}>
                 结束报销（不再等待）
               </button>
             )}
             {claimRemaining > 0 && (
-              <button className="ghost wide" disabled={!rAsset || !Number.isFinite(Number(rAmount)) || Number(rAmount) <= 0 || Number(rAmount) > claimRemaining} onClick={() => { addReimbursement({
+              <button className="ghost wide" disabled={!rAsset || !Number.isFinite(Number(rAmount)) || Number(rAmount) <= 0 || Number(rAmount) > claimRemaining} onClick={() => { if (!addReimbursement({
                 billId: bill.billId, assetId: rAsset, number: Number(rAmount) || 0, detail: remark
-              }); setRAmount('') }}>登记报销（钱到账后再确认）</button>
+              })) { alert('登记失败：账本只读，或金额超过可报销额度'); return } setRAmount('') }}>登记报销（钱到账后再确认）</button>
             )}
 
             <div className="label">退款</div>
@@ -1109,7 +1112,7 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
                       e.target.value = String(r.baseAmount ?? r.number)
                     }
                   }} />
-                <button className="del" onClick={() => deleteRefund(r.refundId)}>撤销</button>
+                <button className="del" onClick={() => { if (!deleteRefund(r.refundId)) alert('撤销失败：当前账本只读') }}>撤销</button>
               </div>
             ))}
             {hasLegacyRefund && <p className="hint">旧退款缺本币金额，请先核对。</p>}
@@ -1123,7 +1126,7 @@ function EditBill({ bill, onClose, onSave }: { bill: Bill; onClose: () => void; 
                 {!refundRateAvailable && <p className="hint">请先设置 {refundCurrency} 汇率。</p>}
                 {refundBase > refundRemaining && <p className="hint">本次退款 {money(refundBase)} 超过还可退的 {money(refundRemaining)}。</p>}
                 {refundAccount && refundCurrency !== defaultCurrency && refundBase > 0 && refundRateAvailable && <p className="hint">按当前汇率预计到账 {accountMoney(refundAccountAmount, refundCurrency, currencies, defaultCurrency)}</p>}
-                <button className="ghost wide" disabled={!refundAccount || !Number.isFinite(refundBase) || refundBase <= 0 || refundBase > refundRemaining || !refundRateAvailable || refundAccountAmount <= 0} onClick={() => { addRefund({ billId: bill.billId, assetId: fAsset || undefined, number: refundAccountAmount, baseAmount: refundBase }); setFAmount('') }}>保存退款</button>
+                <button className="ghost wide" disabled={!refundAccount || !Number.isFinite(refundBase) || refundBase <= 0 || refundBase > refundRemaining || !refundRateAvailable || refundAccountAmount <= 0} onClick={() => { if (!addRefund({ billId: bill.billId, assetId: fAsset || undefined, number: refundAccountAmount, baseAmount: refundBase })) { alert('退款失败：账本只读、账户或汇率不可用'); return } setFAmount('') }}>保存退款</button>
               </>
             )}
           </>

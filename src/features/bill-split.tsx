@@ -43,7 +43,7 @@ export function BillSplitEditor({ bill, onDone, notify }: { bill: Bill; onDone: 
       }))
     if (parts.length < 2) { notify('至少拆分成两笔账单'); return }
     const ok = splitBill(bill.billId, parts)
-    notify(ok ? '账单已拆分' : '拆分失败，请检查填写的金额')
+    notify(ok ? '账单已拆分' : '拆分失败：请检查金额、分类方向、账户币种、退款/报销状态及账本权限')
     if (ok) onDone()
   }
 

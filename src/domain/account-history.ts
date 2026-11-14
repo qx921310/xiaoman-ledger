@@ -69,7 +69,7 @@ export function accountHistory(input: AccountHistoryInput): { entries: AccountEn
 
   for (const r of refunds) {
     if (r.assetId !== asset.assetId) continue
-    entries.push({ key: 'r' + String(r.refundId), time: r.updateTime ?? 0, delta: r.number, label: '退款到账', kind: 'refund' })
+    entries.push({ key: 'r' + String(r.refundId), time: r.time ?? r.updateTime ?? 0, delta: r.number, label: '退款到账', kind: 'refund' })
   }
 
   for (const r of reimbursements) {

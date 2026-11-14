@@ -179,17 +179,18 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
         if (!parent || lendRemaining(parent, lends) <= 0) return fail('该债务已结清')
         if (v > lendRemaining(parent, lends)) return fail('金额超过未结余额')
         if (!aid) return fail('请选择账户')
-        repayLend({ lendId: parent.lendId, amount: v, repaymentAssetId: aid, time: Date.now() })
+        if (!repayLend({ lendId: parent.lendId, amount: v, repaymentAssetId: aid, time: Date.now() })) return fail('记录失败：账本只读或参数无效')
         notify(`${typeMap[debtType]} ${money(v)} 已记录，剩余 ${money(lendRemaining(parent, lends) - v)}`)
         setCost(''); setParentLendId('')
         return true
       }
       if (!counterparty.trim()) return fail('请选择债务')
       if (!aid) return fail('请选择账户')
-      addLend({
+      const recorded = addLend({
         type: debtType, assetId: aid, counterparty: counterparty.trim(), number: v,
         time: Date.now(), remark: `${typeMap[debtType]}-${assets.find((a) => a.assetId === aid)?.assetName ?? ''}`
       })
+      if (!recorded) return fail('记录失败：账本只读或参数无效')
       notify(`${typeMap[debtType]} ${money(v)} 已记录`)
       setCost(''); setCounterparty('')
       return true
@@ -203,14 +204,16 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
       if (f == null || f < 0 || tc == null || tc < 0) return fail('请输入有效的手续费和到账金额')
       const fromCurrency = assets.find((a) => a.assetId === aid)?.currency
       if (f > 0 && !hasCurrencyRate(fromCurrency, currencies, defaultCurrency)) return fail(`请先设置 ${fromCurrency} 汇率`)
-      addTransfer({
-        toCost: tc > 0 ? tc : undefined,
-        fromAssetId: aid, toAssetId: toAid, cost: v,
-        serviceCharge: f, remark, time: new Date(time).getTime()
+      return guard(() => {
+        addTransfer({
+          toCost: tc > 0 ? tc : undefined,
+          fromAssetId: aid, toAssetId: toAid, cost: v,
+          serviceCharge: f, remark, time: new Date(time).getTime()
+        })
+        setCost(''); setFee(''); setRemark(''); setToCost('')
+        notify(`已转账 ${money(v)}` + (tc > 0 && tc !== v ? `（到账 ${money(tc)}）` : '') + (f > 0 ? `，手续费 ${money(f)} 已单独记为支出` : ''))
+        return true
       })
-      setCost(''); setFee(''); setRemark(''); setToCost('')
-      notify(`已转账 ${money(v)}` + (tc > 0 && tc !== v ? `（到账 ${money(tc)}）` : '') + (f > 0 ? `，手续费 ${money(f)} 已单独记为支出` : ''))
-      return true
     }
 
     if (!aid) return fail('请选择账户')

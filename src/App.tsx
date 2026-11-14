@@ -12,7 +12,7 @@ import { AddBill } from './features/add-bill'
 import { Home } from './features/home'
 import { Search } from './features/search'
 import { PinLock, hasPin, setPinScope } from './features/lock'
-import { flushBookPatches, hasPendingBookPatches } from './features/book-pending'
+import { flushBookPatches, hasPendingBookPatches, subscribeBookPending, refreshBookPendingStatus, getBookPendingStatus, type BookPendingStatus } from './features/book-pending'
 import { CalendarPage } from './features/calendar'
 import { Assets } from './features/assets'
 import { Stats } from './features/stats'
@@ -36,6 +36,8 @@ export default function App() {
     return () => document.removeEventListener('visibilitychange', onVis)
   }, [])
   const [syncWarning, setSyncWarning] = useState('')
+  const [bookPending, setBookPending] = useState<BookPendingStatus>(getBookPendingStatus())
+  useEffect(() => subscribeBookPending(setBookPending), [])
   const multiTabHandle = useRef<ReturnType<typeof startMultiTab> | null>(null)
 
   /**
@@ -51,6 +53,7 @@ export default function App() {
     if (session.signal.aborted) return
     setUser(u)
     await loadBooks()
+    void refreshBookPendingStatus()
     if (session.signal.aborted) return
     startAutoSync({ sync: () => syncNow() })
     // 多标签页：别的标签改了数据就重新加载，避免本标签的旧状态把对方覆盖
@@ -168,6 +171,7 @@ export default function App() {
     stopAutoSync()
     try { await auth.logout() } catch { /* 忽略 */ }
     setCurrentUid(0)
+    void refreshBookPendingStatus()
     setSyncWarning('')
     await useLedger.persist.rehydrate()
     setUser(null)
@@ -176,11 +180,11 @@ export default function App() {
   if (user === undefined) return <div className="boot" role="status">加载中…</div>
   if (user && locked) return <PinLock onUnlock={() => setLocked(false)} />
   if (user === null) return <AuthScreen onAuthed={afterAuth} />
-  return <Shell user={user} onLogout={logout} syncWarning={syncWarning} dismissSyncWarning={() => setSyncWarning('')} />
+  return <Shell user={user} onLogout={logout} syncWarning={syncWarning} dismissSyncWarning={() => setSyncWarning('')} bookPending={bookPending} />
 }
 
 
-function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User; onLogout: () => void; syncWarning: string; dismissSyncWarning: () => void }) {
+function Shell({ user, onLogout, syncWarning, dismissSyncWarning, bookPending }: { user: User; onLogout: () => void; syncWarning: string; dismissSyncWarning: () => void; bookPending: BookPendingStatus }) {
   const [tab, setTab] = useState<Tab>('home')
   const [searchOpen, setSearchOpen] = useState(false)
   const [focusBillId, setFocusBillId] = useState<string | number | null>(null)
@@ -249,6 +253,13 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning }: { user: User
 
       <main className="main">
         {syncWarning && <div className="warn" role="alert">{syncWarning} <button className="link" onClick={() => { setTab('me'); dismissSyncWarning() }}>查看同步</button></div>}
+        {bookPending.pending > 0 && (
+          <div className="warn" role="status">
+            {bookPending.pending} 个账本修改待同步
+            {bookPending.conflicts > 0 ? `，${bookPending.conflicts} 项待核对` : ''}
+            {bookPending.error ? `：${bookPending.error}` : bookPending.nextRetryAt ? '，将自动重试' : bookPending.syncing ? '，正在同步' : '，等待同步'}
+          </div>
+        )}
         {searchOpen && (
           <Search onClose={() => setSearchOpen(false)}
             onPick={(id) => { setSearchOpen(false); setFocusBillId(id); setTab('home') }} />

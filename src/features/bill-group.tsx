@@ -45,14 +45,16 @@ export function BillGroupEditor({ groupId, billIds, onDone, notify }: {
     if (members.length < 2) { notify('请至少选择两笔账单'); return }
     if (!parentId) { notify('请选择分类'); return }
     if (existing) {
-      updateBillGroup(existing.billGroupId, {
+      const ok = updateBillGroup(existing.billGroupId, {
         billList: members, parentCategoryId: parentId,
         childCategoryId: childId || undefined, remark
       })
-      notify('账单组合已保存')
+      notify(ok ? '账单组合已保存' : '保存失败：账本只读，或成员不属于同一可写账本')
+      if (!ok) return
     } else {
       const ok = createBillGroup(members, { parentCategoryId: parentId, childCategoryId: childId || undefined, remark })
-      notify(ok ? '账单组合已创建' : '无法创建组合，请检查所选账单')
+      notify(ok ? '账单组合已创建' : '创建失败：账本只读，或成员重复、跨账本')
+      if (!ok) return
     }
     onDone()
   }
@@ -65,9 +67,9 @@ export function BillGroupEditor({ groupId, billIds, onDone, notify }: {
         {existing && (
           <button type="button" className="del" onClick={() => {
             if (!confirm('删除这个账单组合？组内账单仍会保留。')) return
-            dissolveBillGroup(existing.billGroupId)
-            notify('已删除组合')
-            onDone()
+            const ok = dissolveBillGroup(existing.billGroupId)
+            notify(ok ? '已删除组合' : '删除失败：当前账本只读')
+            if (ok) onDone()
           }}>删除</button>
         )}
         <button type="button" className="link" onClick={complete}>完成</button>

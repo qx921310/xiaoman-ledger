@@ -97,11 +97,11 @@ interface LedgerState {
   seeded: boolean
 
   addBill: (patch: Partial<Bill>) => Bill
-  deleteTransfer: (transferId: number | string) => void
-  addReimbursement: (patch: { billId: string | number; assetId: number; number: number; detail?: string }) => void
+  deleteTransfer: (transferId: number | string) => boolean
+  addReimbursement: (patch: { billId: string | number; assetId: number; number: number; detail?: string }) => boolean
   settleReimbursement: (reimbursementId: number) => boolean
-  deleteReimbursement: (reimbursementId: number) => void
-  endReimbursement: (billId: string | number) => void
+  deleteReimbursement: (reimbursementId: number) => boolean
+  endReimbursement: (billId: string | number) => boolean
   addCycle: (patch: Omit<Cycle, 'cycleId' | 'generated' | 'userId' | 'updateTime' | 'enabled'> & { enabled?: boolean }) => void
   deleteCycle: (cycleId: number | string) => void
   toggleCycle: (cycleId: number | string) => void
@@ -109,19 +109,19 @@ interface LedgerState {
   bindCycleBook: (cycleId: number | string, bookId: string | number) => void
   dedupeCycleBills: () => number
   runCycles: () => number
-  addLend: (patch: { type: 1 | 2 | 3 | 4; assetId: number; counterparty: string; number: number; interest?: number; repaymentAssetId?: number; time?: number; remark?: string; parentLendId?: number; bookId?: string | number }) => void
-  repayLend: (patch: { lendId: number; amount: number; repaymentAssetId?: number; time?: number }) => void
-  deleteLend: (lendId: number) => void
+  addLend: (patch: { type: 1 | 2 | 3 | 4; assetId: number; counterparty: string; number: number; interest?: number; repaymentAssetId?: number; time?: number; remark?: string; parentLendId?: number; bookId?: string | number }) => boolean
+  repayLend: (patch: { lendId: number; amount: number; repaymentAssetId?: number; time?: number }) => boolean
+  deleteLend: (lendId: number) => boolean
   addRefund: (patch: { billId: string | number; number: number; assetId?: number; baseAmount?: number; time?: number; remark?: string }) => boolean
-  deleteRefund: (refundId: number) => void
+  deleteRefund: (refundId: number) => boolean
   updateRefund: (refundId: number, patch: { number?: number; assetId?: number; baseAmount?: number }) => boolean
   setBudget: (budget: Budget) => void
   removeBudget: (month: string, categoryId: number) => void
   removeBudgetById: (budgetId: number) => void
-  deleteBill: (billId: string | number) => void
-  restoreBill: (bill: Bill) => void
-  duplicateBill: (billId: string | number) => void
-  setBillShares: (billId: string | number, shares: import('./types').BillShare[]) => void
+  deleteBill: (billId: string | number) => boolean
+  restoreBill: (bill: Bill) => boolean
+  duplicateBill: (billId: string | number) => boolean
+  setBillShares: (billId: string | number, shares: import('./types').BillShare[]) => boolean
   addSplitGroup: (patch: { name: string; members?: string[] }) => import('./types').SplitGroup
   updateSplitGroup: (splitGroupId: number, patch: { name?: string }) => void
   deleteSplitGroup: (splitGroupId: number) => void
@@ -145,9 +145,9 @@ interface LedgerState {
   /** 一木 BillSplitActivity：把一笔账单拆成多笔（底层是 BillGroup） */
   splitBill: (billId: string | number, parts: Array<{ num: number; parentCategoryId?: number; childCategoryId?: number; assetId?: number; remark?: string }>) => boolean
   /** 编辑账单组合（分类 / 子分类 / 备注 / 成员） */
-  updateBillGroup: (billGroupId: number, patch: Partial<import('./types').BillGroup>) => void
-  dissolveBillGroup: (billGroupId: number) => void
-  removeFromBillGroup: (billGroupId: number, billId: string | number) => void
+  updateBillGroup: (billGroupId: number, patch: Partial<import('./types').BillGroup>) => boolean
+  dissolveBillGroup: (billGroupId: number) => boolean
+  removeFromBillGroup: (billGroupId: number, billId: string | number) => boolean
   /** 账单关联：两两关联（一木 BillRelated） */
   addStockAsset: (patch: { name: string; code?: string; price?: number; num?: number; cost?: number; addBill?: boolean }) => import('./types').StockAsset
   deleteStockAsset: (stockAssetId: number) => void
@@ -181,10 +181,10 @@ interface LedgerState {
   /** 分期转成每期账单（记到信用卡账户上） */
   postInstalmentBills: (instalmentId: number) => number
   linkBills: (a: string | number, b: string | number) => boolean
-  unlinkBills: (relatedId: number) => void
-  updateBill: (billId: string | number, patch: Partial<Bill>) => void
+  unlinkBills: (relatedId: number) => boolean
+  updateBill: (billId: string | number, patch: Partial<Bill>) => boolean
   addTransfer: (patch: { transferId?: number | string; fromAssetId: number; toAssetId: number; cost: number; toCost?: number; serviceCharge?: number; time?: number; remark?: string; bookId?: string | number }) => Transfer
-  updateTransfer: (transferId: number | string, patch: Partial<Pick<Transfer, 'fromAssetId' | 'toAssetId' | 'cost' | 'toCost' | 'serviceCharge' | 'time' | 'remark'>>) => void
+  updateTransfer: (transferId: number | string, patch: Partial<Pick<Transfer, 'fromAssetId' | 'toAssetId' | 'cost' | 'toCost' | 'serviceCharge' | 'time' | 'remark'>>) => boolean
   addAsset: (patch: Partial<Asset>) => void
   deleteAsset: (assetId: number) => void
   updateAsset: (asset: Asset) => void
@@ -233,11 +233,16 @@ const BUSINESS_KEYS = [
 ] as const
 
 
-/** 命令层只读守卫：按目标账本的 role 判断，silent（历史只读）一律拒绝写入 */
-function bookWritable(bookId: string | number | undefined, books: Array<{ bookId?: number | string; role?: string }>) {
-  if (bookId == null || String(bookId) === '') return true
-  const hit = books.find((b) => String(b.bookId ?? '') === String(bookId))
-  return hit ? hit.role !== 'silent' : true
+/** 命令层只读守卫：按目标账本的 role 判断；未知归属不能拿来绕过 silent。 */
+function bookWritable(bookId: string | number | undefined, books: Array<{ bookId?: number | string; accountBookId?: number | string; role?: string }>) {
+  if (bookId == null || String(bookId) === '') {
+    // 兼容无只读账本的单用户旧数据；只要存在 silent，未归属记录必须先核对归属。
+    return !books.some((b) => b.role === 'silent')
+  }
+  const hit = books.find((b) => String(b.bookId ?? b.accountBookId ?? '') === String(bookId))
+  // 离线旧账本可能尚未带完整清单；只有已知可写、或清单中不存在 silent 时才兼容。
+  // 清单里存在只读账本时，未知归属一律先核对，不能借未知 ID 绕过只读。
+  return hit ? hit.role !== 'silent' : !books.some((b) => b.role === 'silent')
 }
 
 export const useLedger = create<LedgerState>()(
@@ -343,7 +348,7 @@ export const useLedger = create<LedgerState>()(
           if (!(cost > 0)) return '金额必须大于 0'
           const bookId = patch.bookId ?? (s.currentBookId === 0 ? undefined : s.currentBookId)
           if (bookId != null) {
-            const book = s.accountBooks.find((bk) => String(bk.bookId) === String(bookId))
+            const book = s.accountBooks.find((bk) => String(bk.bookId ?? bk.accountBookId) === String(bookId))
             if (book?.role === 'silent') return '当前账本只读，不能记账'
             const assetId = patch.assetId
             // -1 是一木的「无账户」哨兵，不算非法账户
@@ -431,53 +436,67 @@ export const useLedger = create<LedgerState>()(
       },
 
       // 删除同样要冲正：把该账单对账户的影响退回
-      deleteBill: (billId) => set((s) => {
+      deleteBill: (billId) => {
+        const s = get()
         const old = s.bills.find((b) => b.billId === billId)
-        if (!old) return {}
-        if (!bookWritable(old.bookId, s.accountBooks)) return {}
-        const tomb = { kind: 'bill', id: old.syncId ?? String(billId), bookId: old.bookId, updatedAt: NOW() }
-        const sign = s.parentCategories.find((p) => p.id === old.parentCategoryId)?.kind === 'income' ? 1 : -1
-        return {
-          bills: s.bills.filter((b) => b.billId !== billId),
-          assets: s.assets.map((a) => a.assetId === old.assetId
-            ? { ...a, assetNumber: +(a.assetNumber - sign * old.cost).toFixed(2), updateTime: NOW() }
-            : a),
-          tombstones: [...s.tombstones, tomb]
-        }
-      }),
+        if (!old || !bookWritable(old.bookId, s.accountBooks)) return false
+        set((state) => {
+          const current = state.bills.find((b) => b.billId === billId)
+          if (!current || !bookWritable(current.bookId, state.accountBooks)) return {}
+          const tomb = { kind: 'bill', id: current.syncId ?? String(billId), bookId: current.bookId, updatedAt: NOW() }
+          const sign = state.parentCategories.find((p) => p.id === current.parentCategoryId)?.kind === 'income' ? 1 : -1
+          return {
+            bills: state.bills.filter((b) => b.billId !== billId),
+            assets: state.assets.map((a) => a.assetId === current.assetId
+              ? { ...a, assetNumber: +(a.assetNumber - sign * current.cost).toFixed(2), updateTime: NOW() }
+              : a),
+            tombstones: [...state.tombstones, tomb]
+          }
+        })
+        return true
+      },
 
       // 撤销删除：把账单放回，并去掉对应墓碑
-      restoreBill: (bill) => set((s) => ({
-        bills: s.tombstones.some((t) => t.kind === 'bill' && t.id === (bill.syncId ?? String(bill.billId)))
-          ? [...s.bills, bill]
-          : s.bills.some((b) => b.billId === bill.billId) ? s.bills : [...s.bills, bill],
-        tombstones: s.tombstones.filter((t) => !(t.kind === 'bill' && t.id === (bill.syncId ?? String(bill.billId))))
-      })),
+      restoreBill: (bill) => {
+        const s = get()
+        if (!bookWritable(bill.bookId, s.accountBooks)) return false
+        set((state) => ({
+          bills: state.tombstones.some((t) => t.kind === 'bill' && t.id === (bill.syncId ?? String(bill.billId)))
+            ? [...state.bills, bill]
+            : state.bills.some((b) => b.billId === bill.billId) ? state.bills : [...state.bills, bill],
+          tombstones: state.tombstones.filter((t) => !(t.kind === 'bill' && t.id === (bill.syncId ?? String(bill.billId))))
+        }))
+        return true
+      },
 
       // 复制一笔：内容照搬，时间取当下，编号重新生成
-      duplicateBill: (billId) => set((s) => {
+      duplicateBill: (billId) => {
+        const s = get()
         const old = s.bills.find((b) => b.billId === billId)
-        if (!old) return {}
-        const { syncId, billId: newId } = newBillIdentity()
-        const copy: Bill = {
-          ...old,
-          billId: newId,
-          syncId,
-          displayId: undefined,
-          memberNo: undefined,
-          sequenceNo: undefined,
-          time: NOW(),
-          updateTime: NOW(),
-          // 复制出来的账单不属于任何周期规则，否则会被周期去重当成重复账单删掉
-          cycleId: undefined
-        }
-        return { bills: [...s.bills, copy] }
-      }),
+        if (!old || !bookWritable(old.bookId, s.accountBooks)) return false
+        set((state) => {
+          const { syncId, billId: newId } = newBillIdentity()
+          const copy: Bill = {
+            ...old,
+            billId: newId,
+            syncId,
+            displayId: undefined,
+            memberNo: undefined,
+            sequenceNo: undefined,
+            time: NOW(),
+            updateTime: NOW(),
+            cycleId: undefined
+          }
+          return { bills: [...state.bills, copy] }
+        })
+        return true
+      },
 
       // AA 分摊：只改「谁承担多少」，不影响账户余额与统计总额
       // AA 群组（一木模型）：群组 → 成员 → 支出，分摊明细存账单 billShareInfo
       addSplitGroup: (patch) => {
         const s = get()
+        if (!bookWritable(s.currentBookId, s.accountBooks)) throw new Error('当前账本只读，不能创建 AA 群组')
         let splitGroupId = Date.now()
         while (s.splitGroups.some((g) => g.splitGroupId === splitGroupId)) splitGroupId++
         const group: import('./types').SplitGroup = {
@@ -492,21 +511,29 @@ export const useLedger = create<LedgerState>()(
         return group
       },
 
-      updateSplitGroup: (splitGroupId, patch) => set((s) => ({
-        splitGroups: s.splitGroups.map((g) => g.splitGroupId === splitGroupId ? { ...g, ...patch, updateTime: NOW() } : g)
-      })),
+      updateSplitGroup: (splitGroupId, patch) => set((s) => {
+        const group = s.splitGroups.find((g) => g.splitGroupId === splitGroupId)
+        if (!group || !bookWritable(group.bookId, s.accountBooks)) return {}
+        return { splitGroups: s.splitGroups.map((g) => g.splitGroupId === splitGroupId ? { ...g, ...patch, updateTime: NOW() } : g) }
+      }),
 
-      deleteSplitGroup: (splitGroupId) => set((s) => ({
-        splitGroups: s.splitGroups.filter((g) => g.splitGroupId !== splitGroupId),
-        splitMembers: s.splitMembers.filter((m) => m.splitGroupId !== splitGroupId),
-        tombstones: [...s.tombstones,
-          { kind: 'splitGroup', id: String(splitGroupId), bookId: s.splitGroups.find((g) => g.splitGroupId === splitGroupId)?.bookId, updatedAt: NOW() },
-          ...s.splitMembers.filter((m) => m.splitGroupId === splitGroupId)
-            .map((m) => ({ kind: 'splitMember', id: String(m.splitMemberId), bookId: m.bookId, updatedAt: NOW() }))]
-      })),
+      deleteSplitGroup: (splitGroupId) => set((s) => {
+        const group = s.splitGroups.find((g) => g.splitGroupId === splitGroupId)
+        if (!group || !bookWritable(group.bookId, s.accountBooks)) return {}
+        return {
+          splitGroups: s.splitGroups.filter((g) => g.splitGroupId !== splitGroupId),
+          splitMembers: s.splitMembers.filter((m) => m.splitGroupId !== splitGroupId),
+          tombstones: [...s.tombstones,
+            { kind: 'splitGroup', id: String(splitGroupId), bookId: group.bookId, updatedAt: NOW() },
+            ...s.splitMembers.filter((m) => m.splitGroupId === splitGroupId)
+              .map((m) => ({ kind: 'splitMember', id: String(m.splitMemberId), bookId: m.bookId ?? group.bookId, updatedAt: NOW() }))]
+        }
+      }),
 
       addSplitMember: (splitGroupId, name, self) => {
         const s = get()
+        const group = s.splitGroups.find((g) => g.splitGroupId === splitGroupId)
+        if (!group || !bookWritable(group.bookId, s.accountBooks)) throw new Error('当前账本只读，不能修改 AA 成员')
         let splitMemberId = Date.now()
         while (s.splitMembers.some((m) => m.splitMemberId === splitMemberId)) splitMemberId++
         const member: import('./types').SplitMember = {
@@ -517,20 +544,29 @@ export const useLedger = create<LedgerState>()(
         return member
       },
 
-      updateSplitMember: (splitMemberId, patch) => set((s) => ({
-        splitMembers: s.splitMembers.map((m) => m.splitMemberId === splitMemberId ? { ...m, ...patch, updateTime: NOW() } : m)
-      })),
+      updateSplitMember: (splitMemberId, patch) => set((s) => {
+        const member = s.splitMembers.find((m) => m.splitMemberId === splitMemberId)
+        const group = s.splitGroups.find((g) => g.splitGroupId === member?.splitGroupId)
+        if (!group || !bookWritable(group.bookId, s.accountBooks)) return {}
+        return { splitMembers: s.splitMembers.map((m) => m.splitMemberId === splitMemberId ? { ...m, ...patch, updateTime: NOW() } : m) }
+      }),
 
-      deleteSplitMember: (splitMemberId) => set((s) => ({
-        splitMembers: s.splitMembers.filter((m) => m.splitMemberId !== splitMemberId),
-        tombstones: [...s.tombstones, { kind: 'splitMember', id: String(splitMemberId), bookId: s.splitMembers.find((m) => m.splitMemberId === splitMemberId)?.bookId, updatedAt: NOW() }]
-      })),
+      deleteSplitMember: (splitMemberId) => set((s) => {
+        const member = s.splitMembers.find((m) => m.splitMemberId === splitMemberId)
+        const group = s.splitGroups.find((g) => g.splitGroupId === member?.splitGroupId)
+        if (!group || !bookWritable(group.bookId, s.accountBooks)) return {}
+        return {
+          splitMembers: s.splitMembers.filter((m) => m.splitMemberId !== splitMemberId),
+          tombstones: [...s.tombstones, { kind: 'splitMember', id: String(splitMemberId), bookId: member?.bookId ?? group.bookId, updatedAt: NOW() }]
+        }
+      }),
 
       applySplit: (billId, splitGroupId, splitType, values, payerMemberId) => {
         const s = get()
         const bill = s.bills.find((b) => b.billId === billId)
         const members = s.splitMembers.filter((m) => m.splitGroupId === splitGroupId)
         if (!bill || !members.length) return false
+        if (!bookWritable(bill.bookId, s.accountBooks)) return false
         const { shares, amounts } = splitAmounts(bill.cost, members, splitType, values ?? {})
         const sum = members.reduce((acc, m) => acc + (amounts[m.splitMemberId] ?? 0), 0)
         // 精确到分：合计与账单金额必须完全一致
@@ -558,6 +594,7 @@ export const useLedger = create<LedgerState>()(
       addSplitExpense: (patch) => {
         const s = get()
         const members = s.splitMembers.filter((m) => m.splitGroupId === patch.splitGroupId)
+        if (!bookWritable(s.currentBookId, s.accountBooks)) return false
         const amount = +Number(patch.amount).toFixed(2)
         if (!(amount > 0)) return false
         const picked = patch.participants.filter((p) => members.some((m) => m.splitMemberId === p.memberId))
@@ -595,31 +632,47 @@ export const useLedger = create<LedgerState>()(
       },
 
       /** 删除 AA 分账记录 */
-      deleteSplitExpense: (splitExpenseId) => set((s) => ({
-        splitExpenses: s.splitExpenses.filter((x) => x.splitExpenseId !== splitExpenseId),
-        tombstones: [...s.tombstones, { kind: 'splitExpense', id: String(splitExpenseId),
-          bookId: s.splitExpenses.find((x) => x.splitExpenseId === splitExpenseId)?.bookId, updatedAt: NOW() }]
-      })),
+      deleteSplitExpense: (splitExpenseId) => set((s) => {
+        const expense = s.splitExpenses.find((x) => x.splitExpenseId === splitExpenseId)
+        if (!expense || !bookWritable(expense.bookId, s.accountBooks)) return {}
+        return {
+          splitExpenses: s.splitExpenses.filter((x) => x.splitExpenseId !== splitExpenseId),
+          tombstones: [...s.tombstones, { kind: 'splitExpense', id: String(splitExpenseId),
+            bookId: expense.bookId, updatedAt: NOW() }]
+        }
+      }),
 
       /** 账单图片页：按来源更新附件（账单/转账/借贷三渠道） */
-      setBillFiles: (billId, files) => set((s) => ({
-        bills: s.bills.map((b) => String(b.billId) === String(billId) ? { ...b, files, updateTime: NOW() } : b)
-      })),
-      setTransferFiles: (transferId, files) => set((s) => ({
-        transfers: s.transfers.map((t) => String(t.transferId) === String(transferId) ? { ...t, files, updateTime: NOW() } : t)
-      })),
-      setLendFiles: (lendId, files) => set((s) => ({
-        lends: s.lends.map((l) => String(l.lendId) === String(lendId) ? { ...l, files, updateTime: NOW() } : l)
-      })),
+      setBillFiles: (billId, files) => set((s) => {
+        const bill = s.bills.find((b) => String(b.billId) === String(billId))
+        if (!bill || !bookWritable(bill.bookId, s.accountBooks)) return {}
+        return { bills: s.bills.map((b) => String(b.billId) === String(billId) ? { ...b, files, updateTime: NOW() } : b) }
+      }),
+      setTransferFiles: (transferId, files) => set((s) => {
+        const transfer = s.transfers.find((t) => String(t.transferId) === String(transferId))
+        if (!transfer || !bookWritable(transfer.bookId, s.accountBooks)) return {}
+        return { transfers: s.transfers.map((t) => String(t.transferId) === String(transferId) ? { ...t, files, updateTime: NOW() } : t) }
+      }),
+      setLendFiles: (lendId, files) => set((s) => {
+        const lend = s.lends.find((l) => String(l.lendId) === String(lendId))
+        if (!lend || !bookWritable(lend.bookId, s.accountBooks)) return {}
+        return { lends: s.lends.map((l) => String(l.lendId) === String(lendId) ? { ...l, files, updateTime: NOW() } : l) }
+      }),
 
-      settleSplit: (splitExpenseId, settlement) => set((s) => ({
-        splitExpenses: s.splitExpenses.map((x) => x.splitExpenseId === splitExpenseId
-          ? { ...x, settlement, updateTime: NOW() } : x)
-      })),
+      settleSplit: (splitExpenseId, settlement) => set((s) => {
+        const expense = s.splitExpenses.find((x) => x.splitExpenseId === splitExpenseId)
+        if (!expense || !bookWritable(expense.bookId, s.accountBooks)) return {}
+        return {
+          splitExpenses: s.splitExpenses.map((x) => x.splitExpenseId === splitExpenseId
+            ? { ...x, settlement, updateTime: NOW() } : x)
+        }
+      }),
 
       // 定期存款：一木的「累加至账户余额」就是直接把账户余额加上去（调整，不是流水），
       // 删除时可选「减少账户余额」扣回。用 openingBalance 作为真值，assetNumber 由它派生。
       addAssetFlow: (patch) => set((s) => {
+        const bookId = patch.bookId ?? (s.currentBookId === 0 ? undefined : s.currentBookId)
+        if (!bookWritable(bookId, s.accountBooks)) return {}
         // 用 UUID 做身份：两台设备同一毫秒各自新增也不会撞号
         let flowId: number | string = globalThis.crypto?.randomUUID?.() ?? Date.now()
         while (s.assetFlows.some((f) => String(f.flowId) === String(flowId))) flowId = `f-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -627,7 +680,7 @@ export const useLedger = create<LedgerState>()(
           assetFlows: [...s.assetFlows, {
             flowId, assetId: patch.assetId, delta: Number(patch.delta) || 0,
             reason: patch.reason, time: patch.time ?? NOW(),
-            bookId: patch.bookId ?? (s.currentBookId === 0 ? undefined : s.currentBookId),
+            bookId,
             ownerId: s.userId, updateTime: NOW()
           }]
         }
@@ -635,6 +688,7 @@ export const useLedger = create<LedgerState>()(
 
       addFixedDeposit: (patch) => {
         const st = get()
+        if (!bookWritable(st.currentBookId, st.accountBooks)) return
         let depositId = Date.now()
         while (st.fixedDeposits.some((d) => d.depositId === depositId)) depositId++
         const amt = Number(patch.amount) || 0
@@ -665,6 +719,7 @@ export const useLedger = create<LedgerState>()(
       deleteFixedDeposit: (depositId, options) => {
         const st = get()
         const rec = st.fixedDeposits.find((d) => d.depositId === depositId)
+        if (!rec || !bookWritable(rec.bookId, st.accountBooks)) return
         // 一木：删除时勾选「减少账户余额」才扣回；不勾选则余额保持
         const reduce = !!options?.reduceAsset && rec?.toAsset && rec?.assetId != null
         set((s) => ({
@@ -736,6 +791,7 @@ export const useLedger = create<LedgerState>()(
 
       addStockAsset: (patch) => {
         const s = get()
+        if (!bookWritable(s.currentBookId, s.accountBooks)) throw new Error('当前账本只读，不能新增持仓')
         let stockAssetId = Date.now()
         while (s.stockAssets.some((x) => x.stockAssetId === stockAssetId)) stockAssetId++
         const rec: import('./types').StockAsset = {
@@ -767,7 +823,7 @@ export const useLedger = create<LedgerState>()(
       tradeStock: (stockAssetId, type, num, amount, fee = 0, time) => {
         const s = get()
         const rec = s.stockAssets.find((x) => x.stockAssetId === stockAssetId)
-        if (!rec || !(num > 0)) return false
+        if (!rec || !(num > 0) || !bookWritable(rec.bookId, s.accountBooks)) return false
         const h = { num: rec.primeNum, cost: rec.primeCost, realized: rec.historyIncome, lots: rec.lots }
         const method = rec.costMethod ?? 0
         const next = type === 1 ? applyBuyWithLot(h, num, amount, fee) : applySellByMethod(h, method, num, amount, fee)
@@ -958,6 +1014,7 @@ export const useLedger = create<LedgerState>()(
         const picked = s.bills.filter((b) => ids.includes(key(b)))
         const bookIds = new Set(picked.map((b) => String(b.bookId ?? '')))
         if (bookIds.size > 1) return false
+        if (picked.some((b) => !bookWritable(b.bookId, s.accountBooks))) return false
         // 已经在别的组里的账单不能再入组
         if (ids.some((id) => s.billGroups.some((g) => g.billList.map(String).includes(id)))) return false
         let billGroupId = Date.now()
@@ -977,9 +1034,16 @@ export const useLedger = create<LedgerState>()(
         return true
       },
 
-      dissolveBillGroup: (billGroupId) => set((s) => ({
-        billGroups: s.billGroups.filter((g) => g.billGroupId !== billGroupId)
-      })),
+      dissolveBillGroup: (billGroupId) => {
+        const s = get()
+        const group = s.billGroups.find((g) => g.billGroupId === billGroupId)
+        if (!group) return false
+        const members = s.bills.filter((b) => group.billList.map(String).includes(String(b.billId)))
+        if (!bookWritable(group.bookId, s.accountBooks)
+          || members.some((b) => !bookWritable(b.bookId, s.accountBooks))) return false
+        set((state) => ({ billGroups: state.billGroups.filter((g) => g.billGroupId !== billGroupId) }))
+        return true
+      },
 
       /**
        * 一木 BillSplitActivity：把一笔账单拆成多笔（底层用 BillGroup 关联）。
@@ -1108,13 +1172,16 @@ export const useLedger = create<LedgerState>()(
         const s = get()
         const group = (s.billGroups ?? []).find((g) => g.billGroupId === billGroupId)
         if (!group) return false
-        { const anchor = s.bills.find((b) => String(b.billId) === String(group.firstBillId))
-          if (anchor && !bookWritable(anchor.bookId, s.accountBooks)) return false }
+        const currentMembers = s.bills.filter((b) => group.billList.map(String).includes(String(b.billId)))
+        if (!bookWritable(group.bookId, s.accountBooks)
+          || currentMembers.some((b) => !bookWritable(b.bookId, s.accountBooks))) return false
+        if (patch.bookId !== undefined && String(patch.bookId ?? '') !== String(group.bookId ?? '')) return false
         if (patch.billList) {
           const ids = patch.billList.map(String)
           if (new Set(ids).size !== ids.length) return false
           const picked = s.bills.filter((b) => ids.includes(String(b.billId)))
           if (picked.length !== ids.length) return false
+          if (picked.some((b) => !bookWritable(b.bookId, s.accountBooks))) return false
           // 同账本约束（与创建时一致）：以组合首个账单的账本为准
           const bookOf = (id: string | number) => {
             const b = s.bills.find((x) => String(x.billId) === String(id))
@@ -1145,19 +1212,31 @@ export const useLedger = create<LedgerState>()(
         return true
       },
 
-      removeFromBillGroup: (billGroupId, billId) => set((s) => ({
-        billGroups: s.billGroups
-          .map((g) => g.billGroupId === billGroupId
-            ? { ...g, billList: g.billList.filter((x) => String(x) !== String(billId)) } : g)
-          .filter((g) => g.billList.length >= 2)
-      })),
+      removeFromBillGroup: (billGroupId, billId) => {
+        const s = get()
+        const group = s.billGroups.find((g) => g.billGroupId === billGroupId)
+        if (!group) return false
+        const members = s.bills.filter((b) => group.billList.map(String).includes(String(b.billId)))
+        if (!bookWritable(group.bookId, s.accountBooks)
+          || members.some((b) => !bookWritable(b.bookId, s.accountBooks))) return false
+        set((state) => ({
+          billGroups: state.billGroups
+            .map((g) => g.billGroupId === billGroupId
+              ? { ...g, billList: g.billList.filter((x) => String(x) !== String(billId)), updateTime: NOW() } : g)
+            .filter((g) => g.billList.length >= 2)
+        }))
+        return true
+      },
 
       // 账单关联：同一对账单只保留一条关联，且不能自关联
       linkBills: (a, b) => {
         const s = get()
         const one = String(a), two = String(b)
-        if (!one || !two || one === two) return false
-        if (!s.bills.some((x) => String(x.billId) === one) || !s.bills.some((x) => String(x.billId) === two)) return false
+        if (one === two) return false
+        const first = s.bills.find((x) => String(x.billId) === one)
+        const second = s.bills.find((x) => String(x.billId) === two)
+        if (!first || !second) return false
+        if (!bookWritable(first.bookId, s.accountBooks) || !bookWritable(second.bookId, s.accountBooks)) return false
         const exists = s.billRelated.some((r) =>
           (String(r.oneBillId) === one && String(r.twoBillId) === two)
           || (String(r.oneBillId) === two && String(r.twoBillId) === one))
@@ -1172,25 +1251,36 @@ export const useLedger = create<LedgerState>()(
         return true
       },
 
-      unlinkBills: (relatedId) => set((s) => ({
-        billRelated: s.billRelated.filter((r) => r.relatedId !== relatedId),
-        tombstones: [...s.tombstones, { kind: 'billRelated', id: String(relatedId), bookId: s.billRelated.find((r) => r.relatedId === relatedId)?.bookId, updatedAt: NOW() }]
-      })),
+      unlinkBills: (relatedId) => {
+        const s = get()
+        const related = s.billRelated.find((r) => r.relatedId === relatedId)
+        if (!related || !bookWritable(related.bookId, s.accountBooks)) return false
+        set((state) => ({
+          billRelated: state.billRelated.filter((r) => r.relatedId !== relatedId),
+          tombstones: [...state.tombstones, { kind: 'billRelated', id: String(relatedId), bookId: related.bookId, updatedAt: NOW() }]
+        }))
+        return true
+      },
 
-      setBillShares: (billId, shares) => set((s) => ({
-        bills: s.bills.map((b) => b.billId === billId
-          ? { ...b, billShares: shares.length ? shares : undefined, updateTime: NOW() }
-          : b)
-      })),
+      setBillShares: (billId, shares) => {
+        const s = get()
+        const bill = s.bills.find((b) => b.billId === billId)
+        if (!bill || !bookWritable(bill.bookId, s.accountBooks)) return false
+        set((state) => ({
+          bills: state.bills.map((b) => b.billId === billId
+            ? { ...b, billShares: shares.length ? shares : undefined, updateTime: NOW() }
+            : b)
+        }))
+        return true
+      },
 
       // 改单：先把旧账单对账户的影响撤回，再按新值重新记一次
       updateBill: (billId, patch) => {
         const s = get()
         const old = s.bills.find((b) => b.billId === billId)
-        if (!old) return
-        if (!bookWritable(old.bookId, s.accountBooks)) return
-        const refunded = s.refunds.filter((r) => r.billId === billId).reduce((sum, r) => sum + (r.baseAmount ?? 0), 0)
-        if (patch.cost != null && (!Number.isFinite(patch.cost) || patch.cost < refunded)) return
+        if (!old || !bookWritable(old.bookId, s.accountBooks)) return false
+        const refunded = s.refunds.filter((r) => String(r.billId) === String(billId)).reduce((sum, r) => sum + (r.baseAmount ?? 0), 0)
+        if (patch.cost != null && (!Number.isFinite(patch.cost) || patch.cost < refunded)) return false
         const deltaOf = (b: Bill) =>
           (s.parentCategories.find((p) => p.id === b.parentCategoryId)?.kind === 'income' ? 1 : -1) * b.cost
 
@@ -1225,6 +1315,7 @@ export const useLedger = create<LedgerState>()(
           : a)
 
         set({ bills: s.bills.map((b) => (b.billId === billId ? next : b)), assets })
+        return true
       },
 
       // 转账：本金不计收支；手续费若 >0 则单独生成一条支出账单（与原产品一致）
@@ -1241,6 +1332,8 @@ export const useLedger = create<LedgerState>()(
         const fee = Number(patch.serviceCharge ?? 0)
         const time = patch.time ?? NOW()
         const toCost = Number(patch.toCost ?? patch.cost)
+        const bookId = patch.bookId ?? (s.currentBookId === 0 ? undefined : s.currentBookId)
+        if (!bookWritable(bookId, s.accountBooks)) throw new Error('当前账本只读或不存在，不能新增转账')
 
         // 1) 本金：转出方 -，转入方 +
         set((st) => ({
@@ -1271,7 +1364,6 @@ export const useLedger = create<LedgerState>()(
 
         const t: Transfer = {
           transferId,
-          // 账本作用域：优先用显式传入（模板/调用方），否则当前账本；0 视为未归属
           bookId: patch.bookId ?? (s.currentBookId === 0 ? undefined : s.currentBookId),
           fromAssetId: patch.fromAssetId,
           toAssetId: patch.toAssetId,
@@ -1293,7 +1385,9 @@ export const useLedger = create<LedgerState>()(
       updateTransfer: (transferId, patch) => {
         const s = get()
         const old = s.transfers.find((t) => t.transferId === transferId)
-        if (!old) return
+        if (!old || !bookWritable(old.bookId, s.accountBooks)) return false
+        const targetBook = old.bookId ?? (s.currentBookId === 0 ? undefined : s.currentBookId)
+        if (!bookWritable(targetBook, s.accountBooks)) return false
         const feeBill = old.billId ? s.bills.find((b) => b.billId === old.billId) : undefined
         const feeBack = feeBill ? feeBill.cost : 0
 
@@ -1320,8 +1414,10 @@ export const useLedger = create<LedgerState>()(
           toCost: patch.toCost ?? old.toCost ?? old.cost,
           serviceCharge: patch.serviceCharge ?? old.serviceCharge,
           time: patch.time ?? old.time,
-          remark: patch.remark ?? old.remark
+          remark: patch.remark ?? old.remark,
+          bookId: targetBook
         })
+        return true
       },
 
       // 删除账户：同时写墓碑，避免下次同步又被拉回来
@@ -1358,42 +1454,46 @@ export const useLedger = create<LedgerState>()(
       }),
 
       // 删转账：转出方退回本金+手续费，转入方扣回本金
-      deleteTransfer: (transferId) => set((s) => {
+      deleteTransfer: (transferId) => {
+        const s = get()
         const t = s.transfers.find((x) => x.transferId === transferId)
-        if (!t) return {}
-        const feeBill = s.bills.find(b => b.billId === t.billId)
-        const feeIdentity = feeBill?.syncId ?? String(t.billId)
-        // 撤销：转出方退回本金+手续费，转入方扣回到账金额；连带删掉手续费账单
-        const back = t.cost + t.serviceCharge
-        const toBack = t.toCost ?? t.cost
-        return {
-          transfers: s.transfers.filter((x) => x.transferId !== transferId),
-          bills: t.billId ? s.bills.filter((b) => b.billId !== t.billId) : s.bills,
-          // 转账本身和它的手续费账单都要写墓碑，否则下次拉取会被同步回来
-          tombstones: [
-            ...s.tombstones.filter((x) => !(t.billId && x.kind === 'bill' && x.id === feeIdentity)
-              && !(x.kind === 'transfer' && x.id === String(transferId))),
-            { kind: 'transfer', id: String(transferId), bookId: feeBill?.bookId, updatedAt: NOW() },
-            ...(t.billId ? [{ kind: 'bill', id: feeIdentity, bookId: feeBill?.bookId, updatedAt: NOW() }] : [])
-          ],
-          assets: s.assets.map((a) => {
-            if (a.assetId === t.fromAssetId) return { ...a, assetNumber: +(a.assetNumber + back).toFixed(2), updateTime: NOW() }
-            if (a.assetId === t.toAssetId) return { ...a, assetNumber: +(a.assetNumber - toBack).toFixed(2), updateTime: NOW() }
-            return a
-          })
-        }
-      }),
+        if (!t || !bookWritable(t.bookId, s.accountBooks)) return false
+        set((state) => {
+          const feeBill = state.bills.find(b => b.billId === t.billId)
+          const feeIdentity = feeBill?.syncId ?? String(t.billId)
+          const back = t.cost + t.serviceCharge
+          const toBack = t.toCost ?? t.cost
+          return {
+            transfers: state.transfers.filter((x) => x.transferId !== transferId),
+            bills: t.billId ? state.bills.filter((b) => b.billId !== t.billId) : state.bills,
+            tombstones: [
+              ...state.tombstones.filter((x) => !(t.billId && x.kind === 'bill' && x.id === feeIdentity)
+                && !(x.kind === 'transfer' && x.id === String(transferId))),
+              { kind: 'transfer', id: String(transferId), bookId: t.bookId ?? feeBill?.bookId, updatedAt: NOW() },
+              ...(t.billId ? [{ kind: 'bill', id: feeIdentity, bookId: feeBill?.bookId, updatedAt: NOW() }] : [])
+            ],
+            assets: state.assets.map((a) => {
+              if (a.assetId === t.fromAssetId) return { ...a, assetNumber: +(a.assetNumber + back).toFixed(2), updateTime: NOW() }
+              if (a.assetId === t.toAssetId) return { ...a, assetNumber: +(a.assetNumber - toBack).toFixed(2), updateTime: NOW() }
+              return a
+            })
+          }
+        })
+        return true
+      },
 
       // 登记报销：只落记录，钱还没到；确认到账时才进报销账户
-      addReimbursement: ({ billId, assetId, number: rawNumber, detail }) => set((s) => {
+      addReimbursement: ({ billId, assetId, number: rawNumber, detail }) => {
+        const s = get()
         const bill = s.bills.find((b) => b.billId === billId)
         const account = s.assets.find((a) => a.assetId === assetId)
-        if (!bill || !account || !Number.isFinite(rawNumber) || rawNumber <= 0) return {}
+        if (!bill || !account || !Number.isFinite(rawNumber) || rawNumber <= 0) return false
+        if (!bookWritable(bill.bookId, s.accountBooks)) return false
         // 报销金额一律记本位币（与账单 cost 同口径）；入账到外币账户时才折算
         const number = +rawNumber.toFixed(2)
         // 多次报销：累计金额不得超过原账单
         const claimed = s.reimbursements.filter((r) => r.billId === billId).reduce((sum, r) => sum + (Number(r.number) || 0), 0)
-        if (number > +(bill.cost - claimed).toFixed(2)) return {}
+        if (number > +(bill.cost - claimed).toFixed(2)) return false
         // 同一毫秒内连续登记会撞 id，这里顺延保证唯一
         let rid = Date.now()
         while (s.reimbursements.some((r) => r.reimbursementId === rid)) rid++
@@ -1403,18 +1503,21 @@ export const useLedger = create<LedgerState>()(
           detail: detail ?? '', status: 'pending', userId: s.userId, updateTime: NOW()
         }
         const total = claimed + rec.number
-        return {
-          reimbursements: [rec, ...s.reimbursements],
-          bills: s.bills.map((b) => b.billId === billId
+        set((state) => ({
+          reimbursements: [rec, ...state.reimbursements],
+          bills: state.bills.map((b) => b.billId === billId
             ? { ...b, isReimbursement: 1, reimbursementNum: +total.toFixed(2), updateTime: NOW() } : b)
-        }
-      }),
+        }))
+        return true
+      },
 
       settleReimbursement: (reimbursementId) => {
         const before = get()
         const pending = before.reimbursements.find((r) => r.reimbursementId === reimbursementId)
         const account = before.assets.find((a) => a.assetId === pending?.assetId)
         if (!pending || pending.status === 'done' || !account || !hasCurrencyRate(account.currency, before.currencies, before.defaultCurrency)) return false
+        const bill = before.bills.find((b) => String(b.billId) === String(pending.billId))
+        if (!bookWritable(pending.bookId ?? bill?.bookId, before.accountBooks)) return false
         const rate = !account.currency || account.currency === before.defaultCurrency ? 1
           : before.currencies.find((c) => c.code === account.currency)!.rate
         set((s) => {
@@ -1442,27 +1545,41 @@ export const useLedger = create<LedgerState>()(
       },
 
       // 结束报销：账单标记结束，同时把待报销记录收口，避免待办列表残留
-      endReimbursement: (billId) => set((s) => ({
-        bills: s.bills.map((b) => b.billId === billId ? { ...b, reimbursementEnd: true, updateTime: NOW() } : b),
-        reimbursements: s.reimbursements.map((r) => r.billId === billId && r.status === 'pending'
-          ? { ...r, status: 'ended' as const, updateTime: NOW() } : r)
-      })),
+      endReimbursement: (billId) => {
+        const s = get()
+        const bill = s.bills.find((b) => b.billId === billId)
+        if (!bill || !bookWritable(bill.bookId, s.accountBooks)) return false
+        set((state) => ({
+          bills: state.bills.map((b) => b.billId === billId ? { ...b, reimbursementEnd: true, updateTime: NOW() } : b),
+          reimbursements: state.reimbursements.map((r) => r.billId === billId && r.status === 'pending'
+            ? { ...r, status: 'ended' as const, updateTime: NOW() } : r)
+        }))
+        return true
+      },
 
-      deleteReimbursement: (reimbursementId) => set((s) => {
+      deleteReimbursement: (reimbursementId) => {
+        const s = get()
         const rec = s.reimbursements.find((r) => r.reimbursementId === reimbursementId)
-        if (!rec) return {}
-        const refundBack = rec.status === 'done' ? rec.number : 0
-        const rest = s.reimbursements.filter((r) => r.reimbursementId !== reimbursementId && r.billId === rec.billId)
-        const remainTotal = +rest.reduce((sum, r) => sum + (Number(r.number) || 0), 0).toFixed(2)
-        return {
-          reimbursements: s.reimbursements.filter((r) => r.reimbursementId !== reimbursementId),
-          assets: refundBack ? s.assets.map((a) => a.assetId === rec.assetId
-            ? { ...a, assetNumber: +(a.assetNumber - refundBack).toFixed(2), updateTime: NOW() } : a) : s.assets,
-          bills: s.bills.map((b) => b.billId === rec.billId
-            ? { ...b, isReimbursement: remainTotal > 0 ? 1 : 0, reimbursementNum: remainTotal, updateTime: NOW() } : b),
-          tombstones: [...s.tombstones, { kind: 'reimbursement', id: String(reimbursementId), updatedAt: NOW() }]
-        }
-      }),
+        if (!rec) return false
+        const bill = s.bills.find((b) => String(b.billId) === String(rec.billId))
+        if (!bookWritable(rec.bookId ?? bill?.bookId, s.accountBooks)) return false
+        set((state) => {
+          const current = state.reimbursements.find((r) => r.reimbursementId === reimbursementId)
+          if (!current) return {}
+          const refundBack = current.status === 'done' ? current.number : 0
+          const rest = state.reimbursements.filter((r) => r.reimbursementId !== reimbursementId && r.billId === current.billId)
+          const remainTotal = +rest.reduce((sum, r) => sum + (Number(r.number) || 0), 0).toFixed(2)
+          return {
+            reimbursements: state.reimbursements.filter((r) => r.reimbursementId !== reimbursementId),
+            assets: refundBack ? state.assets.map((a) => a.assetId === current.assetId
+              ? { ...a, assetNumber: +(a.assetNumber - refundBack).toFixed(2), updateTime: NOW() } : a) : state.assets,
+            bills: state.bills.map((b) => b.billId === current.billId
+              ? { ...b, isReimbursement: remainTotal > 0 ? 1 : 0, reimbursementNum: remainTotal, updateTime: NOW() } : b),
+            tombstones: [...state.tombstones, { kind: 'reimbursement', id: String(reimbursementId), bookId: current.bookId ?? bill?.bookId, updatedAt: NOW() }]
+          }
+        })
+        return true
+      },
 
       addCycle: (patch) => set((s) => ({
         cycles: [...s.cycles, {
@@ -1551,47 +1668,46 @@ export const useLedger = create<LedgerState>()(
       },
 
       // 借出 -、借入 +、收回 +、还款 -；删除则反向冲正
-      addLend: ({ type, assetId, counterparty, number, interest, repaymentAssetId, time, remark, parentLendId, bookId }) => set((s) => {
-        const amt = Number(number) || 0
-        if (amt <= 0 || !assetId) return {}
-        // 借出/借入走 assetId；收回/还款优先走 repaymentAssetId
-        const cashAsset = (type === 2 || type === 4) && repaymentAssetId ? repaymentAssetId : assetId
-        const sign = type === 1 || type === 4 ? -1 : 1
-        // 同一毫秒内连续登记会撞 id，顺延保证唯一（父记录与还款记录常在同一次点击内创建）
-        let lendId = Date.now()
-        while (s.lends.some((l) => l.lendId === lendId)) lendId++
-        // 有父记录时必须继承父记录账本；调用方漏传也不能漂移到当前账本
-        const parentBook = parentLendId != null ? s.lends.find((l) => l.lendId === parentLendId)?.bookId : undefined
-        const rec: Lend = {
-          lendId,
-          // 借贷参与余额计算，必须带账本；还款记录继承父记录的账本，不随当前账本漂移
-          bookId: bookId !== undefined ? bookId
+      addLend: ({ type, assetId, counterparty, number, interest, repaymentAssetId, time, remark, parentLendId, bookId }) => {
+        let written = false
+        set((s) => {
+          const amt = Number(number) || 0
+          const parentBook = parentLendId != null ? s.lends.find((l) => l.lendId === parentLendId)?.bookId : undefined
+          const targetBook = bookId !== undefined ? bookId
             : parentLendId != null ? parentBook
-            : (s.currentBookId === 0 ? undefined : s.currentBookId),
-          type, assetId, counterparty: counterparty ?? '',
-          number: amt,
-          interest: Number(interest) || 0,
-          repaymentAssetId: repaymentAssetId || undefined,
-          time: time ?? NOW(), remark: remark ?? '',
-          parentLendId: parentLendId || undefined,
-          userId: s.userId, updateTime: NOW()
-        }
-        return {
-          lends: [rec, ...s.lends],
-          assets: s.assets.map((a) => a.assetId === cashAsset
-            ? { ...a, assetNumber: +(a.assetNumber + sign * amt).toFixed(2), updateTime: NOW() } : a)
-        }
-      }),
+            : (s.currentBookId === 0 ? undefined : s.currentBookId)
+          if (amt <= 0 || !assetId || !bookWritable(targetBook, s.accountBooks)) return {}
+          const cashAsset = (type === 2 || type === 4) && repaymentAssetId ? repaymentAssetId : assetId
+          const sign = type === 1 || type === 4 ? -1 : 1
+          let lendId = Date.now()
+          while (s.lends.some((l) => l.lendId === lendId)) lendId++
+          const rec: Lend = {
+            lendId, bookId: targetBook, type, assetId, counterparty: counterparty ?? '',
+            number: amt, interest: Number(interest) || 0,
+            repaymentAssetId: repaymentAssetId || undefined,
+            time: time ?? NOW(), remark: remark ?? '',
+            parentLendId: parentLendId || undefined,
+            userId: s.userId, updateTime: NOW()
+          }
+          written = true
+          return {
+            lends: [rec, ...s.lends],
+            assets: s.assets.map((a) => a.assetId === cashAsset
+              ? { ...a, assetNumber: +(a.assetNumber + sign * amt).toFixed(2), updateTime: NOW() } : a)
+          }
+        })
+        return written
+      },
 
       // 部分还款/收款：生成一条关联记录，剩余额度由 lend.ts 派生
       repayLend: ({ lendId, amount, repaymentAssetId, time }) => {
         const s = get()
         const parent = s.lends.find((l) => l.lendId === lendId)
-        if (!parent || (parent.type !== 1 && parent.type !== 3)) return
+        if (!parent || (parent.type !== 1 && parent.type !== 3)) return false
         const amt = Number(amount) || 0
         const remaining = lendRemaining(parent, s.lends)
-        if (amt <= 0 || amt > remaining) return
-        s.addLend({
+        if (amt <= 0 || amt > remaining) return false
+        return s.addLend({
           // 账本继承父借贷：跨账本还款时不能落到当前账本
           bookId: parent.bookId,
           type: parent.type === 1 ? 2 : 4,
@@ -1606,27 +1722,31 @@ export const useLedger = create<LedgerState>()(
       },
 
       // 删借贷：删除父记录时连带删除其还款/收款子记录，避免留下孤记录
-      deleteLend: (lendId) => set((s) => {
-        const rec = s.lends.find((x) => x.lendId === lendId)
-        if (!rec) return {}
-        const targets = [rec, ...s.lends.filter((x) => x.parentLendId === lendId)]
-        let assets = s.assets
-        let tombstones = s.tombstones
-        for (const r of targets) {
-          const sign = r.type === 1 || r.type === 4 ? 1 : -1
-          const cashAsset = (r.type === 2 || r.type === 4) && r.repaymentAssetId ? r.repaymentAssetId : r.assetId
-          assets = assets.map((a) => a.assetId === cashAsset
-            ? { ...a, assetNumber: +(a.assetNumber + sign * r.number).toFixed(2), updateTime: NOW() } : a)
-          tombstones = [...tombstones.filter((t) => !(t.kind === 'lend' && t.id === String(r.lendId))),
-            { kind: 'lend', id: String(r.lendId), updatedAt: NOW(),
-              bookId: r.bookId ?? (s.currentBookId === 0 ? undefined : s.currentBookId) }]
-        }
-        return {
-          lends: s.lends.filter((x) => !targets.some((r) => r.lendId === x.lendId)),
-          assets,
-          tombstones
-        }
-      }),
+      deleteLend: (lendId) => {
+        let written = false
+        set((s) => {
+          const rec = s.lends.find((x) => x.lendId === lendId)
+          if (!rec || !bookWritable(rec.bookId, s.accountBooks)) return {}
+          const targets = [rec, ...s.lends.filter((x) => x.parentLendId === lendId)]
+          let assets = s.assets
+          let tombstones = s.tombstones
+          for (const r of targets) {
+            const sign = r.type === 1 || r.type === 4 ? 1 : -1
+            const cashAsset = (r.type === 2 || r.type === 4) && r.repaymentAssetId ? r.repaymentAssetId : r.assetId
+            assets = assets.map((a) => a.assetId === cashAsset
+              ? { ...a, assetNumber: +(a.assetNumber + sign * r.number).toFixed(2), updateTime: NOW() } : a)
+            tombstones = [...tombstones.filter((t) => !(t.kind === 'lend' && t.id === String(r.lendId))),
+              { kind: 'lend', id: String(r.lendId), updatedAt: NOW(), bookId: r.bookId ?? rec.bookId }]
+          }
+          written = true
+          return {
+            lends: s.lends.filter((x) => !targets.some((r) => r.lendId === x.lendId)),
+            assets,
+            tombstones
+          }
+        })
+        return written
+      },
 
       // 账户余额由退款流水自动推导，不再手动改缓存。
       addRefund: (patch) => {
@@ -1638,31 +1758,60 @@ export const useLedger = create<LedgerState>()(
         set(changes as never)
         return true
       },
-      deleteRefund: (refundId) => set((s) => deleteRefundChanges(s, refundId, NOW())),
-
-      // 编辑已有退款：校验累计不超过账单金额；余额由退款派生，自动跟着变
-      updateRefund: (refundId, patch) => {
-        { const st2 = get()
-          const rec = st2.refunds.find((r) => r.refundId === refundId)
-          const owner = rec ? st2.bills.find((b) => String(b.billId) === String(rec.billId)) : undefined
-          if (owner && !bookWritable(owner.bookId, st2.accountBooks)) return false }
+      deleteRefund: (refundId) => {
         const s = get()
         const rec = s.refunds.find((r) => r.refundId === refundId)
         if (!rec) return false
-        const bill = s.bills.find((b) => b.billId === rec.billId)
-        if (!bill) return false
-        const number = patch.number ?? rec.number
-        const baseAmount = Number(patch.baseAmount ?? (number === rec.number ? rec.baseAmount
-          : toBase(number, rec.currency ?? s.defaultCurrency, s.currencies, s.defaultCurrency)))
-        const others = s.refunds.filter((r) => r.billId === rec.billId && r.refundId !== refundId)
+        const owner = s.bills.find((b) => String(b.billId) === String(rec.billId))
+        if (!bookWritable(rec.bookId ?? owner?.bookId, s.accountBooks)) return false
+        set((state) => deleteRefundChanges(state, refundId, NOW()))
+        return true
+      },
+
+      // 编辑已有退款：原币到账金额、本币金额、币种和账户必须同步更新，余额由退款派生
+      updateRefund: (refundId, patch) => {
+        const s = get()
+        const rec = s.refunds.find((r) => r.refundId === refundId)
+        if (!rec) return false
+        const bill = s.bills.find((b) => String(b.billId) === String(rec.billId))
+        if (!bill || !bookWritable(rec.bookId ?? bill?.bookId, s.accountBooks)) return false
+        const asset = s.assets.find((a) => a.assetId === (patch.assetId ?? rec.assetId ?? bill.assetId))
+        if (!asset || !hasCurrencyRate(asset.currency, s.currencies, s.defaultCurrency)) return false
+        const currency = asset.currency ?? s.defaultCurrency
+        const accountChanged = asset.assetId !== rec.assetId
+
+        let number = Number(patch.number ?? rec.number)
+        let baseAmount: number
+        if (patch.baseAmount != null) {
+          // UI 以本币金额作为编辑入口；实际到账原币必须一起变，不能只改展示口径。
+          baseAmount = Number(patch.baseAmount)
+          if (patch.number != null) {
+            const converted = toBase(number, currency, s.currencies, s.defaultCurrency)
+            if (Math.abs(converted - baseAmount) > 0.011) return false
+          } else {
+            number = fromBase(baseAmount, currency, s.currencies, s.defaultCurrency)
+          }
+        } else if (patch.number != null) {
+          baseAmount = toBase(number, currency, s.currencies, s.defaultCurrency)
+        } else if (accountChanged) {
+          // 只换账户时保持退款的本位币价值不变，原到账原币要按新账户重算。
+          baseAmount = rec.baseAmount ?? toBase(rec.number, rec.currency ?? s.defaultCurrency, s.currencies, s.defaultCurrency)
+          number = fromBase(baseAmount, currency, s.currencies, s.defaultCurrency)
+        } else {
+          baseAmount = rec.baseAmount ?? toBase(number, currency, s.currencies, s.defaultCurrency)
+        }
+        number = +number.toFixed(2)
+        baseAmount = +Number(baseAmount).toFixed(2)
+
+        const others = s.refunds.filter((r) => String(r.billId) === String(rec.billId) && r.refundId !== refundId)
         const refunded = others.reduce((sum, r) => sum + (r.baseAmount ?? 0), 0)
         if (!Number.isFinite(number) || number <= 0) return false
         if (!Number.isFinite(baseAmount) || baseAmount <= 0) return false
         if (refunded + baseAmount > bill.cost + 1e-6) return false
         set((st) => ({
           refunds: st.refunds.map((r) => r.refundId === refundId
-            ? { ...r, number, baseAmount, assetId: patch.assetId ?? r.assetId, updateTime: NOW() } : r),
-          bills: st.bills.map((b) => b.billId === rec.billId
+            ? { ...r, number, baseAmount, assetId: asset.assetId, currency, updateTime: NOW() } : r),
+          bills: st.bills.map((b) => String(b.billId) === String(rec.billId)
             ? { ...b, refundNum: +(refunded + baseAmount).toFixed(2), updateTime: NOW() } : b)
         }))
         return true

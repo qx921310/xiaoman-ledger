@@ -22,7 +22,9 @@ async function call(path: string, init?: RequestInit) {
       headers: { 'Content-Type': 'application/json' },
       ...init
     })
-  } catch {
+  } catch (e) {
+    // 会话中止不是离线：交给调用方保留原请求快照，不能自动换账号重发。
+    if ((e as { name?: string })?.name === 'AbortError' || init?.signal?.aborted) throw e
     throw new OfflineError()
   }
   const data = await res.json().catch(() => ({ code: 1, msg: '响应不是 JSON' }))
@@ -55,11 +57,11 @@ export interface BookInfo {
 }
 
 export const books = {
-  list: () => call('/books'),
+  list: (signal?: AbortSignal) => call('/books', { signal }),
   create: (name: string, icon?: string) => call('/books/create', { method: 'POST', body: JSON.stringify({ name, icon }) }),
   /** 账本元数据（图标/显示开关/隐藏）：与一木编辑账本一致 */
-  update: (bookId: string, patch: { name?: string; icon?: string; showTransfer?: boolean; showStock?: boolean; hideAllCategory?: boolean; hidden?: boolean; baseUpdatedAt?: number | null; operationId?: string }) =>
-    call('/books/update', { method: 'POST', body: JSON.stringify({ bookId, ...patch }) }),
+  update: (bookId: string, patch: { name?: string; icon?: string; showTransfer?: boolean; showStock?: boolean; hideAllCategory?: boolean; hidden?: boolean; baseUpdatedAt?: number | null; operationId?: string }, signal?: AbortSignal) =>
+    call('/books/update', { method: 'POST', body: JSON.stringify({ bookId, ...patch }), signal }),
   rename: (bookId: string, name: string) => call('/books/rename', { method: 'POST', body: JSON.stringify({ bookId, name }) }),
   invite: (bookId: string) => call('/books/invite', { method: 'POST', body: JSON.stringify({ bookId }) }),
   join: (code: string) => call('/books/join', { method: 'POST', body: JSON.stringify({ code }) }),

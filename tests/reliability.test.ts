@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import { useLedger } from '../src/store'
 import { loadAccountData } from '../src/account-session'
 import { assetMovements } from '../src/domain/asset-trend'
-import { queueBookPatch, flushBookPatches, conflictOf, hasPendingBookPatches, getBookPatch, clearBookPatch } from '../src/features/book-pending'
+import { queueBookPatch, flushBookPatches, conflictOf, hasPendingBookPatches, getBookPatch, clearBookPatch, resolveConflictUseServer, refreshBookPendingStatus } from '../src/features/book-pending'
+import { advanceSessionEpoch } from '../src/domain/session-epoch'
 import { setCurrentUid } from '../src/auth'
 import { deriveAssets, unresolvedReimbursementAssets } from '../src/balances'
 
@@ -184,6 +185,218 @@ test('隐藏请求未确认时恢复，按顺序提交两个操作', async () =>
     assert.deepEqual(sent.map((x) => x.hidden), [true, false])
     assert.notEqual(sent[0].operationId, sent[1].operationId)
     assert.equal(await hasPendingBookPatches(), false)
+  } finally {
+    globalThis.fetch = original
+  }
+})
+
+const WALL_NOW = Date.now.bind(Date)
+const WALL_TIMEOUT = globalThis.setTimeout
+
+async function waitUntil(predicate: () => boolean | Promise<boolean>, timeout = 3500) {
+  const deadline = WALL_NOW() + timeout
+  while (WALL_NOW() < deadline) {
+    if (await predicate()) return
+    await new Promise((resolve) => WALL_TIMEOUT(resolve, 20))
+  }
+  assert.ok(await predicate(), '等待自动补传完成超时')
+}
+
+test('A 在途+B 入队+A 响应丢失：定时器自动按 A→A(原请求)→B 补传', async () => {
+  setCurrentUid(910)
+  const original = globalThis.fetch
+  const bodies: Array<Record<string, unknown>> = []
+  let lose!: (error: Error) => void
+  let announce!: () => void
+  const started = new Promise<void>((resolve) => { announce = resolve })
+  globalThis.fetch = ((_url, init) => {
+    bodies.push(JSON.parse(String(init?.body)))
+    if (bodies.length === 1) return new Promise<Response>((_resolve, reject) => { lose = reject; announce() })
+    return Promise.resolve({ json: async () => ({ code: 0, result: { books: [], operationUpdatedAt: bodies.length + 1 } }) } as Response)
+  }) as typeof fetch
+  try {
+    await queueBookPatch('A', { name: 'A' }, 1)
+    const first = flushBookPatches()
+    await started
+    await queueBookPatch('A', { name: 'B' }, 1)
+    lose(new Error('响应丢失'))
+    await first
+    assert.equal(bodies.length, 1, '网络失败后不得同步紧循环重试')
+    const queued = await getBookPatch('A')
+    assert.equal(queued?.patch.name, 'B')
+    assert.equal(queued?.sending?.patch.name, 'A')
+    assert.ok(queued?.retry?.at, '失败必须安排退避时间')
+    // 不再显式调用 flush：1 秒基础退避后应由定时器自动恢复。
+    await waitUntil(async () => bodies.length === 3 && !(await hasPendingBookPatches()))
+    assert.deepEqual(bodies.map((b) => b.name), ['A', 'A', 'B'])
+    assert.equal(bodies[1].operationId, bodies[0].operationId)
+    assert.notEqual(bodies[2].operationId, bodies[0].operationId)
+    assert.equal(bodies[1].baseUpdatedAt, bodies[0].baseUpdatedAt)
+  } finally {
+    globalThis.fetch = original
+  }
+})
+
+test('scoped/global 同账本不同草稿：不覆盖、不清旧键，用户取舍后才清理', async () => {
+  setCurrentUid(911)
+  useLedger.setState({ userId: 911, accountBooks: [{ bookId: 'A', accountBookId: 0, accountBookName: 'A', role: 'normal' }] } as never)
+  localStorage.setItem('xiaoman-book-pending:911', JSON.stringify({ A: { name: '账号专属草稿' } }))
+  localStorage.setItem('xiaoman-book-pending', JSON.stringify({ A: { name: '全局草稿' } }))
+  await queueBookPatch('A', { icon: '新编辑' }, 1)
+  const entry = await getBookPatch('A')
+  assert.equal(entry?.patch.name, '账号专属草稿')
+  assert.equal(entry?.migrationConflict, true)
+  assert.equal(entry?.conflict, true)
+  assert.ok(localStorage.getItem('xiaoman-book-pending:911'))
+  assert.ok(localStorage.getItem('xiaoman-book-pending'))
+
+  const original = globalThis.fetch
+  let calls = 0
+  globalThis.fetch = (async () => {
+    calls++
+    return { json: async () => ({ code: 0, result: { books: [{ bookId: 'A', name: '云端取舍', updatedAt: 5 }] } }) } as Response
+  }) as typeof fetch
+  try {
+    assert.equal((await flushBookPatches()).sent, 0, '来源冲突不得未核对就自动覆盖服务端')
+    assert.equal(calls, 0)
+    const book = await resolveConflictUseServer('A')
+    assert.equal(book.name, '云端取舍')
+    assert.equal(await getBookPatch('A'), undefined)
+    assert.equal(localStorage.getItem('xiaoman-book-pending:911'), null)
+    assert.equal(localStorage.getItem('xiaoman-book-pending'), null)
+  } finally {
+    globalThis.fetch = original
+  }
+})
+
+test('跨账号切换：旧回执不写新账号，并保留旧账号的在途快照', async () => {
+  setCurrentUid(912)
+  useLedger.setState({ userId: 912, accountBooks: [{ bookId: 'shared', accountBookId: 0, accountBookName: '甲本地', role: 'admin' }] } as never)
+  await queueBookPatch('shared', { name: '甲编辑' }, 1)
+  const original = globalThis.fetch
+  let finish!: (response: Response) => void
+  let announce!: () => void
+  const started = new Promise<void>((resolve) => { announce = resolve })
+  globalThis.fetch = (() => new Promise<Response>((resolve) => { finish = resolve; announce() })) as typeof fetch
+  try {
+    const pending = flushBookPatches()
+    await started
+    advanceSessionEpoch()
+    setCurrentUid(913)
+    useLedger.setState({ userId: 913, accountBooks: [{ bookId: 'shared', accountBookId: 0, accountBookName: '乙本地', role: 'admin' }] } as never)
+    finish({ json: async () => ({ code: 0, result: { books: [{ bookId: 'shared', name: '甲云端', updatedAt: 2 }], operationUpdatedAt: 2 } }) } as Response)
+    await pending
+    assert.equal(useLedger.getState().accountBooks[0].accountBookName, '乙本地')
+    setCurrentUid(912)
+    const queued = await getBookPatch('shared')
+    assert.equal(queued?.patch.name, '甲编辑')
+    assert.equal(queued?.sending?.patch.name, '甲编辑')
+    assert.equal(queued?.sending?.baseUpdatedAt, 1)
+    assert.ok(queued?.sending?.operationId)
+  } finally {
+    globalThis.fetch = original
+  }
+})
+
+test('同 UID 重新登录：旧代次回执也不能覆盖新会话', async () => {
+  setCurrentUid(914)
+  useLedger.setState({ userId: 914, accountBooks: [{ bookId: 'same', accountBookId: 0, accountBookName: '新会话本地', role: 'admin' }] } as never)
+  await queueBookPatch('same', { name: '旧会话编辑' }, 1)
+  const before = await getBookPatch('same')
+  const original = globalThis.fetch
+  let finish!: (response: Response) => void
+  let announce!: () => void
+  const started = new Promise<void>((resolve) => { announce = resolve })
+  globalThis.fetch = (() => new Promise<Response>((resolve) => { finish = resolve; announce() })) as typeof fetch
+  try {
+    const pending = flushBookPatches()
+    await started
+    advanceSessionEpoch()   // uid 不变，代次变化
+    useLedger.setState({ accountBooks: [{ bookId: 'same', accountBookId: 0, accountBookName: '重新登录后的本地', role: 'admin' }] } as never)
+    finish({ json: async () => ({ code: 0, result: { books: [{ bookId: 'same', name: '旧会话云端', updatedAt: 2 }], operationUpdatedAt: 2 } }) } as Response)
+    await pending
+    assert.equal(useLedger.getState().accountBooks[0].accountBookName, '重新登录后的本地')
+    const after = await getBookPatch('same')
+    assert.equal(after?.operationId, before?.operationId)
+    assert.deepEqual(after?.sending?.patch, before?.patch)
+  } finally {
+    globalThis.fetch = original
+  }
+})
+
+test('租约未到期先登记唤醒，到期自动原样重放', async () => {
+  setCurrentUid(915)
+  await queueBookPatch('lease', { name: 'A' }, 1)
+  const originalFetch = globalThis.fetch
+  const originalSetTimeout = globalThis.setTimeout
+  const originalClearTimeout = globalThis.clearTimeout
+  const originalNow = Date.now
+  const bodies: string[] = []
+  let finish!: (response: Response) => void
+  let announce!: () => void
+  const started = new Promise<void>((resolve) => { announce = resolve })
+  let now = 1_800_000_000_000
+  let timerId = 0
+  const timers = new Map<number, { at: number; fn: () => void }>()
+  Date.now = () => now
+  globalThis.setTimeout = ((fn: () => void, delay = 0) => {
+    const id = ++timerId
+    timers.set(id, { at: now + Number(delay), fn })
+    return id
+  }) as unknown as typeof setTimeout
+  globalThis.clearTimeout = ((id: number) => { timers.delete(id) }) as unknown as typeof clearTimeout
+  globalThis.fetch = ((_url, init) => {
+    bodies.push(String(init?.body))
+    if (bodies.length === 1) return new Promise<Response>((resolve) => { finish = resolve; announce() })
+    return Promise.resolve({ json: async () => ({ code: 0, result: { books: [], operationUpdatedAt: 2 } }) } as Response)
+  }) as typeof fetch
+  try {
+    const first = flushBookPatches()
+    await started
+    advanceSessionEpoch()
+    // 模拟旧请求晚于会话切换返回，留下领取时尚未过期的 sending 租约。
+    finish({ json: async () => ({ code: 0, result: { books: [], operationUpdatedAt: 2 } }) } as Response)
+    await first
+    await flushBookPatches({ automatic: true })
+    const status = await refreshBookPendingStatus()
+    assert.equal(status.nextRetryAt, now + 60_000)
+    const task = [...timers.values()].find((item) => item.at === now + 60_000)
+    assert.ok(task, '租约未到期也必须设置到期定时器')
+    now += 60_001
+    task!.fn()
+    await waitUntil(async () => bodies.length === 2 && !(await hasPendingBookPatches()))
+    assert.equal(bodies[1], bodies[0])
+  } finally {
+    globalThis.fetch = originalFetch
+    globalThis.setTimeout = originalSetTimeout
+    globalThis.clearTimeout = originalClearTimeout
+    Date.now = originalNow
+  }
+})
+
+test('已有 IDB 草稿与旧 localStorage 不同：立即待核对，不上传后复活旧草稿', async () => {
+  setCurrentUid(922)
+  useLedger.setState({ userId: 922, accountBooks: [{ bookId: 'A', accountBookId: 0, accountBookName: 'A', role: 'normal' }] } as never)
+  await queueBookPatch('A', { name: 'IDB 新草稿' }, 1)
+  localStorage.setItem('xiaoman-book-pending:922', JSON.stringify({ A: { name: 'localStorage 旧草稿' } }))
+  await queueBookPatch('A', { icon: '后续编辑' }, 1)
+  const entry = await getBookPatch('A')
+  assert.equal(entry?.patch.name, 'IDB 新草稿')
+  assert.equal(entry?.patch.icon, '后续编辑')
+  assert.equal(entry?.migrationConflict, true)
+  assert.equal(entry?.conflict, true, '必须立即阻止自动上传，而不是等删除 IDB 后再复活旧草稿')
+  assert.ok(localStorage.getItem('xiaoman-book-pending:922'))
+
+  const original = globalThis.fetch
+  globalThis.fetch = (async () => ({
+    json: async () => ({ code: 0, result: { books: [{ bookId: 'A', name: '云端最终取舍', updatedAt: 3 }] } })
+  }) as Response) as typeof fetch
+  try {
+    const book = await resolveConflictUseServer('A')
+    assert.equal(book.name, '云端最终取舍')
+    assert.equal(await getBookPatch('A'), undefined)
+    assert.equal(localStorage.getItem('xiaoman-book-pending:922'), null)
+    assert.equal(await flushBookPatches().then((r) => r.sent), 0, '旧草稿不能在确认后被重新上传')
   } finally {
     globalThis.fetch = original
   }

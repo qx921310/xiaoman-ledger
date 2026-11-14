@@ -8,12 +8,15 @@ import { visibleAssets } from '../src/domain/asset-scope'
 const st = () => useLedger.getState()
 
 const reset = () => {
+  const initial = useLedger.getInitialState()
   useLedger.setState({
     userId: 1, currentBookId: 0, accountBooks: [
       { accountBookId: 1, bookId: 1, accountBookName: 'A', ownerId: 1, memberCount: 1, role: 'normal' },
       { accountBookId: 2, bookId: 2, accountBookName: 'B', ownerId: 1, memberCount: 1, role: 'normal' }
     ],
-    assets: [], bills: [], lends: [], templates: [], dreams: [], aiTypeRules: [], fixedDeposits: [], assetFlows: [], transfers: []
+    assets: [], bills: [], lends: [], templates: [], dreams: [], aiTypeRules: [], fixedDeposits: [], assetFlows: [], transfers: [],
+    refunds: [], reimbursements: [], billGroups: [], billRelated: [], splitGroups: [], splitMembers: [], splitExpenses: [],
+    tombstones: [], currencies: structuredClone(initial.currencies), defaultCurrency: 'CNY'
   } as never)
 }
 
@@ -654,4 +657,150 @@ test('只读账本：命令层拒绝 updateBill 改金额', () => {
   useLedger.setState({ accountBooks: [{ accountBookId: 1, bookId: 1, accountBookName: 'A', ownerId: 1, memberCount: 1, role: 'silent' }] } as never)
   st().updateBill(bill.billId, { cost: 99 })
   assert.equal(st().bills[0].cost, 30, '只读账本不允许改金额')
+})
+
+test('退款编辑：本币金额、原币到账、账单已退与余额保持一致', () => {
+  reset()
+  const bill = seedExpense(30, 1)
+  // 期初 100，原支出 30 后余额 70；补一笔 5 元退款后是 75。
+  assert.equal(st().assets[0].assetNumber, 70)
+  assert.equal(st().addRefund({ billId: bill.billId, number: 5, assetId: bill.assetId }), true)
+  const refundId = st().refunds[0].refundId
+  assert.equal(st().updateRefund(refundId, { baseAmount: 7 }), true)
+  const rec = st().refunds[0]
+  assert.equal(rec.number, 7, '编辑本币金额必须同步更新实际到账金额')
+  assert.equal(rec.baseAmount, 7)
+  assert.equal(st().bills[0].refundNum, 7)
+  assert.equal(st().assets[0].assetNumber, 77)
+})
+
+test('退款换账户：按目标账户币种同步重算原币与本币金额', () => {
+  reset()
+  const bill = seedExpense(30, 1)
+  st().addAsset({ assetId: 991099, assetName: '美元', assetType: 1, assetNumber: 100, currency: 'USD', bookId: 1 } as never)
+  const usd = st().assets.find((a) => a.currency === 'USD')!
+  useLedger.setState({ currencies: [{ code: 'CNY', name: '人民币', symbol: '¥', rate: 1 }, { code: 'USD', name: '美元', symbol: '$', rate: 7 }] } as never)
+  assert.equal(st().addRefund({ billId: bill.billId, number: 7, assetId: bill.assetId }), true)
+  const id = st().refunds[0].refundId
+  assert.equal(st().updateRefund(id, { assetId: usd.assetId }), true)
+  const rec = st().refunds[0]
+  assert.equal(rec.baseAmount, 7)
+  assert.equal(rec.number, 1)
+  assert.equal(rec.currency, 'USD')
+  const opening = usd.openingBalance ?? 100
+  assert.equal(st().assets.find((a) => a.assetId === usd.assetId)!.assetNumber, +(opening + 1).toFixed(2))
+})
+
+test('拆分回滚：已新建一笔后第二新建失败，完整恢复且不留墓碑', () => {
+  reset()
+  const bill = seedExpense(30, 1)
+  const originalAdd = st().addBill
+  const before = st().assets[0].assetNumber
+  let calls = 0
+  useLedger.setState({
+    addBill: (input: never) => {
+      calls += 1
+      if (calls === 2) throw new Error('第二笔新建失败')
+      return originalAdd(input)
+    }
+  } as never)
+  try {
+    assert.equal(st().splitBill(bill.billId, [{ num: 10 }, { num: 10 }, { num: 10 }] as never), false)
+  } finally {
+    useLedger.setState({ addBill: originalAdd } as never)
+  }
+  assert.equal(calls, 2, '必须走到已创建一笔后的第二个写入口')
+  assert.equal(st().bills.length, 1)
+  assert.equal(st().bills[0].billId, bill.billId)
+  assert.equal(st().assets[0].assetNumber, before)
+  assert.equal(st().billGroups.length, 0)
+  assert.equal(st().tombstones.length, 0)
+})
+
+test('拆分成组失败：撤回新分录并恢复原账单', () => {
+  reset()
+  const bill = seedExpense(30, 1)
+  const before = st().assets[0].assetNumber
+  const originalCreate = st().createBillGroup
+  useLedger.setState({ createBillGroup: (() => false) as never })
+  try {
+    assert.equal(st().splitBill(bill.billId, [{ num: 10, remark: '第一笔' }, { num: 20 }] as never), false)
+  } finally {
+    useLedger.setState({ createBillGroup: originalCreate } as never)
+  }
+  assert.equal(st().bills.length, 1)
+  assert.equal(st().bills[0].cost, 30)
+  assert.equal(st().bills[0].remark, bill.remark)
+  assert.equal(st().assets[0].assetNumber, before)
+  assert.equal(st().billGroups.length, 0)
+  assert.equal(st().tombstones.length, 0)
+})
+
+test('只读账本：退款/报销/组合/转账/复制与关联命令均拒绝写入', () => {
+  reset()
+  const parent = st().parentCategories.find((p) => p.kind === 'expense')!
+  const one = seedExpense(30, 1)
+  const two = st().addBill({ assetId: one.assetId, parentCategoryId: parent.id, cost: 20, bookId: 1 } as never)
+  st().addAsset({ assetName: '第二账户', assetType: 1, assetNumber: 100, currency: 'CNY', bookId: 1 } as never)
+  const otherAsset = st().assets.at(-1)!.assetId
+  assert.equal(st().addRefund({ billId: one.billId, number: 5, assetId: one.assetId }), true)
+  assert.equal(st().addReimbursement({ billId: one.billId, number: 5, assetId: one.assetId }), true)
+  assert.equal(st().createBillGroup([one.billId, two.billId]), true)
+  assert.equal(st().linkBills(one.billId, two.billId), true)
+  const transfer = st().addTransfer({ fromAssetId: one.assetId, toAssetId: otherAsset, cost: 1, bookId: 1 })
+  const third = st().addBill({ assetId: one.assetId, parentCategoryId: parent.id, cost: 8, bookId: 1 } as never)
+  const fourth = st().addBill({ assetId: one.assetId, parentCategoryId: parent.id, cost: 9, bookId: 1 } as never)
+  const splitGroup = st().addSplitGroup({ name: 'AA', members: ['我'] })
+  assert.equal(st().addLend({ type: 1, assetId: one.assetId, counterparty: '借款人', number: 3, bookId: 1 }), true)
+  const lendId = st().lends[0].lendId
+  assert.equal(st().applySplit(one.billId, splitGroup.splitGroupId, 0), true)
+  const splitExpenseId = st().splitExpenses[0].splitExpenseId
+  const before = JSON.stringify({
+    bills: st().bills, refunds: st().refunds, reimbursements: st().reimbursements,
+    billGroups: st().billGroups, transfers: st().transfers, lends: st().lends,
+    splitGroups: st().splitGroups, splitMembers: st().splitMembers, splitExpenses: st().splitExpenses,
+    balances: st().assets.map((a) => [a.assetId, a.assetNumber]), tombstones: st().tombstones
+  })
+
+  useLedger.setState({ accountBooks: [{ accountBookId: 1, bookId: 1, accountBookName: 'A', role: 'silent', memberCount: 1 }] } as never)
+  assert.equal(st().createBillGroup([third.billId, fourth.billId]), false)
+  assert.equal(st().dissolveBillGroup(st().billGroups[0].billGroupId), false)
+  assert.equal(st().removeFromBillGroup(st().billGroups[0].billGroupId, two.billId), false)
+  assert.equal(st().updateBillGroup(st().billGroups[0].billGroupId, { remark: '越权' }), false)
+  const refundId = st().refunds[0].refundId
+  const reimbursementId = st().reimbursements[0].reimbursementId
+  assert.equal(st().addReimbursement({ billId: one.billId, number: 1, assetId: one.assetId }), false)
+  assert.equal(st().settleReimbursement(reimbursementId), false)
+  assert.equal(st().endReimbursement(one.billId), false)
+  assert.equal(st().deleteReimbursement(reimbursementId), false)
+  assert.equal(st().updateRefund(refundId, { baseAmount: 6 }), false)
+  assert.equal(st().deleteRefund(refundId), false)
+  assert.equal(st().duplicateBill(one.billId), false)
+  assert.equal(st().restoreBill(one), false)
+  assert.equal(st().updateTransfer(transfer.transferId, { cost: 2 }), false)
+  assert.equal(st().deleteTransfer(transfer.transferId), false)
+  assert.equal(st().applySplit(one.billId, splitGroup.splitGroupId, 0), false)
+  assert.equal(st().linkBills(third.billId, fourth.billId), false)
+  assert.equal(st().unlinkBills(st().billRelated[0].relatedId), false)
+  assert.equal(st().addLend({ type: 1, assetId: one.assetId, counterparty: '借款人', number: 1, bookId: 1 }), false)
+  assert.equal(st().repayLend({ lendId, amount: 1, repaymentAssetId: one.assetId }), false)
+  assert.equal(st().deleteLend(lendId), false)
+  assert.throws(() => st().addSplitGroup({ name: '越权组' }), /只读/)
+  assert.throws(() => st().addSplitMember(splitGroup.splitGroupId, '越权成员'), /只读/)
+  st().updateSplitGroup(splitGroup.splitGroupId, { name: '越权组名' })
+  st().deleteSplitGroup(splitGroup.splitGroupId)
+  st().deleteSplitMember(splitGroup.splitGroupId * 100)
+  st().settleSplit(splitExpenseId, true)
+  st().setBillFiles(one.billId, [{ fileId: 1, fileName: 'forbidden.png', name: 'forbidden.png' } as never])
+  st().setTransferFiles(transfer.transferId, [{ fileId: 2, fileName: 'forbidden.png', name: 'forbidden.png' } as never])
+  st().setLendFiles(lendId, [{ fileId: 3, fileName: 'forbidden.png', name: 'forbidden.png' } as never])
+  assert.throws(() => st().addTransfer({ fromAssetId: one.assetId, toAssetId: otherAsset, cost: 1, bookId: 1 }), /只读/)
+
+  const after = JSON.stringify({
+    bills: st().bills, refunds: st().refunds, reimbursements: st().reimbursements,
+    billGroups: st().billGroups, transfers: st().transfers, lends: st().lends,
+    splitGroups: st().splitGroups, splitMembers: st().splitMembers, splitExpenses: st().splitExpenses,
+    balances: st().assets.map((a) => [a.assetId, a.assetNumber]), tombstones: st().tombstones
+  })
+  assert.equal(after, before, '所有只读命令失败后，账务和墓碑均必须原样保留')
 })
