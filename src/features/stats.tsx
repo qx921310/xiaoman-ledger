@@ -355,6 +355,19 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
         <AssetSankey />
       </details>
 
+      {/* 近 7 日统计（真机首块） */}
+      <div className="week-card">
+        <div className="wc-hd"><b>近7日统计</b><span className="muted">支出 · 收入</span></div>
+        <div className="wc-row">
+          <div className="wc-item"><small>支出</small><b className="out">{money(weekStats.out)}</b></div>
+          <div className="wc-item"><small>收入</small><b className="in">{money(weekStats.inc)}</b></div>
+        </div>
+        <div className="wc-row">
+          <div className="wc-item"><small>结余</small><b>{money(weekStats.net)}</b></div>
+          <div className="wc-item"><small>日均支出</small><b>{money(weekStats.avg)}</b></div>
+        </div>
+      </div>
+
       {mods['收支统计'] && trend.length > 0 && rangeMode === 'custom' && (
         <>
           <div className="label">收支趋势（折线）</div>
@@ -517,19 +530,6 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
           </>
         )
       })()}
-
-      {/* 近 7 日统计（真机首块） */}
-      <div className="week-card">
-        <div className="wc-hd"><b>近7日统计</b><span className="muted">支出 · 收入</span></div>
-        <div className="wc-row">
-          <div className="wc-item"><small>支出</small><b className="out">{money(weekStats.out)}</b></div>
-          <div className="wc-item"><small>收入</small><b className="in">{money(weekStats.inc)}</b></div>
-        </div>
-        <div className="wc-row">
-          <div className="wc-item"><small>结余</small><b>{money(weekStats.net)}</b></div>
-          <div className="wc-item"><small>日均支出</small><b>{money(weekStats.avg)}</b></div>
-        </div>
-      </div>
 
       {mods['资产走势'] && (
         <>
