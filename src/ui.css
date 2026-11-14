@@ -1381,3 +1381,10 @@ button.day-btn {
 .detail-menu button { background: transparent; border: 0; text-align: left; padding: 10px 12px; font-size: var(--font-sm); color: var(--ink); border-radius: var(--r-sm); cursor: pointer; }
 .detail-menu button.danger { color: var(--danger-ink); }
 .subpage-head { position: relative; }
+
+/* 账单详情：技术字段折叠区 */
+.detail-more { border-top: 1px solid var(--line); padding: 10px 0; }
+.detail-more > summary { color: var(--muted); font-size: var(--font-sm); cursor: pointer; list-style: none; padding: 2px 0; }
+.detail-more > summary::-webkit-details-marker { display: none; }
+.detail-more > summary::after { content: '›'; float: right; transform: rotate(90deg); }
+.detail-more[open] > summary::after { transform: rotate(-90deg); }

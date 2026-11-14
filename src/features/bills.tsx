@@ -564,6 +564,7 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
           <button type="button" className="detail-close" aria-label="关闭账单详情" onClick={onClose}>×</button>
         </div>
 
+        <details className="detail-more"><summary>更多信息</summary>
         {(() => {
           const shares = parseShares(bill.billShareInfo)
           if (!shares.length) return null
@@ -578,7 +579,6 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
             </Row>
           )
         })()}
-        <Row label="账单分类"><CatIcon k={c?.icon ?? p?.icon} size={18} />{p?.name}{bill.childCategoryId && !c ? ' - 子分类待核对' : c ? ` - ${c.name}` : ''}</Row>
         <Row label="账单日期">{dayOf(bill.time)} {hhmm(bill.time)}</Row>
         <Row label="收支账户">{a && <AssetIcon type={a.assetType} name={a.assetName} icon={a.assetIcon} size={20} />}{a?.assetName ?? '无'}</Row>
         {billRefunds.map((refund) => {
@@ -675,6 +675,7 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
             : (memberMap[bill.ownerId] ?? `用户 #${bill.ownerId}`)}
         </Row>
 
+        </details>
       {refundOpen && (
         <section className="refund-page" aria-label="退款">
           <div className="rp-head">
