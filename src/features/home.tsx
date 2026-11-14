@@ -46,9 +46,6 @@ export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot, f
   }, [budgets, month])
   // 一木「更多」菜单（popup_home_menu.xml）：视图 简约/详细、范围 全部/按月
   const [menuOpen, setMenuOpen] = useState(false)
-  const [tipClosed, setTipClosed] = useState(() => {
-    try { return localStorage.getItem('xiaoman-home-tip') === 'off' } catch { return true }
-  })
   const [simpleView, setSimpleView] = useState(false)
   const [rangeAll, setRangeAll] = useState(false)
   // 下拉刷新：触发一次同步（对应一木各页的 pull_layout）
@@ -91,13 +88,6 @@ export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot, f
         </div>
       )}
 
-      {!tipClosed && (
-        <div className="home-tip" role="status">
-          <span>附件仅保留 30 天（到期销毁）；导出备份只含账目数据，不含附件文件。</span>
-          <button type="button" className="link" aria-label="关闭提示"
-            onClick={() => { setTipClosed(true); try { localStorage.setItem('xiaoman-home-tip', 'off') } catch { /* 忽略 */ } }}>×</button>
-        </div>
-      )}
 
       {/* 顶栏：账本图标 + 账本名，右侧 搜索 / 更多（对齐真机：绿色线性图标） */}
       <div className="home-hd">
