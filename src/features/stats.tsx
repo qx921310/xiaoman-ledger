@@ -255,6 +255,11 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
         </div>
       </div>
 
+      <details className="stats-extra">
+        <summary>查看资产分布</summary>
+        <AssetSankey />
+      </details>
+
       <TrendChart points={trend} onPickDay={(key) => {
         // 一木 activity_statistics_bill_info：点某天看当天账单
         const billsOfDay = rangeBills.filter((b) => {
@@ -362,11 +367,6 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
       <button className="ghost wide" onClick={() => setEditing({ categoryId: catBudgets[0]?.categoryId ?? 1, amount: '' })}>
         添加分类预算
       </button>
-
-      <details className="stats-extra">
-        <summary>查看资产分布</summary>
-        <AssetSankey />
-      </details>
 
       {mods['收支统计'] && trend.length > 0 && rangeMode === 'custom' && (
         <>
