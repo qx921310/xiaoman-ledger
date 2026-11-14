@@ -130,6 +130,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
   const [discountOpen, setDiscountOpen] = useState(false)
   const [assetSheetOpen, setAssetSheetOpen] = useState(false)
   const [dateOpen, setDateOpen] = useState(false)
+  const [assetFull, setAssetFull] = useState(false)
   const [mobileKeypad, setMobileKeypad] = useState(() => window.matchMedia('(max-width: 600px)').matches)
 
   useEffect(() => {
@@ -479,8 +480,18 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
           {/* 账户选择（半屏可滚动） */}
           {assetSheetOpen && (
             <div className="sheet-mask" onClick={() => setAssetSheetOpen(false)}>
-              <div className="sheet tall" onClick={(e) => e.stopPropagation()}>
-                <div className="sheet-hd"><b>选择账户</b><span className="muted">长按拖动可进行排序</span></div>
+              <div className={'sheet asset-sheet' + (assetFull ? ' full' : '')} onClick={(e) => e.stopPropagation()}>
+                <button type="button" className="sheet-grip" aria-label="展开或收起"
+                  onClick={() => setAssetFull((v) => !v)}><i /></button>
+                <div className="sheet-hd">
+                  <b>选择账户</b>
+                  <span className="sheet-hd-acts">
+                    <button type="button" className="sheet-link" onClick={() => notify('组合支付敬请期待')}>组合支付</button>
+                    <span className="sheet-sort" aria-hidden="true">≡</span>
+                    <span className="sheet-plus" aria-hidden="true">＋</span>
+                  </span>
+                </div>
+                <div className="muted sheet-sub">长按拖动可进行排序</div>
                 <div className="sheet-body">
                   {assets.map((a) => {
                     const bal = a.assetNumber

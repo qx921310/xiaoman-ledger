@@ -1330,3 +1330,13 @@ button.day-btn {
 .entry-transfer-field > span { color: var(--muted); font-size: var(--font-sm); flex: none; }
 .entry-transfer-field .mobile-picker-trigger { flex: 1; background: transparent; font-size: var(--font-md); color: var(--muted); padding: 6px 0; min-height: 40px; }
 .entry-transfer-arrow { text-align: center; color: var(--muted); font-size: var(--font-lg); line-height: 1; padding: 2px 0; }
+
+/* 账户选择弹层：半屏 ↔ 全屏、手柄、头部动作（对齐一木） */
+.asset-sheet { max-height: 56vh; transition: max-height .22s ease; }
+.asset-sheet.full { max-height: 92vh; }
+.sheet-grip { display: block; width: 100%; background: transparent; border: 0; padding: 8px 0 2px; cursor: pointer; }
+.sheet-grip i { display: block; width: 42px; height: 4px; margin: 0 auto; border-radius: var(--r-pill); background: var(--line); }
+.sheet-hd-acts { display: flex; align-items: center; gap: 12px; }
+.sheet-link { background: transparent; border: 0; color: var(--accent); font-size: var(--font-sm); cursor: pointer; }
+.sheet-sort, .sheet-plus { color: var(--ink); font-size: var(--font-lg); line-height: 1; }
+.sheet-sub { padding: 0 16px 6px; font-size: var(--font-xs); }
