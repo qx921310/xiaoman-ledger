@@ -16,6 +16,7 @@ import { BookManager } from './books'
 import { BudgetManager } from './budget'
 import { SplitManager } from './split'
 import { MortgageCalc } from './mortgage'
+import { RateConvert } from './rate-convert'
 import { DreamList } from './dreams'
 import { FilteredBills } from './filtered-bills'
 import { TemplateList } from './templates'
@@ -133,6 +134,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [splitOpen, setSplitOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
   const [mortgageOpen, setMortgageOpen] = useState(false)
+  const [rateOpen, setRateOpen] = useState(false)
   const [meScreen, setMeScreen] = useState<'book' | 'cat' | 'tag' | 'data' | null>(null)
   const [cycleDrill, setCycleDrill] = useState<{ title: string; cycleId: string | number } | null>(null)
   const [backupOpen, setBackupOpen] = useState(false)
@@ -490,6 +492,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       {splitOpen && <SplitManager notify={notify} onBack={() => setSplitOpen(false)} />}
 
       {mortgageOpen && <MortgageCalc onBack={() => setMortgageOpen(false)} notify={notify} />}
+      {rateOpen && <RateConvert onBack={() => setRateOpen(false)} notify={notify} />}
 
       {aboutOpen && (
         <Modal label="关于" onClose={() => setAboutOpen(false)}>
@@ -1030,6 +1033,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
           ['智能分类', () => setAiTypeOpen(true)],
           ['愿望清单', () => setDreamOpen(true)],
           ['房贷计算', () => setMortgageOpen(true)],
+          ['利率换算', () => setRateOpen(true)],
         ] as Array<[string, () => void]>).map(([label, run]) => (
           <button key={label} type="button" className="my-grid-item" onClick={run}>{label}</button>
         ))}
