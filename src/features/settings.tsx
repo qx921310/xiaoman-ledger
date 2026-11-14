@@ -550,6 +550,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
           ['数据备份', 'backup'],
           ['导入导出', 'import'],
           ['主题设置', 'theme'],
+          ['安全设置', 'gesture'],
           ['使用指南', 'guide'],
           ['愿望清单', 'dream'],
           ['更多应用', 'apps'],
@@ -1388,6 +1389,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       <h3>更多</h3>
       <div className="my-links">
         {[
+          ['安全设置', 'gesture'],
           ['使用指南', 'guide'], ['意见反馈', 'feedback'], ['去评分', 'evaluate'],
           ['邀请好友', 'invite'], ['活动中心', 'activity'], ['更多应用', 'apps'],
           ['桌面小组件', 'widget'],
