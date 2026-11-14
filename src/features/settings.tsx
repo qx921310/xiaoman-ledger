@@ -15,6 +15,7 @@ import { BillFiles } from './bill-files'
 import { BookManager } from './books'
 import { BudgetManager } from './budget'
 import { SplitManager } from './split'
+import { MortgageCalc } from './mortgage'
 import { DreamList } from './dreams'
 import { FilteredBills } from './filtered-bills'
 import { TemplateList } from './templates'
@@ -131,6 +132,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [budgetOpen, setBudgetOpen] = useState(false)
   const [splitOpen, setSplitOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
+  const [mortgageOpen, setMortgageOpen] = useState(false)
   const [meScreen, setMeScreen] = useState<'book' | 'cat' | 'tag' | 'data' | null>(null)
   const [cycleDrill, setCycleDrill] = useState<{ title: string; cycleId: string | number } | null>(null)
   const [backupOpen, setBackupOpen] = useState(false)
@@ -486,6 +488,8 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       {filesOpen && <BillFiles notify={notify} onBack={() => setFilesOpen(false)} />}
       {budgetOpen && <BudgetManager notify={notify} onBack={() => setBudgetOpen(false)} />}
       {splitOpen && <SplitManager notify={notify} onBack={() => setSplitOpen(false)} />}
+
+      {mortgageOpen && <MortgageCalc onBack={() => setMortgageOpen(false)} notify={notify} />}
 
       {aboutOpen && (
         <Modal label="关于" onClose={() => setAboutOpen(false)}>
@@ -1025,6 +1029,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
           ['账单图片', () => setFilesOpen(true)],
           ['智能分类', () => setAiTypeOpen(true)],
           ['愿望清单', () => setDreamOpen(true)],
+          ['房贷计算', () => setMortgageOpen(true)],
         ] as Array<[string, () => void]>).map(([label, run]) => (
           <button key={label} type="button" className="my-grid-item" onClick={run}>{label}</button>
         ))}
