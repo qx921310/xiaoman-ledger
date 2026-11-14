@@ -545,14 +545,16 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         ] as Array<[string, string]>).map(([label, key]) => (
           <button key={key} type="button" className="my-grid-item" onClick={() => {
             // 记账相关：落到我们已有的页面/功能；商业化项按约定提示「敬请期待」
-            if (key === 'cycle' || key === 'book' || key === 'tag' || key === 'cat') {
-              notify('请在下方对应区块操作')
-              return
+            const jump = (id: string) => {
+              const el = document.getElementById(id)
+              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              else notify('暂未找到该区块')
             }
-            if (key === 'backup' || key === 'import') {
-              notify('见下方「数据」区块')
-              return
-            }
+            if (key === 'book') { jump('sec-book'); return }
+            if (key === 'cat') { jump('sec-cat'); return }
+            if (key === 'tag') { jump('sec-tag'); return }
+            if (key === 'cycle') { jump('sec-cycle'); return }
+            if (key === 'backup' || key === 'import') { jump('sec-data'); return }
             if (key === 'dream') { setDreamOpen(true); return }
             if (key === 'ai') { setAiTypeOpen(true); return }
             if (key === 'guide') { setGuideOpen(true); return }
@@ -1002,14 +1004,14 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         <button className="danger" onClick={() => { reset(); notify('已清空') }}>清空数据</button>
       </div>
 
-      <h3>账本</h3>
+      <h3 id="sec-book">账本</h3>
       <p className="hint">账本只属于你自己，同一账号可多设备登录同一账本。</p>
       <div className="row">
         <span className="grow">共 {accountBooks.filter((b) => !b.hidden).length} 个账本（已隐藏 {accountBooks.filter((b) => b.hidden).length} 个）</span>
         <button type="button" className="link" onClick={() => setBooksOpen(true)}>账本管理</button>
       </div>
 
-      <h3>分类</h3>
+      <h3 id="sec-cat">分类</h3>
       <p className="hint">已有账单使用的分类不能删除。</p>
       {(['expense', 'income'] as const).map((kind) => (
         <div key={kind}>
@@ -1191,7 +1193,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       })}
 
       <div className="pane-head">
-        <h3>标签管理</h3>
+        <h3 id="sec-tag">标签管理</h3>
         <button type="button" className="link" onClick={() => setAddingTag(true)}>新增</button>
       </div>
       {tags.length === 0 && <p className="hint"></p>}
