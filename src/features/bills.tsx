@@ -672,6 +672,12 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
         <DetailToggle label="不计入收支" on={!!bill.notIntoTotal} onToggle={() => updateBill(bill.billId, { notIntoTotal: !bill.notIntoTotal })} />
         <DetailToggle label="不计入预算" on={!!bill.notIntoBudget} onToggle={() => updateBill(bill.billId, { notIntoBudget: !bill.notIntoBudget })} />
         <Row label="所属账本">{bk?.accountBookName ?? '默认账本'}</Row>
+        <Row label="地点信息">
+          <button type="button" className="link" onClick={() => {
+            const next = prompt('地点信息', bill.location ?? '')
+            if (next != null) updateBill(bill.billId, { location: next.trim() || undefined })
+          }}>{bill.location || '无'}</button>
+        </Row>
         <Row label="记录时间">{dayOf(bill.recordTime ?? bill.time)} {hhmm(bill.recordTime ?? bill.time)}</Row>
         <details className="detail-related">
           <summary>关联与合并账单</summary>

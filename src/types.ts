@@ -298,6 +298,8 @@ export interface BillFile {
 }
 
 export interface Bill {
+  /** 地点信息（真机账单详情有这一行；随账单 payload 同步） */
+  location?: string
   billId: string | number
   /** Stable creation identity; old records may have only the numeric billId. */
   syncId?: string
