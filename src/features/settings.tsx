@@ -1004,6 +1004,19 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         <button className="danger" onClick={() => { reset(); notify('已清空') }}>清空数据</button>
       </div>
 
+      <h3>实用工具</h3>
+      <div className="my-grid">
+        {([
+          ['AA 分账', () => setSplitOpen(true)],
+          ['模板记账', () => setTplOpen(true)],
+          ['账单图片', () => setFilesOpen(true)],
+          ['智能分类', () => setAiTypeOpen(true)],
+          ['愿望清单', () => setDreamOpen(true)],
+        ] as Array<[string, () => void]>).map(([label, run]) => (
+          <button key={label} type="button" className="my-grid-item" onClick={run}>{label}</button>
+        ))}
+      </div>
+
       <h3 id="sec-book">账本</h3>
       <p className="hint">账本只属于你自己，同一账号可多设备登录同一账本。</p>
       <div className="row">
