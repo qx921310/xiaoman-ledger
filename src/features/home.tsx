@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import { useLedger } from '../store'
 import { summarizeBills } from '../bill-summary'
 import { money, monthOf } from '../ui-format'
+
+const plain = (n: number) => n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 import { Bills } from './bills'
 import { usePullRefresh } from '../ui/use-pull-refresh'
 import { syncNowImmediate } from '../sync-auto'
@@ -97,37 +99,56 @@ export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot, f
         </div>
       )}
 
-      <div className="home-toolbar">
-        <div className="ht-left">
-          <span className="ht-book" aria-label="当前账本">{bookName}</span>
-          <b className="ht-month">{new Date().getFullYear()} 年 {new Date().getMonth() + 1} 月</b>
-        </div>
-        <div className="ht-right">
-          <button type="button" className="ht-btn" aria-label="记一笔" onClick={onAdd} disabled={readOnly}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M12 5v14M5 12h14" strokeLinecap="round" /></svg>
+      {/* 顶栏：账本图标 + 账本名，右侧 搜索 / 更多（对齐真机：绿色线性图标） */}
+      <div className="home-hd">
+        <button type="button" className="home-hd-book" onClick={() => setMenuOpen(true)} aria-label="切换账本">
+          <span className="bk-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3h13a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z" /></svg>
+          </span>
+          <b>{bookName}</b>
+        </button>
+        <div className="home-hd-acts">
+          <button type="button" className="hd-btn" aria-label="搜索账单" onClick={onSearch} disabled={!onSearch}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.6-3.6" strokeLinecap="round" /></svg>
           </button>
-          <button type="button" className="ht-btn" aria-label="搜索账单" onClick={onSearch} disabled={!onSearch}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" strokeLinecap="round" /></svg>
-          </button>
-          <button type="button" className="ht-btn" aria-label="更多" onClick={() => setMenuOpen(true)}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>
+          <button type="button" className="hd-btn" aria-label="更多" onClick={() => setMenuOpen(true)}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>
           </button>
         </div>
       </div>
-      {modules.summary && <div className="home-summary">
-        <button type="button" className="hm-item" onClick={onOpenStats} disabled={!onOpenStats}>
-          <small>本月支出</small>
-          <b className="out">{money(used)}</b>
-        </button>
-        <button type="button" className="hm-item" onClick={onOpenStats} disabled={!onOpenStats}>
-          <small>本月收入</small>
-          <b className="in">{money(summary.income)}</b>
-        </button>
-        <button type="button" className="hm-item" onClick={onOpenStats} disabled={!onOpenStats}>
-          <small>本月结余</small>
-          <b>{money(summary.income - used)}</b>
-        </button>
-      </div>}
+
+      {/* 汇总卡：三列概览 + 本月支出大字（对齐真机浅绿渐变卡） */}
+      {modules.summary && (
+        <div className="home-card">
+          <div className="hc-row">
+            <button type="button" className="hc-item" onClick={onOpenStats} disabled={!onOpenStats}>
+              <small>本月收入</small>
+              <b>{plain(summary.income)}</b>
+            </button>
+            <button type="button" className="hc-item" onClick={onOpenStats} disabled={!onOpenStats}>
+              <small>本月结余</small>
+              <b>{plain(summary.income - used)}</b>
+            </button>
+            <button type="button" className="hc-item" onClick={onOpenStats} disabled={!onOpenStats}>
+              <small>剩余月预算</small>
+              <b>{budgetTotal > 0 ? plain(Math.max(0, budgetTotal - budgetUsed)) : '--'}</b>
+            </button>
+          </div>
+          <button type="button" className="hc-big" onClick={onOpenStats} disabled={!onOpenStats}>
+            <small>本月支出(元)</small>
+            <b>{plain(used)}</b>
+          </button>
+          <span className="hc-orn" aria-hidden="true" />
+        </div>
+      )}
+
+      {/* 主按钮：添加一条新记账（整行绿底） */}
+      <button type="button" className="home-add" onClick={onAdd} disabled={readOnly}>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <rect x="3.5" y="4.5" width="17" height="15" rx="3" /><path d="M12 9.5v5M9.5 12h5" strokeLinecap="round" />
+        </svg>
+        添加一条新记账
+      </button>
 
       {modules.budget && budgetTotal > 0 && (
         <div className="home-budget" role="group" aria-label="本月预算">
@@ -197,6 +218,12 @@ export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot, f
           </div>
         </div>
       )}
+
+      <button type="button" className="home-fab" aria-label="语音记账" onClick={onAdd} disabled={readOnly}>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" strokeLinecap="round" />
+        </svg>
+      </button>
 
       {modules.flow && <div className="home-flow">
         <div className="hf-head">流水</div>

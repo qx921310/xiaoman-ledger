@@ -1185,3 +1185,48 @@ button.day-btn {
 .split-row { display: flex; align-items: center; gap: 6px; }
 .split-row .split-cat { flex: 1; min-width: 0; }
 .split-num { width: 96px; text-align: right; }
+
+/* ===== 首页（对齐一木真机结构：顶栏 / 汇总卡 / 整行主按钮 / 语音悬浮） ===== */
+.home-hd { display: flex; align-items: center; justify-content: space-between; padding: 4px 0 10px; }
+.home-hd-book { display: flex; align-items: center; gap: 8px; background: transparent; border: 0; padding: 0; cursor: pointer; }
+.home-hd-book .bk-icon {
+  width: 26px; height: 26px; border-radius: var(--r-sm); display: grid; place-items: center;
+  background: var(--accent); color: var(--card);
+}
+.home-hd-book b { font-size: var(--font-lg); color: var(--ink); }
+.home-hd-acts { display: flex; align-items: center; gap: 10px; }
+.hd-btn { background: transparent; border: 0; color: var(--accent); padding: 6px; cursor: pointer; }
+
+.home-card {
+  position: relative; overflow: hidden; border-radius: var(--r-lg);
+  padding: 14px 16px 16px; margin-bottom: 14px;
+  background: var(--accent-soft);
+}
+.hc-row { display: grid; grid-template-columns: 1.1fr 1fr .9fr; gap: 8px; }
+.hc-item { display: grid; gap: 4px; background: transparent; border: 0; padding: 0; text-align: left; cursor: pointer; }
+.hc-item small { color: var(--muted); font-size: var(--font-xs); }
+.hc-item b { font-size: var(--font-md); color: var(--ink); font-variant-numeric: tabular-nums; }
+.hc-big { display: grid; gap: 2px; margin-top: 10px; background: transparent; border: 0; padding: 0; text-align: left; cursor: pointer; }
+.hc-big small { color: var(--muted); font-size: var(--font-xs); }
+.hc-big b { font-size: var(--font-display); line-height: 1.1; color: var(--accent); font-variant-numeric: tabular-nums; }
+.hc-orn {
+  position: absolute; right: -10px; bottom: -18px; width: 150px; height: 96px; opacity: .45; pointer-events: none;
+  background: radial-gradient(circle at 70% 60%, var(--accent-soft), transparent 62%),
+              radial-gradient(circle at 40% 80%, var(--line), transparent 60%);
+}
+
+.home-add {
+  width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;
+  height: 54px; border: 0; border-radius: var(--r-md); cursor: pointer;
+  background: var(--accent); color: var(--card); font-size: var(--font-md);
+  margin-bottom: 12px;
+}
+.home-add:disabled { opacity: .5; }
+
+.home-fab {
+  position: fixed; right: 16px; bottom: calc(var(--nav-h, 56px) + 18px);
+  width: 56px; height: 56px; border-radius: var(--r-pill); border: 0; cursor: pointer;
+  display: grid; place-items: center; color: var(--card);
+  background: var(--accent); box-shadow: 0 6px 18px var(--shade-6);
+  z-index: 20;
+}
