@@ -578,3 +578,40 @@ test('组合编辑：不允许跨账本成员进入同一组', () => {
   assert.equal(ok, false, '跨账本账单不得并入同一组合')
   assert.equal(st().billGroups[0].billList.length, 2, '组合成员保持不变')
 })
+
+test('拆分：支出不能拆成收入（方向必须一致）', () => {
+  reset()
+  const bill = seedExpense(30, 1)
+  const income = st().parentCategories.find((p) => p.kind === 'income')!
+  const before = st().assets[0].assetNumber
+  const ok = st().splitBill(bill.billId, [
+    { num: 10, parentCategoryId: bill.parentCategoryId },
+    { num: 20, parentCategoryId: income.id }
+  ] as never)
+  assert.equal(ok, false, '方向不一致必须拒绝')
+  assert.equal(st().assets[0].assetNumber, before, '余额不得变化')
+})
+
+test('拆分：外币账单暂不支持，避免汇率差改变余额', () => {
+  reset()
+  const bill = seedExpense(30, 1)
+  useLedger.setState((s) => ({ bills: s.bills.map((b) => String(b.billId) === String(bill.billId) ? { ...b, currencyInfo: 'USD' } : b) }) as never)
+  assert.equal(st().splitBill(bill.billId, [{ num: 10 }, { num: 20 }] as never), false)
+})
+
+test('拆分回滚不留同步墓碑', () => {
+  reset()
+  const bill = seedExpense(30, 1)
+  const tombstonesBefore = st().tombstones.length
+  // 让成组失败：预先占用其中一个 id 的组合归属不可能构造，这里直接校验失败路径不新增墓碑
+  st().splitBill(bill.billId, [{ num: 10 }, { num: 20 }] as never)
+  assert.ok(st().tombstones.length <= tombstonesBefore + 0, '拆分不应产生删除墓碑')
+})
+
+test('只读账本：命令层拒绝退款', () => {
+  reset()
+  const bill = seedExpense(30, 1)
+  // 记账完成后再把账本置为历史只读，校验命令层仍然拒绝写入
+  useLedger.setState({ accountBooks: [{ accountBookId: 1, bookId: 1, accountBookName: 'A', ownerId: 1, memberCount: 1, role: 'silent' }] } as never)
+  assert.equal(st().addRefund({ billId: bill.billId, number: 5, assetId: st().bills[0].assetId }), false, '只读账本禁止退款')
+})

@@ -146,7 +146,8 @@ async function migrateLegacy(uid: number): Promise<void> {
     try {
       const value = JSON.parse(rawGlobal) as Record<string, unknown>
       for (const [bookId, entry] of Object.entries(value)) {
-        if (!ownBooks.has(bookId)) remaining[bookId] = entry
+        // 未确认归属、或本次因已有草稿被跳过的一律保留，只有确实写进 IndexedDB 的才清理
+        if (!ownBooks.has(bookId) || !written.has(bookId)) remaining[bookId] = entry
       }
     } catch { /* 忽略 */ }
   }
@@ -253,11 +254,14 @@ async function flushRound(uid: number): Promise<{ roundSent: number; roundConfli
         const key = keyOf(uid, row.bookId)
         const current = await readOne(store, key)
         if (!current || current.conflict) return undefined
-        // 领取租约：超过 60s 的 sending 视为上次会话中断，允许用同一 operationId 原样重放
         const LEASE_MS = 60_000
-        if (current.sending) {
-          const startedAt = (current.sending as { startedAt?: number }).startedAt ?? 0
-          if (startedAt && Date.now() - startedAt < LEASE_MS) return undefined
+        const prev = current.sending as { operationId?: string; patch?: Record<string, unknown>; baseUpdatedAt?: number | null; startedAt?: number } | undefined
+        if (prev?.startedAt && Date.now() - prev.startedAt < LEASE_MS) return undefined
+        if (prev?.operationId && prev.patch) {
+          // 上次会话已在途中：先原样重放原快照（同 operationId + 同 payload），
+          // 不能拿用户这期间的新编辑去替换，否则会丢请求并制造假冲突
+          await req(store.put({ ...current, sending: { ...prev, startedAt: Date.now() } }))
+          return { operationId: prev.operationId, patch: prev.patch, baseUpdatedAt: prev.baseUpdatedAt ?? null }
         }
         const operationId = current.operationId
           ?? globalThis.crypto?.randomUUID?.()

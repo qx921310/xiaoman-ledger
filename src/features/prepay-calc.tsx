@@ -22,21 +22,26 @@ export function PrepayCalc({ onBack, notify }: { onBack: () => void; notify: (m:
     // 剩余本金
     const left = P * ((1 + r) ** n - (1 + r) ** paidN) / ((1 + r) ** n - 1)
     const after = Math.max(0, left - prepayAmt)
+    // 不提前还时的剩余利息 = 剩余月供合计 - 剩余本金
+    const remainMonths = n - paidN
+    const beforeInterest = +(monthly * remainMonths - left).toFixed(2)
     if (mode === 'reduce') {
-      const remain = n - paidN
-      const newMonthly = (after * r * (1 + r) ** remain) / ((1 + r) ** remain - 1)
+      const newMonthly = (after * r * (1 + r) ** remainMonths) / ((1 + r) ** remainMonths - 1)
+      const afterInterest = +(newMonthly * remainMonths - after).toFixed(2)
       return {
         before: monthly, after: newMonthly, savedMonthly: monthly - newMonthly,
-        left, prepayAmt, months: remain,
-        savedInterest: (monthly * remain) - (newMonthly * remain),
+        left, prepayAmt, months: remainMonths,
+        // 节省利息只能比较「利息支出」，不能拿月供合计直接相减
+        savedInterest: +Math.max(0, beforeInterest - afterInterest).toFixed(2),
       }
     }
     // 缩短期限：月供不变，反推期数
     const newN = Math.ceil(Math.log(monthly / (monthly - after * r)) / Math.log(1 + r))
+    const afterInterest = +(monthly * newN - after).toFixed(2)
     return {
       before: monthly, after: monthly, savedMonthly: 0,
       left, prepayAmt, months: newN,
-      savedInterest: monthly * (n - paidN) - monthly * newN,
+      savedInterest: +Math.max(0, beforeInterest - afterInterest).toFixed(2),
     }
   }, [loan, rate, years, paid, prepay, mode])
 

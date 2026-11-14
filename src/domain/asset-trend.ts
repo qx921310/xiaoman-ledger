@@ -72,7 +72,8 @@ export function assetMovements(input: TrendInput): Map<number, Array<{ time: num
   }
   for (const r of input.refunds) {
     const bill = input.bills.find((b) => String(b.billId) === String(r.billId))
-    push(r.assetId ?? bill?.assetId ?? 0, r.updateTime ?? bill?.time ?? 0, r.number)
+    // 退款以其登记的业务日期计入走势（真机退款页可选日期），缺省才回落到更新时间
+    push(r.assetId ?? bill?.assetId ?? 0, r.time ?? r.updateTime ?? bill?.time ?? 0, r.number)
   }
   for (const r of input.reimbursements) {
     if (r.status === 'done') push(r.assetId, r.settledAt ?? r.updateTime ?? 0, r.accountAmount ?? r.number)

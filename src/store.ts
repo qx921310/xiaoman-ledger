@@ -232,6 +232,21 @@ const BUSINESS_KEYS = [
   'billGroups', 'billRelated', 'dreams', 'aiTypeRules', 'fixedDeposits', 'assetFlows'
 ] as const
 
+
+/** 命令层只读守卫：按目标账本的 role 判断，silent（历史只读）一律拒绝写入 */
+/** 回滚用：移除刚创建的账单，不写墓碑（拆分失败不应在同步里留下删除记录） */
+function rollbackBills(ids: Array<string | number>) {
+  if (!ids.length) return
+  const drop = new Set(ids.map(String))
+  useLedger.setState((st) => ({ bills: st.bills.filter((b) => !drop.has(String(b.billId))) }) as never)
+}
+
+function bookWritable(bookId: string | number | undefined, books: Array<{ bookId?: number | string; role?: string }>) {
+  if (bookId == null || String(bookId) === '') return true
+  const hit = books.find((b) => String(b.bookId ?? '') === String(bookId))
+  return hit ? hit.role !== 'silent' : true
+}
+
 export const useLedger = create<LedgerState>()(
   persist(
     (persistSet, get) => {
@@ -426,6 +441,7 @@ export const useLedger = create<LedgerState>()(
       deleteBill: (billId) => set((s) => {
         const old = s.bills.find((b) => b.billId === billId)
         if (!old) return {}
+        if (!bookWritable(old.bookId, s.accountBooks)) return {}
         const tomb = { kind: 'bill', id: old.syncId ?? String(billId), bookId: old.bookId, updatedAt: NOW() }
         const sign = s.parentCategories.find((p) => p.id === old.parentCategoryId)?.kind === 'income' ? 1 : -1
         return {
@@ -984,6 +1000,7 @@ export const useLedger = create<LedgerState>()(
         const s = get()
         const origin = s.bills.find((b) => String(b.billId) === String(billId))
         if (!origin) return false
+        if (!bookWritable(origin.bookId, s.accountBooks)) return false
         const valid = parts.filter((p) => Number(p.num) > 0)
         if (valid.length < 2) return false
 
@@ -996,14 +1013,19 @@ export const useLedger = create<LedgerState>()(
         if ((s.refunds ?? []).some((r) => String(r.billId) === String(billId))) return false
         if ((s.reimbursements ?? []).some((r) => String(r.billId) === String(billId))) return false
 
-        // 3) 每一笔的分类与账户都必须存在，且账户可用
+        // 3) 每一笔的分类与账户都必须存在，且方向必须与原子账单一致（支出不能拆成收入）
+        const originKind = s.parentCategories.find((c) => c.id === origin.parentCategoryId)?.kind
         for (const p of valid) {
           const parentId = p.parentCategoryId ?? origin.parentCategoryId
           const assetId = p.assetId ?? origin.assetId
-          if (!s.parentCategories.some((c) => c.id === parentId)) return false
+          const parent = s.parentCategories.find((c) => c.id === parentId)
+          if (!parent) return false
+          if (parent.kind !== originKind) return false
           if (p.childCategoryId && !s.childCategories.some((c) => c.id === p.childCategoryId)) return false
           if (!s.assets.some((a) => a.assetId === assetId)) return false
         }
+        // 外币账单：各分录若按当前汇率重算会与原子账单的账户金额不一致，暂不支持拆分
+        if (origin.currencyInfo) return false
 
         // 4) 参与拆分的账单不能已属于其他组合
         const grouped = new Set((s.billGroups ?? []).flatMap((g) => g.billList.map(String)))
@@ -1041,8 +1063,8 @@ export const useLedger = create<LedgerState>()(
             created.push({ billId: bill.billId, created: true, cost, share, p })
           }
         } catch {
-          // 任何一笔写入失败：删除已创建的账单，原账单保持不动
-          for (const row of created) if (row.created) get().deleteBill(row.billId)
+          // 任何一笔写入失败：直接移除已创建的账单（不产生同步墓碑），原账单保持不动
+          rollbackBills(created.filter((r) => r.created).map((r) => r.billId))
           return false
         }
 
@@ -1063,7 +1085,7 @@ export const useLedger = create<LedgerState>()(
           remark: origin.remark
         })
         if (!groupedOk) {
-          for (const row of created) if (row.created) get().deleteBill(row.billId)
+          rollbackBills(created.filter((r) => r.created).map((r) => r.billId))
           get().updateBill(origin.billId, {
             parentCategoryId: origin.parentCategoryId,
             childCategoryId: origin.childCategoryId,
@@ -1601,7 +1623,10 @@ export const useLedger = create<LedgerState>()(
 
       // 账户余额由退款流水自动推导，不再手动改缓存。
       addRefund: (patch) => {
-        const changes = addRefundChanges(get(), patch, NOW())
+        const state = get()
+        const owner = state.bills.find((b) => String(b.billId) === String(patch.billId))
+        if (!bookWritable(owner?.bookId, state.accountBooks)) return false
+        const changes = addRefundChanges(state, patch, NOW())
         if (!changes || Object.keys(changes).length === 0) return false
         set(changes as never)
         return true
