@@ -256,7 +256,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
             <small>负债</small><b>{mask(liability)}</b>
           </button>
         </div>
-        {onOpenSettings && <button type="button" className="link asset-setting" onClick={() => setSettingOpen(true)}>资产设置</button>}
+        {onOpenSettings && <button type="button" className="link asset-setting" aria-label="资产设置" onClick={() => setSettingOpen(true)}>⋯</button>}
       </div>
 
       <div className="asset-cards">
