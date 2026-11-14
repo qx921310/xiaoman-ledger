@@ -124,6 +124,10 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
   const [time, setTime] = useState(toLocalInput(Date.now()))
   const [keypadOpen, setKeypadOpen] = useState(true)
   const [keypadField, setKeypadField] = useState<'cost' | 'fee' | 'toCost' | 'discount'>('cost')
+  const [editOpen, setEditOpen] = useState(false)
+  const [tagSheetOpen, setTagSheetOpen] = useState(false)
+  const [discountOpen, setDiscountOpen] = useState(false)
+  const [assetSheetOpen, setAssetSheetOpen] = useState(false)
   const [mobileKeypad, setMobileKeypad] = useState(() => window.matchMedia('(max-width: 600px)').matches)
 
   useEffect(() => {
@@ -289,9 +293,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
           <div className="entry-tabs">
             {(['expense', 'income', 'transfer', 'debt'] as const).map((item, index) => <button key={item} type="button" aria-pressed={mode === item} className={mode === item ? 'on' : ''} onClick={() => switchMode(item)}>{['支出', '收入', '转账', '债务'][index]}</button>)}
           </div>
-          <MobilePicker className="entry-book" label="选择账本" value={String(curBookId)} options={[
-            { value: '0', label: '全部账本' }, ...accountBooks.filter((b) => !b.hidden).map((b) => ({ value: String(b.bookId ?? b.accountBookId), label: b.accountBookName }))
-          ]} onChange={(value) => { localStorage.setItem('xm-current-book', value); setBook(/^\d+$/.test(value) ? Number(value) : value) }} />
+          <button type="button" className="entry-edit" onClick={() => setEditOpen(true)}>编辑</button>
         </div>
 
         <div className="entry-scroll">
@@ -322,14 +324,6 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
             <label>到账金额<input value={toCost} placeholder="留空与转出相同" inputMode="none" onFocus={() => { setKeypadField('toCost'); setKeypadOpen(true) }} onChange={(e) => setToCost(e.target.value.replace(/[^\d.]/g, ''))} /></label>
             <label>手续费<input value={fee} placeholder="0.00" inputMode="none" onFocus={() => { setKeypadField('fee'); setKeypadOpen(true) }} onChange={(e) => setFee(e.target.value.replace(/[^\d.]/g, ''))} /></label>
           </div> : <>
-            {mode === 'expense' && (
-              <div className="entry-transfer-field">
-                <span>报销</span>
-                <MobilePicker label="选择报销账户" value={String(claimAssetId)}
-                  options={[{ value: '0', label: '不报销' }, ...assets.map((a) => ({ value: String(a.assetId), label: a.simpleName || a.assetName }))]}
-                  onChange={(value) => setClaimAssetId(Number(value))} />
-              </div>
-            )}
             {allTags.length > 0 && (
               <div className="entry-tags">
                 {allTags.map((t) => {
@@ -343,70 +337,185 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
                 })}
               </div>
             )}
-            {(
-              <label>优惠<input value={discount} placeholder="满减金额" inputMode="none"
-                onFocus={() => { setKeypadField('discount'); setKeypadOpen(true) }}
-                onChange={(e) => setDiscount(e.target.value.replace(/[^\d.]/g, ''))} /></label>
-            )}
-            <div className="entry-categories" aria-label="大类">
-              {list.map((p) => <button key={p.id} type="button" aria-pressed={p.id === cur} className={'entry-category' + (p.id === cur ? ' on' : '')} onClick={() => {
-                  setPid(p.id)
-                  const first = sortCategories(children.filter((c) => c.parentId === p.id))[0]
-                  setCid(first ? first.id : 0)
-                }}>
-                <span className="entry-category-icon" style={{ '--category-color': p.color, '--category-bg': p.bg ?? 'var(--accent-soft)' } as React.CSSProperties}><CatIcon k={p.icon} size={22} /></span><span>{p.name}</span>
-              </button>)}
+            <div className="cat-circles" aria-label="大类">
+              {list.map((p) => (
+                <button key={p.id} type="button" aria-pressed={p.id === cur}
+                  className={'cat-circle' + (p.id === cur ? ' on' : '')}
+                  onClick={() => {
+                    setPid(p.id)
+                    const first = sortCategories(children.filter((c) => c.parentId === p.id))[0]
+                    setCid(first ? first.id : 0)
+                  }}>
+                  <span className="cc-icon"><CatIcon k={p.icon} size={26} /><i className="cc-more" aria-hidden="true">…</i></span>
+                  <span className="cc-name">{p.name}</span>
+                </button>
+              ))}
             </div>
-            {subs.length > 0 && <div className="entry-subsection"><div className="entry-subtitle">{parents.find((p) => p.id === cur)?.name}</div>
-              <div className="entry-categories" aria-label="子分类">
-                {subs.map((c) => <button key={c.id} type="button" aria-pressed={cid === c.id} className={'entry-category child' + (cid === c.id ? ' on' : '')} onClick={() => setCid(c.id)}>
-                  <span className="entry-category-icon"><CatIcon k={c.icon} size={19} /></span><span>{c.name}</span>
-                </button>)}
+            {subs.length > 0 && (
+              <div className="sub-card">
+                <div className="sub-grid">
+                  {subs.map((c) => (
+                    <button key={c.id} type="button" aria-pressed={cid === c.id}
+                      className={'sub-cell' + (cid === c.id ? ' on' : '')} onClick={() => setCid(c.id)}>
+                      <CatIcon k={c.icon} size={26} /><span>{c.name}</span>
+                    </button>
+                  ))}
+                  <button type="button" className="sub-cell" onClick={() => { setEditOpen(false); notify('分类请到「我的 → 分类管理」新增') }}>
+                    <span className="sub-add" aria-hidden="true">＋</span><span>新增</span>
+                  </button>
+                </div>
               </div>
-            </div>}
+            )}
           </>}
         </div>
 
         <div className="entry-bottom">
-          <div className="entry-amount-row">
-            <input className="entry-remark" aria-label="备注" value={remark} placeholder="写备注…"
+          <div className="entry-line-a">
+            <button type="button" className="tag-inline" onClick={() => setTagSheetOpen(true)}>
+              <span className="ti-label">标签</span>
+              <span className="ti-value">{pickedTags.length ? pickedTags.join('、') : '输入标签，空格结束'}</span>
+            </button>
+            <input className="entry-remark" aria-label="备注" value={remark} placeholder="添加备注"
               onFocus={() => setKeypadOpen(false)} onBlur={() => setKeypadOpen(true)}
               onChange={(e) => onRemarkChange(e.target.value)} />
-            <button type="button" className="ghost" aria-label="语音"
-              onClick={() => speech.listening ? speech.stop() : speech.start()}>
-              {speech.listening ? '停' : '语'}
-            </button>
-            <label className="ghost entry-file" aria-label="添加附件">
-              附
-              <input type="file" accept="image/*,application/pdf" multiple hidden
-                onChange={async (e) => { await uploadFiles(Array.from(e.target.files ?? [])); e.target.value = '' }} />
+            <span className={'entry-amount' + (mode === 'expense' ? ' out' : mode === 'income' ? ' in' : '')}>
+              <em>{currencySymbol(currencies, displayCurrency, defaultCurrency)}</em>{cost === '' ? '0.00' : formatAmount(cost)}
+            </span>
+          </div>
+
+          <div className="entry-line-b">
+            <label className="chip">
+              <input aria-label="日期" type="datetime-local" value={time} onChange={(e) => setTime(e.target.value)} />
+              <span>{time.slice(0, 10) === toLocalInput(Date.now()).slice(0, 10) ? '今天' : time.slice(5, 10).replace('-', '/')}</span>
             </label>
-            {mode === 'transfer' ? <span className="entry-currency-code">{displayCurrency}</span> : <MobilePicker className="entry-currency" label="选择币种" value={currency} options={currencies.map((c) => ({ value: c.code, label: c.code, detail: c.name, icon: c.symbol }))} onChange={setCurrency} />}
-            <span className="entry-symbol">{currencySymbol(currencies, displayCurrency, defaultCurrency)}</span>
-            <input className="entry-value" aria-label="记账金额" value={formatAmount(cost)} placeholder="0.00" inputMode="none" onFocus={() => { setKeypadField('cost'); setKeypadOpen(true) }} onChange={(e) => setCost(e.target.value.replace(/[^\d.]/g, ''))} />
+            {mode !== 'transfer' && mode !== 'debt' && (
+              <button type="button" className="chip" onClick={() => setAssetSheetOpen(true)}>
+                <span>{assets.find((a) => a.assetId === aid)?.simpleName || assets.find((a) => a.assetId === aid)?.assetName || '选择账户'}</span>
+              </button>
+            )}
+            {mode === 'expense' && (
+              <button type="button" className="chip" onClick={() => setClaimAssetId(0)}>
+                <span>{claimAssetId ? (assets.find((a) => a.assetId === claimAssetId)?.assetName ?? '报销') : '不报销'}</span>
+              </button>
+            )}
+            <button type="button" className="chip" onClick={() => notify('附件：请在下方「附件」上传')}>
+              <span>附件{files.length ? ` ${files.length}` : ''}</span>
+            </button>
+            {mode !== 'debt' && (
+              <button type="button" className="chip" onClick={() => setDiscountOpen(true)}>
+                <span>{Number(discount) > 0 ? `优惠 ${formatAmount(discount)}` : '优惠'}</span>
+              </button>
+            )}
+            <button type="button" className="chip" onClick={() => setEditOpen(true)}>
+              <span>属性</span>
+            </button>
           </div>
-          {mode !== 'transfer' && currency !== defaultCurrency && evaluatedCost != null && evaluatedCost > 0 && <div className="entry-fx">{hasCurrencyRate(currency, currencies, defaultCurrency) ? `折合 ${currencySymbol(currencies, defaultCurrency, defaultCurrency)}${toBase(evaluatedCost, currency, currencies, defaultCurrency).toFixed(2)}` : '请先设置汇率'}</div>}
-          <div className="entry-options">
-            <label className="entry-date"><span>日期</span><strong>{time.slice(0, 10) === toLocalInput(Date.now()).slice(0, 10) ? '今天' : time.slice(5, 10).replace('-', '/')}</strong><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="6" width="16" height="14" rx="3"/><path d="M8 3v6m8-6v6M4 10h16"/></svg><input aria-label="日期" type="datetime-local" value={time} onChange={(e) => setTime(e.target.value)} /></label>
-            {mode !== 'transfer' && <div className="entry-account"><span>账户</span><MobilePicker className="entry-account-picker" label="选择账户" value={String(aid)} options={assetOptions} onChange={(value) => setAid(Number(value))} /></div>}
-            {!keypadOpen && <button type="button" onClick={() => { setKeypadField('cost'); setKeypadOpen(true) }}>数字键盘</button>}
-          </div>
+
+          {mode !== 'transfer' && currency !== defaultCurrency && evaluatedCost != null && evaluatedCost > 0 && (
+            <div className="entry-fx">{hasCurrencyRate(currency, currencies, defaultCurrency) ? `折合 ${currencySymbol(currencies, defaultCurrency, defaultCurrency)}${toBase(evaluatedCost, currency, currencies, defaultCurrency).toFixed(2)}` : '请先设置汇率'}</div>
+          )}
           {privacyBlocked && (
             <p className="hint due-hint">
               「{pickedAsset?.assetName}」是私有账户，记到共享账本会让成员看到它的名字。
               请先把该账户设为共享到本账本，或换用共享账户。
             </p>
           )}
+
           {keypadOpen && <div className="entry-keypad" aria-label="数字键盘">
             {key('1')}{key('2')}{key('3')}{key('退格', 'key-control')}
             {key('4')}{key('5')}{key('6')}<div className="entry-operators">{key('+')}{key('-')}</div>
             {key('7')}{key('8')}{key('9')}<div className="entry-operators">{key('×')}{key('÷')}</div>
             <button type="button" className="key-control" disabled={readOnly} onClick={() => { submit() }}>再记</button>{key('0')}{key('.')}
-            <button type="button" className="key-finish" disabled={readOnly} onClick={() => { if (submit()) onClose?.() }}>完成</button>
-            {mode !== 'transfer' && (
-              <button type="button" className="ghost" aria-label="存为模板" onClick={saveTemplate}>存模板</button>
-            )}
+            {evaluatedCost != null && evaluatedCost > 0
+              ? <button type="button" className="key-finish" disabled={readOnly} onClick={() => { if (submit()) onClose?.() }}>完成</button>
+              : <button type="button" className="key-control" onClick={() => onClose?.()}>取消</button>}
           </div>}
+
+          {/* 标签选择卡（一木：行内输入 + 悬浮列表） */}
+          {tagSheetOpen && (
+            <div className="sheet-mask" onClick={() => setTagSheetOpen(false)}>
+              <div className="sheet" onClick={(e) => e.stopPropagation()}>
+                <div className="sheet-hd"><b>选择标签</b><span aria-hidden="true">☰</span></div>
+                <div className="sheet-body">
+                  {allTags.length === 0 && <p className="hint">还没有标签</p>}
+                  {allTags.map((t) => {
+                    const on = pickedTags.includes(t.name)
+                    return (
+                      <button key={t.tagId} type="button" className="sheet-row" onClick={() => setPickedTags((prev) => on ? prev.filter((x) => x !== t.name) : [...prev, t.name])}>
+                        <i className={'sheet-dot' + (on ? ' on' : '')} aria-hidden="true" />
+                        <span>{t.name}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 优惠金额 */}
+          {discountOpen && (
+            <div className="sheet-mask" onClick={() => setDiscountOpen(false)}>
+              <div className="sheet" onClick={(e) => e.stopPropagation()}>
+                <div className="sheet-hd"><b>优惠金额</b></div>
+                <div className="sheet-body">
+                  <input aria-label="优惠金额" inputMode="decimal" value={discount}
+                    onChange={(e) => setDiscount(e.target.value.replace(/[^\d.]/g, ''))} placeholder="0.00" />
+                </div>
+                <div className="sheet-ft"><button type="button" className="ghost" onClick={() => setDiscountOpen(false)}>完成</button></div>
+              </div>
+            </div>
+          )}
+
+          {/* 账户选择（半屏可滚动） */}
+          {assetSheetOpen && (
+            <div className="sheet-mask" onClick={() => setAssetSheetOpen(false)}>
+              <div className="sheet tall" onClick={(e) => e.stopPropagation()}>
+                <div className="sheet-hd"><b>选择账户</b><span className="muted">长按拖动可进行排序</span></div>
+                <div className="sheet-body">
+                  {assets.map((a) => {
+                    const bal = a.assetNumber
+                    return (
+                      <button key={a.assetId} type="button" className="asset-row" onClick={() => { setAid(a.assetId); setAssetSheetOpen(false) }}>
+                        <span className="ar-icon"><CatIcon k={a.assetIcon} size={22} /></span>
+                        <span className="ar-name">{a.simpleName || a.assetName}</span>
+                        <span className={'ar-bal' + (bal > 0 ? ' in' : bal < 0 ? ' out' : '')}>{accountMoney(bal, a.currency, currencies, defaultCurrency)}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 编辑 / 属性（一木顶部「编辑」） */}
+          {editOpen && (
+            <div className="sheet-mask" onClick={() => setEditOpen(false)}>
+              <div className="sheet" onClick={(e) => e.stopPropagation()}>
+                <div className="sheet-hd"><b>编辑</b></div>
+                <div className="sheet-body">
+                  <div className="label">账本</div>
+                  <MobilePicker label="选择账本" value={String(curBookId)} options={[
+                    { value: '0', label: '全部账本' },
+                    ...accountBooks.filter((b) => !b.hidden).map((b) => ({ value: String(b.bookId ?? b.accountBookId), label: b.accountBookName }))
+                  ]} onChange={(value) => { localStorage.setItem('xm-current-book', value); setBook(/^\d+$/.test(value) ? Number(value) : value) }} />
+                  {mode !== 'transfer' && (
+                    <>
+                      <div className="label">币种</div>
+                      <MobilePicker label="选择币种" value={currency} options={currencies.map((c) => ({ value: c.code, label: c.code, detail: c.name }))} onChange={setCurrency} />
+                    </>
+                  )}
+                  <label className="row"><span className="grow">不计收支</span><input type="checkbox" checked={notIntoTotal} onChange={(e) => setNotIntoTotal(e.target.checked)} /></label>
+                  <label className="row"><span className="grow">不计预算</span><input type="checkbox" checked={notIntoBudget} onChange={(e) => setNotIntoBudget(e.target.checked)} /></label>
+                  <label className="row"><span className="grow">附件</span>
+                    <input type="file" aria-label="添加附件" accept="image/*,application/pdf" multiple
+                      onChange={async (e) => { await uploadFiles(Array.from(e.target.files ?? [])); e.target.value = '' }} />
+                  </label>
+                  {mode !== 'transfer' && <button type="button" className="ghost wide" onClick={() => { saveTemplate(); setEditOpen(false) }}>存为模板</button>}
+                </div>
+                <div className="sheet-ft"><button type="button" className="ghost" onClick={() => setEditOpen(false)}>完成</button></div>
+              </div>
+            </div>
+          )}
         </div>
       </section>
     )
