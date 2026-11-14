@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLedger } from '../store'
 import { useSpeech } from '../ui/use-speech'
+import { DateSheet } from './date-sheet'
 import { lendRemaining } from '../lend'
 import { accountMoney, currencySymbol, findCurrency, hasCurrencyRate, toBase } from '../money'
 import { money, toLocalInput } from '../ui-format'
@@ -128,6 +129,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
   const [tagSheetOpen, setTagSheetOpen] = useState(false)
   const [discountOpen, setDiscountOpen] = useState(false)
   const [assetSheetOpen, setAssetSheetOpen] = useState(false)
+  const [dateOpen, setDateOpen] = useState(false)
   const [mobileKeypad, setMobileKeypad] = useState(() => window.matchMedia('(max-width: 600px)').matches)
 
   useEffect(() => {
@@ -306,6 +308,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
                 </button>
               ))}
             </div>
+            <div className="entry-transfer-arrow" aria-hidden="true">⌄</div>
             {(debtType === 2 || debtType === 4) ? (
               <div className="entry-transfer-field">
                 <span>债务</span>
@@ -319,10 +322,8 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
             <div className="entry-transfer-field"><span>账户</span><MobilePicker label="选择账户" value={String(aid)} options={assetOptions} onChange={(value) => setAid(Number(value))} /></div>
           </div> : mode === 'transfer' ? <div className="entry-transfer">
             <div className="entry-transfer-field"><span>转出账户</span><MobilePicker label="选择转出账户" value={String(aid)} options={assetOptions} onChange={(value) => setAid(Number(value))} /></div>
-            <div className="entry-transfer-arrow">↓</div>
+            <div className="entry-transfer-arrow" aria-hidden="true">⇅</div>
             <div className="entry-transfer-field"><span>转入账户</span><MobilePicker label="选择转入账户" value={String(toAid)} options={assetOptions} onChange={(value) => setToAid(Number(value))} /></div>
-            <label>到账金额<input value={toCost} placeholder="留空与转出相同" inputMode="none" onFocus={() => { setKeypadField('toCost'); setKeypadOpen(true) }} onChange={(e) => setToCost(e.target.value.replace(/[^\d.]/g, ''))} /></label>
-            <label>手续费<input value={fee} placeholder="0.00" inputMode="none" onFocus={() => { setKeypadField('fee'); setKeypadOpen(true) }} onChange={(e) => setFee(e.target.value.replace(/[^\d.]/g, ''))} /></label>
           </div> : <>
             {allTags.length > 0 && (
               <div className="entry-tags">
@@ -384,10 +385,9 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
           </div>
 
           <div className="entry-line-b">
-            <label className="chip">
-              <input aria-label="日期" type="datetime-local" value={time} onChange={(e) => setTime(e.target.value)} />
+            <button type="button" className="chip" onClick={() => setDateOpen(true)}>
               <span>{time.slice(0, 10) === toLocalInput(Date.now()).slice(0, 10) ? '今天' : time.slice(5, 10).replace('-', '/')}</span>
-            </label>
+            </button>
             {mode !== 'transfer' && mode !== 'debt' && (
               <button type="button" className="chip" onClick={() => setAssetSheetOpen(true)}>
                 <span>{assets.find((a) => a.assetId === aid)?.simpleName || assets.find((a) => a.assetId === aid)?.assetName || '选择账户'}</span>
@@ -401,9 +401,14 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
             <button type="button" className="chip" onClick={() => notify('附件：请在下方「附件」上传')}>
               <span>附件{files.length ? ` ${files.length}` : ''}</span>
             </button>
-            {mode !== 'debt' && (
+            {(mode === 'expense' || mode === 'income') && (
               <button type="button" className="chip" onClick={() => setDiscountOpen(true)}>
                 <span>{Number(discount) > 0 ? `优惠 ${formatAmount(discount)}` : '优惠'}</span>
+              </button>
+            )}
+            {mode === 'transfer' && (
+              <button type="button" className="chip" onClick={() => { setKeypadField('fee'); setKeypadOpen(true) }}>
+                <span>{Number(fee) > 0 ? `手续费 ${formatAmount(fee)}` : '手续费'}</span>
               </button>
             )}
             <button type="button" className="chip" onClick={() => setEditOpen(true)}>
@@ -430,6 +435,11 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
               ? <button type="button" className="key-finish" disabled={readOnly} onClick={() => { if (submit()) onClose?.() }}>完成</button>
               : <button type="button" className="key-control" onClick={() => onClose?.()}>取消</button>}
           </div>}
+
+          {dateOpen && (
+            <DateSheet value={time} onCancel={() => setDateOpen(false)}
+              onConfirm={(next) => { setTime(next); setDateOpen(false) }} />
+          )}
 
           {/* 标签选择卡（一木：行内输入 + 悬浮列表） */}
           {tagSheetOpen && (
