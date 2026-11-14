@@ -526,6 +526,7 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
   const [refundAmt, setRefundAmt] = useState('')
   const [claimOpen, setClaimOpen] = useState(false)
   const [claimAsset, setClaimAsset] = useState(0)
+  const [moreOpen, setMoreOpen] = useState(false)
   const [claimAmt, setClaimAmt] = useState('')
   const instalment = instalments.find((i) => String(i.billId) === String(bill.billId))
   useEffect(() => {
@@ -542,6 +543,15 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
       <div className="subpage-head">
         <button type="button" className="link" onClick={onClose}>‹ 返回</button>
         <h3>账单详情</h3>
+        <button type="button" className="link" aria-label="更多操作" onClick={() => setMoreOpen((v) => !v)}>⋯</button>
+        {moreOpen && (
+          <div className="detail-menu" role="menu">
+            <button type="button" role="menuitem" className="danger" onClick={() => {
+              setMoreOpen(false)
+              if (confirm('删除这笔账单？')) { del(bill.billId); onClose() }
+            }}>删除</button>
+          </div>
+        )}
       </div>
         <div className="dhead" style={{ background: p?.bg ?? 'var(--accent-soft)', color: p?.color ?? 'var(--ink)' }}>
           <CatIcon k={c?.icon ?? p?.icon} size={34} />
