@@ -216,7 +216,6 @@ export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot, f
       </button>
 
       {modules.flow && <div className="home-flow">
-        <div className="hf-head">流水</div>
         <Bills me={me} onAdd={onAdd} embedded rangeAll={rangeAll} simpleView={simpleView}
           focusBillId={focusBillId} onFocusHandled={onFocusHandled} />
       </div>}
