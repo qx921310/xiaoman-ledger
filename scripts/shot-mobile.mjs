@@ -112,7 +112,8 @@ if (loginRes.ok) {
     })
   }
 }
-await cdp.send('Page.navigate', { url: URL_ARG })
+const bustUrl = URL_ARG + (URL_ARG.includes('?') ? '&' : '?') + 'v=' + Date.now()
+await cdp.send('Page.navigate', { url: bustUrl })
 await sleep(3000)
 await cdp.shot('01-home.png')
 
@@ -129,7 +130,8 @@ const clickByText = async (text, file) => {
   })()`)
   await sleep(1200)
   await cdp.shot(file)
-  console.log(ok ? `点击「${text}」` : `未找到「${text}」`)
+  const snippet = await cdp.evaluate("document.body.innerText.replace(/\\s+/g,' ').slice(0,240)")
+  console.log(ok ? `点击「${text}」` : `未找到「${text}」`, '｜正文:', snippet)
 }
 for (const [i, step] of steps.entries()) {
   await clickByText(step, `${String(i + 2).padStart(2, '0')}-step.png`)
