@@ -615,3 +615,43 @@ test('只读账本：命令层拒绝退款', () => {
   useLedger.setState({ accountBooks: [{ accountBookId: 1, bookId: 1, accountBookName: 'A', ownerId: 1, memberCount: 1, role: 'silent' }] } as never)
   assert.equal(st().addRefund({ billId: bill.billId, number: 5, assetId: st().bills[0].assetId }), false, '只读账本禁止退款')
 })
+
+test('拆分：跨币种账户（人民币账单 + 外币账户）必须拒绝', () => {
+  reset()
+  st().addAsset({ assetName: '美元', assetType: 1, assetNumber: 900, currency: 'USD', bookId: 1 } as never)
+  const usdAsset = st().assets.find((a) => a.currency === 'USD')!
+  const parent = st().parentCategories.find((p) => p.kind === 'expense')!
+  const bill = st().addBill({ assetId: usdAsset.assetId, parentCategoryId: parent.id, cost: 100, billType: 2, time: Date.now(), bookId: 1 } as never)
+  const before = st().assets.find((a) => a.assetId === usdAsset.assetId)!.assetNumber
+  assert.equal(st().splitBill(bill.billId, [{ num: 40 }, { num: 60 }] as never), false, '外币账户账单不得拆分')
+  assert.equal(st().assets.find((a) => a.assetId === usdAsset.assetId)!.assetNumber, before, '余额不得变化')
+})
+
+test('拆分中断：第二笔创建失败时余额必须恢复', () => {
+  reset()
+  const bill = seedExpense(30, 1)
+  const assetId = st().bills[0].assetId
+  const before = st().assets[0].assetNumber
+  const originalAdd = st().addBill
+  let calls = 0
+  useLedger.setState({
+    addBill: (input: never) => {
+      calls += 1
+      if (calls >= 1) throw new Error('注入失败')
+      return originalAdd(input)
+    }
+  } as never)
+  const ok = st().splitBill(bill.billId, [{ num: 10 }, { num: 20 }] as never)
+  useLedger.setState({ addBill: originalAdd } as never)
+  assert.equal(ok, false, '创建失败应返回 false')
+  assert.equal(st().bills.length, 1, '不应残留半成品账单')
+  assert.equal(st().assets[0].assetNumber, before, '余额必须回到拆分前')
+})
+
+test('只读账本：命令层拒绝 updateBill 改金额', () => {
+  reset()
+  const bill = seedExpense(30, 1)
+  useLedger.setState({ accountBooks: [{ accountBookId: 1, bookId: 1, accountBookName: 'A', ownerId: 1, memberCount: 1, role: 'silent' }] } as never)
+  st().updateBill(bill.billId, { cost: 99 })
+  assert.equal(st().bills[0].cost, 30, '只读账本不允许改金额')
+})

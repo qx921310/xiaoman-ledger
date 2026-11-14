@@ -234,13 +234,6 @@ const BUSINESS_KEYS = [
 
 
 /** 命令层只读守卫：按目标账本的 role 判断，silent（历史只读）一律拒绝写入 */
-/** 回滚用：移除刚创建的账单，不写墓碑（拆分失败不应在同步里留下删除记录） */
-function rollbackBills(ids: Array<string | number>) {
-  if (!ids.length) return
-  const drop = new Set(ids.map(String))
-  useLedger.setState((st) => ({ bills: st.bills.filter((b) => !drop.has(String(b.billId))) }) as never)
-}
-
 function bookWritable(bookId: string | number | undefined, books: Array<{ bookId?: number | string; role?: string }>) {
   if (bookId == null || String(bookId) === '') return true
   const hit = books.find((b) => String(b.bookId ?? '') === String(bookId))
@@ -1024,8 +1017,17 @@ export const useLedger = create<LedgerState>()(
           if (p.childCategoryId && !s.childCategories.some((c) => c.id === p.childCategoryId)) return false
           if (!s.assets.some((a) => a.assetId === assetId)) return false
         }
-        // 外币账单：各分录若按当前汇率重算会与原子账单的账户金额不一致，暂不支持拆分
+        // 外币/跨币种：只要「账单核算币种或任一账户币种」与本位币不同，就拒绝拆分。
+        // 只判断 currencyInfo 不够——人民币账单用美元账户支付时该字段可能为空，
+        // 但账户金额是按外币冻结的，拆分重算会改变余额。
+        const originAsset = s.assets.find((a) => a.assetId === origin.assetId)
+        const baseCurrency = s.defaultCurrency
         if (origin.currencyInfo) return false
+        if (originAsset?.currency && originAsset.currency !== baseCurrency) return false
+        for (const p of valid) {
+          const acc = s.assets.find((a) => a.assetId === (p.assetId ?? origin.assetId))
+          if (acc?.currency && acc.currency !== (originAsset?.currency ?? baseCurrency)) return false
+        }
 
         // 4) 参与拆分的账单不能已属于其他组合
         const grouped = new Set((s.billGroups ?? []).flatMap((g) => g.billList.map(String)))
@@ -1063,8 +1065,9 @@ export const useLedger = create<LedgerState>()(
             created.push({ billId: bill.billId, created: true, cost, share, p })
           }
         } catch {
-          // 任何一笔写入失败：直接移除已创建的账单（不产生同步墓碑），原账单保持不动
-          rollbackBills(created.filter((r) => r.created).map((r) => r.billId))
+          // 写入失败：用受控 set 移除已创建账单（走余额派生，且不产生同步墓碑）
+          const drop = new Set(created.filter((r) => r.created).map((r) => String(r.billId)))
+          if (drop.size) set((st) => ({ bills: st.bills.filter((b) => !drop.has(String(b.billId))) }))
           return false
         }
 
@@ -1085,7 +1088,8 @@ export const useLedger = create<LedgerState>()(
           remark: origin.remark
         })
         if (!groupedOk) {
-          rollbackBills(created.filter((r) => r.created).map((r) => r.billId))
+          const drop = new Set(created.filter((r) => r.created).map((r) => String(r.billId)))
+          if (drop.size) set((st) => ({ bills: st.bills.filter((b) => !drop.has(String(b.billId))) }))
           get().updateBill(origin.billId, {
             parentCategoryId: origin.parentCategoryId,
             childCategoryId: origin.childCategoryId,
@@ -1104,6 +1108,8 @@ export const useLedger = create<LedgerState>()(
         const s = get()
         const group = (s.billGroups ?? []).find((g) => g.billGroupId === billGroupId)
         if (!group) return false
+        { const anchor = s.bills.find((b) => String(b.billId) === String(group.firstBillId))
+          if (anchor && !bookWritable(anchor.bookId, s.accountBooks)) return false }
         if (patch.billList) {
           const ids = patch.billList.map(String)
           if (new Set(ids).size !== ids.length) return false
@@ -1182,6 +1188,7 @@ export const useLedger = create<LedgerState>()(
         const s = get()
         const old = s.bills.find((b) => b.billId === billId)
         if (!old) return
+        if (!bookWritable(old.bookId, s.accountBooks)) return
         const refunded = s.refunds.filter((r) => r.billId === billId).reduce((sum, r) => sum + (r.baseAmount ?? 0), 0)
         if (patch.cost != null && (!Number.isFinite(patch.cost) || patch.cost < refunded)) return
         const deltaOf = (b: Bill) =>
@@ -1635,6 +1642,10 @@ export const useLedger = create<LedgerState>()(
 
       // 编辑已有退款：校验累计不超过账单金额；余额由退款派生，自动跟着变
       updateRefund: (refundId, patch) => {
+        { const st2 = get()
+          const rec = st2.refunds.find((r) => r.refundId === refundId)
+          const owner = rec ? st2.bills.find((b) => String(b.billId) === String(rec.billId)) : undefined
+          if (owner && !bookWritable(owner.bookId, st2.accountBooks)) return false }
         const s = get()
         const rec = s.refunds.find((r) => r.refundId === refundId)
         if (!rec) return false

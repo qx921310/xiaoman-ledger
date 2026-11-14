@@ -169,6 +169,8 @@ export async function queueBookPatch(bookId: string, patch: Record<string, unkno
       baseUpdatedAt: existing?.baseUpdatedAt ?? baseUpdatedAt ?? null,
       at: Date.now(),
       operationId: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      // 在途快照不可被新编辑覆盖：A 已发出但响应丢失时，必须能用原 opId + 原 payload 重放
+      sending: existing?.sending,
       conflict: existing?.conflict
     }
     await req(store.put(record))
@@ -291,7 +293,8 @@ async function flushRound(uid: number): Promise<{ roundSent: number; roundConfli
           const key = keyOf(uid, row.bookId)
           const current = await readOne(store, key)
           if (!current) return false
-          if (current.operationId === claimed.operationId) {
+          const samePatch = JSON.stringify(current.patch ?? {}) === JSON.stringify(claimed.patch ?? {})
+          if (samePatch) {
             await req(store.delete(key))
             return false
           }
@@ -318,12 +321,17 @@ async function flushRound(uid: number): Promise<{ roundSent: number; roundConfli
           })
           conflicted++
         } else {
-          // 离线/网络错误：清掉发送标记，下次重试沿用同一 operationId（幂等）
+          // 离线/网络错误：保留原快照并要求立刻重放（startedAt=0），
+          // 重放保证同一 operationId + 同一 payload，服务端可幂等去重
           await withStore('readwrite', async (store) => {
             const key = keyOf(uid, row.bookId)
             const current = await readOne(store, key)
             if (!current) return
-            await req(store.put({ ...current, sending: undefined }))
+            const prev = current.sending as { operationId?: string; patch?: Record<string, unknown>; baseUpdatedAt?: number | null } | undefined
+            const keep = prev?.operationId && prev.patch
+              ? { ...prev, startedAt: 0 }
+              : current.sending
+            await req(store.put({ ...current, sending: keep }))
           })
         }
       }
