@@ -15,3 +15,7 @@ server/.env
 
 # 临时分析产物
 .tmp-*
+
+# 截图产物
+.shots/
+.shots*/
