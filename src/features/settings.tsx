@@ -266,6 +266,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [newGroup, setNewGroup] = useState('')
   const [newMember, setNewMember] = useState<Record<number, string>>({})
   const [newCat, setNewCat] = useState<{ parentId: number; kind: 'expense' | 'income'; name: string; icon: string } | null>(null)
+  const [newCatScoped, setNewCatScoped] = useState(false)
   const addCycle = useLedger((s) => s.addCycle)
   const deleteCycle = useLedger((s) => s.deleteCycle)
   const toggleCycle = useLedger((s) => s.toggleCycle)
@@ -1083,12 +1084,24 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
             <option value="">默认</option>
             {(newCat.parentId === 0 ? PARENT_ICONS : CHILD_ICONS).map((k) => <option key={k} value={k}>{k}</option>)}
           </select>
+          <label className="row">
+            <span className="grow">仅在本账本显示</span>
+            <input type="checkbox" checked={newCatScoped} onChange={(e) => setNewCatScoped(e.target.checked)} />
+          </label>
+          <p className="hint">在其他账本将默认不显示，只显示在本账本</p>
           <div className="modal-btns">
-            <button className="ghost" onClick={() => setNewCat(null)}>取消</button>
+            <button className="ghost" onClick={() => { setNewCat(null); setNewCatScoped(false) }}>取消</button>
             <button className="primary" onClick={() => {
               if (!newCat.name.trim()) return notify('请填写名称')
-              addCategory({ ...newCat, name: newCat.name.trim(), icon: newCat.icon || undefined })
-              setNewCat(null)
+              const created = addCategory({ ...newCat, name: newCat.name.trim(), icon: newCat.icon || undefined })
+              // 一木 AddAccountBookActivity.Y(long)：仅本账本 = 把该分类从其它账本隐藏（hideBook 记其它账本号）
+              if (newCatScoped && accountBooks.length > 1) {
+                const others = accountBooks
+                  .filter((b) => b.bookId && String(b.bookId) !== String(currentBookId))
+                  .map((b) => b.bookId as number | string)
+                if (others.length) updateCategory(created.id, { hideBook: others })
+              }
+              setNewCat(null); setNewCatScoped(false)
               notify('分类已添加')
             }}>保存</button>
           </div>
