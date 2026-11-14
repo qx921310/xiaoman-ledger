@@ -130,6 +130,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [filesOpen, setFilesOpen] = useState(false)
   const [budgetOpen, setBudgetOpen] = useState(false)
   const [splitOpen, setSplitOpen] = useState(false)
+  const [aboutOpen, setAboutOpen] = useState(false)
   const [cycleDrill, setCycleDrill] = useState<{ title: string; cycleId: string | number } | null>(null)
   const [backupOpen, setBackupOpen] = useState(false)
   // 一木 UserInfoActivity：昵称与头像可改（本地保存，账号维度）
@@ -484,6 +485,17 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       {filesOpen && <BillFiles notify={notify} onBack={() => setFilesOpen(false)} />}
       {budgetOpen && <BudgetManager notify={notify} onBack={() => setBudgetOpen(false)} />}
       {splitOpen && <SplitManager notify={notify} onBack={() => setSplitOpen(false)} />}
+
+      {aboutOpen && (
+        <Modal label="关于" onClose={() => setAboutOpen(false)}>
+          <h3>关于小满记账</h3>
+          <div className="row"><span className="grow">版本</span><span className="muted">v1 · {new Date().getFullYear()}</span></div>
+          <div className="row"><span className="grow">存储</span><span className="muted">本地优先，多设备同步</span></div>
+          <div className="row"><span className="grow">数据</span><span className="muted">导出 JSON / Excel，随时带走</span></div>
+          <p className="hint">小满记账：小有盈余，日子清楚。</p>
+          <button type="button" className="ghost wide" onClick={() => setAboutOpen(false)}>知道了</button>
+        </Modal>
+      )}
       {dreamOpen && <DreamList notify={notify} onBack={() => setDreamOpen(false)} />}
       {aiTypeOpen && <AiTypeManager notify={notify} onBack={() => setAiTypeOpen(false)} />}
 
@@ -574,6 +586,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
               return
             }
             if (key === 'theme') { notify('敬请期待：主题设置'); return }
+            if (key === 'about') { setAboutOpen(true); return }
             notify('敬请期待')
           }}>{label}</button>
         ))}
