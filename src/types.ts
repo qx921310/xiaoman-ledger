@@ -526,6 +526,9 @@ export interface Refund {
   /** Refunded amount in the ledger's base currency, captured when recorded. */
   baseAmount?: number
   number: number
+  /** 退款发生时间与备注（真机退款页有这两项） */
+  time?: number
+  remark?: string
   userId: number
   updateTime: number
 }

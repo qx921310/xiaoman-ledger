@@ -112,7 +112,7 @@ interface LedgerState {
   addLend: (patch: { type: 1 | 2 | 3 | 4; assetId: number; counterparty: string; number: number; interest?: number; repaymentAssetId?: number; time?: number; remark?: string; parentLendId?: number; bookId?: string | number }) => void
   repayLend: (patch: { lendId: number; amount: number; repaymentAssetId?: number; time?: number }) => void
   deleteLend: (lendId: number) => void
-  addRefund: (patch: { billId: string | number; number: number; assetId?: number; baseAmount?: number }) => void
+  addRefund: (patch: { billId: string | number; number: number; assetId?: number; baseAmount?: number; time?: number; remark?: string }) => boolean
   deleteRefund: (refundId: number) => void
   updateRefund: (refundId: number, patch: { number?: number; assetId?: number; baseAmount?: number }) => boolean
   setBudget: (budget: Budget) => void
@@ -986,37 +986,66 @@ export const useLedger = create<LedgerState>()(
         if (!origin) return false
         const valid = parts.filter((p) => Number(p.num) > 0)
         if (valid.length < 2) return false
-        const total = +valid.reduce((n, p) => n + Number(p.num), 0).toFixed(2)
+
+        // 1) 金额必须与原子账单完全一致（一木：拆分不改变总额），浮点用分比较
+        const cents = (v: number) => Math.round(Number(v) * 100)
+        const totalCents = valid.reduce((n, p) => n + cents(p.num), 0)
+        if (totalCents !== cents(origin.cost)) return false
+
+        // 2) 已退款 / 已报销的账单不允许拆分：退款与报销引用会悬空，余额口径也无法保证
+        if ((s.refunds ?? []).some((r) => String(r.billId) === String(billId))) return false
+        if ((s.reimbursements ?? []).some((r) => String(r.billId) === String(billId))) return false
+
+        // 3) 每一笔的分类与账户都必须存在，且账户可用
+        for (const p of valid) {
+          const parentId = p.parentCategoryId ?? origin.parentCategoryId
+          const assetId = p.assetId ?? origin.assetId
+          if (!s.parentCategories.some((c) => c.id === parentId)) return false
+          if (p.childCategoryId && !s.childCategories.some((c) => c.id === p.childCategoryId)) return false
+          if (!s.assets.some((a) => a.assetId === assetId)) return false
+        }
+
+        // 4) 参与拆分的账单不能已属于其他组合
+        const grouped = new Set((s.billGroups ?? []).flatMap((g) => g.billList.map(String)))
+        if (grouped.has(String(origin.billId))) return false
+
         const discount = Math.abs(origin.discountNumber ?? 0)
         let allocated = 0
-        const created = valid.map((p, i) => {
-          const cost = +Number(p.num).toFixed(2)
-          const last = i === valid.length - 1
-          // 优惠按金额占比分摊，最后一笔取余数，保证合计不变
-          const share = discount > 0
-            ? (last ? +(discount - allocated).toFixed(2) : +(cost * discount / total).toFixed(2))
-            : undefined
-          if (share != null && !last) allocated = +(allocated + share).toFixed(2)
-          if (i === 0) {
-            // 第一笔沿用原账单
-            return { billId: origin.billId, created: false, cost, share, p }
+        const created: Array<{ billId: string | number; created: boolean; cost: number; share?: number; p: (typeof valid)[number] }> = []
+        try {
+          for (let i = 0; i < valid.length; i += 1) {
+            const p = valid[i]
+            const cost = +Number(p.num).toFixed(2)
+            const last = i === valid.length - 1
+            const share = discount > 0
+              ? (last ? +(discount - allocated).toFixed(2) : +((cents(cost) * discount) / (totalCents / 100) / 100).toFixed(2))
+              : undefined
+            if (share != null && !last) allocated = +(allocated + share).toFixed(2)
+            if (i === 0) {
+              created.push({ billId: origin.billId, created: false, cost, share, p })
+              continue
+            }
+            const bill = get().addBill({
+              assetId: p.assetId ?? origin.assetId,
+              parentCategoryId: p.parentCategoryId ?? origin.parentCategoryId,
+              childCategoryId: p.childCategoryId,
+              cost,
+              time: origin.time,
+              remark: p.remark ?? origin.remark,
+              bookId: origin.bookId,
+              discountNumber: share,
+              notIntoTotal: origin.notIntoTotal,
+              notIntoBudget: origin.notIntoBudget,
+              currencyInfo: origin.currencyInfo
+            })
+            created.push({ billId: bill.billId, created: true, cost, share, p })
           }
-          const bill = get().addBill({
-            assetId: p.assetId ?? origin.assetId,
-            parentCategoryId: p.parentCategoryId ?? origin.parentCategoryId,
-            childCategoryId: p.childCategoryId,
-            cost,
-            time: origin.time,
-            remark: p.remark ?? origin.remark,
-            bookId: origin.bookId,
-            discountNumber: share,
-            notIntoTotal: origin.notIntoTotal,
-            notIntoBudget: origin.notIntoBudget,
-            currencyInfo: origin.currencyInfo
-          })
-          return { billId: bill.billId, created: true, cost, share, p }
-        })
-        // 原账单改为第一笔的内容
+        } catch {
+          // 任何一笔写入失败：删除已创建的账单，原账单保持不动
+          for (const row of created) if (row.created) get().deleteBill(row.billId)
+          return false
+        }
+
         const first = created[0]
         get().updateBill(origin.billId, {
           parentCategoryId: first.p.parentCategoryId ?? origin.parentCategoryId,
@@ -1026,36 +1055,67 @@ export const useLedger = create<LedgerState>()(
           remark: first.p.remark ?? origin.remark,
           discountNumber: first.share
         })
-        // 原账单有报销：为后续每笔补一条待报销
-        if (origin.isReimbursement === 1) {
-          const claim = s.reimbursements.find((r) => String(r.billId) === String(origin.billId) && r.status !== 'ended')
-          if (claim) {
-            for (const row of created.slice(1)) {
-              get().addReimbursement({ billId: row.billId, assetId: claim.assetId, number: row.cost, detail: claim.detail })
-            }
-          }
-        }
-        // 用 BillGroup 关联拆出的账单（一木 b0.C(group, ids)）
-        return get().createBillGroup(created.map((c) => c.billId), {
+
+        // 组合失败时整体回滚，避免出现「拆开了但没建立关联」的半成品
+        const groupedOk = get().createBillGroup(created.map((c) => c.billId), {
           parentCategoryId: origin.parentCategoryId,
           childCategoryId: origin.childCategoryId,
           remark: origin.remark
         })
+        if (!groupedOk) {
+          for (const row of created) if (row.created) get().deleteBill(row.billId)
+          get().updateBill(origin.billId, {
+            parentCategoryId: origin.parentCategoryId,
+            childCategoryId: origin.childCategoryId,
+            assetId: origin.assetId,
+            cost: origin.cost,
+            remark: origin.remark,
+            discountNumber: origin.discountNumber
+          })
+          return false
+        }
+        return true
       },
 
       /** 一木 BillGroupActivity：编辑组合的分类 / 子分类 / 备注 / 成员 */
-      updateBillGroup: (billGroupId, patch) => set((s) => ({
-        billGroups: s.billGroups.map((g) => {
-          if (g.billGroupId !== billGroupId) return g
-          const next = { ...g, ...patch, updateTime: NOW() }
-          if (patch.billList) {
-            const picked = s.bills.filter((b) => patch.billList!.map(String).includes(String(b.billId)))
-            next.totalNumber = +picked.reduce((sum, b) => sum + b.cost, 0).toFixed(2)
-            next.firstBillId = patch.billList[0] ?? g.firstBillId
+      updateBillGroup: (billGroupId, patch) => {
+        const s = get()
+        const group = (s.billGroups ?? []).find((g) => g.billGroupId === billGroupId)
+        if (!group) return false
+        if (patch.billList) {
+          const ids = patch.billList.map(String)
+          if (new Set(ids).size !== ids.length) return false
+          const picked = s.bills.filter((b) => ids.includes(String(b.billId)))
+          if (picked.length !== ids.length) return false
+          // 同账本约束（与创建时一致）：以组合首个账单的账本为准
+          const bookOf = (id: string | number) => {
+            const b = s.bills.find((x) => String(x.billId) === String(id))
+            return String(b?.bookId ?? '')
           }
-          return next
-        })
-      })),
+          const targetBook = bookOf(group.firstBillId ?? ids[0])
+          if (picked.some((b) => String(b.bookId ?? '') !== targetBook)) return false
+          // 不能吞并已属于其它组合的账单
+          const otherGrouped = new Set(
+            (s.billGroups ?? []).filter((g) => g.billGroupId !== billGroupId)
+              .flatMap((g) => g.billList.map(String))
+          )
+          if (ids.some((id) => otherGrouped.has(id))) return false
+        }
+        set((state) => ({
+          billGroups: state.billGroups.map((g) => {
+            if (g.billGroupId !== billGroupId) return g
+            const next = { ...g, ...patch, updateTime: NOW() }
+            if (patch.billList) {
+              const ids = patch.billList.map(String)
+              const picked = state.bills.filter((b) => ids.includes(String(b.billId)))
+              next.totalNumber = +picked.reduce((sum, b) => sum + b.cost, 0).toFixed(2)
+              next.firstBillId = patch.billList[0] ?? g.firstBillId
+            }
+            return next
+          })
+        }))
+        return true
+      },
 
       removeFromBillGroup: (billGroupId, billId) => set((s) => ({
         billGroups: s.billGroups
@@ -1540,7 +1600,12 @@ export const useLedger = create<LedgerState>()(
       }),
 
       // 账户余额由退款流水自动推导，不再手动改缓存。
-      addRefund: (patch) => set((s) => addRefundChanges(s, patch, NOW())),
+      addRefund: (patch) => {
+        const changes = addRefundChanges(get(), patch, NOW())
+        if (!changes || Object.keys(changes).length === 0) return false
+        set(changes as never)
+        return true
+      },
       deleteRefund: (refundId) => set((s) => deleteRefundChanges(s, refundId, NOW())),
 
       // 编辑已有退款：校验累计不超过账单金额；余额由退款派生，自动跟着变

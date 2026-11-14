@@ -550,22 +550,28 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
         <button type="button" className="link" aria-label="更多操作" onClick={() => setMoreOpen((v) => !v)}>⋯</button>
         {moreOpen && (
           <div className="detail-menu" role="menu">
-            <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); setAttrOpen(true) }}>属性设置</button>
-            <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); setSplitting(true) }}>账单拆分</button>
-            <button type="button" role="menuitem" onClick={() => {
+            <button type="button" role="menuitem" disabled={!!readOnly} onClick={() => { setMoreOpen(false); setAttrOpen(true) }}>属性设置</button>
+            <button type="button" role="menuitem" disabled={!!readOnly} onClick={() => { setMoreOpen(false); setSplitting(true) }}>账单拆分</button>
+            <button type="button" role="menuitem" disabled={!!readOnly} onClick={() => {
               setMoreOpen(false)
-              addTemplate({
-                name: `${p?.name ?? '账单'}模板`,
-                parentCategoryId: bill.parentCategoryId,
-                childCategoryId: bill.childCategoryId,
-                assetId: bill.assetId,
-                cost: bill.cost,
-                remark: bill.remark,
-                billType: bill.billType
-              } as never)
-              alert('已存为模板')
+              const saved = addTemplate({
+                name: bill.remark?.trim() || `${p?.name ?? '账单'}模板`,
+                mode: 'bill',
+                bookId: bill.bookId,
+                bill: {
+                  assetId: bill.assetId,
+                  parentCategoryId: bill.parentCategoryId,
+                  childCategoryId: bill.childCategoryId,
+                  cost: bill.cost,
+                  remark: bill.remark,
+                  notIntoTotal: bill.notIntoTotal,
+                  notIntoBudget: bill.notIntoBudget,
+                  currencyInfo: bill.currencyInfo
+                }
+              })
+              alert(saved ? '已存为模板' : '保存模板失败')
             }}>转为模板</button>
-            <button type="button" role="menuitem" className="danger" onClick={() => {
+            <button type="button" role="menuitem" className="danger" disabled={!!readOnly} onClick={() => {
               setMoreOpen(false)
               if (confirm('删除这笔账单？')) { del(bill.billId); onClose() }
             }}>删除</button>
@@ -787,13 +793,20 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
             <button type="button" className="rp-done" aria-label="完成" onClick={() => {
               const v = Number(refundAmt) || 0
               if (v <= 0) { alert('请输入退款金额'); return }
-              addRefund({ billId: bill.billId, number: v })
-              setRefundAmt(''); setRefundOpen(false)
+              const ok = addRefund({
+                billId: bill.billId,
+                number: v,
+                assetId: refundAsset || bill.assetId,
+                time: refundDate ? new Date(`${refundDate}T12:00:00`).getTime() : Date.now(),
+                remark: refundRemark
+              })
+              if (!ok) { alert('退款失败：金额超过可退额度，或该账户汇率未设置'); return }
+              setRefundAmt(''); setRefundRemark(''); setRefundOpen(false)
             }}>✓</button>
           </div>
           <div className="rp-body">
             <div className="rp-field">
-              <span>退款金额({a?.currency ?? defaultCurrency})</span>
+              <span>退款金额({assets.find((x) => x.assetId === (refundAsset || bill.assetId))?.currency ?? a?.currency ?? defaultCurrency})</span>
               <input aria-label="退款金额" inputMode="decimal" value={refundAmt} placeholder="请输入金额"
                 onChange={(e) => setRefundAmt(e.target.value.replace(/[^\d.]/g, ''))} />
             </div>
@@ -857,8 +870,9 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
         {readOnly && <span className="muted">当前账本只读，不能修改账单</span>}
       </div>
       <div className="detail-bar">
-        <button type="button" className="db-refund" onClick={() => { setRefundAmt(''); setRefundOpen(true) }}>退款</button>
-        <button type="button" className="db-edit" onClick={onEdit}>编辑</button>
+        <button type="button" className="db-refund" disabled={!!readOnly}
+          onClick={() => { setRefundAmt(''); setRefundOpen(true) }}>退款</button>
+        <button type="button" className="db-edit" disabled={!!readOnly} onClick={onEdit}>编辑</button>
       </div>
     </section>
   )

@@ -12,7 +12,7 @@ type RefundState = {
   tombstones: Tombstone[]
   userId: number
 }
-type NewRefund = { billId: string | number; number: number; assetId?: number; baseAmount?: number }
+type NewRefund = { billId: string | number; number: number; assetId?: number; baseAmount?: number; time?: number; remark?: string }
 
 export function addRefundChanges(s: RefundState, input: NewRefund, now: number) {
   const bill = s.bills.find((b) => b.billId === input.billId)
@@ -31,7 +31,8 @@ export function addRefundChanges(s: RefundState, input: NewRefund, now: number) 
   const rec: Refund = {
     refundId, billId: bill.billId, assetId: asset.assetId, currency: asset.currency ?? s.defaultCurrency,
     bookId: (bill as { bookId?: string | number }).bookId,
-    number: amount, baseAmount: base, userId: s.userId, updateTime: now
+    number: amount, baseAmount: base, time: input.time ?? now,
+    remark: input.remark?.trim() || undefined, userId: s.userId, updateTime: now
   }
   return {
     refunds: [rec, ...s.refunds],

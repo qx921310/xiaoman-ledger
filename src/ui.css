@@ -1400,3 +1400,6 @@ button.day-btn {
 .wc-item b { font-size: var(--font-lg); color: var(--ink); font-variant-numeric: tabular-nums; }
 .wc-item b.out { color: var(--out); }
 .wc-item b.in { color: var(--in); }
+
+/* 只读账本：详情操作不可点 */
+.detail-menu button:disabled, .detail-bar button:disabled { opacity: .45; cursor: not-allowed; }

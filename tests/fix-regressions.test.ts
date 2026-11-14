@@ -510,3 +510,71 @@ test('生效账本：空数组=全部隐藏，未设置=全部可见', () => {
   const onlyA = { ...base, showBook: [1] } as never
   assert.equal(visibleAssets([onlyA], 2, 1).length, 0, '仅在 A 账本可见时 B 账本看不到')
 })
+
+// ===== CR 2026-11-14：拆分总额/事务、组合跨账本、退款字段 =====
+
+const seedAsset = () => {
+  st().addAsset({ assetName: '现金', assetType: 1, assetNumber: 100, currency: 'CNY', bookId: 1 } as never)
+  return st().assets[0].assetId
+}
+const seedExpense = (cost: number, bookId: number) => {
+  const assetId = seedAsset()
+  const parent = st().parentCategories.find((p) => p.kind === 'expense')!
+  return st().addBill({ assetId, parentCategoryId: parent.id, cost, billType: 2, time: Date.now(), bookId } as never)
+}
+
+test('拆分：总额不等于原账单必须拒绝，且余额不变', () => {
+  reset()
+  const bill = seedExpense(30, 1)
+  const before = st().assets[0].assetNumber
+  const ok = st().splitBill(bill.billId, [{ num: 20 }, { num: 20 }] as never)
+  assert.equal(ok, false, '20+20 与 30 不符应拒绝')
+  assert.equal(st().bills.length, 1, '只应保留原账单')
+  assert.equal(st().assets[0].assetNumber, before, '余额不得变化')
+})
+
+test('拆分：已退款的账单拒绝拆分', () => {
+  reset()
+  const bill = seedExpense(30, 1)
+  const assetId = st().bills[0].assetId
+  assert.equal(st().addRefund({ billId: bill.billId, number: 5, assetId }), true)
+  const before = st().assets[0].assetNumber
+  const ok = st().splitBill(bill.billId, [{ num: 10 }, { num: 20 }] as never)
+  assert.equal(ok, false, '已退款账单不应允许拆分')
+  assert.equal(st().assets[0].assetNumber, before)
+})
+
+test('拆分：总额一致时成功且余额不变', () => {
+  reset()
+  const bill = seedExpense(30, 1)
+  const before = st().assets[0].assetNumber
+  const ok = st().splitBill(bill.billId, [{ num: 10 }, { num: 20 }] as never)
+  assert.equal(ok, true)
+  assert.equal(st().assets[0].assetNumber, before, '拆分不改变总支出')
+})
+
+test('退款：账户/日期/备注写入记录，超额退款被拒绝', () => {
+  reset()
+  const bill = seedExpense(30, 1)
+  const assetId = st().bills[0].assetId
+  const time = Date.now() - 86400000
+  assert.equal(st().addRefund({ billId: bill.billId, number: 10, assetId, time, remark: '部分退' }), true)
+  const rec = st().refunds[0]
+  assert.equal(rec.assetId, assetId)
+  assert.equal(rec.time, time)
+  assert.equal(rec.remark, '部分退')
+  assert.equal(st().addRefund({ billId: bill.billId, number: 999, assetId }), false, '超额必须拒绝')
+})
+
+test('组合编辑：不允许跨账本成员进入同一组', () => {
+  reset()
+  const a1 = seedExpense(10, 1)
+  const a2 = st().addBill({ assetId: a1.assetId, parentCategoryId: a1.parentCategoryId, cost: 15, billType: 2, time: Date.now(), bookId: 1 } as never)
+  const b1 = seedExpense(20, 2)
+  const created = st().createBillGroup([a1.billId, a2.billId] as never, { remark: 'x' } as never)
+  assert.equal(created, true, '同账本两笔应能成组')
+  const group = st().billGroups[0]
+  const ok = st().updateBillGroup(group.billGroupId, { billList: [a1.billId, a2.billId, b1.billId] } as never)
+  assert.equal(ok, false, '跨账本账单不得并入同一组合')
+  assert.equal(st().billGroups[0].billList.length, 2, '组合成员保持不变')
+})

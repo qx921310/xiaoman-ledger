@@ -129,8 +129,15 @@ async function migrateLegacy(uid: number): Promise<void> {
       await req(store.put({ ...entry, key }))
     }
   })
-  // 事务已提交成功，才可以删旧数据
-  localStorage.removeItem(legacyScopedKey(uid))
+  // 事务已提交成功，才清理已落库的条目；未确认归属或未迁移的必须留在旧键里
+  try {
+    const leftover = JSON.parse(rawScoped || '{}') as Record<string, unknown>
+    for (const bookId of Object.keys(parsed)) delete leftover[bookId]
+    if (Object.keys(leftover).length > 0) localStorage.setItem(legacyScopedKey(uid), JSON.stringify(leftover))
+    else localStorage.removeItem(legacyScopedKey(uid))
+  } catch {
+    localStorage.removeItem(legacyScopedKey(uid))
+  }
   const remaining: Record<string, unknown> = {}
   if (rawGlobal) {
     try {
@@ -243,11 +250,16 @@ async function flushRound(uid: number): Promise<{ roundSent: number; roundConfli
         const key = keyOf(uid, row.bookId)
         const current = await readOne(store, key)
         if (!current || current.conflict) return undefined
-        if (current.sending) return undefined
+        // 领取租约：超过 60s 的 sending 视为上次会话中断，允许用同一 operationId 原样重放
+        const LEASE_MS = 60_000
+        if (current.sending) {
+          const startedAt = (current.sending as { startedAt?: number }).startedAt ?? 0
+          if (startedAt && Date.now() - startedAt < LEASE_MS) return undefined
+        }
         const operationId = current.operationId
           ?? globalThis.crypto?.randomUUID?.()
           ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`
-        const sending = { operationId, patch: current.patch, baseUpdatedAt: current.baseUpdatedAt }
+        const sending = { operationId, patch: current.patch, baseUpdatedAt: current.baseUpdatedAt, startedAt: Date.now() }
         await req(store.put({ ...current, operationId, sending }))
         return { operationId, patch: current.patch, baseUpdatedAt: current.baseUpdatedAt }
       })
