@@ -546,6 +546,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         </Modal>
       )}
 
+      {!meScreen && (<>
       <h3>功能</h3>
       <div className="my-grid">
         {([
@@ -602,6 +603,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
           }}>{label}</button>
         ))}
       </div>
+      </>)}
 
       {meScreen === 'data' && (<>
       <button type="button" className="link" onClick={() => setMeScreen(null)}>‹ 返回我的</button>
