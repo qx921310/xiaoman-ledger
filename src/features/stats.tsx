@@ -354,6 +354,64 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
         添加分类预算
       </button>
 
+      {mods['标签占比'] && tagRows.length > 0 && (
+        <>
+          <div className="label">标签占比</div>
+          <div className="stats-chart" role="img" aria-label="标签支出占比饼图">
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie data={tagRows.slice(0, 6).map((r) => ({ name: r.name, value: r.amount }))}
+                  dataKey="value" nameKey="name" innerRadius={48} outerRadius={78} paddingAngle={2}>
+                  {tagRows.slice(0, 6).map((r, i) => (
+                    <Cell key={r.name} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(v) => money(Number(v))} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </>
+      )}
+
+      {mods['收支对比'] && (() => {
+        const compare = [
+          { label: '收入', 金额: rangeSummary.income },
+          { label: '支出', 金额: rangeSummary.expense },
+          { label: '结余', 金额: +(rangeSummary.income - rangeSummary.expense).toFixed(2) }
+        ]
+        return (
+          <>
+            <div className="label">收支对比</div>
+            <div className="stats-chart" role="img" aria-label="收支对比条形图">
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart data={compare} layout="vertical">
+                  <XAxis type="number" hide />
+                  <YAxis type="category" dataKey="label" width={48} tick={{ fontSize: 11 }} />
+                  <Tooltip formatter={(v) => money(Number(v))} />
+                  <Bar dataKey="金额" fill="var(--accent)" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </>
+        )
+      })()}
+
+      {mods['资产走势'] && (
+        <>
+          <div className="label">资产走势 <small className="muted">（估算：以当前余额回推）</small></div>
+          <div className="stats-chart" role="img" aria-label="资产走势折线图">
+            <ResponsiveContainer width="100%" height={180}>
+              <LineChart data={assetTrend}>
+                <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                <YAxis hide />
+                <Tooltip formatter={(v) => money(Number(v))} />
+                <Line type="monotone" dataKey="净值" stroke="var(--accent)" dot={false} strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </>
+      )}
+
       <TrendChart points={trend} onPickDay={(key) => {
         // 一木 activity_statistics_bill_info：点某天看当天账单
         const billsOfDay = rangeBills.filter((b) => {
@@ -488,64 +546,6 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
           </>
         )
       })()}
-
-      {mods['标签占比'] && tagRows.length > 0 && (
-        <>
-          <div className="label">标签占比</div>
-          <div className="stats-chart" role="img" aria-label="标签支出占比饼图">
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie data={tagRows.slice(0, 6).map((r) => ({ name: r.name, value: r.amount }))}
-                  dataKey="value" nameKey="name" innerRadius={48} outerRadius={78} paddingAngle={2}>
-                  {tagRows.slice(0, 6).map((r, i) => (
-                    <Cell key={r.name} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(v) => money(Number(v))} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </>
-      )}
-
-      {mods['收支对比'] && (() => {
-        const compare = [
-          { label: '收入', 金额: rangeSummary.income },
-          { label: '支出', 金额: rangeSummary.expense },
-          { label: '结余', 金额: +(rangeSummary.income - rangeSummary.expense).toFixed(2) }
-        ]
-        return (
-          <>
-            <div className="label">收支对比</div>
-            <div className="stats-chart" role="img" aria-label="收支对比条形图">
-              <ResponsiveContainer width="100%" height={160}>
-                <BarChart data={compare} layout="vertical">
-                  <XAxis type="number" hide />
-                  <YAxis type="category" dataKey="label" width={48} tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(v) => money(Number(v))} />
-                  <Bar dataKey="金额" fill="var(--accent)" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </>
-        )
-      })()}
-
-      {mods['资产走势'] && (
-        <>
-          <div className="label">资产走势 <small className="muted">（估算：以当前余额回推）</small></div>
-          <div className="stats-chart" role="img" aria-label="资产走势折线图">
-            <ResponsiveContainer width="100%" height={180}>
-              <LineChart data={assetTrend}>
-                <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-                <YAxis hide />
-                <Tooltip formatter={(v) => money(Number(v))} />
-                <Line type="monotone" dataKey="净值" stroke="var(--accent)" dot={false} strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </>
-      )}
 
       {mods['支出占比'] && expenseRows.length > 0 && (
         <>
