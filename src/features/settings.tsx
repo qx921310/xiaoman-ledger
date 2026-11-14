@@ -538,21 +538,20 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       <h3>功能</h3>
       <div className="my-grid">
         {([
-          ['自动记账', 'auto'],
-          ['智能分类', 'ai'],
-          ['周期记账', 'cycle'],
           ['账本管理', 'book'],
+          ['分类管理', 'cat'],
+          ['标签管理', 'tag'],
+          ['导入导出', 'import'],
+          ['愿望清单', 'dream'],
           ['预算管理', 'budget'],
           ['AA 分账', 'split'],
           ['模板记账', 'tpl'],
-          ['标签管理', 'tag'],
-          ['分类管理', 'cat'],
+          ['周期记账', 'cycle'],
+          ['智能分类', 'ai'],
           ['数据备份', 'backup'],
-          ['导入导出', 'import'],
           ['主题设置', 'theme'],
           ['安全设置', 'gesture'],
           ['使用指南', 'guide'],
-          ['愿望清单', 'dream'],
           ['更多应用', 'apps'],
           ['关于', 'about'],
         ] as Array<[string, string]>).map(([label, key]) => (
