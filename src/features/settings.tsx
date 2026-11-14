@@ -18,6 +18,7 @@ import { SplitManager } from './split'
 import { MortgageCalc } from './mortgage'
 import { RateConvert } from './rate-convert'
 import { InvestCalc } from './invest-calc'
+import { TaxCalc } from './tax-calc'
 import { DreamList } from './dreams'
 import { FilteredBills } from './filtered-bills'
 import { TemplateList } from './templates'
@@ -137,6 +138,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [mortgageOpen, setMortgageOpen] = useState(false)
   const [rateOpen, setRateOpen] = useState(false)
   const [investOpen, setInvestOpen] = useState(false)
+  const [taxOpen, setTaxOpen] = useState(false)
   const [meScreen, setMeScreen] = useState<'book' | 'cat' | 'tag' | 'data' | null>(null)
   const [cycleDrill, setCycleDrill] = useState<{ title: string; cycleId: string | number } | null>(null)
   const [backupOpen, setBackupOpen] = useState(false)
@@ -496,6 +498,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       {mortgageOpen && <MortgageCalc onBack={() => setMortgageOpen(false)} notify={notify} />}
       {rateOpen && <RateConvert onBack={() => setRateOpen(false)} notify={notify} />}
       {investOpen && <InvestCalc onBack={() => setInvestOpen(false)} notify={notify} />}
+      {taxOpen && <TaxCalc onBack={() => setTaxOpen(false)} notify={notify} />}
 
       {aboutOpen && (
         <Modal label="关于" onClose={() => setAboutOpen(false)}>
@@ -1040,6 +1043,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
           ['房贷计算', () => setMortgageOpen(true)],
           ['利率换算', () => setRateOpen(true)],
           ['理财收益', () => setInvestOpen(true)],
+          ['个税计算', () => setTaxOpen(true)],
         ] as Array<[string, () => void]>).map(([label, run]) => (
           <button key={label} type="button" className="my-grid-item" onClick={run}>{label}</button>
         ))}
