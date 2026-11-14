@@ -79,6 +79,22 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
 
   }, [rangeBills, assets, bills, transfers, lends, refunds, reimbursements, assetFlows, parents, currencies, defaultCurrency])
 
+  // 近 7 日概览（对齐一木统计页首块：支出/收入 + 结余/日均支出）
+  const weekStats = useMemo(() => {
+    const now = Date.now()
+    const from = now - 7 * 86400000
+    let out = 0
+    let inc = 0
+    for (const b of bills) {
+      if (b.time < from || b.time > now) continue
+      if (b.notIntoTotal) continue
+      const kind = parents.find((p) => p.id === b.parentCategoryId)?.kind
+      if (kind === 'income') inc += b.cost
+      else out += billNetAmount(b, refunds)
+    }
+    return { out: +out.toFixed(2), inc: +inc.toFixed(2), net: +(inc - out).toFixed(2), avg: +(out / 7).toFixed(2) }
+  }, [bills, parents, refunds])
+
   const daySeries = useMemo(() => {
     const map = new Map<string, number>()
     for (const b of monthBills) {
@@ -501,6 +517,19 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
           </>
         )
       })()}
+
+      {/* 近 7 日统计（真机首块） */}
+      <div className="week-card">
+        <div className="wc-hd"><b>近7日统计</b><span className="muted">支出 · 收入</span></div>
+        <div className="wc-row">
+          <div className="wc-item"><small>支出</small><b className="out">{money(weekStats.out)}</b></div>
+          <div className="wc-item"><small>收入</small><b className="in">{money(weekStats.inc)}</b></div>
+        </div>
+        <div className="wc-row">
+          <div className="wc-item"><small>结余</small><b>{money(weekStats.net)}</b></div>
+          <div className="wc-item"><small>日均支出</small><b>{money(weekStats.avg)}</b></div>
+        </div>
+      </div>
 
       {mods['资产走势'] && (
         <>

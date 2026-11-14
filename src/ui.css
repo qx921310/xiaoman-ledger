@@ -1388,3 +1388,15 @@ button.day-btn {
 .detail-more > summary::-webkit-details-marker { display: none; }
 .detail-more > summary::after { content: '›'; float: right; transform: rotate(90deg); }
 .detail-more[open] > summary::after { transform: rotate(-90deg); }
+
+/* 统计：近7日概览卡（对齐真机首块） */
+.week-card { background: var(--card); border-radius: var(--r-md); padding: 14px 16px; display: grid; gap: 10px; }
+.wc-hd { display: flex; align-items: baseline; justify-content: space-between; }
+.wc-hd b { font-size: var(--font-md); color: var(--ink); }
+.wc-hd .muted { font-size: var(--font-xs); }
+.wc-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.wc-item { display: grid; gap: 2px; }
+.wc-item small { color: var(--muted); font-size: var(--font-xs); }
+.wc-item b { font-size: var(--font-lg); color: var(--ink); font-variant-numeric: tabular-nums; }
+.wc-item b.out { color: var(--out); }
+.wc-item b.in { color: var(--in); }
