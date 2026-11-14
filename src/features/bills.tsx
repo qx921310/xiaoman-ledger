@@ -581,6 +581,14 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
         })()}
         <Row label="账单日期">{dayOf(bill.time)} {hhmm(bill.time)}</Row>
         <Row label="收支账户">{a && <AssetIcon type={a.assetType} name={a.assetName} icon={a.assetIcon} size={20} />}{a?.assetName ?? '无'}</Row>
+        <Row label="备注">{bill.remark || '无'}</Row>
+        <Row label="标签">
+          {(bill.tags && bill.tags.length)
+            ? bill.tags.map((t) => (
+              <span key={t} className="tag" style={{ background: tagColor(t) ?? undefined, color: 'var(--ink)' }}>{t}</span>
+            ))
+            : '无'}
+        </Row>
         {billRefunds.map((refund) => {
           const refundAsset = assets.find((x) => x.assetId === (refund.assetId ?? bill.assetId))
           return <Row key={refund.refundId} label="已退款">{refund.baseAmount != null ? money(refund.baseAmount) : accountMoney(refund.number, refund.currency ?? refundAsset?.currency, currencies, defaultCurrency)} · {refundAsset?.assetName ?? '账户'}</Row>
@@ -613,14 +621,6 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
             </Row>
           )
         })()}
-        <Row label="备注">{bill.remark || '无'}</Row>
-        <Row label="标签">
-          {(bill.tags && bill.tags.length)
-            ? bill.tags.map((t) => (
-              <span key={t} className="tag" style={{ background: tagColor(t) ?? undefined, color: 'var(--ink)' }}>{t}</span>
-            ))
-            : '无'}
-        </Row>
         <Row label="附件">{bill.files && bill.files.length ? `${bill.files.length} 个` : '无'}</Row>
         <DetailToggle label="不计入收支" on={!!bill.notIntoTotal} onToggle={() => updateBill(bill.billId, { notIntoTotal: !bill.notIntoTotal })} />
         <DetailToggle label="不计入预算" on={!!bill.notIntoBudget} onToggle={() => updateBill(bill.billId, { notIntoBudget: !bill.notIntoBudget })} />
