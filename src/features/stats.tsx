@@ -260,20 +260,6 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
         <AssetSankey />
       </details>
 
-      <TrendChart points={trend} onPickDay={(key) => {
-        // 一木 activity_statistics_bill_info：点某天看当天账单
-        const billsOfDay = rangeBills.filter((b) => {
-          const d = new Date(b.time)
-          const label = month.slice(5, 7) === String(d.getMonth() + 1).padStart(2, '0')
-            ? `${d.getDate()}` : `${d.getMonth() + 1}-${d.getDate()}`
-          return key === label || key === `${d.getMonth() + 1}-${d.getDate()}`
-        })
-        setDetail({ kind: 'day', title: key, bills: billsOfDay })
-      }} />
-      <CategoryChart title="支出分类" rows={expenseRows} onPick={(id, name) => setDrill({ title: name, catId: id })} />
-      <CategoryChart title="收入分类" rows={incomeRows} onPick={(id, name) => setDrill({ title: name, catId: id })} />
-
-      <div className="label">预算</div>
       {totalBudget > 0 ? (
         <div className="budget-box">
           <div className="budget-line">
@@ -368,6 +354,20 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
         添加分类预算
       </button>
 
+      <TrendChart points={trend} onPickDay={(key) => {
+        // 一木 activity_statistics_bill_info：点某天看当天账单
+        const billsOfDay = rangeBills.filter((b) => {
+          const d = new Date(b.time)
+          const label = month.slice(5, 7) === String(d.getMonth() + 1).padStart(2, '0')
+            ? `${d.getDate()}` : `${d.getMonth() + 1}-${d.getDate()}`
+          return key === label || key === `${d.getMonth() + 1}-${d.getDate()}`
+        })
+        setDetail({ kind: 'day', title: key, bills: billsOfDay })
+      }} />
+      <CategoryChart title="支出分类" rows={expenseRows} onPick={(id, name) => setDrill({ title: name, catId: id })} />
+      <CategoryChart title="收入分类" rows={incomeRows} onPick={(id, name) => setDrill({ title: name, catId: id })} />
+
+      <div className="label">预算</div>
       {mods['收支统计'] && trend.length > 0 && rangeMode === 'custom' && (
         <>
           <div className="label">收支趋势（折线）</div>
