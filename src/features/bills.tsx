@@ -527,6 +527,7 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
   const [claimOpen, setClaimOpen] = useState(false)
   const [claimAsset, setClaimAsset] = useState(0)
   const [moreOpen, setMoreOpen] = useState(false)
+  const [tagSheet, setTagSheet] = useState(false)
   const [claimAmt, setClaimAmt] = useState('')
   const instalment = instalments.find((i) => String(i.billId) === String(bill.billId))
   useEffect(() => {
@@ -583,11 +584,10 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
         <Row label="收支账户">{a && <AssetIcon type={a.assetType} name={a.assetName} icon={a.assetIcon} size={20} />}{a?.assetName ?? '无'}</Row>
         <Row label="备注">{bill.remark || '无'}</Row>
         <Row label="标签">
-          {(bill.tags && bill.tags.length)
-            ? bill.tags.map((t) => (
-              <span key={t} className="tag" style={{ background: tagColor(t) ?? undefined, color: 'var(--ink)' }}>{t}</span>
-            ))
-            : '无'}
+          {(bill.tags && bill.tags.length) ? bill.tags.map((t) => (
+            <span key={t} className="tag" style={{ background: tagColor(t) ?? undefined, color: 'var(--ink)' }}>{t}</span>
+          )) : null}
+          <button type="button" className="link" onClick={() => setTagSheet(true)}>点击添加</button>
         </Row>
         {billRefunds.map((refund) => {
           const refundAsset = assets.find((x) => x.assetId === (refund.assetId ?? bill.assetId))
@@ -621,7 +621,38 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
             </Row>
           )
         })()}
-        <Row label="附件">{bill.files && bill.files.length ? `${bill.files.length} 个` : '无'}</Row>
+        <Row label="附件">
+          {bill.files && bill.files.length ? bill.files.map((f) => (
+            <a key={f.remotePath} href={f.remotePath} target="_blank" rel="noreferrer" className="tag">{f.name}</a>
+          )) : null}
+          <label className="link">点击添加
+            <input type="file" hidden aria-label="添加附件"
+              accept="image/png,image/jpeg,image/webp,image/gif,application/pdf"
+              onChange={async (e) => {
+                let f = e.target.files?.[0]
+                if (!f) return
+                try {
+                  if (f.type.startsWith('image/')) {
+                    f = await imageCompression(f, { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true })
+                  }
+                  const res = await fetch(`/api/files?name=${encodeURIComponent(f.name)}`, {
+                    method: 'POST', credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/octet-stream' }, body: f
+                  })
+                  const data = await res.json()
+                  if (data.code !== 0) throw new Error(data.msg || '上传失败')
+                  updateBill(bill.billId, {
+                    files: [...(bill.files ?? []), {
+                      fileId: Date.now(), billId: bill.billId, name: data.result.name,
+                      fileName: data.result.name, fileSize: f.size, remotePath: data.result.url
+                    }]
+                  })
+                } catch (err) {
+                  alert(err instanceof Error ? err.message : '上传失败')
+                }
+              }} />
+          </label>
+        </Row>
         <DetailToggle label="不计入收支" on={!!bill.notIntoTotal} onToggle={() => updateBill(bill.billId, { notIntoTotal: !bill.notIntoTotal })} />
         <DetailToggle label="不计入预算" on={!!bill.notIntoBudget} onToggle={() => updateBill(bill.billId, { notIntoBudget: !bill.notIntoBudget })} />
         <Row label="所属账本">{bk?.accountBookName ?? '默认账本'}</Row>
@@ -676,6 +707,29 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
         </Row>
 
         </details>
+      {tagSheet && (
+        <div className="sheet-mask" onClick={() => setTagSheet(false)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="sheet-hd"><b>选择标签</b></div>
+            <div className="sheet-body">
+              {tags.filter((t) => !t.hide).map((t) => {
+                const on = (bill.tags ?? []).includes(t.name)
+                return (
+                  <button key={t.tagId} type="button" className="sheet-row" onClick={() => {
+                    const next = on ? bill.tags.filter((x) => x !== t.name) : [...(bill.tags ?? []), t.name]
+                    updateBill(bill.billId, { tags: next })
+                  }}>
+                    <i className={'sheet-dot' + (on ? ' on' : '')} aria-hidden="true" />
+                    <span>{t.name}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <div className="sheet-ft"><button type="button" className="ghost" onClick={() => setTagSheet(false)}>完成</button></div>
+          </div>
+        </div>
+      )}
+
       {refundOpen && (
         <section className="refund-page" aria-label="退款">
           <div className="rp-head">
