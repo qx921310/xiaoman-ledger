@@ -1363,3 +1363,15 @@ button.day-btn {
 .rp-field span { color: var(--muted); font-size: var(--font-sm); flex: none; }
 .rp-field input, .rp-field select { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--ink); font-size: var(--font-md); text-align: right; }
 .rp-sub { color: var(--muted); font-size: var(--font-xs); padding: 0 4px; }
+
+/* 标签管理：色点 + 名称 + 详情设置（对齐一木的轻量列表） */
+.pane-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 14px 0 6px; }
+.pane-head h3 { margin: 0; font-size: var(--font-md); color: var(--ink); }
+.tag-row { min-height: 52px; }
+.tag-name { font-size: var(--font-md); color: var(--ink); }
+.tag-more { flex: none; position: relative; }
+.tag-more summary { list-style: none; cursor: pointer; color: var(--muted); font-size: var(--font-xs); }
+.tag-more summary::-webkit-details-marker { display: none; }
+.tag-more[open] { display: grid; gap: 6px; }
+.tag-more[open] summary { color: var(--accent); }
+.tag-more select, .tag-more .color { max-width: 150px; }

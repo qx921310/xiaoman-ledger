@@ -188,6 +188,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const updateTag = useLedger((s) => s.updateTag)
   const deleteTag = useLedger((s) => s.deleteTag)
   const [newTag, setNewTag] = useState('')
+  const [addingTag, setAddingTag] = useState(false)
   const [newTagParent, setNewTagParent] = useState('')
   const setBook = useLedger((s) => s.setBook)
   const updateBookMeta = useLedger((s) => s.updateBookMeta)
@@ -1176,14 +1177,17 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         )
       })}
 
-      <h3>标签</h3>
-      <p className="hint"></p>
+      <div className="pane-head">
+        <h3>标签管理</h3>
+        <button type="button" className="link" onClick={() => setAddingTag(true)}>新增</button>
+      </div>
       {tags.length === 0 && <p className="hint"></p>}
       {tags.map((t) => (
-        <div key={t.tagId} className="row">
+        <div key={t.tagId} className="row tag-row">
           <span className="tag-dot" style={{ background: t.color }} />
-          <div className="grow">
-            <div>{t.name}{t.parentName ? <span className="tag">属于 {t.parentName}</span> : null}</div>
+          <span className="grow tag-name">{t.name}{t.parentName ? <span className="tag">属于 {t.parentName}</span> : null}</span>
+          <details className="tag-more">
+            <summary aria-label={`${t.name} 设置`}>设置</summary>
             <select aria-label={`${t.name} 的父标签`} value={t.parentTagId ?? ''}
               onChange={(e) => updateTag(t.tagId, { parentTagId: e.target.value ? Number(e.target.value) : undefined })}>
               <option value="">顶层标签</option>
@@ -1195,18 +1199,13 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
               <input type="checkbox" checked={Boolean(t.hide)} onChange={(e) => updateTag(t.tagId, { hide: e.target.checked })} />
               记账时不显示
             </label>
-          </div>
-          <input
-            aria-label={`${t.name} 标签颜色`}
-            className="color"
-            type="color"
-            value={t.color}
-            onChange={(e) => updateTag(t.tagId, { color: e.target.value })}
-          />
+            <input aria-label={`${t.name} 标签颜色`} className="color" type="color" value={t.color}
+              onChange={(e) => updateTag(t.tagId, { color: e.target.value })} />
+          </details>
           <button className="del" aria-label={`删除标签 ${t.name}`} onClick={() => deleteTag(t.tagId)}>删</button>
         </div>
       ))}
-      <div className="row2">
+      {addingTag && <div className="row2">
         <input aria-label="新标签名" value={newTag} placeholder="新标签名" onChange={(e) => setNewTag(e.target.value)} />
         <select aria-label="新标签的父标签" value={newTagParent} onChange={(e) => setNewTagParent(e.target.value)}>
           <option value="">顶层标签</option>
@@ -1219,9 +1218,10 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
           addTag({ name: newTag.trim(), color: DEFAULT_TAG_COLOR, parentTagId: newTagParent ? Number(newTagParent) : undefined })
           setNewTag('')
           setNewTagParent('')
+          setAddingTag(false)
           notify('标签已添加')
         }}>添加标签</button>
-      </div>
+      </div>}
 
       <h3>币种与汇率</h3>
       <div className="row">
