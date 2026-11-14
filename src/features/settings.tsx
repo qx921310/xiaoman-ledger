@@ -608,10 +608,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         <button type="button" className="link" onClick={() => setFilesOpen(true)}>查看账单图片</button>
       </div>
       <h3>从其他记账软件迁移</h3>
-      <p className="hint">
-        支持 <b>一木记账导出的 Excel/CSV</b>（表头含 日期/收支类型/金额/类别/二级分类/账户）、
-        转账流水表，以及含时间与金额的通用表格。疑似重复的账单会提示核对，并全部保留。
-      </p>
+      <p className="hint">支持 Excel/CSV 与转账流水表，重复账单会提示核对。</p>
 
       <label className="filebtn big">
         选择文件（.xlsx / .xls / .csv）
