@@ -119,7 +119,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
   const [moreInfo, setMoreInfo] = useState(false)
   const [summaryText, setSummaryText] = useState<string | null>(null)
   // 一木统计页的 11 个可勾选模块（StatisticsModule）
-  const MODULES = ['支出占比', '支出数据', '收支统计', '收支对比', '标签占比', '标签数据', '资产走势', '账户收支', '本月总结', '报表统计', '成员收支'] as const
+  const MODULES = ['收支统计', '收支对比', '资产走势', '支出占比', '标签占比', '标签数据', '支出数据', '账户收支', '本月总结', '报表统计', '成员收支'] as const
   const [modOpen, setModOpen] = useState(false)
   const [drill, setDrill] = useState<{ title: string; catId: number } | null>(null)
   const [detail, setDetail] = useState<{ kind: 'category' | 'tag' | 'account' | 'day'; title: string; bills: typeof bills } | null>(null)
