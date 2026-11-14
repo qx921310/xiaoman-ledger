@@ -351,7 +351,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
       </button>
 
       <details className="stats-extra">
-        <summary>查看资产构成</summary>
+        <summary>查看资产分布</summary>
         <AssetSankey />
       </details>
 
