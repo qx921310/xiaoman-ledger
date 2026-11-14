@@ -131,7 +131,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [budgetOpen, setBudgetOpen] = useState(false)
   const [splitOpen, setSplitOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
-  const [meScreen, setMeScreen] = useState<'book' | 'cat' | 'tag' | null>(null)
+  const [meScreen, setMeScreen] = useState<'book' | 'cat' | 'tag' | 'data' | null>(null)
   const [cycleDrill, setCycleDrill] = useState<{ title: string; cycleId: string | number } | null>(null)
   const [backupOpen, setBackupOpen] = useState(false)
   // 一木 UserInfoActivity：昵称与头像可改（本地保存，账号维度）
@@ -567,7 +567,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
             if (key === 'cat') { setMeScreen('cat'); window.scrollTo({ top: 0 }); return }
             if (key === 'tag') { setMeScreen('tag'); window.scrollTo({ top: 0 }); return }
             if (key === 'cycle') { jump('sec-cycle'); return }
-            if (key === 'backup' || key === 'import') { jump('sec-data'); return }
+            if (key === 'backup' || key === 'import') { setMeScreen('data'); window.scrollTo({ top: 0 }); return }
             if (key === 'dream') { setDreamOpen(true); return }
             if (key === 'ai') { setAiTypeOpen(true); return }
             if (key === 'guide') { setGuideOpen(true); return }
@@ -593,6 +593,8 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         ))}
       </div>
 
+      {meScreen === 'data' && (<>
+      <button type="button" className="link" onClick={() => setMeScreen(null)}>‹ 返回我的</button>
       <h3>数据</h3>
       <div className="my-data">
         <div className="row"><span className="grow">云同步</span><span className="muted">{syncLine}</span></div>
@@ -1029,6 +1031,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       </div>
 
       <button type="button" className="link" onClick={() => setMeScreen(null)}>‹ 返回我的</button>
+      </>)}
       {meScreen === 'book' && (<>
       <button type="button" className="link" onClick={() => setMeScreen(null)}>‹ 返回我的</button>
       <h3>账本</h3>
