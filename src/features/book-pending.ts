@@ -121,18 +121,21 @@ async function migrateLegacy(uid: number): Promise<void> {
   }
   if (!Object.keys(parsed).length) return
 
+  const written = new Set<string>()
   await withStore('readwrite', async (store) => {
     for (const [bookId, entry] of Object.entries(parsed)) {
       const key = keyOf(uid, bookId)
       const existing = await readOne(store, key)
-      if (existing) continue                          // 已在库里：不覆盖更新的草稿
+      if (existing) continue                          // 已在库里：不覆盖更新的草稿，旧条目必须保留
       await req(store.put({ ...entry, key }))
+      written.add(bookId)
     }
   })
   // 事务已提交成功，才清理已落库的条目；未确认归属或未迁移的必须留在旧键里
   try {
     const leftover = JSON.parse(rawScoped || '{}') as Record<string, unknown>
-    for (const bookId of Object.keys(parsed)) delete leftover[bookId]
+    // 只清理「确实写入 IndexedDB」的条目；被跳过（已有草稿）或未确认归属的一律保留
+    for (const bookId of written) delete leftover[bookId]
     if (Object.keys(leftover).length > 0) localStorage.setItem(legacyScopedKey(uid), JSON.stringify(leftover))
     else localStorage.removeItem(legacyScopedKey(uid))
   } catch {
