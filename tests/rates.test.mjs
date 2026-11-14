@@ -68,6 +68,13 @@ test('汇率接口：未登录 401，登录后返回 CFETS 中间价且 JPY 已�
     }
   } finally {
     child.kill()
-    await rm(temp, { recursive: true, force: true })
+    // Windows 上 sqlite 句柄释放有延迟，直接删临时目录会偶发 EBUSY，重试几次
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      try { await rm(temp, { recursive: true, force: true }); break }
+      catch (e) {
+        if (attempt === 7) throw e
+        await new Promise((r) => setTimeout(r, 200))
+      }
+    }
   }
 })
