@@ -797,27 +797,33 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
       )}
 
       {claimOpen && (
-        <Modal label="报销" onClose={() => setClaimOpen(false)}>
-          <h3>报销</h3>
-          <div className="label">报销账户</div>
-          <select aria-label="报销账户" value={claimAsset} onChange={(e) => setClaimAsset(Number(e.target.value))}>
-            <option value={0}>请选择账户</option>
-            {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
-          </select>
-          <div className="label">报销金额</div>
-          <input aria-label="报销金额" inputMode="decimal" value={claimAmt}
-            onChange={(e) => setClaimAmt(e.target.value.replace(/[^\d.]/g, ''))} />
-          <div className="modal-btns">
-            <button className="ghost" onClick={() => setClaimOpen(false)}>取消</button>
-            <button className="primary" onClick={() => {
+        <section className="refund-page" aria-label="报销">
+          <div className="rp-head">
+            <button type="button" className="rp-back" aria-label="返回" onClick={() => setClaimOpen(false)}>‹</button>
+            <h3>报销</h3>
+            <button type="button" className="rp-done" aria-label="完成" onClick={() => {
               const v = Number(claimAmt) || 0
-              if (v > 0 && claimAsset) {
-                addReimbursement({ billId: bill.billId, assetId: claimAsset, number: v })
-                setClaimAmt(''); setClaimOpen(false)
-              }
-            }}>保存报销</button>
+              if (v <= 0) { alert('请输入报销金额'); return }
+              if (!claimAsset) { alert('请选择报销账户'); return }
+              addReimbursement({ billId: bill.billId, assetId: claimAsset, number: v })
+              setClaimAmt(''); setClaimOpen(false)
+            }}>✓</button>
           </div>
-        </Modal>
+          <div className="rp-body">
+            <div className="rp-field">
+              <span>报销金额</span>
+              <input aria-label="报销金额" inputMode="decimal" value={claimAmt} placeholder="请输入金额"
+                onChange={(e) => setClaimAmt(e.target.value.replace(/[^\d.]/g, ''))} />
+            </div>
+            <div className="rp-field">
+              <span>报销账户</span>
+              <select aria-label="报销账户" value={claimAsset} onChange={(e) => setClaimAsset(Number(e.target.value))}>
+                <option value={0}>请选择账户</option>
+                {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
+              </select>
+            </div>
+          </div>
+        </section>
       )}
 
       <div className="bill-page-actions">
