@@ -194,7 +194,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
       )}
 
       <div className="stats-tabs" role="tablist" aria-label="统计视图">
-        {([['month', '普通'], ['year', '年度'], ['custom', '自定义']] as const).map(([key, label]) => (
+        {([['month', '月统计'], ['year', '年统计'], ['custom', '自定义']] as const).map(([key, label]) => (
           <button key={key} type="button" role="tab"
             aria-selected={rangeMode === key}
             className={rangeMode === key ? 'on' : ''}
