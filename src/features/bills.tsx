@@ -529,6 +529,7 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
   const [moreOpen, setMoreOpen] = useState(false)
   const [tagSheet, setTagSheet] = useState(false)
   const [splitting, setSplitting] = useState(false)
+  const [attrOpen, setAttrOpen] = useState(false)
   const addTemplate = useLedger((st) => st.addTemplate)
   const [claimAmt, setClaimAmt] = useState('')
   const instalment = instalments.find((i) => String(i.billId) === String(bill.billId))
@@ -549,6 +550,7 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
         <button type="button" className="link" aria-label="更多操作" onClick={() => setMoreOpen((v) => !v)}>⋯</button>
         {moreOpen && (
           <div className="detail-menu" role="menu">
+            <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); setAttrOpen(true) }}>属性设置</button>
             <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); setSplitting(true) }}>账单拆分</button>
             <button type="button" role="menuitem" onClick={() => {
               setMoreOpen(false)
@@ -748,6 +750,27 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
               })}
             </div>
             <div className="sheet-ft"><button type="button" className="ghost" onClick={() => setTagSheet(false)}>完成</button></div>
+          </div>
+        </div>
+      )}
+
+      {attrOpen && (
+        <div className="sheet-mask" onClick={() => setAttrOpen(false)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="sheet-hd"><b>属性设置</b></div>
+            <div className="sheet-body">
+              <label className="row">
+                <span className="grow">不计入收支</span>
+                <input type="checkbox" checked={!!bill.notIntoTotal}
+                  onChange={(e) => updateBill(bill.billId, { notIntoTotal: e.target.checked })} />
+              </label>
+              <label className="row">
+                <span className="grow">不计入预算</span>
+                <input type="checkbox" checked={!!bill.notIntoBudget}
+                  onChange={(e) => updateBill(bill.billId, { notIntoBudget: e.target.checked })} />
+              </label>
+            </div>
+            <div className="sheet-ft"><button type="button" className="ghost" onClick={() => setAttrOpen(false)}>完成</button></div>
           </div>
         </div>
       )}
