@@ -19,6 +19,8 @@ import { MortgageCalc } from './mortgage'
 import { RateConvert } from './rate-convert'
 import { InvestCalc } from './invest-calc'
 import { TaxCalc } from './tax-calc'
+import { PrepayCalc } from './prepay-calc'
+import { PensionCalc } from './pension-calc'
 import { DreamList } from './dreams'
 import { FilteredBills } from './filtered-bills'
 import { TemplateList } from './templates'
@@ -139,6 +141,8 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [rateOpen, setRateOpen] = useState(false)
   const [investOpen, setInvestOpen] = useState(false)
   const [taxOpen, setTaxOpen] = useState(false)
+  const [prepayOpen, setPrepayOpen] = useState(false)
+  const [pensionOpen, setPensionOpen] = useState(false)
   const [meScreen, setMeScreen] = useState<'book' | 'cat' | 'tag' | 'data' | null>(null)
   const [cycleDrill, setCycleDrill] = useState<{ title: string; cycleId: string | number } | null>(null)
   const [backupOpen, setBackupOpen] = useState(false)
@@ -499,6 +503,8 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       {rateOpen && <RateConvert onBack={() => setRateOpen(false)} notify={notify} />}
       {investOpen && <InvestCalc onBack={() => setInvestOpen(false)} notify={notify} />}
       {taxOpen && <TaxCalc onBack={() => setTaxOpen(false)} notify={notify} />}
+      {prepayOpen && <PrepayCalc onBack={() => setPrepayOpen(false)} notify={notify} />}
+      {pensionOpen && <PensionCalc onBack={() => setPensionOpen(false)} notify={notify} />}
 
       {aboutOpen && (
         <Modal label="关于" onClose={() => setAboutOpen(false)}>
@@ -620,6 +626,8 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
           ['利率换算', () => setRateOpen(true)],
           ['理财收益', () => setInvestOpen(true)],
           ['个税计算', () => setTaxOpen(true)],
+          ['提前还贷', () => setPrepayOpen(true)],
+          ['养老金测算', () => setPensionOpen(true)],
         ] as Array<[string, () => void]>).map(([label, run]) => (
           <button key={label} type="button" className="my-grid-item" onClick={run}>{label}</button>
         ))}
