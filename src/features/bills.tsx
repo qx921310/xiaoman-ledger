@@ -13,7 +13,7 @@ import { billNetAmount } from '../bill-amount'
 import { FilteredBills } from './filtered-bills'
 import { BillGroupEditor } from './bill-group'
 import { BillSplitEditor } from './bill-split'
-import { accountMoney, fromBase, hasCurrencyRate } from '../money'
+import { accountMoney, fromBase, hasCurrencyRate, currencySymbol, toBase } from '../money'
 import { resolveBillChild } from '../taxonomy'
 import { summarizeBills } from '../bill-summary'
 
@@ -520,6 +520,9 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
   const addRefund = useLedger((s2) => s2.addRefund)
   const addReimbursement = useLedger((s2) => s2.addReimbursement)
   const [refundOpen, setRefundOpen] = useState(false)
+  const [refundRemark, setRefundRemark] = useState('')
+  const [refundAsset, setRefundAsset] = useState(0)
+  const [refundDate, setRefundDate] = useState(new Date().toISOString().slice(0, 10))
   const [refundAmt, setRefundAmt] = useState('')
   const [claimOpen, setClaimOpen] = useState(false)
   const [claimAsset, setClaimAsset] = useState(0)
@@ -663,19 +666,43 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
         </Row>
 
       {refundOpen && (
-        <Modal label="退款" onClose={() => setRefundOpen(false)}>
-          <h3>退款</h3>
-          <div className="label">退款金额</div>
-          <input aria-label="退款金额" inputMode="decimal" value={refundAmt}
-            onChange={(e) => setRefundAmt(e.target.value.replace(/[^\d.]/g, ''))} />
-          <div className="modal-btns">
-            <button className="ghost" onClick={() => setRefundOpen(false)}>取消</button>
-            <button className="primary" onClick={() => {
+        <section className="refund-page" aria-label="退款">
+          <div className="rp-head">
+            <button type="button" className="rp-back" aria-label="返回" onClick={() => setRefundOpen(false)}>‹</button>
+            <h3>退款</h3>
+            <button type="button" className="rp-done" aria-label="完成" onClick={() => {
               const v = Number(refundAmt) || 0
-              if (v > 0) { addRefund({ billId: bill.billId, number: v }); setRefundAmt(''); setRefundOpen(false) }
-            }}>保存退款</button>
+              if (v <= 0) { alert('请输入退款金额'); return }
+              addRefund({ billId: bill.billId, number: v })
+              setRefundAmt(''); setRefundOpen(false)
+            }}>✓</button>
           </div>
-        </Modal>
+          <div className="rp-body">
+            <div className="rp-field">
+              <span>退款金额({a?.currency ?? defaultCurrency})</span>
+              <input aria-label="退款金额" inputMode="decimal" value={refundAmt} placeholder="请输入金额"
+                onChange={(e) => setRefundAmt(e.target.value.replace(/[^\d.]/g, ''))} />
+            </div>
+            {Number(refundAmt) > 0 && (a?.currency ?? defaultCurrency) !== defaultCurrency && (
+              <div className="rp-sub">折合 {currencySymbol(currencies, defaultCurrency, defaultCurrency)}{toBase(Number(refundAmt), a?.currency ?? defaultCurrency, currencies, defaultCurrency).toFixed(2)}</div>
+            )}
+            <div className="rp-field">
+              <span>备注</span>
+              <input aria-label="备注" value={refundRemark} placeholder="请输入备注" onChange={(e) => setRefundRemark(e.target.value)} />
+            </div>
+            <div className="rp-field">
+              <span>退款账户</span>
+              <select aria-label="退款账户" value={refundAsset} onChange={(e) => setRefundAsset(Number(e.target.value))}>
+                <option value={0}>请选择账户</option>
+                {assets.map((x) => <option key={x.assetId} value={x.assetId}>{x.assetName}</option>)}
+              </select>
+            </div>
+            <div className="rp-field">
+              <span>退款日期</span>
+              <input aria-label="退款日期" type="date" value={refundDate} onChange={(e) => setRefundDate(e.target.value)} />
+            </div>
+          </div>
+        </section>
       )}
 
       {claimOpen && (

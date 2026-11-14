@@ -1352,3 +1352,14 @@ button.day-btn {
 .db-refund, .db-edit { flex: 1; height: 46px; border-radius: var(--r-md); font-size: var(--font-md); cursor: pointer; }
 .db-refund { background: transparent; border: 1px solid var(--line); color: var(--danger-ink); }
 .db-edit { background: var(--accent); border: 0; color: var(--card); }
+
+/* 退款：整页表单（对齐一木：‹ 退款 ✓ + 四行字段） */
+.refund-page { position: fixed; inset: 0; z-index: 80; background: var(--bg); display: flex; flex-direction: column; }
+.rp-head { display: flex; align-items: center; gap: 8px; padding: 12px 12px 8px; }
+.rp-head h3 { flex: 1; margin: 0; text-align: center; font-size: var(--font-lg); color: var(--ink); }
+.rp-back, .rp-done { width: 40px; height: 40px; background: transparent; border: 0; font-size: var(--font-xl); color: var(--accent); cursor: pointer; }
+.rp-body { padding: 6px 16px 24px; display: grid; gap: 10px; }
+.rp-field { display: flex; align-items: center; gap: 12px; background: var(--card); border-radius: var(--r-md); padding: 14px 14px; }
+.rp-field span { color: var(--muted); font-size: var(--font-sm); flex: none; }
+.rp-field input, .rp-field select { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--ink); font-size: var(--font-md); text-align: right; }
+.rp-sub { color: var(--muted); font-size: var(--font-xs); padding: 0 4px; }
