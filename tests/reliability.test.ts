@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { useLedger } from '../src/store'
 import { loadAccountData } from '../src/account-session'
 import { assetMovements } from '../src/domain/asset-trend'
-import { queueBookPatch, flushBookPatches, conflictOf, hasPendingBookPatches, getBookPatch, clearBookPatch, resolveConflictUseServer, refreshBookPendingStatus } from '../src/features/book-pending'
+import { queueBookPatch, flushBookPatches, conflictOf, hasPendingBookPatches, getBookPatch, clearBookPatch, resolveConflictUseServer, refreshBookPendingStatus, selectMigrationCandidate } from '../src/features/book-pending'
 import { advanceSessionEpoch } from '../src/domain/session-epoch'
 import { setCurrentUid } from '../src/auth'
 import { deriveAssets, unresolvedReimbursementAssets } from '../src/balances'
@@ -399,5 +399,63 @@ test('已有 IDB 草稿与旧 localStorage 不同：立即待核对，不上传�
     assert.equal(await flushBookPatches().then((r) => r.sent), 0, '旧草稿不能在确认后被重新上传')
   } finally {
     globalThis.fetch = original
+  }
+})
+
+test('损坏的全局旧队列不参与迁移，也绝不能被迁移流程删除', async () => {
+  setCurrentUid(923)
+  useLedger.setState({ userId: 923, accountBooks: [{ bookId: 'A', accountBookId: 0, accountBookName: 'A', role: 'normal' }] } as never)
+  const broken = '{ this is not valid JSON'
+  localStorage.setItem('xiaoman-book-pending', broken)
+  try {
+    await queueBookPatch('A', { name: '新的可靠草稿' }, 1)
+    assert.equal(localStorage.getItem('xiaoman-book-pending'), broken, '无法解析的旧键必须原样保留，不能被空剩余队列覆盖')
+  } finally {
+    localStorage.removeItem('xiaoman-book-pending')
+  }
+})
+
+test('迁移冲突可明确选择全局旧草稿，再由用户确认是否保留本地', async () => {
+  setCurrentUid(924)
+  useLedger.setState({ userId: 924, accountBooks: [{ bookId: 'A', accountBookId: 0, accountBookName: 'A', role: 'normal' }] } as never)
+  localStorage.setItem('xiaoman-book-pending:924', JSON.stringify({ A: { name: '专属草稿' } }))
+  localStorage.setItem('xiaoman-book-pending', JSON.stringify({ A: { name: '全局草稿' } }))
+  try {
+    await queueBookPatch('A', { icon: '后续编辑' }, 1)
+    assert.equal((await getBookPatch('A'))?.patch.name, '专属草稿')
+    assert.equal(await selectMigrationCandidate('A', 'global'), true)
+    const selected = await getBookPatch('A')
+    assert.equal(selected?.patch.name, '全局草稿')
+    assert.equal(selected?.conflict, true, '选择候选不能自动提交或清理另一份草稿')
+    assert.ok(localStorage.getItem('xiaoman-book-pending:924'))
+    assert.ok(localStorage.getItem('xiaoman-book-pending'))
+  } finally {
+    localStorage.removeItem('xiaoman-book-pending:924')
+    localStorage.removeItem('xiaoman-book-pending')
+  }
+})
+
+test('迁移冲突的备份写入失败时，旧草稿必须保留', async () => {
+  setCurrentUid(925)
+  useLedger.setState({ userId: 925, accountBooks: [{ bookId: 'A', accountBookId: 0, accountBookName: 'A', role: 'normal' }] } as never)
+  const scopedKey = 'xiaoman-book-pending:925'
+  localStorage.setItem(scopedKey, JSON.stringify({ A: { name: '专属草稿' } }))
+  localStorage.setItem('xiaoman-book-pending', JSON.stringify({ A: { name: '全局草稿' } }))
+  const originalSetItem = localStorage.setItem.bind(localStorage)
+  try {
+    await queueBookPatch('A', { icon: '后续编辑' }, 1)
+    globalThis.localStorage.setItem = ((key: string, value: string) => {
+      if (key === 'xiaoman.legacyConflictBackup') throw new Error('模拟存储空间已满')
+      originalSetItem(key, value)
+    }) as typeof localStorage.setItem
+    const original = globalThis.fetch
+    globalThis.fetch = (async () => ({ json: async () => ({ code: 0, result: { books: [{ bookId: 'A', name: '云端', updatedAt: 1 }] } }) })) as typeof fetch
+    try { await resolveConflictUseServer('A') } finally { globalThis.fetch = original }
+    assert.ok(localStorage.getItem(scopedKey), '账号专属旧草稿不能在备份失败时删除')
+    assert.ok(localStorage.getItem('xiaoman-book-pending'), '全局旧草稿不能在备份失败时删除')
+  } finally {
+    globalThis.localStorage.setItem = originalSetItem as typeof localStorage.setItem
+    localStorage.removeItem(scopedKey)
+    localStorage.removeItem('xiaoman-book-pending')
   }
 })

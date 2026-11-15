@@ -222,16 +222,22 @@ async function migrateLegacy(uid: number, session: BookSession): Promise<void> {
   }
   const globalWritten = removable('global')
   const remaining: Record<string, unknown> = {}
+  // 解析失败时绝不能将 remaining（空对象）写回并删除原始全局键。
+  // 原文档强调“坏的旧数据忽略”，但“忽略”只能是不参与迁移，不能等同于丢弃。
+  let globalParsed = !rawGlobal
   if (rawGlobal) {
     try {
       const value = JSON.parse(rawGlobal) as Record<string, unknown>
+      globalParsed = true
       for (const [bookId, entry] of Object.entries(value)) {
         if (!ownBooks.has(bookId) || !globalWritten.has(bookId)) remaining[bookId] = entry
       }
-    } catch { /* 忽略 */ }
+    } catch { /* 保留未能解析的原始键，等待人工恢复 */ }
   }
-  if (Object.keys(remaining).length) localStorage.setItem(LEGACY_GLOBAL_KEY, JSON.stringify(remaining))
-  else localStorage.removeItem(LEGACY_GLOBAL_KEY)
+  if (globalParsed) {
+    if (Object.keys(remaining).length) localStorage.setItem(LEGACY_GLOBAL_KEY, JSON.stringify(remaining))
+    else localStorage.removeItem(LEGACY_GLOBAL_KEY)
+  }
 }
 
 /** 记录一次失败的账本保存，等待联网后补传 */
@@ -257,7 +263,9 @@ export async function queueBookPatch(bookId: string, patch: Record<string, unkno
       retry: undefined,
       error: undefined,
       conflict: existing?.conflict,
-      migrationConflict: existing?.migrationConflict
+      migrationConflict: existing?.migrationConflict,
+      // 后续编辑只合并 patch；迁移冲突的两份原始候选必须持续可供用户导出/选择。
+      migrationCandidates: existing?.migrationCandidates
     }
     await req(store.put(record))
   })
@@ -586,6 +594,37 @@ export async function conflictOf(bookId: string): Promise<PendingBookPatch | und
   return entry?.conflict ? entry : undefined
 }
 
+/** 迁移冲突时明确选用一个旧候选。仍保留 conflict，必须由用户再确认“保留本地”才会提交。 */
+export async function selectMigrationCandidate(bookId: string, source: 'scoped' | 'global'): Promise<boolean> {
+  const uid = getCurrentUid()
+  const session = captureSessionEpoch()
+  const entry = await getBookPatch(bookId)
+  const candidate = entry?.migrationCandidates?.find((item) => item.source === source)
+  if (!entry?.migrationConflict || !candidate) return false
+  try {
+    await withStore('readwrite', async (store) => {
+      const key = keyOf(uid, bookId)
+      const current = await readOne(store, key)
+      assertBookSession(session, uid)
+      if (!current?.migrationConflict) throw new Error('迁移冲突已发生变化，请重新核对')
+      await req(store.put({
+        ...current,
+        patch: candidate.patch,
+        baseUpdatedAt: candidate.baseUpdatedAt,
+        operationId: undefined,
+        sending: undefined,
+        retry: undefined,
+        conflict: true,
+        error: `已选择${source === 'global' ? '全局' : '账号专属'}旧草稿，请确认“保留本地”后提交`
+      }))
+    })
+    void refreshBookPendingStatus()
+    return true
+  } catch {
+    return false
+  }
+}
+
 const LEGACY_CONFLICT_BACKUP_KEY = 'xiaoman.legacyConflictBackup'
 
 /** 迁移冲突只有在用户明确选择保留哪一份后，才可丢弃旧键中的两个候选。
@@ -608,7 +647,10 @@ function discardLegacyMigrationConflict(uid: number, bookId: string, entry: Pend
         ...prev,
         [`${new Date().toISOString()}|${bookId}`]: backup
       }))
-    } catch { /* 备份失败则不清理，保证不丢数据 */ }
+    } catch {
+      // 备份失败时不可继续到下面的删除循环，否则候选会在“已选择”时丢失。
+      return
+    }
   }
   for (const key of [legacyScopedKey(uid), LEGACY_GLOBAL_KEY]) {
     try {

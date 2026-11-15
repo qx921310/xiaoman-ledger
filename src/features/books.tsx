@@ -4,7 +4,7 @@ import { books as bookApi } from '../auth'
 import { Modal } from '../ui/modal'
 import { HiddenPage } from './hidden-page'
 import { CatIcon } from '../ui/icons'
-import { queueBookPatch, flushBookPatches, conflictOf, resolveConflictKeepLocal, resolveConflictUseServer } from './book-pending'
+import { queueBookPatch, flushBookPatches, conflictOf, resolveConflictKeepLocal, resolveConflictUseServer, selectMigrationCandidate } from './book-pending'
 
 // 账本图标候选（一木 activity_add_account_book 的 icon_layout；这里用自有图标集）
 const BOOK_ICONS = ['ic_parent_daily', 'ic_parent_food', 'ic_parent_traffic', 'ic_parent_shopping',
@@ -28,14 +28,18 @@ export function BookManager({ notify, onBack }: { notify: (m: string) => void; o
   const [newIcon, setNewIcon] = useState(BOOK_ICONS[0])
   const [hidePage, setHidePage] = useState(false)
   const [conflicts, setConflicts] = useState<string[]>([])
+  const [migrationCandidateIds, setMigrationCandidateIds] = useState<Set<string>>(new Set())
   useEffect(() => {
     void flushBookPatches().then(async () => {
       const rows = await Promise.all(books.map(async (b) => {
         const id = String(b.bookId)
         if (!id) return null
-        return (await conflictOf(id)) ? id : null
+        const entry = await conflictOf(id)
+        return entry ? { id, hasGlobalCandidate: entry.migrationCandidates?.some((item) => item.source === 'global') ?? false } : null
       }))
-      setConflicts(rows.filter((x): x is string => !!x))
+      const active = rows.filter((x): x is { id: string; hasGlobalCandidate: boolean } => !!x)
+      setConflicts(active.map((x) => x.id))
+      setMigrationCandidateIds(new Set(active.filter((x) => x.hasGlobalCandidate).map((x) => x.id)))
     }).catch((e) => notify(e instanceof Error ? e.message : '账本同步失败'))
   }, [books])
   const [creating, setCreating] = useState(false)
@@ -123,6 +127,10 @@ export function BookManager({ notify, onBack }: { notify: (m: string) => void; o
                   setTimeout(() => URL.revokeObjectURL(a.href), 1000)
                   notify('已导出两份旧草稿候选')
                 }}>导出候选</button>
+                {migrationCandidateIds.has(id) && <button type="button" className="link" onClick={async () => {
+                  const ok = await selectMigrationCandidate(id, 'global')
+                  notify(ok ? '已选择全局旧草稿，请确认“保留本地”后提交' : '候选已变化，请重新核对')
+                }}>使用全局候选</button>}
                 <button type="button" className="link" onClick={async () => {
                   const ok = await resolveConflictKeepLocal(id)
                   notify(ok ? '已用本地内容覆盖' : '覆盖失败，请联网后重试')
