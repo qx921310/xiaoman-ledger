@@ -18,6 +18,9 @@ const EMAIL = arg('email', 'dual@xiaoman.test')
 const PASSWORD = arg('password', 'DualTest12345')
 const COUNT = Number(arg('count', '5'))
 const TAG = arg('tag', `dev${DEVICE}`)
+// 每轮唯一 runId：避免跨轮同前缀记录把「漏写」伪装成 PASS
+const RUN = arg('run', `run-${Date.now().toString(36)}`)
+const idPrefix = `${TAG}-${DEVICE}-${RUN}`
 const log = []
 
 // 网络层的抖动模拟：两个设备错开几百毫秒，制造真实并发
@@ -56,6 +59,7 @@ async function push(records) {
   return call('/api/data/push', { method: 'POST', body: JSON.stringify({ protocolVersion: 2, records }) })
 }
 
+let idemId = ''
 async function main() {
   if (!(await login())) throw new Error('登录失败')
   const first = await pull()
@@ -69,7 +73,7 @@ async function main() {
   const generation = first.generations.find((g) => String(g.bookId) === String(bookId))?.generation ?? 0
   const created = []
   for (let i = 0; i < COUNT; i += 1) {
-    const id = `${TAG}-${DEVICE}-${Date.now()}-${i}-${randomUUID().slice(0, 6)}`
+    const id = `${idPrefix}-c${i}${i === COUNT - 1 ? `` : ``}-${randomUUID().slice(0, 4)}`
     const now = Date.now()
     const payload = { billId: id, bookId, cost: i + 1, time: now, assetId: null, parentCategoryId: null, accountAmount: i + 1 }
     const r = await push([{ kind: 'bill', id, bookId, generation, operationId: randomUUID(), baseVersion: 0, updatedAt: now, payload }])
@@ -80,7 +84,8 @@ async function main() {
 
   // 幂等：一笔全新记录，用同一个 operationId 连发两次；第二次应被回执识别，不产生第二条
   {
-    const id = `${TAG}-${DEVICE}-idem-${Date.now()}-${randomUUID().slice(0, 6)}`
+    const id = `${idPrefix}-idem-${randomUUID().slice(0, 4)}`
+    idemId = id
     const op = randomUUID()
     const now = Date.now()
     const payload = { billId: id, bookId, cost: 9, time: now }
@@ -100,12 +105,16 @@ async function main() {
   }
 
   const after = await pull()
-  const mine = (after.records ?? []).filter((r) => String(r.id).startsWith(`${TAG}-${DEVICE}`))
+  const mine = (after.records ?? []).filter((r) => String(r.id).startsWith(idPrefix))
   const sum = mine.reduce((n, r) => n + Number(r.payload?.cost ?? 0), 0)
   step('verify-pull', { deviceRecords: mine.length, sum, statuses: created.map((c) => c.status) })
 
   mkdirSync('.dualdev', { recursive: true })
-  writeFileSync(`.dualdev/${DEVICE}.json`, JSON.stringify({ device: DEVICE, bookId, created, pulled: mine.length, sum, log }, null, 2))
+  writeFileSync(`.dualdev/${DEVICE}.json`, JSON.stringify({
+    device: DEVICE, run: RUN, tag: TAG, bookId,
+    expectedIds: [...created.map((c) => c.id), ...log.filter((l) => l.name === 'idempotent-replay').map(() => idemId).filter(Boolean)],
+    created, idemId, pulled: mine.length, sum, log
+  }, null, 2))
   console.log(`[${DEVICE}] DONE records=${mine.length} sum=${sum}`)
 }
 

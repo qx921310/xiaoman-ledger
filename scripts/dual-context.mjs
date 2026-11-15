@@ -81,6 +81,21 @@ const setInput = async (sid, label, value) => evalIn(sid, `(() => {
   el.dispatchEvent(new Event('input', { bubbles: true }))
   return true
 })()`)
+
+const waitFor = async (sid, selector, timeoutMs = 4000) => {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    const found = await evalIn(sid, `!!document.querySelector(${JSON.stringify(selector)})`)
+    if (found) return true
+    await sleep(150)
+  }
+  return false
+}
+const clickFirst = async (sid, text) => evalIn(sid, `(() => {
+  const el = [...document.querySelectorAll('button,a,summary')].find((x) => x.textContent.trim() === ${JSON.stringify(text)})
+  if (!el) return false
+  el.click(); return true
+})()`)
 const bodyText = async (sid) => evalIn(sid, 'document.body.innerText.replace(/\\s+/g," ").slice(0,600)')
 
 const login = async (sid) => {
@@ -114,21 +129,29 @@ for (const sid of [tab1, tab2]) {
   await clickText(sid, '我的'); await sleep(600)
   await clickText(sid, '账本管理'); await sleep(900)
 }
-record('tabs-ready', { t1: (await bodyText(tab1)).slice(0, 80), t2: (await bodyText(tab2)).slice(0, 80) })
+const buttonsOf = (sid) => evalIn(sid, `JSON.stringify([...document.querySelectorAll('button,a,summary')].map((x) => (x.textContent || '').trim()).filter(Boolean).slice(0, 40))`)
+record('tabs-ready', {
+  t1Buttons: JSON.parse((await buttonsOf(tab1)) || '[]'),
+  t2Buttons: JSON.parse((await buttonsOf(tab2)) || '[]')
+})
 
 // tab1 断网，改名 → 应该进入离线队列
 await offline(tab1, true)
-await clickText(tab1, '编辑'); await sleep(500)
-await setInput(tab1, '账本名称', `离线改名-${Date.now()}`)
-await clickText(tab1, '保存'); await sleep(900)
-record('tab1-offline-saved', { text: await bodyText(tab1) })
+const opened1 = await clickFirst(tab1, '编辑')
+const hasInput1 = await waitFor(tab1, 'input[aria-label="账本名称"]')
+const typed1 = hasInput1 ? await setInput(tab1, '账本名称', `离线改名-${Date.now()}`) : false
+const saved1 = typed1 ? await clickFirst(tab1, '保存') : false
+await sleep(1200)
+record('tab1-offline-saved', { opened: opened1, hasInput: hasInput1, typed: typed1, saved: saved1, text: await bodyText(tab1) })
 
 // tab2 在线，改另一个名字 → 服务端更新成功
-await clickText(tab2, '编辑'); await sleep(500)
+const opened2 = await clickFirst(tab2, '编辑')
+const hasInput2 = await waitFor(tab2, 'input[aria-label="账本名称"]')
 const onlineName = `在线改名-${Date.now()}`
-await setInput(tab2, '账本名称', onlineName)
-await clickText(tab2, '保存'); await sleep(1500)
-record('tab2-online-saved', { name: onlineName, text: (await bodyText(tab2)).slice(0, 160) })
+const typed2 = hasInput2 ? await setInput(tab2, '账本名称', onlineName) : false
+const saved2 = typed2 ? await clickFirst(tab2, '保存') : false
+await sleep(1800)
+record('tab2-online-saved', { opened: opened2, hasInput: hasInput2, typed: typed2, saved: saved2, name: onlineName, text: (await bodyText(tab2)).slice(0, 200) })
 
 // tab1 恢复网络 → 触发补传，应该出现冲突提示而不是静默覆盖
 await offline(tab1, false)
