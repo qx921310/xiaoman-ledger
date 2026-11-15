@@ -40,9 +40,13 @@ export function SplitManager({ onBack, notify }: { onBack: () => void; notify: (
     const name = editing?.name.trim() ?? ''
     if (!name) { notify('请输入群组名称'); return }
     if (!editing?.groupId) {
-      const g = addSplitGroup({ name })
-      addSplitMember(g.splitGroupId, '我', true)
-      setEditing({ groupId: g.splitGroupId, name: g.name })
+      try {
+        const g = addSplitGroup({ name })
+        addSplitMember(g.splitGroupId, '我', true)
+        setEditing({ groupId: g.splitGroupId, name: g.name })
+      } catch (e) {
+        notify(e instanceof Error ? e.message : '创建 AA 群组失败')
+      }
     } else {
       updateSplitGroup(editing.groupId, { name })
       setEditing(null)

@@ -567,6 +567,13 @@ export const useLedger = create<LedgerState>()(
         const members = s.splitMembers.filter((m) => m.splitGroupId === splitGroupId)
         if (!bill || !members.length) return false
         if (!bookWritable(bill.bookId, s.accountBooks)) return false
+        // 群组必须与账单同属一个账本：不允许用可写账单引用只读账本的 AA 群组
+        const group = s.splitGroups.find((g) => g.splitGroupId === splitGroupId)
+        if (!group) return false
+        // 群组未记录账本时视为当前账本；一旦记录，就必须与账单同账本
+        const groupBook = group.bookId ?? s.currentBookId
+        if (groupBook && String(groupBook) !== String(bill.bookId ?? s.currentBookId ?? '')) return false
+        if (!bookWritable(groupBook, s.accountBooks)) return false
         const { shares, amounts } = splitAmounts(bill.cost, members, splitType, values ?? {})
         const sum = members.reduce((acc, m) => acc + (amounts[m.splitMemberId] ?? 0), 0)
         // 精确到分：合计与账单金额必须完全一致
@@ -594,7 +601,11 @@ export const useLedger = create<LedgerState>()(
       addSplitExpense: (patch) => {
         const s = get()
         const members = s.splitMembers.filter((m) => m.splitGroupId === patch.splitGroupId)
-        if (!bookWritable(s.currentBookId, s.accountBooks)) return false
+        const group = s.splitGroups.find((g) => g.splitGroupId === patch.splitGroupId)
+        if (!group) return false
+        const groupBook = group.bookId ?? s.currentBookId
+        if (groupBook && String(groupBook) !== String(s.currentBookId)) return false
+        if (!bookWritable(groupBook, s.accountBooks)) return false
         const amount = +Number(patch.amount).toFixed(2)
         if (!(amount > 0)) return false
         const picked = patch.participants.filter((p) => members.some((m) => m.splitMemberId === p.memberId))
@@ -1279,6 +1290,9 @@ export const useLedger = create<LedgerState>()(
         const s = get()
         const old = s.bills.find((b) => b.billId === billId)
         if (!old || !bookWritable(old.bookId, s.accountBooks)) return false
+        // 归属变更必须走专用移动命令并校验源/目标双方权限；普通编辑一律拒绝，
+        // 否则可写账本的账单能被改挂到只读账本。
+        if (patch.bookId != null && String(patch.bookId) !== String(old.bookId ?? '')) return false
         const refunded = s.refunds.filter((r) => String(r.billId) === String(billId)).reduce((sum, r) => sum + (r.baseAmount ?? 0), 0)
         if (patch.cost != null && (!Number.isFinite(patch.cost) || patch.cost < refunded)) return false
         const deltaOf = (b: Bill) =>

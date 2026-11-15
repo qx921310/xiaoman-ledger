@@ -51,6 +51,8 @@ export interface PendingBookPatch {
   error?: string
   /** scoped/global 两份旧草稿不同；用户作出取舍后才允许清理原始旧键 */
   migrationConflict?: boolean
+  /** 迁移冲突时保存的两个原始候选，供用户查看/导出/选择，绝不静默丢弃 */
+  migrationCandidates?: Array<{ source: 'scoped' | 'global'; patch: Record<string, unknown>; baseUpdatedAt: number | null }>
   conflict?: boolean
 }
 
@@ -157,7 +159,18 @@ async function migrateLegacy(uid: number, session: BookSession): Promise<void> {
           previous.different ||= different
           previous.entry.migrationConflict ||= different
           previous.entry.conflict ||= different
-          if (different) previous.entry.error = '账号专属队列与全局队列内容不同，请核对后选择保留哪一份'
+          if (different) {
+            previous.entry.error = '账号专属队列与全局队列内容不同，请核对后选择保留哪一份'
+            const toCandidate = (src: 'scoped' | 'global', raw: unknown) => {
+              const e = raw as Partial<PendingBookPatch>
+              const patch = ('patch' in (e as object) ? (e.patch ?? {}) : (raw ?? {})) as Record<string, unknown>
+              return { source: src, patch, baseUpdatedAt: (e.baseUpdatedAt ?? null) as number | null }
+            }
+            const cands = [] as Array<{ source: 'scoped' | 'global'; patch: Record<string, unknown>; baseUpdatedAt: number | null }>
+            if (previous.scoped !== undefined) cands.push(toCandidate('scoped', previous.scoped))
+            if (previous.global !== undefined) cands.push(toCandidate('global', previous.global))
+            previous.entry.migrationCandidates = cands
+          }
           // previous.entry 保持 scoped 候选，不用 global 后写覆盖。
         }
       }
@@ -573,9 +586,30 @@ export async function conflictOf(bookId: string): Promise<PendingBookPatch | und
   return entry?.conflict ? entry : undefined
 }
 
-/** 迁移冲突只有在用户明确选择保留哪一份后，才可丢弃旧键中的两个候选。 */
+const LEGACY_CONFLICT_BACKUP_KEY = 'xiaoman.legacyConflictBackup'
+
+/** 迁移冲突只有在用户明确选择保留哪一份后，才可丢弃旧键中的两个候选。
+ *  丢弃前必须把两份候选写入备份键：任何来源都不允许静默消失。 */
 function discardLegacyMigrationConflict(uid: number, bookId: string, entry: PendingBookPatch) {
   if (!entry.migrationConflict) return
+  const backup: Record<string, unknown> = {}
+  for (const key of [legacyScopedKey(uid), LEGACY_GLOBAL_KEY]) {
+    try {
+      const raw = localStorage.getItem(key)
+      if (!raw) continue
+      const value = JSON.parse(raw) as Record<string, unknown>
+      if (value[bookId] !== undefined) backup[`${key}#${bookId}`] = value[bookId]
+    } catch { /* 解析失败：保留原数据，供下次核对 */ }
+  }
+  if (Object.keys(backup).length) {
+    try {
+      const prev = JSON.parse(localStorage.getItem(LEGACY_CONFLICT_BACKUP_KEY) ?? '{}') as Record<string, unknown>
+      localStorage.setItem(LEGACY_CONFLICT_BACKUP_KEY, JSON.stringify({
+        ...prev,
+        [`${new Date().toISOString()}|${bookId}`]: backup
+      }))
+    } catch { /* 备份失败则不清理，保证不丢数据 */ }
+  }
   for (const key of [legacyScopedKey(uid), LEGACY_GLOBAL_KEY]) {
     try {
       const raw = localStorage.getItem(key)

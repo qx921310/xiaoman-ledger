@@ -112,6 +112,18 @@ export function BookManager({ notify, onBack }: { notify: (m: string) => void; o
               <div key={id} className="row">
                 <span className="grow">{row?.accountBookName ?? id}</span>
                 <button type="button" className="link" onClick={async () => {
+                  const entry = await conflictOf(id)
+                  const cands = entry?.migrationCandidates ?? []
+                  if (!cands.length) { notify('没有可导出的旧草稿候选'); return }
+                  const blob = new Blob([JSON.stringify(cands, null, 2)], { type: 'application/json' })
+                  const a = document.createElement('a')
+                  a.href = URL.createObjectURL(blob)
+                  a.download = `旧草稿候选-${id}.json`
+                  a.click()
+                  setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+                  notify('已导出两份旧草稿候选')
+                }}>导出候选</button>
+                <button type="button" className="link" onClick={async () => {
                   const ok = await resolveConflictKeepLocal(id)
                   notify(ok ? '已用本地内容覆盖' : '覆盖失败，请联网后重试')
                   if (ok) setConflicts((prev) => prev.filter((x) => x !== id))

@@ -11,6 +11,9 @@ import { Modal } from '../ui/modal'
 export function FixedDepositList({ onBack, notify }: { onBack: () => void; notify: (m: string) => void }) {
   const list = useLedger((s) => s.fixedDeposits ?? [])
   const add = useLedger((s) => s.addFixedDeposit)
+  const safeAdd = (patch: Parameters<typeof add>[0]) => {
+    try { add(patch) } catch (e) { window.alert(e instanceof Error ? e.message : '新增定存失败') }
+  }
   const del = useLedger((s) => s.deleteFixedDeposit)
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ amount: '', rate: '', term: '1', start: '', remark: '' })
@@ -103,7 +106,7 @@ export function FixedDepositList({ onBack, notify }: { onBack: () => void; notif
               if (amount <= 0) { notify('请填写存入金额'); return }
               // 定存涉及资金流水，属账本数据：必须先在具体账本里
               if (currentBookId === 0) { notify('请先切换到具体账本再新增定存'); return }
-              add({
+              safeAdd({
                 amount, rate: Number(form.rate) || 0, termYears: Number(form.term) || 1,
                 startTime: form.start ? new Date(`${form.start}T00:00:00`).getTime() : Date.now(),
                 remark: form.remark,

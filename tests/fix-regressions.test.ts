@@ -804,3 +804,19 @@ test('只读账本：退款/报销/组合/转账/复制与关联命令均拒绝�
   })
   assert.equal(after, before, '所有只读命令失败后，账务和墓碑均必须原样保留')
 })
+
+test('编辑账单不得改变账本归属（防止改挂到只读账本）', () => {
+  reset()
+  const bill = seedExpense(30, 1)
+  st().updateBill(bill.billId, { bookId: 2 } as never)
+  assert.equal(String(st().bills[0].bookId), '1', '归属不得通过普通编辑变更')
+})
+
+test('AA 分账不得引用其它账本的群组', () => {
+  reset()
+  const bill = seedExpense(30, 1)
+  useLedger.setState({ currentBookId: 2 } as never)
+  const group = st().addSplitGroup({ name: '别账本 AA', members: ['我'] })
+  useLedger.setState({ currentBookId: 1 } as never)
+  assert.equal(st().applySplit(bill.billId, group.splitGroupId, 0), false, '跨账本群组必须拒绝')
+})
