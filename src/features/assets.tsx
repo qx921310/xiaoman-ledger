@@ -669,8 +669,8 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
       </>)}
 
       {screen === 'assets' && (<>
-      <details className="fold">
-        <summary>新增账户</summary>
+      <details className="fold new-asset">
+        <summary>＋ 新增账户</summary>
       {/* 字段顺序照一木 AddCapitalActivity / AddCreditCardActivity */}
       <input aria-label="新账户名称" value={name} onChange={(e) => setName(e.target.value)} placeholder="账户名（如：招行储蓄卡）" />
       <div className="row2">

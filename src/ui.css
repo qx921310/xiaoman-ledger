@@ -1478,3 +1478,7 @@ textarea:focus-visible {
 .entry-dual > div { display: flex; flex-direction: column; gap: 2px; }
 .entry-dual small { color: var(--muted); font-size: var(--font-xs); }
 .entry-dual b { font-size: var(--font-sm); }
+
+/* 资产：新增账户入口用按钮样式，而非普通折叠标题 */
+.new-asset > summary { list-style: none; text-align: center; padding: 12px; border: 1px dashed var(--line); border-radius: var(--r-md); color: var(--accent); }
+.new-asset > summary::-webkit-details-marker { display: none; }
