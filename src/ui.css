@@ -1465,3 +1465,10 @@ textarea:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
+
+/* 资产：账户详情整页（对齐一木 s22–s25） */
+.acct-hero { display: flex; flex-direction: column; gap: 4px; padding: 14px 12px; margin: 8px 0; background: var(--accent-soft); border-radius: var(--r-md); }
+.acct-hero b { font-size: var(--font-display); }
+.acct-tabs { margin: 6px 0 10px; }
+.acct-month { margin-top: 10px; }
+.acct-month .am-hd { display: flex; justify-content: space-between; padding: 6px 2px; color: var(--muted); font-size: var(--font-xs); }

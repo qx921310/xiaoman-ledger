@@ -70,6 +70,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
   const unresolvedRates = unresolvedReimbursementAssets({ assets: allAssets, bills, transfers, lends, refunds, reimbursements,
     parentCategories: allAssetsParents, defaultCurrency, currencyRate: (code) => currencies.find((c) => c.code === code)?.rate })
   const [historyAsset, setHistoryAsset] = useState<Asset | null>(null)
+  const [accountTab, setAccountTab] = useState<'all' | 'bill' | 'other'>('all')
   const [repayForm, setRepayForm] = useState<{ lendId: number; remaining: number; amount: string; assetId: number } | null>(null)
   const [lendForm, setLendForm] = useState<{ type: 1 | 2 | 3 | 4; assetId: number; counterparty: string; number: string; interest: string; repaymentAssetId: number; remark: string } | null>(null)
   const { receivable, payable } = lendTotals(lends)
@@ -116,12 +117,12 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
   // 一木：点净资产/存款/负债/组头 → 弹「构成」明细
   type CompRow = { name: string; amount: number; unit?: 'money' | 'count' | 'percent' }
   // 一木把「待报销 / 借出借入 / 投资持仓」做成独立页面；这里用条件渲染的子页复刻
-  const [screen, setScreen] = useState<'assets' | 'reimburse' | 'lend' | 'stock' | 'hidden'>('assets')
+  const [screen, setScreen] = useState<'assets' | 'account' | 'reimburse' | 'lend' | 'stock' | 'hidden'>('assets')
   const subpageTitle = useRef<HTMLHeadingElement>(null)
   // 只记录「从哪个卡片进来的」，不持有 DOM 节点（返回时卡片是重新渲染的，旧节点已卸载）
   const cameFrom = useRef<'reimburse' | 'lend' | 'stock' | 'hidden'>('reimburse')
   const rootRef = useRef<HTMLElement>(null)
-  const prevScreen = useRef<'assets' | 'reimburse' | 'lend' | 'stock' | 'hidden'>('assets')
+  const prevScreen = useRef<'assets' | 'account' | 'reimburse' | 'lend' | 'stock' | 'hidden'>('assets')
 
   /** 进入子页：压一条历史记录（去重，避免连点双压）；系统返回键可退回 */
   const goto = (next: 'reimburse' | 'lend' | 'stock' | 'hidden') => {
@@ -219,7 +220,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
         </div>
       )}
 
-      {screen !== 'assets' && (
+      {screen !== 'assets' && screen !== 'account' && (
         <div className="subpage-head">
           <button type="button" className="link" onClick={backToAssets}>‹ 返回资产</button>
           <h3 ref={subpageTitle} tabIndex={-1}>{{ reimburse: '待报销', lend: '借入借出', stock: '投资持仓', hidden: '隐藏资产' }[screen]}</h3>
@@ -290,7 +291,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
 
             <div>
               <button className="link" aria-label={`查看 ${a.assetName} 流水`}
-                onClick={() => setHistoryAsset(a)}>{a.simpleName || a.assetName}</button>
+                onClick={() => { setHistoryAsset(a); setScreen('account') }}>{a.simpleName || a.assetName}</button>
               {a.cardCode && <span className="tag">尾号 {a.cardCode}</span>}
             </div>
             <small>
@@ -323,38 +324,69 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
         </div>
       ))}
 
-      {historyAsset && (() => {
+      </>)}
+
+      {screen === 'account' && historyAsset && (() => {
         const { entries, opening } = accountHistory({
           asset: historyAsset, assetFlows, bills, transfers, lends, refunds, reimbursements, parents: allAssetsParents
         })
-        let running = opening
+        const filtered = entries.filter((e) => accountTab === 'all' || (accountTab === 'bill' ? e.kind === 'bill' : e.kind !== 'bill'))
+        const groups: Array<{ key: string; label: string; net: number; rows: typeof filtered }> = []
+        for (const e of [...filtered].sort((a, b) => b.time - a.time)) {
+          const d = new Date(e.time)
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+          const head = groups[groups.length - 1]
+          if (head && head.key === key) { head.rows.push(e); head.net = +(head.net + e.delta).toFixed(2) }
+          else groups.push({ key, label: `${d.getFullYear()}年${d.getMonth() + 1}月`, net: e.delta, rows: [e] })
+        }
         return (
-          <Modal label={`${historyAsset.assetName} 流水`} onClose={() => setHistoryAsset(null)}>
-            <h3>{historyAsset.simpleName || historyAsset.assetName}</h3>
-            <p className="hint">
-              期初 {money(opening)} · 当前 {accountMoney(historyAsset.assetNumber, historyAsset.currency, currencies, defaultCurrency)} · 共 {entries.length} 笔
-            </p>
-            {entries.length === 0 && <p className="hint">这个账户还没有流水。</p>}
-            {entries.map((e) => {
-              running = +(running + e.delta).toFixed(2)
-              return (
-                <div key={e.key} className="row">
-                  <div className="grow">
-                    <div>{e.label}</div>
-                    <small>{dayOf(e.time)} · 余额 {money(running)}</small>
-                  </div>
-                  <b className={e.delta >= 0 ? 'in' : 'out'}>{e.delta >= 0 ? '+' : '-'}{money(Math.abs(e.delta))}</b>
-                </div>
-              )
-            })}
-            <div className="modal-btns">
-              <button className="ghost" onClick={() => setHistoryAsset(null)}>关闭</button>
+          <div className="subpage-block">
+            <div className="subpage-head">
+              <button type="button" className="link" onClick={() => { setScreen('assets'); setHistoryAsset(null) }}>‹ 返回</button>
+              <h3>{historyAsset.simpleName || historyAsset.assetName}</h3>
+              <button type="button" className="link" onClick={() => setEditingAsset(historyAsset)}>编辑</button>
             </div>
-          </Modal>
+
+            <div className="acct-hero">
+              <small>账户余额</small>
+              <b className={historyAsset.assetNumber < 0 ? 'out' : ''}>
+                {accountMoney(historyAsset.assetNumber, historyAsset.currency, currencies, defaultCurrency)}
+              </b>
+              <span className="muted">期初 {money(opening)} · 共 {entries.length} 笔</span>
+            </div>
+
+            <div className="seg acct-tabs">
+              <button type="button" className={accountTab === 'all' ? 'on' : ''} onClick={() => setAccountTab('all')}>全部</button>
+              <button type="button" className={accountTab === 'bill' ? 'on' : ''} onClick={() => setAccountTab('bill')}>账单</button>
+              <button type="button" className={accountTab === 'other' ? 'on' : ''} onClick={() => setAccountTab('other')}>转账·其他</button>
+            </div>
+
+            {groups.length === 0 && <p className="hint">这个账户还没有流水。</p>}
+            {groups.map((g) => (
+              <div key={g.key} className="acct-month">
+                <div className="am-hd">
+                  <span>{g.label}</span>
+                  <b className={g.net >= 0 ? 'in' : 'out'}>{g.net >= 0 ? '+' : '-'}{money(Math.abs(g.net))}</b>
+                </div>
+                {g.rows.map((e) => (
+                  <div key={e.key} className="row">
+                    <div className="grow">
+                      <div>{e.label}</div>
+                      <small>{dayOf(e.time)}{e.detail ? ' · ' + e.detail : ''}</small>
+                    </div>
+                    <b className={e.delta >= 0 ? 'in' : 'out'}>{e.delta >= 0 ? '+' : '-'}{money(Math.abs(e.delta))}</b>
+                  </div>
+                ))}
+              </div>
+            ))}
+
+            <div className="modal-btns">
+              <button className="ghost" onClick={() => setScreen('assets')}>关闭</button>
+            </div>
+          </div>
         )
       })()}
 
-      </>)}
       {screen === 'stock' && (
       <div className="subpage-block">
       <div className="subpage-sum">
