@@ -421,6 +421,19 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
             </button>
           </div>
 
+          {(() => {
+            const acctCurrency = assets.find((a) => a.assetId === aid)?.currency ?? defaultCurrency
+            if (mode === 'transfer' || acctCurrency === defaultCurrency) return null
+            const amount = evaluatedCost ?? 0
+            const converted = hasCurrencyRate(acctCurrency, currencies, defaultCurrency)
+              ? toBase(amount, acctCurrency, currencies, defaultCurrency) : null
+            return (
+              <div className="entry-dual">
+                <div><small>账户币种 {acctCurrency}</small><b>{currencySymbol(currencies, acctCurrency, defaultCurrency)}{amount.toFixed(2)}</b></div>
+                <div><small>统计币种 {defaultCurrency}</small><b>{converted == null ? '请先设置汇率' : `${currencySymbol(currencies, defaultCurrency, defaultCurrency)}${converted.toFixed(2)}`}</b></div>
+              </div>
+            )
+          })()}
           {mode !== 'transfer' && currency !== defaultCurrency && evaluatedCost != null && evaluatedCost > 0 && (
             <div className="entry-fx">{hasCurrencyRate(currency, currencies, defaultCurrency) ? `折合 ${currencySymbol(currencies, defaultCurrency, defaultCurrency)}${toBase(evaluatedCost, currency, currencies, defaultCurrency).toFixed(2)}` : '请先设置汇率'}</div>
           )}

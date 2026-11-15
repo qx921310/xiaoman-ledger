@@ -1472,3 +1472,9 @@ textarea:focus-visible {
 .acct-tabs { margin: 6px 0 10px; }
 .acct-month { margin-top: 10px; }
 .acct-month .am-hd { display: flex; justify-content: space-between; padding: 6px 2px; color: var(--muted); font-size: var(--font-xs); }
+
+/* 记账页：账户币种 / 统计币种 两行（一木 p11） */
+.entry-dual { display: flex; gap: 12px; padding: 6px 2px; }
+.entry-dual > div { display: flex; flex-direction: column; gap: 2px; }
+.entry-dual small { color: var(--muted); font-size: var(--font-xs); }
+.entry-dual b { font-size: var(--font-sm); }
