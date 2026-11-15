@@ -428,9 +428,32 @@ const server = createServer(async (req, res) => {
   if (req.method === 'OPTIONS') return send(res, 204, {})
   const url = new URL(req.url, `http://${req.headers.host}`)
   const path = url.pathname
+  const startedAt = Date.now()
+  const reqId = String(req.headers['x-request-id'] || '').slice(0, 40) || `${startedAt.toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+  // 结构化访问日志（journald 可检索）：只记路径与状态，不记请求体、不记邮箱密码
+  res.on('finish', () => {
+    if (!path.startsWith('/api/')) return
+    const who = (() => { try { return currentUser(req)?.id ?? 0 } catch { return 0 } })()
+    console.log(JSON.stringify({
+      t: new Date().toISOString(), reqId, m: req.method, p: path,
+      s: res.statusCode, ms: Date.now() - startedAt, uid: who
+    }))
+  })
 
   try {
-    if (path === '/api/health') return ok(res, { ok: true, service: 'ledger-api', time: Date.now(), writable: Boolean(WRITE_TOKEN) })
+    if (path === '/api/health') {
+      const counts = {}
+      try {
+        counts.records = db.prepare('SELECT COUNT(*) AS n FROM records').get().n
+        counts.books = db.prepare('SELECT COUNT(*) AS n FROM books').get().n
+        counts.users = db.prepare('SELECT COUNT(*) AS n FROM users').get().n
+      } catch { /* 统计失败不影响健康检查结论 */ }
+      return ok(res, {
+        ok: true, service: 'ledger-api', time: Date.now(),
+        writable: Boolean(WRITE_TOKEN), uptimeSec: Math.round(process.uptime()),
+        commit: process.env.LEDGER_COMMIT || null, counts
+      })
+    }
 
     // 任何写请求都要过令牌；未配置令牌时服务端保持只读
     // 账号相关接口例外：注册/登录本身就是写操作，且必须对公网开放
@@ -1079,6 +1102,10 @@ if (path === '/api/books/members' && req.method === 'GET') {
     if (serveStatic(url, res)) return
     return send(res, 404, { code: 1, msg: 'not found' })
   } catch (e) {
+    console.error(JSON.stringify({
+      t: new Date().toISOString(), reqId, m: req.method, p: path,
+      err: String(e && e.message || e), stack: String(e?.stack || '').split('\n').slice(0, 6).join(' | ')
+    }))
     return fail(res, String(e && e.message || e))
   }
 })
