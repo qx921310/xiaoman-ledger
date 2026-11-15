@@ -146,21 +146,6 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
     return `color-mix(in srgb, var(--accent) ${Math.round((n / heatMax) * 70)}%, transparent)`
   }
 
-  const pickedStat = picked
-    ? statOf(new Date(`${picked}T00:00:00`))
-    : { income: 0, expense: 0, count: 0 }
-  /** 某天的农历（选中日头部用） */
-  const dayLunar = (key: string) => {
-    try {
-      const [y, m, d] = key.split('-').map(Number)
-      const solar = Solar.fromDate(new Date(y, m - 1, d))
-      const lunar = solar.getLunar()
-      // 一木头部是「日期 + 农历」，这里固定给农历月日，节日只作补充
-      const solarFestival = solar.getFestivals()[0] ?? lunar.getFestivals()[0] ?? lunar.getJieQi()
-      const lunarText = `${lunar.getMonthInChinese()}月${lunar.getDayInChinese()}`
-      return solarFestival ? `${lunarText} · ${solarFestival}` : lunarText
-    } catch { return '' }
-  }
 
   // 一木日历详情区顶部有「还款提醒」列表（repayment_list）：当天到期的信用卡还款
   const repayReminders = useMemo(() => {
@@ -179,10 +164,26 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
     return list
   }, [picked, assets, bookId, year, monthIdx])
 
-  const pickedBills = picked
-    ? bills.filter((b) => (bookId === 0 || String(b.bookId) === String(bookId)) && fullDay(b.time) === picked)
-      .sort((a, b) => b.time - a.time)
-    : []
+  /** 一木 s19/s21：日历下方按日列出整月账单，日头带当天支出/收入合计 */
+  const monthDayGroups = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; lunar: string; income: number; expense: number; bills: typeof bills }>()
+    for (const b of bills) {
+      if (!inScope(b)) continue
+      const key = fullDay(b.time)
+      if (!key.startsWith(`${year}-${String(monthIdx + 1).padStart(2, '0')}`)) continue
+      const cur = map.get(key) ?? {
+        key, label: `${Number(key.slice(5, 7))}月${Number(key.slice(8, 10))}日 ${'日一二三四五六'[new Date(b.time).getDay()]}`,
+        lunar: (() => { try { const l = Solar.fromDate(new Date(b.time)).getLunar(); return `${l.getMonthInChinese()}月${l.getDayInChinese()}` } catch { return '' } })(),
+        income: 0, expense: 0, bills: [] as typeof bills
+      }
+      if (kindOf.get(b.parentCategoryId) === 'income') cur.income = +(cur.income + b.cost).toFixed(2)
+      else if (!b.notIntoTotal) cur.expense = +(cur.expense + billNetAmount(b, refunds)).toFixed(2)
+      cur.bills.push(b)
+      map.set(key, cur)
+    }
+    return [...map.values()].sort((a, b) => (a.key < b.key ? 1 : -1))
+  }, [bills, inScope, year, monthIdx, kindOf, refunds])
+
 
   return (
     <section className="card">
@@ -193,12 +194,12 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
           <button className="ghost" aria-label="下个月" onClick={() => setCursor(new Date(year, monthIdx + 1, 1))}>›</button>
         </div>
         <div className="cal-totals">
-          <div><small>收入</small><b className="in">{money(monthTotals.income)}</b></div>
           <div><small>支出</small><b className="out">{money(monthTotals.expense)}</b></div>
-          <div><small>结余</small><b>{money(monthTotals.balance)}</b></div>
+          <div><small>收入</small><b className="in">{money(monthTotals.income)}</b></div>
         </div>
         <div className="cal-actions">
-          <button type="button" className="cal-today" onClick={() => { const t = new Date(); setCursor(t); setPicked(fullDay(t.getTime())) }}>返回今天</button>
+          <button type="button" className="cal-today" onClick={() => { const t = new Date(); setCursor(t); setPicked(fullDay(t.getTime())) }}>今天</button>
+          <button type="button" className="cal-today" aria-label="更多" onClick={() => setMenuOpen(true)}>⋯</button>
           {onAddBill && <button type="button" className="cal-add" onClick={onAddBill}>记一笔</button>}
         </div>
       </div>
@@ -271,8 +272,8 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
                 onClick={() => setPicked(key)} aria-label={`${date.getMonth() + 1}月${date.getDate()}日`}>
                 <em>{key === todayKey ? '今' : date.getDate()}</em>
                 {showLunar && <i className="cal-lunar">{lunarOfDate(date)}</i>}
-                {stat.expense ? <i className="out">{'-'}{money(stat.expense).replace('¥', '')}</i> : null}
-                {stat.income ? <i className="in">+{money(stat.income).replace('¥', '')}</i> : null}
+                {stat.expense ? <i className="out">{'-'}{money(stat.expense)}</i> : null}
+                {stat.income ? <i className="in">+{money(stat.income)}</i> : null}
               </button>
             )
           })}
@@ -289,47 +290,50 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
               onClick={() => setPicked(keyOf(day))} aria-label={`${monthIdx + 1}月${day}日`}>
               <em>{isToday(day) ? '今' : day}</em>
               {showLunar && <i className="cal-lunar">{lunarOf(day)}</i>}
-              {showAmount && stat?.expense ? <i className="out">{'-'}{money(stat.expense).replace('¥', '')}</i> : null}
-              {showAmount && stat?.income ? <i className="in">+{money(stat.income).replace('¥', '')}</i> : null}
+              {showAmount && stat?.expense ? <i className="out">{'-'}{money(stat.expense)}</i> : null}
+              {showAmount && stat?.income ? <i className="in">+{money(stat.income)}</i> : null}
             </button>
           )
         })}
       </div>
       )}
 
-      {picked && (
+      {monthDayGroups.length > 0 && (
         <div className="cal-list">
-          <div className="hf-head">
-            <span>
-              {picked}
-              <small className="cal-lunar">{dayLunar(picked)}</small>
-            </span>
-            <span className="cal-day-sum">
-              收 {money(pickedStat.income)} · 支 {money(pickedStat.expense)} · 结余 {money(+(pickedStat.income - pickedStat.expense).toFixed(2))}
-            </span>
-            <span>共 {pickedBills.length} 笔</span>
-          </div>
-          {repayReminders.length > 0 && (
-            <div className="cal-repay">
-              <b>还款提醒</b>
-              {repayReminders.map((r) => (
-                <div key={r.key} className="row">
-                  <span className="grow">{r.name}</span>
-                  <b className="out">{money(r.due)}</b>
+          {monthDayGroups.map((g) => (
+            <div key={g.key} className="cal-daygroup">
+              <div className="hf-head">
+                <span>
+                  {g.label}
+                  <small className="cal-lunar">{g.lunar}</small>
+                </span>
+                <span className="cal-day-sum">
+                  {g.expense ? `支 ${money(g.expense)}` : ''}{g.expense && g.income ? ' · ' : ''}{g.income ? `收 ${money(g.income)}` : ''}
+                </span>
+              </div>
+              {g.bills.map((b) => (
+                <div key={String(b.billId)} className="row">
+                  <div className="grow">
+                    <div>{parents.find((p) => p.id === b.parentCategoryId)?.name ?? '未分类'}{b.remark ? ` · ${b.remark}` : ''}</div>
+                    <small>{new Date(b.time).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</small>
+                  </div>
+                  <b className={kindOf.get(b.parentCategoryId) === 'income' ? 'in' : 'out'}>
+                    {kindOf.get(b.parentCategoryId) === 'income' ? '+' : '-'}{money(b.cost)}
+                  </b>
                 </div>
               ))}
             </div>
-          )}
-          {pickedBills.length === 0 && <p className="hint">这天没有记账。</p>}
-          {pickedBills.map((b) => (
-            <div key={String(b.billId)} className="row">
-              <div className="grow">
-                <div>{parents.find((p) => p.id === b.parentCategoryId)?.name ?? '未分类'}{b.remark ? ` · ${b.remark}` : ''}</div>
-                <small>{new Date(b.time).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</small>
-              </div>
-              <b className={kindOf.get(b.parentCategoryId) === 'income' ? 'in' : 'out'}>
-                {kindOf.get(b.parentCategoryId) === 'income' ? '+' : '-'}{money(b.cost)}
-              </b>
+          ))}
+        </div>
+      )}
+
+      {picked && repayReminders.length > 0 && (
+        <div className="cal-repay">
+          <b>还款提醒</b>
+          {repayReminders.map((r) => (
+            <div key={r.key} className="row">
+              <span className="grow">{r.name}</span>
+              <b className="out">{money(r.due)}</b>
             </div>
           ))}
         </div>
