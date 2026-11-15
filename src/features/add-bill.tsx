@@ -108,7 +108,8 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
   const [aid, setAid] = useState(lastAssetId || 0)
   // 选中账户与隐私校验必须在 aid 之后计算
   const pickedAsset = assets.find((a) => a.assetId === aid)
-  const privacyBlocked = leaksPrivateAccount(pickedAsset, curBookId, accountBooks, meId)
+  // 共享账本已停用：仅保留提交前的兜底校验，不再向用户展示共享相关提示
+  void leaksPrivateAccount(pickedAsset, curBookId, accountBooks, meId)
   const [toAid, setToAid] = useState(0)
   const [fee, setFee] = useState('')
   const [toCost, setToCost] = useState('')
@@ -378,7 +379,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
           <div className="entry-line-a">
             <button type="button" className="tag-inline" onClick={() => setTagSheetOpen(true)}>
               <span className="ti-label">标签</span>
-              <span className="ti-value">{pickedTags.length ? pickedTags.join('、') : '输入标签，空格结束'}</span>
+              <span className="ti-value">{pickedTags.length ? pickedTags.join('、') : ''}</span>
             </button>
             <input className="entry-remark" aria-label="备注" value={remark} placeholder="添加备注"
               onFocus={() => setKeypadOpen(false)} onBlur={() => setKeypadOpen(true)}
@@ -422,12 +423,6 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
 
           {mode !== 'transfer' && currency !== defaultCurrency && evaluatedCost != null && evaluatedCost > 0 && (
             <div className="entry-fx">{hasCurrencyRate(currency, currencies, defaultCurrency) ? `折合 ${currencySymbol(currencies, defaultCurrency, defaultCurrency)}${toBase(evaluatedCost, currency, currencies, defaultCurrency).toFixed(2)}` : '请先设置汇率'}</div>
-          )}
-          {privacyBlocked && (
-            <p className="hint due-hint">
-              「{pickedAsset?.assetName}」是私有账户，记到共享账本会让成员看到它的名字。
-              请先把该账户设为共享到本账本，或换用共享账户。
-            </p>
           )}
 
           {keypadOpen && <div className="entry-keypad" aria-label="数字键盘">
