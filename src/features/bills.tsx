@@ -297,7 +297,7 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
           </div>
         )
       })}
-      {(list.length > 0 || tList.length > 0) && (
+      {!simpleView && (list.length > 0 || tList.length > 0) && (
         <div className="pick-bar">
           {!selecting ? (
             <button type="button" className="link" onClick={() => setSelecting(true)}>选择</button>
@@ -363,10 +363,10 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
                     </small>
                   </div>
                   <b className="neutral">{money(t.cost)}</b>
-                  <div className="ledger-actions">
+                  {!simpleView && <div className="ledger-actions">
                     {!readOnly && <button className="link" aria-label="编辑转账" onClick={() => setEditingTransfer(t)}>编辑</button>}
                     {!readOnly && <button className="del" aria-label="删除转账" onClick={() => { if (!delTransfer(t.transferId)) setTip('删除失败：当前账本只读') }}>删除</button>}
-                  </div>
+                  </div>}
                 </div>
               )
             }
@@ -378,7 +378,7 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
               <div key={b.billId} className={'row ledger-row' + (simpleView ? ' simple' : '') + (picked.has(String(b.billId)) ? ' picked' : '')}
                 onClick={selecting ? () => togglePick(String(b.billId)) : undefined}>
                 <span className="dot-badge" style={{ background: p?.bg ?? 'var(--accent-soft)', color: p?.color ?? 'var(--ink)' }}>
-                  <CatIcon k={p?.icon} size={16} />
+                  <CatIcon k={p?.icon ?? 'ic_parent_other'} size={16} />
                 </span>
                 <div className="grow">
                   <div>
@@ -419,13 +419,13 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
                   )}
                   <b className={inc ? 'in' : 'out'}>{inc ? '+' : '-'}{money(inc ? b.cost : billNetAmount(b, refunds))}</b>
                 </span>
-                <div className="ledger-actions">
+                {!simpleView && <div className="ledger-actions">
                   <button className="link" aria-label={`查看${p?.name ?? '账单'}明细`} onClick={() => setDetail(b)}>明细</button>
                   {!readOnly && <button className="link" aria-label={`编辑${p?.name ?? '账单'}`} onClick={() => setEditing(b)}>编辑</button>}
                   {!readOnly && <button className="link" aria-label={`拆分${p?.name ?? '账单'}`} onClick={() => setSplitting(b)}>拆分</button>}
                   {!readOnly && <button className="link" aria-label={`复制${p?.name ?? '账单'}`} onClick={() => duplicate(b.billId)}>复制</button>}
                   {!readOnly && <button className="del" aria-label={`删除${p?.name ?? '账单'}`} onClick={() => removeWithUndo(b)}>删除</button>}
-                </div>
+                </div>}
               </div>
             )
           })}

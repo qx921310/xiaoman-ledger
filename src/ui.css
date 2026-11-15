@@ -1428,3 +1428,40 @@ button.day-btn {
 .br-track { height: 8px; border-radius: var(--r-pill); background: var(--line); overflow: hidden; }
 .br-fill { height: 100%; background: var(--accent); }
 .br-legend { display: flex; justify-content: space-between; color: var(--muted); font-size: var(--font-xs); }
+
+/* ===== 设计语言基线：原生控件统一外观（一木用自有下拉，不用系统默认样式） ===== */
+input:not([type='checkbox']):not([type='radio']):not([type='range']),
+select,
+textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--card);
+  color: var(--ink);
+  font-size: var(--font-sm);
+  font-family: inherit;
+  padding: 10px 12px;
+  min-height: 40px;
+}
+
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 34px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 17px) calc(50% - 2px),
+    calc(100% - 12px) calc(50% - 2px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}

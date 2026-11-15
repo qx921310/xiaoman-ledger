@@ -46,7 +46,7 @@ export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot, f
   }, [budgets, month])
   // 一木「更多」菜单（popup_home_menu.xml）：视图 简约/详细、范围 全部/按月
   const [menuOpen, setMenuOpen] = useState(false)
-  const [simpleView, setSimpleView] = useState(false)
+  const [simpleView] = useState(true)
   const [rangeAll, setRangeAll] = useState(false)
   // 下拉刷新：触发一次同步（对应一木各页的 pull_layout）
   const [pullAction, setPullAction] = useState<'sync' | 'add'>('sync')
@@ -116,12 +116,12 @@ export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot, f
               <b>{plain(summary.income)}</b>
             </button>
             <button type="button" className="hc-item" onClick={onOpenStats} disabled={!onOpenStats}>
-              <small>本月结余</small>
-              <b>{plain(summary.income - used)}</b>
+              <small>本月支出</small>
+              <b>{plain(used)}</b>
             </button>
             <button type="button" className="hc-item" onClick={onOpenStats} disabled={!onOpenStats}>
-              <small>剩余月预算</small>
-              <b>{budgetTotal > 0 ? plain(Math.max(0, budgetTotal - budgetUsed)) : '--'}</b>
+              <small>本月结余</small>
+              <b>{plain(+(summary.income - used).toFixed(2))}</b>
             </button>
           </div>
           <button type="button" className="hc-big" onClick={onOpenStats} disabled={!onOpenStats}>
@@ -171,13 +171,6 @@ export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot, f
       {menuOpen && (
         <div className="menu-mask" onClick={() => setMenuOpen(false)}>
           <div className="home-menu" role="dialog" aria-label="更多" onClick={(e) => e.stopPropagation()}>
-            <div className="hm-group">
-              <div className="hm-label">视图</div>
-              <div className="hm-seg">
-                <button type="button" className={!simpleView ? 'on' : ''} onClick={() => setSimpleView(false)}>详细</button>
-                <button type="button" className={simpleView ? 'on' : ''} onClick={() => setSimpleView(true)}>简约</button>
-              </div>
-            </div>
             <div className="hm-group">
               <div className="hm-label">范围</div>
               <div className="hm-seg">
