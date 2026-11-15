@@ -175,6 +175,22 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
   const tagRows = useMemo(() => byTag(rangeBills, tags, parents, refunds), [rangeBills, tags, parents, refunds])
   const rangeSummary = useMemo(() => summarizeBills(rangeBills, parents, refunds), [rangeBills, parents, refunds])
 
+  /** 报表统计（一木 s28）：按月的支出/收入/结余 */
+  const monthReport = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; income: number; expense: number }>()
+    for (const b of bills) {
+      if (currentBookId !== 0 && String(b.bookId) !== String(currentBookId)) continue
+      if (b.notIntoTotal) continue
+      const d = new Date(b.time)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      const cur = map.get(key) ?? { key, label: `${d.getFullYear()}年${d.getMonth() + 1}月`, income: 0, expense: 0 }
+      if (parents.find((c) => c.id === b.parentCategoryId)?.kind === 'income') cur.income = +(cur.income + b.cost).toFixed(2)
+      else cur.expense = +(cur.expense + billNetAmount(b, refunds)).toFixed(2)
+      map.set(key, cur)
+    }
+    return [...map.values()].sort((a, b) => (a.key < b.key ? 1 : -1)).slice(0, 12)
+  }, [bills, currentBookId, parents, refunds])
+
   return (
     <section className="card">
       {drill && (
@@ -238,9 +254,12 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
         </div>
       )}
       {!bounds && <p className="hint">请选择有效的开始和结束日期。</p>}
-      <p className="hint">
-        范围合计：支出 {money(rangeSummary.expense)} · 收入 {money(rangeSummary.income)} · 结余 {money(rangeSummary.income - rangeSummary.expense)}（{rangeBills.length} 笔）
-      </p>
+      <div className="totals-3" aria-label="范围合计">
+        <div><small>支出</small><b className="out">{money(rangeSummary.expense)}</b></div>
+        <div><small>收入</small><b className="in">{money(rangeSummary.income)}</b></div>
+        <div><small>结余</small><b>{money(rangeSummary.income - rangeSummary.expense)}</b></div>
+        <p className="muted">共 {rangeBills.length} 笔</p>
+      </div>
 
       {/* 近 7 日统计（真机首块） */}
       <div className="week-card">
@@ -255,10 +274,28 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
         </div>
       </div>
 
-      <details className="stats-extra">
-        <summary>查看资产分布</summary>
+      <div className="stats-block">
+        <div className="sb-hd"><b>报表统计</b></div>
+        <table className="table">
+          <thead><tr><th>月份</th><th>支出</th><th>收入</th><th>结余</th></tr></thead>
+          <tbody>
+            {monthReport.map((r) => (
+              <tr key={r.key}>
+                <td>{r.label}</td>
+                <td>{money(r.expense)}</td>
+                <td>{money(r.income)}</td>
+                <td>{money(r.income - r.expense)}</td>
+              </tr>
+            ))}
+            {monthReport.length === 0 && <tr><td colSpan={4}>这个时间范围暂无收支记录</td></tr>}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="stats-block">
+        <div className="sb-hd"><b>资产汇总</b></div>
         <AssetSankey />
-      </details>
+      </div>
 
       {totalBudget > 0 ? (
         <div className="budget-box">

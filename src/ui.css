@@ -1409,3 +1409,12 @@ button.day-btn {
 .cal-daygroup:first-child { border-top: 0; margin-top: 0; }
 .cal-daygroup .hf-head { display: flex; align-items: center; gap: 8px; padding: 4px 2px; }
 .cal-daygroup .hf-head .cal-lunar { margin-left: 6px; }
+
+/* 统计：三列合计与区块标题（一木 s27/s28） */
+.totals-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 10px 0; }
+.totals-3 > div { display: flex; flex-direction: column; gap: 2px; }
+.totals-3 small { color: var(--muted); font-size: var(--font-xs); }
+.totals-3 b { font-size: var(--font-lg); }
+.totals-3 .muted { grid-column: 1 / -1; margin: 0; }
+.stats-block { margin-top: 12px; }
+.sb-hd { display: flex; align-items: center; justify-content: space-between; padding: 6px 2px; }
