@@ -1418,3 +1418,13 @@ button.day-btn {
 .totals-3 .muted { grid-column: 1 / -1; margin: 0; }
 .stats-block { margin-top: 12px; }
 .sb-hd { display: flex; align-items: center; justify-content: space-between; padding: 6px 2px; }
+
+/* 统计：资产汇总环形图与预算占比 */
+.asset-donut { display: flex; align-items: center; gap: 8px; }
+.asset-legend { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.al-row { display: flex; align-items: center; gap: 8px; font-size: var(--font-sm); }
+.al-row i { width: 8px; height: 8px; border-radius: var(--r-pill); display: inline-block; }
+.budget-ring { display: flex; flex-direction: column; gap: 6px; padding: 4px 2px 8px; }
+.br-track { height: 8px; border-radius: var(--r-pill); background: var(--line); overflow: hidden; }
+.br-fill { height: 100%; background: var(--accent); }
+.br-legend { display: flex; justify-content: space-between; color: var(--muted); font-size: var(--font-xs); }

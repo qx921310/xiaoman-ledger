@@ -11,7 +11,6 @@ const CHART_COLORS = ['var(--accent)', 'var(--focus-ink)', 'var(--muted)', 'var(
 import { byAsset, byTag } from '../domain/stats-breakdown'
 import { statisticsBounds, chartTrend, categoryDistribution } from '../domain/statistics-charts'
 import { CategoryChart, TrendChart } from './statistics-charts'
-import { AssetSankey } from './asset-sankey'
 import { StatsDetail } from './stats-detail'
 import { assetTrend as assetTrendOf } from '../domain/asset-trend'
 import { Modal } from '../ui/modal'
@@ -175,6 +174,16 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
   const tagRows = useMemo(() => byTag(rangeBills, tags, parents, refunds), [rangeBills, tags, parents, refunds])
   const rangeSummary = useMemo(() => summarizeBills(rangeBills, parents, refunds), [rangeBills, parents, refunds])
 
+  /** 资产汇总（一木 s27）：按账户余额做环形图与图例 */
+  const assetPie = useMemo(() => {
+    const palette = ['var(--accent)', 'var(--in)', 'var(--out)', 'var(--line)', 'var(--muted)']
+    return assets
+      .filter((a) => (currentBookId === 0 || a.bookId == null || String(a.bookId) === String(currentBookId)))
+      .filter((a) => Number(a.assetNumber) > 0)
+      .map((a, i) => ({ id: a.assetId, name: a.simpleName || a.assetName, value: +Number(a.assetNumber).toFixed(2), color: palette[i % palette.length] }))
+      .sort((a, b) => b.value - a.value)
+  }, [assets, currentBookId])
+
   /** 报表统计（一木 s28）：按月的支出/收入/结余 */
   const monthReport = useMemo(() => {
     const map = new Map<string, { key: string; label: string; income: number; expense: number }>()
@@ -294,8 +303,42 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
 
       <div className="stats-block">
         <div className="sb-hd"><b>资产汇总</b></div>
-        <AssetSankey />
+        <div className="asset-donut">
+          <ResponsiveContainer width="55%" height={150}>
+            <PieChart>
+              <Pie data={assetPie} dataKey="value" nameKey="name" innerRadius={38} outerRadius={64} stroke="none">
+                {assetPie.map((row) => <Cell key={row.id} fill={row.color} />)}
+              </Pie>
+              <Tooltip formatter={(v) => money(Number(v))} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="asset-legend">
+            {assetPie.map((row) => (
+              <div key={row.id} className="al-row">
+                <i style={{ background: row.color }} />
+                <span className="grow">{row.name}</span>
+                <b>{money(row.value)}</b>
+              </div>
+            ))}
+            {assetPie.length === 0 && <p className="hint">这个时间范围暂无收支记录</p>}
+          </div>
+        </div>
       </div>
+
+      {totalBudget > 0 && (
+        <div className="stats-block">
+          <div className="sb-hd"><b>预算占比</b><span className="muted">{money(totalBudget)}</span></div>
+          <div className="budget-ring">
+            <div className="br-track">
+              <div className="br-fill" style={{ width: `${Math.min(100, (spentOf(0) / totalBudget) * 100)}%` }} />
+            </div>
+            <div className="br-legend">
+              <span>已用 {money(spentOf(0))}</span>
+              <span>剩余 {money(Math.max(0, totalBudget - spentOf(0)))}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {totalBudget > 0 ? (
         <div className="budget-box">
