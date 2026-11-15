@@ -19,3 +19,8 @@ server/.env
 # 截图产物
 .shots/
 .shots*/
+
+# 双设备验证产物
+.dualdev/
+.chrome-dual/
+.shots-dual/
