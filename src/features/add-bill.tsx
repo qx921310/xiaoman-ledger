@@ -300,7 +300,8 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
           <div className="entry-tabs">
             {(['expense', 'income', 'transfer', 'debt'] as const).map((item, index) => <button key={item} type="button" aria-pressed={mode === item} className={mode === item ? 'on' : ''} onClick={() => switchMode(item)}>{['支出', '收入', '转账', '债务'][index]}</button>)}
           </div>
-          <button type="button" className="entry-edit" onClick={() => setEditOpen(true)}>编辑</button>
+          <button type="button" className="entry-edit" disabled={readOnly}
+            onClick={() => { if (submit()) onClose?.() }}>完成</button>
         </div>
 
         <div className="entry-scroll">
@@ -443,9 +444,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
             {key('4')}{key('5')}{key('6')}<div className="entry-operators">{key('+')}{key('-')}</div>
             {key('7')}{key('8')}{key('9')}<div className="entry-operators">{key('×')}{key('÷')}</div>
             <button type="button" className="key-control" disabled={readOnly} onClick={() => { submit() }}>再记</button>{key('0')}{key('.')}
-            {evaluatedCost != null && evaluatedCost > 0
-              ? <button type="button" className="key-finish" disabled={readOnly} onClick={() => { if (submit()) onClose?.() }}>完成</button>
-              : <button type="button" className="key-control" onClick={() => onClose?.()}>取消</button>}
+            <button type="button" className="key-control" onClick={() => onClose?.()}>取消</button>
           </div>}
 
           {dateOpen && (
