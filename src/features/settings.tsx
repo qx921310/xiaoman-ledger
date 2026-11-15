@@ -1,3 +1,4 @@
+import { clearAllBookPatches } from './book-pending'
 import { useEffect, useMemo, useState } from 'react'
 import { useLedger } from '../store'
 import type { Cycle } from '../types'
@@ -263,24 +264,10 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   }
   const parentCategories = useLedger((s) => s.parentCategories)
   const childCategories = useLedger((s) => s.childCategories)
-  const templates = useLedger((s) => s.templates)
-  const applyTemplate = useLedger((s) => s.applyTemplate)
-  const deleteTemplate = useLedger((s) => s.deleteTemplate)
-  const splitGroups = useLedger((s) => s.splitGroups)
-  const splitMembers = useLedger((s) => s.splitMembers)
-  const splitExpenses = useLedger((s) => s.splitExpenses)
-  const addSplitGroup = useLedger((s) => s.addSplitGroup)
-  const deleteSplitGroup = useLedger((s) => s.deleteSplitGroup)
-  const addSplitMember = useLedger((s) => s.addSplitMember)
-  const deleteSplitMember = useLedger((s) => s.deleteSplitMember)
-  const updateSplitMember = useLedger((s) => s.updateSplitMember)
-  const settleSplit = useLedger((s) => s.settleSplit)
   const [ocrBusy, setOcrBusy] = useState(false)
   const [ocrSaving, setOcrSaving] = useState(false)
   const [ocrResult, setOcrResult] = useState<OcrDraft | null>(null)
   const addBill = useLedger((s) => s.addBill)
-  const [newGroup, setNewGroup] = useState('')
-  const [newMember, setNewMember] = useState<Record<number, string>>({})
   const [newCat, setNewCat] = useState<{ parentId: number; kind: 'expense' | 'income'; name: string; icon: string } | null>(null)
   const [newCatScoped, setNewCatScoped] = useState(false)
   const addCycle = useLedger((s) => s.addCycle)
@@ -648,6 +635,13 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
           <span className="grow">云备份</span><span className="muted">{syncLine}</span>
         </button>
         <div className="row"><span className="grow">导出备份</span><span className="muted">JSON</span></div>
+        <button type="button" className="row my-row-btn" onClick={async () => {
+          const n = await clearAllBookPatches()
+          localStorage.removeItem('xiaoman-sync-warning')
+          notify(n ? `已清理 ${n} 条本地待同步草稿（云端未动）` : '本机没有待同步草稿')
+        }}>
+          <span className="grow">清理本地同步缓存</span><span className="muted">仅本机</span>
+        </button>
       </div>
 
       <h3>账单文件</h3>
@@ -1177,88 +1171,6 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       )}
 
       </>)}
-      <h3>模板</h3>
-      <p className="hint"></p>
-      {templates.length === 0 && <p className="hint">还没有模板。</p>}
-      {templates.map((t) => (
-        <div key={t.templateId} className="row">
-          <div className="grow">
-            <div>{t.name}</div>
-            <small>
-              {t.mode === 'transfer'
-                ? `转账 ${money(t.transfer?.cost ?? 0)}`
-                : `${parents.find((p) => p.id === t.bill?.parentCategoryId)?.name ?? '未分类'} ${money(t.bill?.cost ?? 0)}`}
-            </small>
-          </div>
-          <button className="link" onClick={() => {
-            if (applyTemplate(t.templateId)) notify('已按模板记一笔')
-          }}>记账</button>
-          <button className="del" onClick={() => deleteTemplate(t.templateId)}>删</button>
-        </div>
-      ))}
-
-      <h3>AA 群组</h3>
-      <p className="hint">建群组后，记账时可选择 AA 分摊。</p>
-      <div className="row2">
-        <input aria-label="新群组名称" value={newGroup} placeholder="群组名，如 周末聚餐"
-          onChange={(e) => setNewGroup(e.target.value)} />
-        <button className="ghost" onClick={() => {
-          if (!newGroup.trim()) return notify('请填写群组名')
-          addSplitGroup({ name: newGroup.trim(), members: ['我'] })
-          setNewGroup('')
-          notify('群组已创建')
-        }}>新建群组</button>
-      </div>
-      {splitGroups.length === 0 && <p className="hint">还没有 AA 群组。</p>}
-      {splitGroups.map((g) => {
-        const members = splitMembers.filter((m) => m.splitGroupId === g.splitGroupId)
-        const expenses = splitExpenses.filter((x) => x.splitGroupId === g.splitGroupId)
-        const pending = expenses.filter((x) => !x.settlement)
-        return (
-          <div key={g.splitGroupId} className="cat-block">
-            <div className="row">
-              <div className="grow">
-                <b>{g.name}</b>
-                <small>{members.length} 位成员 · {pending.length} 笔待结算</small>
-              </div>
-              <button className="del" aria-label={`删除群组 ${g.name}`} onClick={() => deleteSplitGroup(g.splitGroupId)}>删</button>
-            </div>
-            <div className="cat-children">
-              {members.map((m) => (
-                <div key={m.splitMemberId} className="cat-child">
-                  <span className="grow">{m.name}{m.self ? '（我）' : ''}</span>
-                  {!m.self && (
-                    <button className="link" onClick={() => {
-                      members.forEach((x) => updateSplitMember(x.splitMemberId, { self: false }))
-                      updateSplitMember(m.splitMemberId, { self: true })
-                    }}>设为我</button>
-                  )}
-                  <button className="del" onClick={() => deleteSplitMember(m.splitMemberId)}>删</button>
-                </div>
-              ))}
-              <div className="row2">
-                <input aria-label={`${g.name} 新成员`} value={newMember[g.splitGroupId] ?? ''} placeholder="成员名"
-                  onChange={(e) => setNewMember({ ...newMember, [g.splitGroupId]: e.target.value })} />
-                <button className="ghost" onClick={() => {
-                  const name = (newMember[g.splitGroupId] ?? '').trim()
-                  if (!name) return
-                  addSplitMember(g.splitGroupId, name)
-                  setNewMember({ ...newMember, [g.splitGroupId]: '' })
-                }}>加成员</button>
-              </div>
-              {expenses.map((x) => (
-                <div key={x.splitExpenseId} className="cat-child">
-                  <span className="grow">{x.title} · {money(x.amount)} · {['均分', '按金额', '按份额'][x.splitType]}</span>
-                  <button className="link" onClick={() => settleSplit(x.splitExpenseId, !x.settlement)}>
-                    {x.settlement ? '已结算' : '标记已结算'}
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )
-      })}
-
       {meScreen === 'tag' && (<>
       <button type="button" className="link" onClick={() => setMeScreen(null)}>‹ 返回我的</button>
       <div className="pane-head">
@@ -1427,7 +1339,6 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       {onLogout && <button className="ghost wide" onClick={() => { if (confirm('确定退出登录吗？本机数据会保留。')) onLogout() }}>退出登录</button>}
 
       <h3>财务工具</h3>
-      <p className="hint">房贷计划、信用卡分期在「资产」页使用。</p>
 
       <h3>更多</h3>
       <div className="my-links">

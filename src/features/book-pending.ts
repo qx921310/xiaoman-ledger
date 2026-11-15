@@ -272,6 +272,17 @@ export async function queueBookPatch(bookId: string, patch: Record<string, unkno
   void refreshBookPendingStatus()
 }
 
+/** 清空本账号在本机的待补传队列（只影响本地，不动云端） */
+export async function clearAllBookPatches(): Promise<number> {
+  const uid = getCurrentUid()
+  const rows = await listAll(uid)
+  await withStore('readwrite', async (store) => {
+    for (const row of rows) await req(store.delete(keyOf(uid, row.bookId)))
+  })
+  await refreshBookPendingStatus()
+  return rows.length
+}
+
 export async function getBookPatch(bookId: string): Promise<PendingBookPatch | undefined> {
   const uid = getCurrentUid()
   return withStore('readonly', async (store) => {

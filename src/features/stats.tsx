@@ -644,15 +644,12 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
                 </div>
               </>
             )}
-            <div className="label">追加额度（可选）</div>
-            <input aria-label="追加额度" value={editing.addNum ?? ''} inputMode="decimal" placeholder="在原额度上叠加"
-              onChange={(e) => setEditing({ ...editing, addNum: e.target.value.replace(/[^\d.]/g, '') })} />
             <div className="label">基础额度</div>
             <input
               aria-label="基础额度"
               value={editing.amount}
               autoFocus
-              placeholder="填 0 表示取消"
+              placeholder="预算额度"
               onChange={(e) => setEditing({ ...editing, amount: e.target.value.replace(/[^\d.]/g, '') })}
               inputMode="decimal"
             />

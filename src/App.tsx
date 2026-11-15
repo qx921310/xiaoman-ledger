@@ -99,7 +99,9 @@ export default function App() {
       const r = await syncNow()
       const warn = r.denied ? `${r.denied} 条记录未能推送，请到设置页检查同步结果。` : ''
       const kept = Number(r.conflictsKept ?? 0) + Number(r.conflicts ?? 0)
-      setSyncWarning(warn || (kept ? `有 ${kept} 条记录待核对（冲突或未推送），请到设置页处理。` : ''))
+      // 云端已被清空（例如重置数据）时，本机残留的「待核对」不再有意义，直接清掉
+      const cloudEmpty = Number(r.pulled ?? 0) === 0 && Number(r.pushed ?? 0) === 0 && kept > 0
+      setSyncWarning(warn || (cloudEmpty ? '' : kept ? `有 ${kept} 条记录待核对（冲突或未推送），请到设置页处理。` : ''))
       console.log('[sync] 自动同步完成', r)
     } catch (e) {
       console.warn('[sync] 自动同步失败（可手动重试）', e)

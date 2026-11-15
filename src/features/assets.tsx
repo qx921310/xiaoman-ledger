@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useLedger, useTotalAssets } from '../store'
 import { ASSET_TYPE, LEND_TYPE } from '../types'
 import type { Asset } from '../types'
-import { money, dayOf, fullDay } from '../ui-format'
+import { money, dayOf } from '../ui-format'
 import { errorMessage } from '../errors'
 import { AssetIcon } from '../ui/icons'
 import { ASSET_ICON_GROUPS } from '../ui/asset-icons'
@@ -15,7 +15,6 @@ import { AssetStats } from './asset-stats'
 import { accountMoney, toBase } from '../money'
 import { visibleAssets } from '../domain/asset-scope'
 import { accountHistory } from '../domain/account-history'
-import { planInstalment, planLoan } from '../domain/loan'
 import { holdingValue, totalProfit } from '../domain/stock'
 import { IconPicker } from '../ui/icon-picker'
 import { lendRemaining, lendTotals } from '../lend'
@@ -52,13 +51,6 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
   const deleteLend = useLedger((s) => s.deleteLend)
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null)
   const deleteAsset = useLedger((s) => s.deleteAsset)
-  const homeLoans = useLedger((s) => s.homeLoans)
-  const instalments = useLedger((s) => s.instalments)
-  const addHomeLoan = useLedger((s) => s.addHomeLoan)
-  const deleteHomeLoan = useLedger((s) => s.deleteHomeLoan)
-  const addInstalment = useLedger((s) => s.addInstalment)
-  const deleteInstalment = useLedger((s) => s.deleteInstalment)
-  const postInstalmentBills = useLedger((s) => s.postInstalmentBills)
   const stockAssets = useLedger((s) => s.stockAssets)
   const setStockHidden = useLedger((s) => s.setStockHidden)
   const addStockAsset = useLedger((s) => s.addStockAsset)
@@ -69,8 +61,6 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
   const [stockForm, setStockForm] = useState({ name: '', code: '', num: '', amount: '' })
   const [stockSell, setStockSell] = useState<Record<number, string>>({})
   const [stockSellAmt, setStockSellAmt] = useState<Record<number, string>>({})
-  const [loanForm, setLoanForm] = useState({ name: '房贷', commercial: '', commercialRate: '4.3', provident: '', providentRate: '3.1', lprAdd: '', periods: '360', repayment: 'equal-payment' as 'equal-payment' | 'equal-principal' })
-  const [insForm, setInsForm] = useState({ total: '', periods: '12', serviceRate: '7.2', serviceType: 0, month: fullDay(Date.now()).slice(0, 7), assetId: 0 })
   const bills = useLedger((s) => s.bills)
   const allAssetsParents = useLedger((s) => s.parentCategories)
   const transfers = useLedger((s) => s.transfers)
@@ -454,138 +444,8 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
       </div>
       )}
       {screen === 'assets' && (<>
-      <details className="fold">
-        <summary>房贷计划</summary>
       
-      <div className="row2">
-        <input aria-label="商业贷款金额" placeholder="商贷金额" value={loanForm.commercial} inputMode="decimal"
-          onChange={(e) => setLoanForm({ ...loanForm, commercial: e.target.value.replace(/[^\d.]/g, '') })} />
-        <input aria-label="商贷年利率" placeholder="商贷年利率 %" value={loanForm.commercialRate} inputMode="decimal"
-          onChange={(e) => setLoanForm({ ...loanForm, commercialRate: e.target.value.replace(/[^\d.]/g, '') })} />
-      </div>
-      <div className="row2">
-        <input aria-label="公积金贷款金额" placeholder="公积金金额" value={loanForm.provident} inputMode="decimal"
-          onChange={(e) => setLoanForm({ ...loanForm, provident: e.target.value.replace(/[^\d.]/g, '') })} />
-        <input aria-label="公积金年利率" placeholder="公积金年利率 %" value={loanForm.providentRate} inputMode="decimal"
-          onChange={(e) => setLoanForm({ ...loanForm, providentRate: e.target.value.replace(/[^\d.]/g, '') })} />
-      </div>
-      <div className="row2">
-        <input aria-label="期数" placeholder="期数（月）" value={loanForm.periods} inputMode="numeric"
-          onChange={(e) => setLoanForm({ ...loanForm, periods: e.target.value.replace(/\D/g, '') })} />
-        <select aria-label="还款方式" value={loanForm.repayment}
-          onChange={(e) => setLoanForm({ ...loanForm, repayment: e.target.value as 'equal-payment' | 'equal-principal' })}>
-          <option value="equal-payment">等额本息</option>
-          <option value="equal-principal">等额本金</option>
-        </select>
-      </div>
-      {(() => {
-        const plan = planLoan({
-          commercial: { amount: Number(loanForm.commercial) || 0, rate: (Number(loanForm.commercialRate) || 0) / 100 },
-          provident: { amount: Number(loanForm.provident) || 0, rate: (Number(loanForm.providentRate) || 0) / 100 },
-          periods: Number(loanForm.periods) || 360,
-          repayment: loanForm.repayment
-        })
-        if (!plan.periods.length) return null
-        return (
-          <div className="budget-box small">
-            <div className="budget-line"><span>首期月供</span><b>{money(plan.firstMonthly)}</b></div>
-            <div className="budget-line"><span>利息总额</span><b>{money(plan.totalInterest)}</b></div>
-            <div className="budget-line"><span>还款总额</span><b>{money(plan.totalPrincipal + plan.totalInterest)}</b></div>
-            <button className="ghost wide" onClick={() => {
-              addHomeLoan({
-                name: loanForm.name,
-                commercial: Number(loanForm.commercial) || 0,
-                commercialRate: (Number(loanForm.commercialRate) || 0) / 100,
-                provident: Number(loanForm.provident) || 0,
-                providentRate: (Number(loanForm.providentRate) || 0) / 100,
-                lprAdd: Number(loanForm.lprAdd) || undefined,
-                periods: Number(loanForm.periods) || 360,
-                repayment: loanForm.repayment
-              })
-              notify('房贷计划已保存')
-            }}>保存计划</button>
-          </div>
-        )
-      })()}
-      {homeLoans.map((l) => {
-        const plan = planLoan({
-          commercial: { amount: l.commercial, rate: l.commercialRate },
-          provident: { amount: l.provident, rate: l.providentRate },
-          periods: l.periods, repayment: l.repayment
-        })
-        return (
-          <div key={l.loanId} className="row">
-            <div className="grow">
-              <div>{l.name} · {l.repayment === 'equal-payment' ? '等额本息' : '等额本金'}</div>
-              <small>本金 {money(l.commercial + l.provident)} · 月供 {money(plan.firstMonthly)} · 利息 {money(plan.totalInterest)}</small>
-            </div>
-            <button className="del" onClick={() => deleteHomeLoan(l.loanId)}>删</button>
-          </div>
-        )
-      })}
-
-      </details>
-      <details className="fold">
-        <summary>信用卡分期</summary>
-      <div className="row2">
-        <input aria-label="分期本金" placeholder="分期本金" value={insForm.total} inputMode="decimal"
-          onChange={(e) => setInsForm({ ...insForm, total: e.target.value.replace(/[^\d.]/g, '') })} />
-        <input aria-label="分期期数" placeholder="期数" value={insForm.periods} inputMode="numeric"
-          onChange={(e) => setInsForm({ ...insForm, periods: e.target.value.replace(/\D/g, '') })} />
-      </div>
-      <div className="row2">
-        <input aria-label="手续费率" placeholder="总手续费率 %" value={insForm.serviceRate} inputMode="decimal"
-          onChange={(e) => setInsForm({ ...insForm, serviceRate: e.target.value.replace(/[^\d.]/g, '') })} />
-        <select aria-label="手续费方式" value={insForm.serviceType}
-          onChange={(e) => setInsForm({ ...insForm, serviceType: Number(e.target.value) })}>
-          <option value={0}>手续费一次性收</option>
-          <option value={1}>手续费每期收</option>
-        </select>
-      </div>
-      {(() => {
-        const plan = planInstalment({
-          total: Number(insForm.total) || 0,
-          periods: Number(insForm.periods) || 12,
-          serviceRate: (Number(insForm.serviceRate) || 0) / 100,
-          serviceType: insForm.serviceType === 1 ? 1 : 0
-        })
-        if (!plan.periods.length) return null
-        return (
-          <div className="budget-box small">
-            <div className="budget-line"><span>每期本金</span><b>{money(plan.periods[0].principal)}</b></div>
-            <div className="budget-line"><span>手续费合计</span><b>{money(plan.totalService)}</b></div>
-            <button className="ghost wide" onClick={() => {
-              addInstalment({
-                totalNumber: Number(insForm.total) || 0,
-                periods: Number(insForm.periods) || 12,
-                serviceRate: (Number(insForm.serviceRate) || 0) / 100,
-                serviceType: insForm.serviceType === 1 ? 1 : 0,
-                accountMonth: insForm.month,
-                assetId: insForm.assetId || assets.find((a) => a.assetType === 2)?.assetId
-              })
-              notify('分期已登记')
-            }}>登记分期</button>
-          </div>
-        )
-      })()}
-      {instalments.map((i) => {
-        const plan = planInstalment({ total: i.totalNumber, periods: i.periods, serviceRate: i.serviceRate, serviceType: i.serviceType })
-        return (
-          <div key={i.instalmentId} className="row">
-            <div className="grow">
-              <div>{money(i.totalNumber)} · {i.periods} 期 · 手续费 {money(plan.totalService)}</div>
-              <small>每期约 {money(plan.periods[0]?.principal ?? 0)} · 从 {i.accountMonth} 起</small>
-            </div>
-            <button className="link" onClick={() => {
-              const n = postInstalmentBills(i.instalmentId)
-              notify(n ? `已生成 ${n} 期账单` : '没有可生成的账单（账户缺失或已生成）')
-            }}>生成账单</button>
-            <button className="del" onClick={() => deleteInstalment(i.instalmentId)}>删</button>
-          </div>
-        )
-      })}
-
-      </details>
+      
       {editingAsset && (
         <AssetEditor
           asset={editingAsset}
