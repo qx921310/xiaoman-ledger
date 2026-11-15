@@ -376,7 +376,7 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
             const inc = p?.kind === 'income'
             return (
               <div key={b.billId} className={'row ledger-row' + (simpleView ? ' simple' : '') + (picked.has(String(b.billId)) ? ' picked' : '')}
-                onClick={selecting ? () => togglePick(String(b.billId)) : undefined}>
+                onClick={selecting ? () => togglePick(String(b.billId)) : () => setDetail(b)}>
                 <span className="dot-badge" style={{ background: p?.bg ?? 'var(--accent-soft)', color: p?.color ?? 'var(--ink)' }}>
                   <CatIcon k={p?.icon ?? 'ic_parent_other'} size={16} />
                 </span>
