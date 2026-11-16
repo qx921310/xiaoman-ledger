@@ -169,6 +169,8 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
     const v = evaluateAmount(cost)
     if (v == null || v <= 0) return fail('请输入有效金额')
     if (String(curBookId) === '0') return fail('请先选择一个具体账本')
+    // 只读账本：命令层会拒，界面也要立刻提示，别让用户白填
+    if (!bookWritable(curBookId, accountBooks)) return fail('当前账本只读，不能记账')
 
     if (mode === 'debt') {
       const typeMap: Record<1 | 2 | 3 | 4, string> = { 1: '资金借出', 2: '收款', 3: '资金借入', 4: '还款' }
@@ -178,9 +180,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
         const parent = lends.find((l) => l.lendId === parentLendId)
         if (!parent || lendRemaining(parent, lends) <= 0) return fail('该债务已结清')
         if (v > lendRemaining(parent, lends)) return fail('金额超过未结余额')
-        // 只读账本：命令层会拒，但界面要立刻给出明确提示，别让用户白填
-    if (!bookWritable(curBookId, accountBooks)) return fail('当前账本只读，不能记账')
-    if (!aid) return fail('请选择账户')
+        if (!aid) return fail('请选择账户')
         if (!repayLend({ lendId: parent.lendId, amount: v, repaymentAssetId: aid, time: Date.now() })) return fail('记录失败：账本只读或参数无效')
         notify(`${typeMap[debtType]} ${money(v)} 已记录，剩余 ${money(lendRemaining(parent, lends) - v)}`)
         setCost(''); setParentLendId('')

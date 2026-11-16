@@ -273,7 +273,7 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning, bookPending }:
             onPick={(id) => { setSearchOpen(false); setFocusBillId(id); setTab('home') }} />
         )}
         {!searchOpen && tab === 'home' && (
-          <Home me={user} onAdd={() => setTab('add')}
+          <Home me={user} notify={notify} onAdd={() => setTab('add')}
             onOpenStats={() => setTab('stats')}
             onSearch={() => setSearchOpen(true)}
             onMore={() => setTab('me')}

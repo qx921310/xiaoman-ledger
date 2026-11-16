@@ -9,13 +9,14 @@ import { usePullRefresh } from '../ui/use-pull-refresh'
 import { syncNowImmediate } from '../sync-auto'
 
 /** 首页：本月汇总 + 预算卡 + 记账入口 + 流水（照一木的单列结构） */
-export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot, focusBillId, onFocusHandled }: {
+export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot, notify, focusBillId, onFocusHandled }: {
   me?: { id: number; email: string }
   onAdd: () => void
   onOpenStats?: () => void
   onSearch?: () => void
   onMore?: () => void
   onScreenshot?: () => void
+  notify?: (message: string) => void
   /** 搜索命中后要打开的账单 */
   focusBillId?: string | number | null
   onFocusHandled?: () => void
@@ -133,7 +134,7 @@ export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot, f
       )}
 
       {/* 主按钮：添加一条新记账（整行绿底） */}
-      <button type="button" className="home-add" onClick={onAdd} disabled={readOnly}>
+      <button type="button" className="home-add" onClick={() => (readOnly ? notify?.('当前账本只读，不能记账') : onAdd())}>
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
           <rect x="3.5" y="4.5" width="17" height="15" rx="3" /><path d="M12 9.5v5M9.5 12h5" strokeLinecap="round" />
         </svg>
@@ -202,7 +203,7 @@ export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot, f
         </div>
       )}
 
-      <button type="button" className="home-fab" aria-label="语音记账" onClick={onAdd} disabled={readOnly}>
+      <button type="button" className="home-fab" aria-label="语音记账" onClick={() => (readOnly ? notify?.('当前账本只读，不能记账') : onAdd())}>
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
           <rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" strokeLinecap="round" />
         </svg>
