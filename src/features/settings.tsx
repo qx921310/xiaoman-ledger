@@ -146,7 +146,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [prepayOpen, setPrepayOpen] = useState(false)
   const [pensionOpen, setPensionOpen] = useState(false)
   const [tool, setTool] = useState<'hourly' | 'inflation' | 'buyrent' | null>(null)
-  const [meScreen, setMeScreen] = useState<'book' | 'cat' | 'tag' | 'data' | null>(null)
+  const [meScreen, setMeScreen] = useState<'book' | 'cat' | 'tag' | 'data' | 'currency' | null>(null)
   const [cycleDrill, setCycleDrill] = useState<{ title: string; cycleId: string | number } | null>(null)
   const [backupOpen, setBackupOpen] = useState(false)
   // 一木 UserInfoActivity：昵称与头像可改（本地保存，账号维度）
@@ -580,6 +580,9 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         </button>
         <button type="button" className="row my-row-btn" onClick={() => { setMeScreen('data'); window.scrollTo({ top: 0 }) }}>
           <span className="grow">导入导出</span><span className="muted">Excel / CSV</span>
+        </button>
+        <button type="button" className="row my-row-btn" onClick={() => { setMeScreen('currency'); window.scrollTo({ top: 0 }) }}>
+          <span className="grow">币种与汇率</span><span className="muted">{currencies.length} 种</span>
         </button>
         <button type="button" className="row my-row-btn" onClick={() => setFilesOpen(true)}>
           <span className="grow">账单图片</span><span className="muted">{bills.filter((b) => (b.files?.length ?? 0) > 0).length} 笔</span>
@@ -1220,7 +1223,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       </div>}
 
       </>)}
-      <h3>币种与汇率</h3>
+      {meScreen === 'currency' && (<>\n      <button type="button" className="link" onClick={() => setMeScreen(null)}>‹ 返回我的</button>\n      <h3>币种与汇率</h3>
       <div className="row">
         <span className="grow" />
         <button type="button" className="link" disabled={rateBusy} onClick={async () => {
@@ -1281,7 +1284,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         }}>添加</button>
       </div>
 
-      <h3>云端同步</h3>
+      </>)}\n\n      <h3>云端同步</h3>
       <p className="hint">
         同步冲突时保留本地内容并提示。
       </p>
