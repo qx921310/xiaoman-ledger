@@ -188,6 +188,9 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
   }, [bills, inScope, year, monthIdx, kindOf, refunds])
 
 
+  /** 格内金额：超过 1 万用「万」，避免撑破格子 */
+  const cellAmount = (v: number) => (v >= 10000 ? `${(v / 10000).toFixed(1)}万` : money(v).replace('¥', ''))
+
   return (
     <section className="card">
       <div className="cal-toolbar">
@@ -275,8 +278,8 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
                 onClick={() => setPicked(key)} aria-label={`${date.getMonth() + 1}月${date.getDate()}日`}>
                 <em>{key === todayKey ? '今' : date.getDate()}</em>
                 {showLunar && <i className="cal-lunar">{lunarOfDate(date)}</i>}
-                {stat.expense ? <i className="out">{'-'}{money(stat.expense)}</i> : null}
-                {stat.income ? <i className="in">+{money(stat.income)}</i> : null}
+                {stat.expense ? <i className="out">{'-'}{cellAmount(stat.expense)}</i> : null}
+                {stat.income ? <i className="in">+{cellAmount(stat.income)}</i> : null}
               </button>
             )
           })}
@@ -293,8 +296,8 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
               onClick={() => setPicked(keyOf(day))} aria-label={`${monthIdx + 1}月${day}日`}>
               <em>{isToday(day) ? '今' : day}</em>
               {showLunar && <i className="cal-lunar">{lunarOf(day)}</i>}
-              {showAmount && stat?.expense ? <i className="out">{'-'}{money(stat.expense)}</i> : null}
-              {showAmount && stat?.income ? <i className="in">+{money(stat.income)}</i> : null}
+              {showAmount && stat?.expense ? <i className="out">{'-'}{cellAmount(stat.expense)}</i> : null}
+              {showAmount && stat?.income ? <i className="in">+{cellAmount(stat.income)}</i> : null}
             </button>
           )
         })}

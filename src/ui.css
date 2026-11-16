@@ -1516,3 +1516,11 @@ textarea:focus-visible {
 .my-vip .vip-open { flex: none; padding: 6px 14px; border: 0; border-radius: var(--r-pill); background: var(--accent); color: var(--focus-ink); font-size: var(--font-sm); }
 .my-backup-warn { display: block; width: 100%; margin: 6px 0; padding: 10px 12px; border: 0; border-radius: var(--r-md);
   background: var(--accent-soft); color: var(--focus-ink); font-size: var(--font-xs); text-align: start; }
+
+/* 日历格内金额：小字、超长省略，避免 ¥10,000.00 撑破格子 */
+.cal-cell i { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-xs); }
+
+/* 我的：会员条按钮不压字 */
+.my-vip { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; }
+.my-vip .vip-text { flex: 1; min-width: 0; }
+.my-vip .vip-open { flex: 0 0 auto; white-space: nowrap; }

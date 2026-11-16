@@ -358,7 +358,7 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
                   <div className="grow">
                     <div>转账 · {from?.assetName ?? '已删除账户'} → {to?.assetName ?? '已删除账户'}</div>
                     <small>
-                      {hhmm(t.time)} · 不计收支
+                      {hhmm(t.time)}
                       {t.serviceCharge > 0 ? ` · 手续费 ${money(t.serviceCharge)}` : ''}
                       {t.remark ? ` · ${t.remark}` : ''}
                     </small>
