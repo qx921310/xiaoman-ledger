@@ -1864,11 +1864,14 @@ export const useLedger = create<LedgerState>()(
         tombstones: [...s.tombstones, { kind: 'budget', id: `custom:${budgetId}`, updatedAt: NOW() }]
       })),
 
-      updateAsset: (asset) => set((s) => ({
-        assets: s.assets.map((a) => a.assetId === asset.assetId
-          ? { ...asset, openingBalance: (a.openingBalance ?? a.assetNumber) + (asset.assetNumber - a.assetNumber), updateTime: NOW() }
-          : a)
-      })),
+      updateAsset: (asset) => set((s) => {
+        if (!bookWritable(asset.bookId ?? s.currentBookId, s.accountBooks)) return {}
+        return {
+          assets: s.assets.map((a) => a.assetId === asset.assetId
+            ? { ...asset, openingBalance: (a.openingBalance ?? a.assetNumber) + (asset.assetNumber - a.assetNumber), updateTime: NOW() }
+            : a)
+        }
+      }),
 
       setBook: (id) => set({ currentBookId: id }),
 

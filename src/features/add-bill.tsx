@@ -422,21 +422,13 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
             </button>
           </div>
 
-          {(() => {
-            const acctCurrency = assets.find((a) => a.assetId === aid)?.currency ?? defaultCurrency
-            if (mode === 'transfer' || acctCurrency === defaultCurrency) return null
-            const amount = evaluatedCost ?? 0
-            const converted = hasCurrencyRate(acctCurrency, currencies, defaultCurrency)
-              ? toBase(amount, acctCurrency, currencies, defaultCurrency) : null
-            return (
-              <div className="entry-dual">
-                <div><small>账户币种 {acctCurrency}</small><b>{currencySymbol(currencies, acctCurrency, defaultCurrency)}{amount.toFixed(2)}</b></div>
-                <div><small>统计币种 {defaultCurrency}</small><b>{converted == null ? '请先设置汇率' : `${currencySymbol(currencies, defaultCurrency, defaultCurrency)}${converted.toFixed(2)}`}</b></div>
-              </div>
-            )
-          })()}
           {mode !== 'transfer' && currency !== defaultCurrency && evaluatedCost != null && evaluatedCost > 0 && (
-            <div className="entry-fx">{hasCurrencyRate(currency, currencies, defaultCurrency) ? `折合 ${currencySymbol(currencies, defaultCurrency, defaultCurrency)}${toBase(evaluatedCost, currency, currencies, defaultCurrency).toFixed(2)}` : '请先设置汇率'}</div>
+            <div className="entry-dual">
+              <div><small>记账币种 {currency}</small><b>{currencySymbol(currencies, currency, defaultCurrency)}{(evaluatedCost ?? 0).toFixed(2)}</b></div>
+              <div><small>统计币种 {defaultCurrency}</small><b>{hasCurrencyRate(currency, currencies, defaultCurrency)
+                ? `${currencySymbol(currencies, defaultCurrency, defaultCurrency)}${toBase(evaluatedCost ?? 0, currency, currencies, defaultCurrency).toFixed(2)}`
+                : '请先设置汇率'}</b></div>
+            </div>
           )}
 
           {keypadOpen && <div className="entry-keypad" aria-label="数字键盘">
@@ -444,11 +436,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
             {key('4')}{key('5')}{key('6')}<div className="entry-operators">{key('+')}{key('-')}</div>
             {key('7')}{key('8')}{key('9')}<div className="entry-operators">{key('×')}{key('÷')}</div>
             <button type="button" className="key-control" disabled={readOnly} onClick={() => { submit() }}>再记</button>{key('0')}{key('.')}
-            <button type="button" className="key-control" onClick={() => {
-              const dirty = (evaluatedCost ?? 0) > 0 || Boolean(remark.trim())
-              if (dirty && !window.confirm('放弃这笔还没保存的记账？')) return
-              onClose?.()
-            }}>取消</button>
+            <button type="button" className="key-control" onClick={() => onClose?.()}>取消</button>
           </div>}
 
           {dateOpen && (

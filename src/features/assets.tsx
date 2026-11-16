@@ -291,7 +291,10 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
 
             <div>
               <button className="link" aria-label={`查看 ${a.assetName} 流水`}
-                onClick={() => { setHistoryAsset(a); setAccountTab('all'); setScreen('account') }}>{a.simpleName || a.assetName}</button>
+                onClick={() => {
+                  setHistoryAsset(a); setAccountTab('all'); setScreen('account')
+                  try { history.pushState({ ...(history.state ?? {}), assetsScreen: 'account' }, '') } catch { /* 宿主不支持忽略 */ }
+                }}>{a.simpleName || a.assetName}</button>
               {a.cardCode && <span className="tag">尾号 {a.cardCode}</span>}
             </div>
             <small>
@@ -353,7 +356,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
               <b className={account.assetNumber < 0 ? 'out' : ''}>
                 {accountMoney(account.assetNumber, account.currency, currencies, defaultCurrency)}
               </b>
-              <span className="muted">期初 {accountMoney(opening, account.currency, currencies, defaultCurrency)} · 共 {entries.length} 笔</span>
+              <span className="muted">期初 {accountMoney(opening, account.currency, currencies, defaultCurrency)} · 共 {filtered.length} 笔</span>
             </div>
 
             <div className="seg acct-tabs">
@@ -375,7 +378,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
                       <div>{e.label}</div>
                       <small>{dayOf(e.time)}{e.detail ? ' · ' + e.detail : ''}</small>
                     </div>
-                    <b className={e.delta >= 0 ? 'in' : 'out'}>{e.delta >= 0 ? '+' : '-'}{money(Math.abs(e.delta))}</b>
+                    <b className={e.delta >= 0 ? 'in' : 'out'}>{e.delta >= 0 ? '+' : '-'}{accountMoney(Math.abs(e.delta), account.currency, currencies, defaultCurrency)}</b>
                   </div>
                 ))}
               </div>

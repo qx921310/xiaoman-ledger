@@ -91,11 +91,9 @@ label.label { display: block; }
 .chip.on { border-color: var(--accent); background: var(--accent-soft); color: var(--focus-ink); }
 .chip i { width: 8px; height: 8px; border-radius: var(--r-pill); display: inline-block; }
 
-input, select {
-  width: 100%; border: 1px solid var(--line); border-radius: var(--r-md);
-  padding: 9px 11px; font-size: var(--font-sm); background: var(--card); color: var(--ink); outline: none;
-}
-input:focus, select:focus { border-color: var(--accent); }
+/* 基础外观统一由文件末尾的 :where() 基线负责，这里不再用元素选择器压过类样式 */
+:where(input, select) { width: 100%; color: var(--ink); outline: none; }
+:where(input, select):focus { border-color: var(--accent); }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
 
 .primary {
