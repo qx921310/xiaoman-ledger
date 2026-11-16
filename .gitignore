@@ -40,3 +40,7 @@ server/.env
 # 全量验收产物
 .e2e-full/
 .e2e-b/
+
+# 造数与双设备产物
+.seed/
+.dual/
