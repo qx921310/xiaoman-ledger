@@ -53,3 +53,6 @@ server/.env
 # 深度验收产物
 .deep/
 .ro.txt
+
+# 只读验收产物
+.readonly/
