@@ -1,4 +1,5 @@
 import { clearAllBookPatches } from './book-pending'
+import { SelectSheet } from '../ui/select-sheet'
 import { useEffect, useMemo, useState } from 'react'
 import { useLedger } from '../store'
 import type { Cycle } from '../types'
@@ -455,12 +456,10 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
 
       <div className="me-book">
         <label className="label" htmlFor="me-book-switch">当前账本</label>
-        <select id="me-book-switch" value={String(currentBookId)}
-          onChange={(e) => { const v = e.target.value; setBook(v === '0' ? 0 : v) }}>
-          {accountBooks.filter((b) => b.bookId != null && !b.hidden).map((b) => (
-            <option key={String(b.bookId)} value={String(b.bookId)}>{b.accountBookName}</option>
-          ))}
-        </select>
+        <SelectSheet ariaLabel="当前账本" value={String(currentBookId)}
+          options={accountBooks.filter((b) => b.bookId != null && !b.hidden)
+            .map((b) => ({ value: String(b.bookId), label: b.accountBookName }))}
+          onChange={(v) => setBook(v === '0' ? 0 : v)} />
         <small className="muted">{currentBook?.hidden ? '已隐藏' : '仅自己可见'}</small>
       </div>
 
