@@ -68,13 +68,13 @@ console.log('add buttons:', addButtons)
 const catOpen = await click('分类管理'); await sleep(1200)
 const catBody = await ev("document.body.innerText.replace(/\\s+/g,' ').slice(0,160)")
 const catInputs = await ev(`[...document.querySelectorAll('input,button[aria-label]')].map(e=>(e.getAttribute('aria-label')||e.getAttribute('placeholder')||e.textContent.trim().slice(0,8))).filter(Boolean).join('|')`)
-const catAdd = await clickC('新增') || await clickC('添加')
+const catAdd = await clickC('新增支出分类')
 await sleep(900)
 const catInputs2 = await ev(`[...document.querySelectorAll('input')].map(e=>(e.getAttribute('aria-label')||e.getAttribute('placeholder')||'')).filter(Boolean).join('|')`)
 let catSaved = false
 if (catInputs2) {
-  await typeInto(`input[aria-label="${catInputs2.split('|')[0]}"]`, '验收分类')
-  catSaved = await clickC('保存') || await clickC('确定')
+  await typeInto('.modal input[aria-label="分类名称"]', '验收分类')
+  catSaved = await ev(`(() => { const b=[...document.querySelectorAll('.modal button')].find(x=>x.textContent.trim()==='保存'); if(!b) return false; b.click(); return true })()`)
   await sleep(1500)
 }
 let p = await waitFor((x) => (x?.records ?? []).some((r) => r.kind === 'parent' && String(r.payload?.name ?? '').includes('验收分类')), 8000)
@@ -89,7 +89,7 @@ await clickC('新增'); await sleep(800)
 let tagSaved = false
 if (tagInputs.includes('新标签名')) {
   await typeInto('input[aria-label="新标签名"]', '验收标签A')
-  tagSaved = await clickC('保存')
+  tagSaved = await clickC('添加标签') || await clickC('保存')
   await sleep(1500)
 }
 p = await waitFor((x) => (x?.records ?? []).some((r) => r.kind === 'tag' && String(r.payload?.name ?? '').includes('验收标签A')), 8000)
@@ -104,7 +104,7 @@ await clickC('新增'); await sleep(800)
 let bookSaved = false
 if (bookInputs.includes('账本名称')) {
   await typeInto('input[aria-label="账本名称"]', '验收账本C')
-  bookSaved = await clickC('保存')
+  bookSaved = await clickC('保存') || await clickC('创建')
   await sleep(1600)
 }
 p = await waitFor((x) => (x?.books ?? []).length >= 2 || (x?.records ?? []).filter((r) => r.kind === 'book').length >= 2, 8000)
