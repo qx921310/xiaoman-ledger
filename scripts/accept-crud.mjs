@@ -68,7 +68,7 @@ console.log('add buttons:', addButtons)
 const catOpen = await click('分类管理'); await sleep(1200)
 const catBody = await ev("document.body.innerText.replace(/\\s+/g,' ').slice(0,160)")
 const catInputs = await ev(`[...document.querySelectorAll('input,button[aria-label]')].map(e=>(e.getAttribute('aria-label')||e.getAttribute('placeholder')||e.textContent.trim().slice(0,8))).filter(Boolean).join('|')`)
-const catAdd = await clickC('新增支出分类')
+const catAdd = await clickC('新增大类')
 await sleep(900)
 const catInputs2 = await ev(`[...document.querySelectorAll('input')].map(e=>(e.getAttribute('aria-label')||e.getAttribute('placeholder')||'')).filter(Boolean).join('|')`)
 let catSaved = false
@@ -82,19 +82,25 @@ const catCount = (p.records ?? []).filter((r) => r.kind === 'parent' && String(r
 ok('新增分类', catOpen && catCount >= 1, `open=${catOpen} saved=${catSaved} inputs=${catInputs2} count=${catCount} body=${catBody.slice(0, 50)} toast=${await toast()}`)
 
 // 回我的 → 标签管理
-await clickC('返回'); await sleep(1000)
-const tagOpen = await click('标签管理'); await sleep(1200)
+await clickC('返回我的'); await sleep(1200)
+const tagOpen = await ev(`(() => { const b=document.querySelector('button.my-grid-item[aria-label="标签管理"]'); if(!b) return false; b.click(); return true })()`)
+await sleep(1500)
+const tagPaneText = await ev("document.body.innerText.replace(/\\s+/g,' ').slice(0,140)")
+const tagPane = await ev(`(() => { const h=[...document.querySelectorAll('h3')].find(x=>x.textContent.includes('标签管理')); return h ? h.parentElement.textContent.slice(0,80) : '' })()`)
 const tagInputs = await ev(`[...document.querySelectorAll('input')].map(e=>(e.getAttribute('aria-label')||e.getAttribute('placeholder')||'')).filter(Boolean).join('|')`)
-await clickC('新增'); await sleep(800)
+const tagAddBtn = await ev(`(() => { const b=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='新增'); if(!b) return false; b.click(); return true })()`)
+await sleep(800)
 let tagSaved = false
-if (tagInputs.includes('新标签名')) {
+// 「新增」之后才会渲染输入框
+const tagInputs2 = await ev(`[...document.querySelectorAll('input')].map(e=>(e.getAttribute('aria-label')||'')).filter(Boolean).join('|')`)
+if (tagAddBtn && tagInputs2.includes('新标签名')) {
   await typeInto('input[aria-label="新标签名"]', '验收标签A')
   tagSaved = await clickC('添加标签') || await clickC('保存')
   await sleep(1500)
 }
 p = await waitFor((x) => (x?.records ?? []).some((r) => r.kind === 'tag' && String(r.payload?.name ?? '').includes('验收标签A')), 8000)
 const tagCount = (p.records ?? []).filter((r) => r.kind === 'tag' && String(r.payload?.name ?? '').includes('验收标签A')).length
-ok('新增标签', tagOpen && tagCount >= 1, `open=${tagOpen} saved=${tagSaved} inputs=${tagInputs} count=${tagCount}`)
+ok('新增标签', tagOpen && tagCount >= 1, `open=${tagOpen} saved=${tagSaved} addBtn=${tagAddBtn} inputs=${tagInputs} count=${tagCount} pane=${tagPaneText?.slice(0,40)}`)
 
 // 回我的 → 账本管理
 await clickC('返回'); await sleep(1000)
