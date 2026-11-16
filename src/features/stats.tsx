@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { billNetAmount } from '../bill-amount'
 import { useLedger } from '../store'
+import { visibleAssets } from '../domain/asset-scope'
+import { toBase } from '../money'
 import { money, monthOf, toLocalInput } from '../ui-format'
 import { CatIcon } from '../ui/icons'
 import { summarizeBills } from '../bill-summary'
@@ -177,18 +179,18 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
   /** 资产汇总（一木 s27）：按账户余额做环形图与图例 */
   const assetPie = useMemo(() => {
     const palette = ['var(--accent)', 'var(--in)', 'var(--out)', 'var(--line)', 'var(--muted)']
-    return assets
-      .filter((a) => (currentBookId === 0 || a.bookId == null || String(a.bookId) === String(currentBookId)))
+    return visibleAssets(assets, currentBookId, userId)
+      .filter((a) => !a.hide && a.intoTotalAsset !== false)
+      .map((a) => ({ ...a, assetNumber: toBase(Number(a.assetNumber), a.currency, currencies, defaultCurrency) }))
       .filter((a) => Number(a.assetNumber) > 0)
       .map((a, i) => ({ id: a.assetId, name: a.simpleName || a.assetName, value: +Number(a.assetNumber).toFixed(2), color: palette[i % palette.length] }))
       .sort((a, b) => b.value - a.value)
-  }, [assets, currentBookId])
+  }, [assets, currentBookId, userId, currencies, defaultCurrency])
 
   /** 报表统计（一木 s28）：按月的支出/收入/结余 */
   const monthReport = useMemo(() => {
     const map = new Map<string, { key: string; label: string; income: number; expense: number }>()
-    for (const b of bills) {
-      if (currentBookId !== 0 && String(b.bookId) !== String(currentBookId)) continue
+    for (const b of rangeBills) {
       if (b.notIntoTotal) continue
       const d = new Date(b.time)
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -198,7 +200,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
       map.set(key, cur)
     }
     return [...map.values()].sort((a, b) => (a.key < b.key ? 1 : -1)).slice(0, 12)
-  }, [bills, currentBookId, parents, refunds])
+  }, [rangeBills, parents, refunds])
 
   return (
     <section className="card">
@@ -285,7 +287,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
 
       <div className="stats-block">
         <div className="sb-hd"><b>报表统计</b></div>
-        <table className="table">
+        <table className="stats-report-table">
           <thead><tr><th>月份</th><th>支出</th><th>收入</th><th>结余</th></tr></thead>
           <tbody>
             {monthReport.map((r) => (
@@ -320,7 +322,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
                 <b>{money(row.value)}</b>
               </div>
             ))}
-            {assetPie.length === 0 && <p className="hint">这个时间范围暂无收支记录</p>}
+            {assetPie.length === 0 && <p className="hint">暂无资产</p>}
           </div>
         </div>
       </div>

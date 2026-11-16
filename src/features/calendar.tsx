@@ -176,12 +176,15 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
         lunar: (() => { try { const l = Solar.fromDate(new Date(b.time)).getLunar(); return `${l.getMonthInChinese()}月${l.getDayInChinese()}` } catch { return '' } })(),
         income: 0, expense: 0, bills: [] as typeof bills
       }
+      if (b.notIntoTotal) { cur.bills.push(b); map.set(key, cur); continue }
       if (kindOf.get(b.parentCategoryId) === 'income') cur.income = +(cur.income + b.cost).toFixed(2)
-      else if (!b.notIntoTotal) cur.expense = +(cur.expense + billNetAmount(b, refunds)).toFixed(2)
+      else cur.expense = +(cur.expense + billNetAmount(b, refunds)).toFixed(2)
       cur.bills.push(b)
       map.set(key, cur)
     }
-    return [...map.values()].sort((a, b) => (a.key < b.key ? 1 : -1))
+    return [...map.values()]
+      .map((g) => ({ ...g, bills: [...g.bills].sort((a, b) => b.time - a.time) }))
+      .sort((a, b) => (a.key < b.key ? 1 : -1))
   }, [bills, inScope, year, monthIdx, kindOf, refunds])
 
 

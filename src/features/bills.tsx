@@ -352,7 +352,7 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
               const to = assets.find((a) => a.assetId === t.toAssetId)
               return (
                 <div key={'t' + t.transferId} className={'row ledger-row' + (picked.has(String(t.transferId)) ? ' picked' : '')}
-                  onClick={selecting ? () => togglePick(String(t.transferId)) : undefined}>
+                  onClick={selecting ? () => togglePick(String(t.transferId)) : () => setEditingTransfer(t)}>
                   <i className="dot arrow">⇄</i>
                   <div className="grow">
                     <div>转账 · {from?.assetName ?? '已删除账户'} → {to?.assetName ?? '已删除账户'}</div>

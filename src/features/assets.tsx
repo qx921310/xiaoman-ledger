@@ -291,7 +291,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
 
             <div>
               <button className="link" aria-label={`查看 ${a.assetName} 流水`}
-                onClick={() => { setHistoryAsset(a); setScreen('account') }}>{a.simpleName || a.assetName}</button>
+                onClick={() => { setHistoryAsset(a); setAccountTab('all'); setScreen('account') }}>{a.simpleName || a.assetName}</button>
               {a.cardCode && <span className="tag">尾号 {a.cardCode}</span>}
             </div>
             <small>
@@ -327,8 +327,9 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
       </>)}
 
       {screen === 'account' && historyAsset && (() => {
+        const account = assets.find((x) => x.assetId === historyAsset.assetId) ?? historyAsset
         const { entries, opening } = accountHistory({
-          asset: historyAsset, assetFlows, bills, transfers, lends, refunds, reimbursements, parents: allAssetsParents
+          asset: account, assetFlows, bills, transfers, lends, refunds, reimbursements, parents: allAssetsParents
         })
         const filtered = entries.filter((e) => accountTab === 'all' || (accountTab === 'bill' ? e.kind === 'bill' : e.kind !== 'bill'))
         const groups: Array<{ key: string; label: string; net: number; rows: typeof filtered }> = []
@@ -343,16 +344,16 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
           <div className="subpage-block">
             <div className="subpage-head">
               <button type="button" className="link" onClick={() => { setScreen('assets'); setHistoryAsset(null) }}>‹ 返回</button>
-              <h3>{historyAsset.simpleName || historyAsset.assetName}</h3>
-              <button type="button" className="link" onClick={() => setEditingAsset(historyAsset)}>编辑</button>
+              <h3>{account.simpleName || account.assetName}</h3>
+              <button type="button" className="link" onClick={() => setEditingAsset(account)}>编辑</button>
             </div>
 
             <div className="acct-hero">
               <small>账户余额</small>
-              <b className={historyAsset.assetNumber < 0 ? 'out' : ''}>
-                {accountMoney(historyAsset.assetNumber, historyAsset.currency, currencies, defaultCurrency)}
+              <b className={account.assetNumber < 0 ? 'out' : ''}>
+                {accountMoney(account.assetNumber, account.currency, currencies, defaultCurrency)}
               </b>
-              <span className="muted">期初 {money(opening)} · 共 {entries.length} 笔</span>
+              <span className="muted">期初 {accountMoney(opening, account.currency, currencies, defaultCurrency)} · 共 {entries.length} 笔</span>
             </div>
 
             <div className="seg acct-tabs">
@@ -366,7 +367,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
               <div key={g.key} className="acct-month">
                 <div className="am-hd">
                   <span>{g.label}</span>
-                  <b className={g.net >= 0 ? 'in' : 'out'}>{g.net >= 0 ? '+' : '-'}{money(Math.abs(g.net))}</b>
+                  <b className={g.net >= 0 ? 'in' : 'out'}>{g.net >= 0 ? '+' : '-'}{accountMoney(Math.abs(g.net), account.currency, currencies, defaultCurrency)}</b>
                 </div>
                 {g.rows.map((e) => (
                   <div key={e.key} className="row">
@@ -475,9 +476,6 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
 
       </div>
       )}
-      {screen === 'assets' && (<>
-      
-      
       {editingAsset && (
         <AssetEditor
           asset={editingAsset}
@@ -485,7 +483,6 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
           onSave={(next) => { updateAsset(next); setEditingAsset(null); notify('账户已更新') }}
         />
       )}
-      </>)}
 
       {screen === 'lend' && (
       <div className="subpage-block">
