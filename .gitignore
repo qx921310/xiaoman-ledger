@@ -36,3 +36,7 @@ server/.env
 
 # E2E 验收产物
 .e2e/
+
+# 全量验收产物
+.e2e-full/
+.e2e-b/
