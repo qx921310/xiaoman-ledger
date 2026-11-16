@@ -5,6 +5,7 @@ import { loadAccountData } from './account-session'
 import { syncNow } from './sync'
 import { startAutoSync, stopAutoSync, getAutoSyncState } from './sync-auto'
 import { startMultiTab } from './multi-tab'
+import { SelectShim } from './ui/select-shim'
 import { advanceSessionEpoch, captureSessionEpoch } from './domain/session-epoch'
 
 import { AuthScreen } from './features/auth'
@@ -182,7 +183,12 @@ export default function App() {
   if (user === undefined) return <div className="boot" role="status">加载中…</div>
   if (user && locked) return <PinLock onUnlock={() => setLocked(false)} />
   if (user === null) return <AuthScreen onAuthed={afterAuth} />
-  return <Shell user={user} onLogout={logout} syncWarning={syncWarning} dismissSyncWarning={() => setSyncWarning('')} bookPending={bookPending} />
+  return (
+    <>
+      <SelectShim />
+      <Shell user={user} onLogout={logout} syncWarning={syncWarning} dismissSyncWarning={() => setSyncWarning('')} bookPending={bookPending} />
+    </>
+  )
 }
 
 
