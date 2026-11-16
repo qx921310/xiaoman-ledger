@@ -56,3 +56,6 @@ server/.env
 
 # 只读验收产物
 .readonly/
+
+# 债务验收产物
+.debt/
