@@ -2336,7 +2336,8 @@ export const useTotalAssets = () =>
     const hiddenBooks = new Set(
       s.accountBooks.filter((b) => b.notShowStock).map((b) => String(b.bookId ?? ''))
     )
-    return s.assets.filter((a) => !a.hide && a.intoTotalAsset)
+    // 字段缺省视为「计入总资产」：老数据/导入/API 写入可能没有这个字段
+    return s.assets.filter((a) => !a.hide && a.intoTotalAsset !== false)
       .filter((a) => a.bookId == null || !hiddenBooks.has(String(a.bookId)))
       .reduce((sum, a) => sum + a.assetNumber * rateOf(a.currency), 0)
   })
