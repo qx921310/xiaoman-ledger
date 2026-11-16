@@ -69,11 +69,12 @@ await sleep(900)
 const newBook = await ev(`(() => { const b=[...document.querySelectorAll('.modal button, button')].find(x=>x.textContent.trim()==='新增'); if(!b) return false; b.click(); return true })()`)
 await sleep(800)
 const typed = await typeInto('input[aria-label="账本名称"]', '第二本账')
-const saved = await ev(`(() => { const b=[...document.querySelectorAll('.modal button')].find(x=>x.textContent.trim()==='保存'); if(!b) return false; b.click(); return true })()`)
+const saved = await ev(`(() => { const b=[...document.querySelectorAll('.modal button')].find(x=>x.textContent.trim()==='创建'); if(!b) return false; b.click(); return true })()`)
 await sleep(1800)
 let snap = await pull()
-const books = (snap.records ?? []).filter((r) => r.kind === 'book' && !r.deleted)
-ok('新建账本 B', meOpen && newBook && (saved || books.length >= 2), `meOpen=${meOpen} manager=${openManager} books=${books.length} typed=${typed}`)
+const apiBooks = async () => (await (await fetch(`${BASE}/api/books`, { headers: { Cookie: cookie } })).json()).result?.books ?? []
+const booksAfter = await apiBooks()
+ok('新建账本 B', meOpen && newBook && saved && booksAfter.length >= 2, `saved=${saved} apiBooks=${booksAfter.length} names=${booksAfter.map((b) => b.name).join('/')}`)
 
 // 切到 B：我的 → 当前账本选择器
 // 首页账本胶囊 → 弹层选择
