@@ -1256,7 +1256,8 @@ button.day-btn {
 .tag-inline .ti-label { color: var(--muted); font-size: var(--font-xs); flex: none; }
 .tag-inline .ti-value { color: var(--ink); font-size: var(--font-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 42vw; }
 .entry-remark { flex: 1 1 30%; min-width: 0; }
-.entry-amount { flex: 0 0 auto; white-space: nowrap; margin-left: auto; font-size: var(--font-lg); font-variant-numeric: tabular-nums; color: var(--ink); }
+.entry-amount { flex: 0 0 auto; white-space: nowrap; margin-left: auto; font-size: var(--font-display); font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; color: var(--ink); }
+.entry-line-a { min-height: 56px; align-items: center; }
 .entry-amount em { font-style: normal; font-size: var(--font-sm); margin-right: 4px; color: var(--muted); }
 .entry-amount.out { color: var(--out); }
 .entry-amount.in { color: var(--in); }
@@ -1487,3 +1488,9 @@ textarea:focus-visible {
 .stats-report-table th { text-align: right; color: var(--muted); font-weight: 400; padding: 6px 4px; }
 .stats-report-table th:first-child, .stats-report-table td:first-child { text-align: left; }
 .stats-report-table td { text-align: right; padding: 6px 4px; border-top: 1px solid var(--line); }
+
+/* 记账页：标签/备注/金额行留出左右内边距，标签做成可点小胶囊 */
+.entry-line-a { padding: 6px 12px; gap: 10px; }
+.tag-inline { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; background: transparent; border: 0; padding: 4px 0; color: var(--muted); font-size: var(--font-xs); }
+.tag-inline .ti-value { color: var(--ink); font-size: var(--font-sm); }
+.entry-line-b { padding: 6px 12px 10px; }
