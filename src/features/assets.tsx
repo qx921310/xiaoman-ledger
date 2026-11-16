@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { SelectSheet } from '../ui/select-sheet'
 import { useLedger, useTotalAssets } from '../store'
 import { ASSET_TYPE, LEND_TYPE } from '../types'
 import type { Asset } from '../types'
@@ -683,12 +684,12 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
       {/* 字段顺序照一木 AddCapitalActivity / AddCreditCardActivity */}
       <input aria-label="新账户名称" value={name} onChange={(e) => setName(e.target.value)} placeholder="账户名（如：招行储蓄卡）" />
       <div className="row2">
-        <select aria-label="新账户类型" value={type} onChange={(e) => setType(Number(e.target.value))}>
-          {Object.entries(ASSET_TYPE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
-        <select aria-label="新账户币种" value={newCurrency} onChange={(e) => setNewCurrency(e.target.value)}>
-          {currencies.map((c) => <option key={c.code} value={c.code}>{c.code} · {c.name}</option>)}
-        </select>
+        <SelectSheet ariaLabel="新账户类型" value={String(type)}
+          options={Object.entries(ASSET_TYPE).map(([k, v]) => ({ value: k, label: v }))}
+          onChange={(v) => setType(Number(v))} />
+        <SelectSheet ariaLabel="新账户币种" value={newCurrency}
+          options={currencies.map((c) => ({ value: c.code, label: `${c.code} · ${c.name}` }))}
+          onChange={setNewCurrency} />
       </div>
       <div className="row2">
         <input aria-label="账户简称" value={newSimple} onChange={(e) => setNewSimple(e.target.value)} placeholder="简称（可选）" maxLength={8} />
