@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLedger } from '../store'
 import { useSpeech } from '../ui/use-speech'
+import { SelectSheet } from '../ui/select-sheet'
 import { DateSheet } from './date-sheet'
 import { lendRemaining } from '../lend'
 import { accountMoney, currencySymbol, findCurrency, hasCurrencyRate, toBase } from '../money'
@@ -557,9 +558,9 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
         <span>{currencySymbol(currencies, currency, defaultCurrency)}</span>
         <input value={formatAmount(cost)} onChange={(e) => setCost(e.target.value.replace(/[^\d.]/g, ''))} placeholder="0.00" aria-label="记账金额" inputMode="decimal" />
         {currencies.length > 1 && (
-          <select aria-label="记账币种" className="cur" value={currency} onChange={(e) => setCurrency(e.target.value)}>
-            {currencies.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
-          </select>
+          <SelectSheet ariaLabel="记账币种" className="cur" value={currency}
+            options={currencies.map((c) => ({ value: c.code, label: c.code }))}
+            onChange={setCurrency} />
         )}
       </div>
       {currency !== defaultCurrency && Number(cost) > 0 && (
@@ -578,17 +579,17 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
           <div className="row2">
             <div>
               <div className="label">转出账户</div>
-              <select aria-label="转出账户" value={aid} onChange={(e) => setAid(Number(e.target.value))}>
-                <option value={0}>{assets.length ? '请选择账户' : '请先添加账户'}</option>
-                {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}（{accountMoney(a.assetNumber, a.currency, currencies, defaultCurrency)}）</option>)}
-              </select>
+              <SelectSheet ariaLabel="转出账户" value={String(aid)}
+                options={[{ value: '0', label: assets.length ? '请选择账户' : '请先添加账户' },
+                  ...assets.map((a) => ({ value: String(a.assetId), label: `${a.assetName}（${accountMoney(a.assetNumber, a.currency, currencies, defaultCurrency)}）` }))]}
+                onChange={(v) => setAid(Number(v))} />
             </div>
             <div>
               <div className="label">转入账户</div>
-              <select aria-label="转入账户" value={toAid} onChange={(e) => setToAid(Number(e.target.value))}>
-                <option value={0}>{assets.length ? '请选择账户' : '请先添加账户'}</option>
-                {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
-              </select>
+              <SelectSheet ariaLabel="转入账户" value={String(toAid)}
+                options={[{ value: '0', label: assets.length ? '请选择账户' : '请先添加账户' },
+                  ...assets.map((a) => ({ value: String(a.assetId), label: a.assetName }))]}
+                onChange={(v) => setToAid(Number(v))} />
             </div>
           </div>
           <div className="row2">

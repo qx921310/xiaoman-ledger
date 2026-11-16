@@ -1494,3 +1494,18 @@ textarea:focus-visible {
 .tag-inline { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; background: transparent; border: 0; padding: 4px 0; color: var(--muted); font-size: var(--font-xs); }
 .tag-inline .ti-value { color: var(--ink); font-size: var(--font-sm); }
 .entry-line-b { padding: 6px 12px 10px; }
+
+/* 自有下拉：外观与输入框一致，点开走底部弹层（替代系统 select） */
+.select-sheet { position: relative; display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px;
+  padding: 9px 34px 9px 12px; border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--card); color: var(--ink); font-size: var(--font-sm); text-align: start; }
+.select-sheet:disabled { opacity: .5; }
+.select-sheet .ss-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.select-sheet .ss-arrow { position: absolute; inset-inline-end: 12px; width: 8px; height: 8px;
+  border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: rotate(45deg) translateY(-2px); }
+.ss-list { display: flex; flex-direction: column; }
+.ss-item { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 12px 4px; background: transparent; border: 0; border-top: 1px solid var(--line);
+  color: var(--ink); font-size: var(--font-sm); text-align: start; }
+.ss-item:first-child { border-top: 0; }
+.ss-item.on { color: var(--accent); font-weight: 600; }
