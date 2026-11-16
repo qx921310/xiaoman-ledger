@@ -392,7 +392,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         </span>
         <span className="grow">
           <b>{profile.nick || me?.email?.split('@')[0] || '我'}</b>
-          <span className="muted">已连续记账 {streak} 天</span>
+          <span className="muted">坚持记账的第 {streak} 天 · 已记录 {bills.length} 条账单</span>
         </span>
       </button>
 
