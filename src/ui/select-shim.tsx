@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 /**
  * 全局下拉兜底：拦截页面上所有原生 <select> 的点击，改用应用自己的底部弹层。
@@ -25,6 +25,11 @@ export function SelectShim() {
     return () => document.removeEventListener('pointerdown', onPointerDown, true)
   }, [])
 
+  const firstRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (state) firstRef.current?.focus()
+  }, [state])
+
   if (!state) return null
 
   const commit = (value: string) => {
@@ -40,7 +45,7 @@ export function SelectShim() {
       <div className="sheet" role="dialog" aria-label={state.title} onClick={(e) => e.stopPropagation()}>
         <div className="sheet-hd"><b>{state.title}</b></div>
         <div className="sheet-body ss-list">
-          {state.items.map((it) => (
+          {state.items.map((it, index) => (
             <button key={it.value} type="button" role="option" aria-selected={it.value === state.current}
               className={'ss-item' + (it.value === state.current ? ' on' : '')}
               disabled={it.disabled}

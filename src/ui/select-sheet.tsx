@@ -7,7 +7,7 @@ import { useState } from 'react'
 export function SelectSheet({ ariaLabel, value, options, onChange, disabled, className }: {
   ariaLabel: string
   value: string
-  options: Array<{ value: string; label: string }>
+  options: Array<{ value: string; label: string; disabled?: boolean }>
   onChange: (v: string) => void
   disabled?: boolean
   className?: string
@@ -30,7 +30,8 @@ export function SelectSheet({ ariaLabel, value, options, onChange, disabled, cla
               {options.map((o) => (
                 <button key={o.value} type="button" role="option" aria-selected={o.value === value}
                   className={'ss-item' + (o.value === value ? ' on' : '')}
-                  onClick={() => { onChange(o.value); setOpen(false) }}>
+                  disabled={o.disabled}
+                  onClick={() => { if (o.disabled) return; onChange(o.value); setOpen(false) }}>
                   <span>{o.label}</span>
                   {o.value === value && <i aria-hidden="true">✓</i>}
                 </button>
