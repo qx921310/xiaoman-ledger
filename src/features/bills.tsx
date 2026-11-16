@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { SelectSheet } from '../ui/select-sheet'
 import { useLedger } from '../store'
 import { BILL_TYPE } from '../types'
 import type { Bill, Transfer } from '../types'
@@ -820,10 +821,9 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
             </div>
             <div className="rp-field">
               <span>退款账户</span>
-              <select aria-label="退款账户" value={refundAsset} onChange={(e) => setRefundAsset(Number(e.target.value))}>
-                <option value={0}>请选择账户</option>
-                {assets.map((x) => <option key={x.assetId} value={x.assetId}>{x.assetName}</option>)}
-              </select>
+              <SelectSheet ariaLabel="退款账户" value={String(refundAsset)}
+                options={[{ value: '0', label: '请选择账户' }, ...assets.map((x) => ({ value: String(x.assetId), label: x.assetName }))]}
+                onChange={(v) => setRefundAsset(Number(v))} />
             </div>
             <div className="rp-field">
               <span>退款日期</span>
@@ -856,10 +856,9 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
             </div>
             <div className="rp-field">
               <span>报销账户</span>
-              <select aria-label="报销账户" value={claimAsset} onChange={(e) => setClaimAsset(Number(e.target.value))}>
-                <option value={0}>请选择账户</option>
-                {assets.map((a) => <option key={a.assetId} value={a.assetId}>{a.assetName}</option>)}
-              </select>
+              <SelectSheet ariaLabel="报销账户" value={String(claimAsset)}
+                options={[{ value: '0', label: '请选择账户' }, ...assets.map((a) => ({ value: String(a.assetId), label: a.assetName }))]}
+                onChange={(v) => setClaimAsset(Number(v))} />
             </div>
           </div>
         </section>
