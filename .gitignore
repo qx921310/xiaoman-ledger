@@ -30,3 +30,6 @@ server/.env
 .chrome-accept/
 .chrome-probe/
 .shots-accept/
+
+# 录屏产物
+.rec/
