@@ -49,3 +49,7 @@ server/.env
 .montage/
 .seed-ui/
 .shots*/
+
+# 深度验收产物
+.deep/
+.ro.txt
