@@ -347,6 +347,11 @@ export const useLedger = create<LedgerState>()(
           const cost = Number(patch.cost ?? 0)
           if (!(cost > 0)) return '金额必须大于 0'
           const bookId = patch.bookId ?? (s.currentBookId === 0 ? undefined : s.currentBookId)
+          // 「全部账本」下没有明确归属时也不能跳过只读校验：
+          // 只要存在历史只读账本，就必须要求显式选择可写账本
+          if (bookId == null && s.accountBooks.some((bk) => bk.role === 'silent')) {
+            return '当前处于「全部账本」，请先选择一个可写账本'
+          }
           if (bookId != null) {
             const book = s.accountBooks.find((bk) => String(bk.bookId ?? bk.accountBookId) === String(bookId))
             if (book?.role === 'silent') return '当前账本只读，不能记账'
