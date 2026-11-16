@@ -1509,3 +1509,10 @@ textarea:focus-visible {
   color: var(--ink); font-size: var(--font-sm); text-align: start; }
 .ss-item:first-child { border-top: 0; }
 .ss-item.on { color: var(--accent); font-weight: 600; }
+
+/* 我的：会员条与备份提醒（对齐 fragment_my.xml） */
+.my-vip .vip-text { display: flex; flex-direction: column; gap: 2px; }
+.my-vip .vip-text small { color: var(--muted); font-size: var(--font-xs); }
+.my-vip .vip-open { flex: none; padding: 6px 14px; border: 0; border-radius: var(--r-pill); background: var(--accent); color: var(--focus-ink); font-size: var(--font-sm); }
+.my-backup-warn { display: block; width: 100%; margin: 6px 0; padding: 10px 12px; border: 0; border-radius: var(--r-md);
+  background: var(--accent-soft); color: var(--focus-ink); font-size: var(--font-xs); text-align: start; }

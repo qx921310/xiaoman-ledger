@@ -397,9 +397,18 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       </button>
 
       <div className="my-vip">
-        <span>会员权益（记账不限量、云备份扩容）</span>
-        <button type="button" className="link" onClick={() => notify('敬请期待')}>了解</button>
+        <div className="vip-text">
+          <b>升级到高级会员</b>
+          <small>更多功能，记账更轻松</small>
+        </div>
+        <button type="button" className="vip-open" onClick={() => notify('敬请期待：会员功能')}>去开通</button>
       </div>
+
+      {/^尚未同步|从未/.test(syncLine) && (
+        <button type="button" className="my-backup-warn" onClick={() => { setMeScreen('data'); window.scrollTo({ top: 0 }) }}>
+          未开启任何备份方式，卸载后数据将丢失，点击查看备份状态
+        </button>
+      )}
 
       {(pull.progress > 0 || pull.busy) && !hiddenOpen && (
         <div className="pull-tip" role="status" aria-live="polite">
