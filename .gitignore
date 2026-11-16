@@ -66,3 +66,6 @@ server/.env
 
 # CRUD 验收产物
 .crud/
+
+# 统计验收产物
+.stats/
