@@ -346,7 +346,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
         return (
           <div className="subpage-block">
             <div className="subpage-head">
-              <button type="button" className="link" onClick={() => { setScreen('assets'); setHistoryAsset(null) }}>‹ 返回</button>
+              <button type="button" className="link" onClick={() => { setScreen('assets'); setHistoryAsset(null); setAccountTab('all') }}>‹ 返回</button>
               <h3>{account.simpleName || account.assetName}</h3>
               <button type="button" className="link" onClick={() => setEditingAsset(account)}>编辑</button>
             </div>
@@ -385,7 +385,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
             ))}
 
             <div className="modal-btns">
-              <button className="ghost" onClick={() => setScreen('assets')}>关闭</button>
+              <button className="ghost" onClick={() => { setScreen('assets'); setHistoryAsset(null); setAccountTab('all') }}>关闭</button>
             </div>
           </div>
         )

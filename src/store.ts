@@ -1435,14 +1435,18 @@ export const useLedger = create<LedgerState>()(
       },
 
       // 删除账户：同时写墓碑，避免下次同步又被拉回来
-      deleteAsset: (assetId) => set((s) => ({
+      deleteAsset: (assetId) => set((s) => {
+        const target = s.assets.find((a) => a.assetId === assetId)
+        if (target && !bookWritable(target.bookId ?? s.currentBookId, s.accountBooks)) return {}
+        return {
         assets: s.assets.filter((a) => a.assetId !== assetId),
         tombstones: [...s.tombstones, {
           kind: 'asset', id: String(assetId),
           ownerId: s.assets.find((a) => a.assetId === assetId)?.userId,
           updatedAt: NOW()
         }]
-      })),
+        }
+      }),
 
       addAsset: (patch) => set((s) => {
         patch = { ...patch, ownerId: patch.ownerId ?? s.userId }

@@ -352,7 +352,7 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
               const to = assets.find((a) => a.assetId === t.toAssetId)
               return (
                 <div key={'t' + t.transferId} className={'row ledger-row' + (picked.has(String(t.transferId)) ? ' picked' : '')}
-                  onClick={selecting ? () => togglePick(String(t.transferId)) : readOnly ? undefined : () => setEditingTransfer(t)}>
+                  onClick={(e) => { if ((e.target as HTMLElement).closest('button')) return; if (selecting) togglePick(String(t.transferId)); else if (!readOnly) setEditingTransfer(t) }}>
                   <i className="dot arrow">⇄</i>
                   <div className="grow">
                     <div>转账 · {from?.assetName ?? '已删除账户'} → {to?.assetName ?? '已删除账户'}</div>
@@ -376,7 +376,7 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
             const inc = p?.kind === 'income'
             return (
               <div key={b.billId} className={'row ledger-row' + (simpleView ? ' simple' : '') + (picked.has(String(b.billId)) ? ' picked' : '')}
-                onClick={selecting ? () => togglePick(String(b.billId)) : () => setDetail(b)}>
+                onClick={(e) => { if ((e.target as HTMLElement).closest('button')) return; if (selecting) togglePick(String(b.billId)); else setDetail(b) }}>
                 <span className="dot-badge" style={{ background: p?.bg ?? 'var(--accent-soft)', color: p?.color ?? 'var(--ink)' }}>
                   <CatIcon k={p?.icon ?? 'ic_parent_other'} size={16} />
                 </span>
