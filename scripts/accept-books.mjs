@@ -76,33 +76,23 @@ const books = (snap.records ?? []).filter((r) => r.kind === 'book' && !r.deleted
 ok('新建账本 B', meOpen && newBook && (saved || books.length >= 2), `meOpen=${meOpen} manager=${openManager} books=${books.length} typed=${typed}`)
 
 // 切到 B：我的 → 当前账本选择器
-// 通过持久化状态切换账本（等价于用户切书，绕开 UI 定位）
-snap = await pull()
-const bookRecords = (snap.records ?? []).filter((r) => r.kind === 'book' && !r.deleted)
-const targetB = bookRecords.find((r) => String(r.payload?.name ?? '').includes('第二本账'))?.bookId
-    ?? bookRecords.map((r) => r.bookId).find((id) => String(id) !== String(snap.currentBookId ?? ''))
-const setBook = async (bookId) => ev(`(() => {
-  const keys = Object.keys(localStorage).filter((k) => k.includes('xiaoman'))
-  const key = keys.find((k) => (localStorage.getItem(k) || '').includes('currentBookId')) || keys[0]
-  if (!key) return false
-  const raw = JSON.parse(localStorage.getItem(key))
-  raw.state.currentBookId = ${JSON.stringify(String(targetB))} === '__B__' ? raw.state.currentBookId : ${JSON.stringify('__BOOK__')}
-  localStorage.setItem(key, JSON.stringify(raw))
-  return key
+// 首页账本胶囊 → 弹层选择
+// 先刷新一次，验证「新账本是否需要重载才出现」
+await cdp.send('Page.reload', {}, sid); await sleep(3800)
+await click('我的'); await sleep(1400)
+const chipOpen = await clickSel('button[aria-label="当前账本"]')
+await sleep(900)
+const sheetOpts = await ev(`[...document.querySelectorAll('.sheet, .sheet-mask')].map(el => el.textContent.replace(/\\s+/g,' ').slice(0, 160)).join(' || ')`)
+const pickedB = await ev(`(() => {
+  const items = [...document.querySelectorAll('.sheet-mask button, .sheet button, [role=option]')]
+  const hit = items.find((b) => b.textContent.includes('第二本账'))
+  if (!hit) return 'no-option'
+  hit.click(); return hit.textContent.trim().slice(0, 30)
 })()`)
-const switched = await ev(`(() => {
-  const keys = Object.keys(localStorage).filter((k) => k.includes('xiaoman'))
-  const key = keys.find((k) => (localStorage.getItem(k) || '').includes('currentBookId')) || keys[0]
-  if (!key) return 'no-key'
-  const raw = JSON.parse(localStorage.getItem(key))
-  raw.state.currentBookId = ${JSON.stringify(targetB ?? '')}
-  localStorage.setItem(key, JSON.stringify(raw))
-  return raw.state.currentBookId
-})()`)
-await cdp.send('Page.reload', {}, sid)
-await sleep(3600)
+await sleep(2000)
 const afterSwitch = await text()
-ok('切换到账本 B', Boolean(targetB) && afterSwitch.includes('第二本账'), `key=${switched} body=${afterSwitch.slice(0, 60)}`)
+const switchedOk = afterSwitch.includes('第二本账')
+ok('切换到账本 B', chipOpen && pickedB !== 'no-option' && switchedOk, `opts=${sheetOpts.slice(0, 90)} picked=${pickedB}`)
 
 // B 内记一笔 77
 await click('首页'); await sleep(900)
@@ -114,18 +104,15 @@ const homeB = await text()
 ok('账本 B 内记账成功', homeB.includes('77'), homeB.slice(0, 120))
 
 // 切回 A
-const backToA = await ev(`(() => {
-  const keys = Object.keys(localStorage).filter((k) => k.includes('xiaoman'))
-  const key = keys.find((k) => (localStorage.getItem(k) || '').includes('currentBookId')) || keys[0]
-  if (!key) return 'no-key'
-  const raw = JSON.parse(localStorage.getItem(key))
-  raw.state.currentBookId = ${JSON.stringify(String(snap.currentBookId ?? ''))}
-  localStorage.setItem(key, JSON.stringify(raw))
-  return raw.state.currentBookId
+await click('我的'); await sleep(1200)
+await clickSel('button[aria-label="当前账本"]'); await sleep(900)
+const back = await ev(`(() => {
+  const items = [...document.querySelectorAll('.sheet-mask button, .sheet button, [role=option]')]
+  const hit = items.find((b) => b.textContent.includes('我的账本'))
+  if (!hit) return 'no-option'
+  hit.click(); return hit.textContent.trim().slice(0, 20)
 })()`)
-await cdp.send('Page.reload', {}, sid)
-await sleep(3600)
-const back = backToA
+await sleep(2000)
 await sleep(1600)
 const homeA = await text()
 ok('切回账本 A 后看不到 B 的账', back && !homeA.includes('77'), homeA.slice(0, 140))
