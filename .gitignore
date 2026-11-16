@@ -63,3 +63,6 @@ server/.env
 # 资产验收产物
 .assets/
 .as.txt
+
+# CRUD 验收产物
+.crud/
