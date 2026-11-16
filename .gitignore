@@ -59,3 +59,7 @@ server/.env
 
 # 债务验收产物
 .debt/
+
+# 资产验收产物
+.assets/
+.as.txt
