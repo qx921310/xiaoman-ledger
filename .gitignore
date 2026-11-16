@@ -69,3 +69,6 @@ server/.env
 
 # 统计验收产物
 .stats/
+
+# 冲突验收产物
+.conflict/
