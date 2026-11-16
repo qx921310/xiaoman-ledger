@@ -358,11 +358,6 @@ export const useLedger = create<LedgerState>()(
             const assetId = patch.assetId
             // -1 是一木的「无账户」哨兵，不算非法账户
             if (assetId != null && assetId !== -1 && !s.assets.some((a) => a.assetId === assetId)) return '账户不存在'
-            if (assetId != null && assetId !== -1) {
-              const asset = s.assets.find((a) => a.assetId === assetId)!
-              const members = book?.memberCount
-              if (asset.bookId == null && members != null && members > 1 && Number(bookId) !== 0) return '私有账户不能记进共享账本'
-            }
           }
           return null
         }

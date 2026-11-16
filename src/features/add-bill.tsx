@@ -9,7 +9,7 @@ import { money, toLocalInput } from '../ui-format'
 import { CatIcon } from '../ui/icons'
 import { editAmount, evaluateAmount, formatAmount } from '../ui/keypad'
 import { MobilePicker } from '../ui/mobile-picker'
-import { leaksPrivateAccount, visibleAssets } from '../domain/asset-scope'
+import { visibleAssets } from '../domain/asset-scope'
 import { sortCategories } from '../domain/category-order'
 
 export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) => void; onClose?: () => void; onNeedAsset?: () => void }) {
@@ -108,9 +108,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
   const [cid, setCid] = useState(lastChildId)
   const [aid, setAid] = useState(lastAssetId || 0)
   // 选中账户与隐私校验必须在 aid 之后计算
-  const pickedAsset = assets.find((a) => a.assetId === aid)
   // 共享账本已停用：仅保留提交前的兜底校验，不再向用户展示共享相关提示
-  void leaksPrivateAccount(pickedAsset, curBookId, accountBooks, meId)
   const [toAid, setToAid] = useState(0)
   const [fee, setFee] = useState('')
   const [toCost, setToCost] = useState('')
@@ -219,10 +217,6 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
     }
 
     if (!aid) return fail('请选择账户')
-    // 统一校验：私有账户不许记进多人账本（再记、完成、桌面端都会走到这里）
-    if (leaksPrivateAccount(assets.find((a) => a.assetId === aid), curBookId, accountBooks, meId)) {
-      return fail('该账户是私有账户，记到多人账本会让成员看到；请先设为共享或换账户')
-    }
     // 分类必须在当前可见列表里，且与收支方向一致（隐藏所有分类后不得回退到不可见分类）
     const visible = parents.find((p) => p.id === cur)
     if (!visible) return fail('请选择当前账本可用的分类')
