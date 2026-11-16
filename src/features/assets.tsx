@@ -40,6 +40,12 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
   const meId = useLedger((s) => s.userId)
   const assets = visibleAssets(allAssets, currentBookId, meId)
   const accountBooks = useLedger((s) => s.accountBooks)
+  // 历史只读账本：账户的增删改在命令层已拒绝，这里给出明确入口禁用与提示
+  const readOnlyBook = (() => {
+    if (!currentBookId) return false
+    const bk = accountBooks.find((b) => String(b.bookId ?? b.accountBookId) === String(currentBookId))
+    return bk?.role === 'silent'
+  })()
   const currencies = useLedger((s) => s.currencies)
   const defaultCurrency = useLedger((s) => s.defaultCurrency)
   const total = useTotalAssets()
@@ -311,8 +317,10 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
             )}
           </div>
           <b className={a.assetNumber < 0 ? 'out' : ''}>{accountMoney(a.assetNumber, a.currency, currencies, defaultCurrency)}</b>
-          <button className="link" aria-label={`编辑账户 ${a.assetName}`} onClick={() => setEditingAsset(a)}>改</button>
-          <button className="del" aria-label={`删除账户 ${a.assetName}`} onClick={() => {
+          <button className="link" aria-label={`编辑账户 ${a.assetName}`} disabled={readOnlyBook}
+            onClick={() => { if (readOnlyBook) { notify('当前账本只读，不能修改账户'); return } setEditingAsset(a) }}>改</button>
+          <button className="del" aria-label={`删除账户 ${a.assetName}`} disabled={readOnlyBook} onClick={() => {
+            if (readOnlyBook) { notify('当前账本只读，不能删除账户'); return }
             const used = bills.some((b) => b.assetId === a.assetId)
               || transfers.some((t) => t.fromAssetId === a.assetId || t.toAssetId === a.assetId)
               || lends.some((l) => l.assetId === a.assetId || l.repaymentAssetId === a.assetId)
@@ -348,7 +356,8 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
             <div className="subpage-head">
               <button type="button" className="link" onClick={() => { setScreen('assets'); setHistoryAsset(null); setAccountTab('all') }}>‹ 返回</button>
               <h3>{account.simpleName || account.assetName}</h3>
-              <button type="button" className="link" onClick={() => setEditingAsset(account)}>编辑</button>
+              <button type="button" className="link" disabled={readOnlyBook}
+                onClick={() => { if (readOnlyBook) { notify('当前账本只读，不能修改账户'); return } setEditingAsset(account) }}>编辑</button>
             </div>
 
             <div className="acct-hero">
