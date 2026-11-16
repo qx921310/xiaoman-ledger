@@ -33,3 +33,6 @@ server/.env
 
 # 录屏产物
 .rec/
+
+# E2E 验收产物
+.e2e/
