@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useLedger } from '../store'
+import { bookWritable, useLedger } from '../store'
 import { useSpeech } from '../ui/use-speech'
 import { SelectSheet } from '../ui/select-sheet'
 import { DateSheet } from './date-sheet'
@@ -178,7 +178,9 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
         const parent = lends.find((l) => l.lendId === parentLendId)
         if (!parent || lendRemaining(parent, lends) <= 0) return fail('该债务已结清')
         if (v > lendRemaining(parent, lends)) return fail('金额超过未结余额')
-        if (!aid) return fail('请选择账户')
+        // 只读账本：命令层会拒，但界面要立刻给出明确提示，别让用户白填
+    if (!bookWritable(curBookId, accountBooks)) return fail('当前账本只读，不能记账')
+    if (!aid) return fail('请选择账户')
         if (!repayLend({ lendId: parent.lendId, amount: v, repaymentAssetId: aid, time: Date.now() })) return fail('记录失败：账本只读或参数无效')
         notify(`${typeMap[debtType]} ${money(v)} 已记录，剩余 ${money(lendRemaining(parent, lends) - v)}`)
         setCost(''); setParentLendId('')

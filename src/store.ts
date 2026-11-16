@@ -234,7 +234,7 @@ const BUSINESS_KEYS = [
 
 
 /** 命令层只读守卫：按目标账本的 role 判断；未知归属不能拿来绕过 silent。 */
-function bookWritable(bookId: string | number | undefined, books: Array<{ bookId?: number | string; accountBookId?: number | string; role?: string }>) {
+export function bookWritable(bookId: string | number | undefined, books: Array<{ bookId?: number | string; accountBookId?: number | string; role?: string }>) {
   if (bookId == null || String(bookId) === '') {
     // 兼容无只读账本的单用户旧数据；只要存在 silent，未归属记录必须先核对归属。
     return !books.some((b) => b.role === 'silent')
