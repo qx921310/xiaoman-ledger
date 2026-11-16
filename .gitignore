@@ -44,3 +44,8 @@ server/.env
 # 造数与双设备产物
 .seed/
 .dual/
+
+# 截图与录屏产物
+.montage/
+.seed-ui/
+.shots*/
