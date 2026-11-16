@@ -61,6 +61,19 @@ async function launch(name, port) {
   return { proc, cdp, sid, ev, click, clickC, text, reload, typeInto, cookie }
 }
 
+
+const setAmount = async (dev, value) => {
+  const rect = await dev.ev(`(() => { const i=document.querySelector('input[aria-label="账单原始金额"]'); if(!i) return null; const b=i.getBoundingClientRect(); return {x:b.x+b.width/2,y:b.y+b.height/2} })()`)
+  if (!rect) return false
+  await dev.cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: rect.x, y: rect.y, button: 'left', clickCount: 1 }, dev.sid)
+  await dev.cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: rect.x, y: rect.y, button: 'left', clickCount: 1 }, dev.sid)
+  await dev.cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', modifiers: 2, key: 'a', code: 'KeyA', windowsVirtualKeyCode: 65 }, dev.sid)
+  await dev.cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', modifiers: 2, key: 'a', code: 'KeyA', windowsVirtualKeyCode: 65 }, dev.sid)
+  await dev.cdp.send('Input.insertText', { text: String(value) }, dev.sid)
+  await sleep(250)
+  return true
+}
+
 // 注册 + 造一笔账
 const reg = await fetch(`${BASE}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: EMAIL, password: PASSWORD }) })
 if ((await reg.json()).code !== 0) await fetch(`${BASE}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: EMAIL, password: PASSWORD }) })
@@ -87,9 +100,10 @@ await A.click('首页'); await sleep(900)
 await A.ev("(() => { const r=document.querySelector('.ledger-row'); if(!r) return false; r.click(); return true })()")
 await sleep(1300)
 await A.click('编辑'); await sleep(1300)
-for (let i = 0; i < 6; i += 1) { await A.ev(`(() => { const b=[...document.querySelectorAll('button')].find(x=>(x.getAttribute('aria-label')||'')==='退格'); if(!b) return false; b.click(); return true })()`); await sleep(120) }
-for (const c of ['3', '0']) { await A.click(c); await sleep(130) }
-await A.ev(`(() => { const b=[...document.querySelectorAll('.modal button')].find(x=>x.textContent.trim()==='保存'); if(!b) return false; b.click(); return true })()`); await sleep(2400)
+await setAmount(A, 30)
+const savedA = await A.ev(`(() => { const b=[...document.querySelectorAll('.modal button')].find(x=>x.textContent.trim()==='保存'); if(!b) return false; b.click(); return true })()`)
+await sleep(2600)
+await sleep(200)
 log('A saved 30')
 
 // B 改 40（基于旧版本）
@@ -97,10 +111,10 @@ await B.click('首页'); await sleep(900)
 await B.ev("(() => { const r=document.querySelector('.ledger-row'); if(!r) return false; r.click(); return true })()")
 await sleep(1300)
 await B.click('编辑'); await sleep(1300)
-for (let i = 0; i < 6; i += 1) { await B.ev(`(() => { const b=[...document.querySelectorAll('button')].find(x=>(x.getAttribute('aria-label')||'')==='退格'); if(!b) return false; b.click(); return true })()`); await sleep(120) }
-for (const c of ['4', '0']) { await B.click(c); await sleep(130) }
-await B.ev(`(() => { const b=[...document.querySelectorAll('.modal button')].find(x=>x.textContent.trim()==='保存'); if(!b) return false; b.click(); return true })()`); await sleep(2600)
-log('B saved 40')
+await setAmount(B, 40)
+const savedB = await B.ev(`(() => { const b=[...document.querySelectorAll('.modal button')].find(x=>x.textContent.trim()==='保存'); if(!b) return false; b.click(); return true })()`)
+await sleep(2800)
+log(`B save=${savedB}`)
 const bText = await B.text()
 await B.reload()
 const bText2 = await B.text()

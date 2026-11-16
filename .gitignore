@@ -75,3 +75,6 @@ server/.env
 
 # 多账本验收产物
 .books/
+
+# 编辑验收产物
+.edit/
