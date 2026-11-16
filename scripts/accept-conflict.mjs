@@ -86,19 +86,20 @@ log('B ready')
 await A.click('首页'); await sleep(900)
 await A.ev("(() => { const r=document.querySelector('.ledger-row'); if(!r) return false; r.click(); return true })()")
 await sleep(1300)
-await A.click('编辑'); await sleep(1200)
-await A.typeInto('input[aria-label="记账金额"]', '')
-await A.ev(`(() => { const i=document.querySelector('input[aria-label="记账金额"]'); if(!i) return false; const s=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set; s.call(i,'30'); i.dispatchEvent(new Event('input',{bubbles:true})); return true })()`)
-await A.ev("document.querySelector('.entry-edit')?.click()"); await sleep(2200)
+await A.click('编辑'); await sleep(1300)
+for (let i = 0; i < 6; i += 1) { await A.ev(`(() => { const b=[...document.querySelectorAll('button')].find(x=>(x.getAttribute('aria-label')||'')==='退格'); if(!b) return false; b.click(); return true })()`); await sleep(120) }
+for (const c of ['3', '0']) { await A.click(c); await sleep(130) }
+await A.ev(`(() => { const b=[...document.querySelectorAll('.modal button')].find(x=>x.textContent.trim()==='保存'); if(!b) return false; b.click(); return true })()`); await sleep(2400)
 log('A saved 30')
 
 // B 改 40（基于旧版本）
 await B.click('首页'); await sleep(900)
 await B.ev("(() => { const r=document.querySelector('.ledger-row'); if(!r) return false; r.click(); return true })()")
 await sleep(1300)
-await B.click('编辑'); await sleep(1200)
-await B.ev(`(() => { const i=document.querySelector('input[aria-label="记账金额"]'); if(!i) return false; const s=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set; s.call(i,'40'); i.dispatchEvent(new Event('input',{bubbles:true})); return true })()`)
-await B.ev("document.querySelector('.entry-edit')?.click()"); await sleep(2500)
+await B.click('编辑'); await sleep(1300)
+for (let i = 0; i < 6; i += 1) { await B.ev(`(() => { const b=[...document.querySelectorAll('button')].find(x=>(x.getAttribute('aria-label')||'')==='退格'); if(!b) return false; b.click(); return true })()`); await sleep(120) }
+for (const c of ['4', '0']) { await B.click(c); await sleep(130) }
+await B.ev(`(() => { const b=[...document.querySelectorAll('.modal button')].find(x=>x.textContent.trim()==='保存'); if(!b) return false; b.click(); return true })()`); await sleep(2600)
 log('B saved 40')
 const bText = await B.text()
 await B.reload()
