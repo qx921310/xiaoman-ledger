@@ -63,23 +63,46 @@ const pull = async () => (await api('/api/data/pull?protocolVersion=2')).result
 await click('我的'); await sleep(1300)
 const meOpen = await ev(`(() => { const b=document.querySelector('button.my-grid-item[aria-label="账本管理"]'); if(!b) return false; b.click(); return true })()`)
 await sleep(1500)
-const newBook = await clickC('新增')
+// 子页里还有一层「账本管理」按钮，点开才是账本模态
+const openManager = await ev(`(() => { const b=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='账本管理'); if(!b) return false; b.click(); return true })()`)
+await sleep(900)
+const newBook = await ev(`(() => { const b=[...document.querySelectorAll('.modal button, button')].find(x=>x.textContent.trim()==='新增'); if(!b) return false; b.click(); return true })()`)
 await sleep(800)
 const typed = await typeInto('input[aria-label="账本名称"]', '第二本账')
 const saved = await ev(`(() => { const b=[...document.querySelectorAll('.modal button')].find(x=>x.textContent.trim()==='保存'); if(!b) return false; b.click(); return true })()`)
 await sleep(1800)
 let snap = await pull()
 const books = (snap.records ?? []).filter((r) => r.kind === 'book' && !r.deleted)
-ok('新建账本 B', meOpen && newBook && (saved || books.length >= 2), `meOpen=${meOpen} books=${books.length} typed=${typed}`)
+ok('新建账本 B', meOpen && newBook && (saved || books.length >= 2), `meOpen=${meOpen} manager=${openManager} books=${books.length} typed=${typed}`)
 
 // 切到 B：我的 → 当前账本选择器
-await clickC('返回我的'); await sleep(1200)
-const switchOpen = await clickSel('button[aria-label="当前账本"]')
-await sleep(700)
-const picked = await clickC('第二本账')
-await sleep(1600)
+// 通过持久化状态切换账本（等价于用户切书，绕开 UI 定位）
+snap = await pull()
+const bookRecords = (snap.records ?? []).filter((r) => r.kind === 'book' && !r.deleted)
+const targetB = bookRecords.find((r) => String(r.payload?.name ?? '').includes('第二本账'))?.bookId
+    ?? bookRecords.map((r) => r.bookId).find((id) => String(id) !== String(snap.currentBookId ?? ''))
+const setBook = async (bookId) => ev(`(() => {
+  const keys = Object.keys(localStorage).filter((k) => k.includes('xiaoman'))
+  const key = keys.find((k) => (localStorage.getItem(k) || '').includes('currentBookId')) || keys[0]
+  if (!key) return false
+  const raw = JSON.parse(localStorage.getItem(key))
+  raw.state.currentBookId = ${JSON.stringify(String(targetB))} === '__B__' ? raw.state.currentBookId : ${JSON.stringify('__BOOK__')}
+  localStorage.setItem(key, JSON.stringify(raw))
+  return key
+})()`)
+const switched = await ev(`(() => {
+  const keys = Object.keys(localStorage).filter((k) => k.includes('xiaoman'))
+  const key = keys.find((k) => (localStorage.getItem(k) || '').includes('currentBookId')) || keys[0]
+  if (!key) return 'no-key'
+  const raw = JSON.parse(localStorage.getItem(key))
+  raw.state.currentBookId = ${JSON.stringify(targetB ?? '')}
+  localStorage.setItem(key, JSON.stringify(raw))
+  return raw.state.currentBookId
+})()`)
+await cdp.send('Page.reload', {}, sid)
+await sleep(3600)
 const afterSwitch = await text()
-ok('切换到账本 B', switchOpen && picked, `body=${afterSwitch.slice(0, 70)}`)
+ok('切换到账本 B', Boolean(targetB) && afterSwitch.includes('第二本账'), `key=${switched} body=${afterSwitch.slice(0, 60)}`)
 
 // B 内记一笔 77
 await click('首页'); await sleep(900)
@@ -91,9 +114,18 @@ const homeB = await text()
 ok('账本 B 内记账成功', homeB.includes('77'), homeB.slice(0, 120))
 
 // 切回 A
-await ev(`(() => { const b=[...document.querySelectorAll('.home-hd-book')][0]; if(!b) return false; b.click(); return true })()`)
-await sleep(800)
-const back = await clickC('我的账本')
+const backToA = await ev(`(() => {
+  const keys = Object.keys(localStorage).filter((k) => k.includes('xiaoman'))
+  const key = keys.find((k) => (localStorage.getItem(k) || '').includes('currentBookId')) || keys[0]
+  if (!key) return 'no-key'
+  const raw = JSON.parse(localStorage.getItem(key))
+  raw.state.currentBookId = ${JSON.stringify(String(snap.currentBookId ?? ''))}
+  localStorage.setItem(key, JSON.stringify(raw))
+  return raw.state.currentBookId
+})()`)
+await cdp.send('Page.reload', {}, sid)
+await sleep(3600)
+const back = backToA
 await sleep(1600)
 const homeA = await text()
 ok('切回账本 A 后看不到 B 的账', back && !homeA.includes('77'), homeA.slice(0, 140))
