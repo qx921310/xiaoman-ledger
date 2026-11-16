@@ -25,3 +25,8 @@ server/.env
 .chrome-dual/
 .shots-dual/
 .chrome-shim/
+
+# 验收脚本产物
+.chrome-accept/
+.chrome-probe/
+.shots-accept/
