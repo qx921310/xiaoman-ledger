@@ -444,7 +444,11 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
             {key('4')}{key('5')}{key('6')}<div className="entry-operators">{key('+')}{key('-')}</div>
             {key('7')}{key('8')}{key('9')}<div className="entry-operators">{key('×')}{key('÷')}</div>
             <button type="button" className="key-control" disabled={readOnly} onClick={() => { submit() }}>再记</button>{key('0')}{key('.')}
-            <button type="button" className="key-control" onClick={() => onClose?.()}>取消</button>
+            <button type="button" className="key-control" onClick={() => {
+              const dirty = (evaluatedCost ?? 0) > 0 || Boolean(remark.trim())
+              if (dirty && !window.confirm('放弃这笔还没保存的记账？')) return
+              onClose?.()
+            }}>取消</button>
           </div>}
 
           {dateOpen && (
