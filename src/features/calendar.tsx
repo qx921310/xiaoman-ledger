@@ -321,7 +321,7 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
                     <small>{new Date(b.time).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</small>
                   </div>
                   <b className={kindOf.get(b.parentCategoryId) === 'income' ? 'in' : 'out'}>
-                    {kindOf.get(b.parentCategoryId) === 'income' ? '+' : '-'}{money(b.cost)}
+                    {kindOf.get(b.parentCategoryId) === 'income' ? '+' : '-'}{money(kindOf.get(b.parentCategoryId) === 'income' ? b.cost : billNetAmount(b, refunds))}
                   </b>
                 </div>
               ))}
@@ -330,7 +330,7 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
         </div>
       )}
 
-      {picked && repayReminders.length > 0 && (
+      {picked && picked.startsWith(`${year}-${String(monthIdx + 1).padStart(2, '0')}`) && repayReminders.length > 0 && (
         <div className="cal-repay">
           <b>还款提醒</b>
           {repayReminders.map((r) => (
