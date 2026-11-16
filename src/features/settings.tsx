@@ -559,7 +559,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
           ['自动记账', 'auto'], ['周期记账', 'cycle'], ['愿望清单', 'dream'], ['分类关键词', 'ai'],
           ['账本管理', 'book'], ['标签管理', 'tag'], ['分类管理', 'cat'], ['更多设置', 'more'],
         ] as Array<[string, string]>).map(([label, key]) => (
-          <button key={key} type="button" className="my-grid-item" onClick={() => {
+          <button key={key} type="button" className="my-grid-item" aria-label={label} onClick={() => {
             if (key === 'book') { setMeScreen('book'); window.scrollTo({ top: 0 }); return }
             if (key === 'cat') { setMeScreen('cat'); window.scrollTo({ top: 0 }); return }
             if (key === 'tag') { setMeScreen('tag'); window.scrollTo({ top: 0 }); return }
@@ -596,7 +596,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
           ['更多一木应用', 'apps'], ['桌面小部件', 'widget'], ['使用手册', 'guide'],
           ['邀请好友', 'invite'], ['关于我们', 'about'], ['意见反馈', 'feedback'],
         ] as Array<[string, string]>).map(([label, key]) => (
-          <button key={key} type="button" className="my-grid-item" onClick={() => {
+          <button key={key} type="button" className="my-grid-item" aria-label={label} onClick={() => {
             if (key === 'tools') { document.getElementById('sec-tools')?.scrollIntoView({ behavior: 'smooth' }); return }
             if (key === 'theme') { notify('敬请期待：主题外观'); return }
             if (key === 'guide') { setGuideOpen(true); return }
