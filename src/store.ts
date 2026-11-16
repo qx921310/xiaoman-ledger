@@ -1871,7 +1871,12 @@ export const useLedger = create<LedgerState>()(
       })),
 
       updateAsset: (asset) => set((s) => {
-        if (!bookWritable(asset.bookId ?? s.currentBookId, s.accountBooks)) return {}
+        // 只读校验必须看「状态里既有账户」的归属，不能信调用方传入的 bookId
+        const existing = s.assets.find((a) => a.assetId === asset.assetId)
+        if (!existing) return {}
+        if (!bookWritable(existing.bookId ?? s.currentBookId, s.accountBooks)) return {}
+        // 普通编辑不得把账户迁到别的账本（归属变更需要专用命令）
+        if (asset.bookId != null && String(asset.bookId) !== String(existing.bookId ?? '')) return {}
         return {
           assets: s.assets.map((a) => a.assetId === asset.assetId
             ? { ...asset, openingBalance: (a.openingBalance ?? a.assetNumber) + (asset.assetNumber - a.assetNumber), updateTime: NOW() }
