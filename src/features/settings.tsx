@@ -27,7 +27,6 @@ import { ToolCalc } from './tool-calc'
 import { DreamList } from './dreams'
 import { FilteredBills } from './filtered-bills'
 import { TemplateList } from './templates'
-import { hasPin, setPin, clearPin, verifyPin } from './lock'
 import { usePullRefresh } from '../ui/use-pull-refresh'
 import { validateBackup } from '../backup'
 import { CHILD_ICONS, PARENT_ICONS } from '../ui/category-icons'
@@ -548,54 +547,47 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       <h3>功能</h3>
       <div className="my-grid">
         {([
-          ['账本管理', 'book'],
-          ['分类管理', 'cat'],
-          ['标签管理', 'tag'],
-          ['导入导出', 'import'],
-          ['愿望清单', 'dream'],
-          ['预算管理', 'budget'],
-          ['AA 分账', 'split'],
-          ['模板记账', 'tpl'],
-          ['周期记账', 'cycle'],
-          ['智能分类', 'ai'],
-          ['数据备份', 'backup'],
-          ['主题设置', 'theme'],
-          ['安全设置', 'gesture'],
-          ['使用指南', 'guide'],
-          ['更多应用', 'apps'],
-          ['关于', 'about'],
+          ['自动记账', 'auto'], ['周期记账', 'cycle'], ['愿望清单', 'dream'], ['分类关键词', 'ai'],
+          ['账本管理', 'book'], ['标签管理', 'tag'], ['分类管理', 'cat'], ['更多设置', 'more'],
         ] as Array<[string, string]>).map(([label, key]) => (
           <button key={key} type="button" className="my-grid-item" onClick={() => {
-            // 记账相关：落到我们已有的页面/功能；商业化项按约定提示「敬请期待」
-            const jump = (id: string) => {
-              const el = document.getElementById(id)
-              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-              else notify('暂未找到该区块')
-            }
             if (key === 'book') { setMeScreen('book'); window.scrollTo({ top: 0 }); return }
             if (key === 'cat') { setMeScreen('cat'); window.scrollTo({ top: 0 }); return }
             if (key === 'tag') { setMeScreen('tag'); window.scrollTo({ top: 0 }); return }
-            if (key === 'cycle') { jump('sec-cycle'); return }
-            if (key === 'backup' || key === 'import') { setMeScreen('data'); window.scrollTo({ top: 0 }); return }
+            if (key === 'cycle' || key === 'more') { setMeScreen('data'); window.scrollTo({ top: 0 }); return }
             if (key === 'dream') { setDreamOpen(true); return }
             if (key === 'ai') { setAiTypeOpen(true); return }
+            if (key === 'auto') { notify('自动记账需要 Android 通知/短信权限，网页版暂不支持'); return }
+            notify('敬请期待')
+          }}>{label}</button>
+        ))}
+      </div>
+
+      <h3>数据管理</h3>
+      <div className="my-data">
+        <div className="row"><span className="grow">云同步</span><span className="muted">{syncLine}</span></div>
+        <button type="button" className="row my-row-btn" onClick={() => { setMeScreen('data'); window.scrollTo({ top: 0 }) }}>
+          <span className="grow">数据备份</span><span className="muted">JSON</span>
+        </button>
+        <button type="button" className="row my-row-btn" onClick={() => { setMeScreen('data'); window.scrollTo({ top: 0 }) }}>
+          <span className="grow">导入导出</span><span className="muted">Excel / CSV</span>
+        </button>
+        <button type="button" className="row my-row-btn" onClick={() => setFilesOpen(true)}>
+          <span className="grow">账单图片</span><span className="muted">{bills.filter((b) => (b.files?.length ?? 0) > 0).length} 笔</span>
+        </button>
+      </div>
+
+      <h3>其他</h3>
+      <div className="my-grid">
+        {([
+          ['实用工具', 'tools'], ['主题外观', 'theme'], ['更多活动', 'activity'],
+          ['更多一木应用', 'apps'], ['桌面小部件', 'widget'], ['使用手册', 'guide'],
+          ['邀请好友', 'invite'], ['关于我们', 'about'], ['意见反馈', 'feedback'],
+        ] as Array<[string, string]>).map(([label, key]) => (
+          <button key={key} type="button" className="my-grid-item" onClick={() => {
+            if (key === 'tools') { document.getElementById('sec-tools')?.scrollIntoView({ behavior: 'smooth' }); return }
+            if (key === 'theme') { notify('敬请期待：主题外观'); return }
             if (key === 'guide') { setGuideOpen(true); return }
-            if (key === 'tpl') { setTplOpen(true); return }
-            if (key === 'gesture') {
-              if (hasPin()) {
-                const p0 = prompt('请输入当前手势密码以关闭')
-                if (p0 == null) return
-                if (!verifyPin(p0)) { notify('密码不正确'); return }
-                clearPin(); notify('已关闭手势密码')
-              }
-              else {
-                const p1 = prompt('设置 4 位数字密码')
-                if (p1 && /^\d{4}$/.test(p1)) { setPin(p1); notify('手势密码已设置') }
-                else if (p1) notify('请输入 4 位数字')
-              }
-              return
-            }
-            if (key === 'theme') { notify('敬请期待：主题设置'); return }
             if (key === 'about') { setAboutOpen(true); return }
             notify('敬请期待')
           }}>{label}</button>
