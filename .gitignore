@@ -72,3 +72,6 @@ server/.env
 
 # 冲突验收产物
 .conflict/
+
+# 多账本验收产物
+.books/
