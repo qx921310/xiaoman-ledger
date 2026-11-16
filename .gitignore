@@ -24,3 +24,4 @@ server/.env
 .dualdev/
 .chrome-dual/
 .shots-dual/
+.chrome-shim/

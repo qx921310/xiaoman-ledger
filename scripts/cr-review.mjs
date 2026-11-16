@@ -67,7 +67,7 @@ const prompt = `你是资深代码审查者，只做严谨的证据型审查。�
 ${stat}
 
 === git diff ===
-${diff.slice(0, 35_000)}
+${diff.slice(0, 45_000)}
 
 === 关键文件全文 ===${attachments}
 `
@@ -83,7 +83,7 @@ const res = await fetch(`${ENDPOINT}/chat/completions`, {
       { role: 'user', content: prompt }
     ],
     temperature: 0.2,
-    max_tokens: 32000
+    max_tokens: 12000
   })
 })
 if (!res.ok) {
