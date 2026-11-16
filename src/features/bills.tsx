@@ -533,6 +533,7 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
   const [splitting, setSplitting] = useState(false)
   const [attrOpen, setAttrOpen] = useState(false)
   const addTemplate = useLedger((st) => st.addTemplate)
+  const duplicate = useLedger((st) => st.duplicateBill)
   const [claimAmt, setClaimAmt] = useState('')
   const instalment = instalments.find((i) => String(i.billId) === String(bill.billId))
   useEffect(() => {
@@ -554,6 +555,7 @@ function BillDetail({ bill, me, readOnly, onClose, onEdit }: {
           <div className="detail-menu" role="menu">
             <button type="button" role="menuitem" disabled={!!readOnly} onClick={() => { setMoreOpen(false); setAttrOpen(true) }}>属性设置</button>
             <button type="button" role="menuitem" disabled={!!readOnly} onClick={() => { setMoreOpen(false); setSplitting(true) }}>账单拆分</button>
+            <button type="button" role="menuitem" disabled={!!readOnly} onClick={() => { setMoreOpen(false); duplicate(bill.billId); onClose?.() }}>复制账单</button>
             <button type="button" role="menuitem" disabled={!!readOnly} onClick={() => {
               setMoreOpen(false)
               const saved = addTemplate({
