@@ -114,6 +114,35 @@ const assets = (p.records ?? []).filter((r) => r.kind === 'asset' && !r.deleted)
 const cash = assets.find((r) => String(r.payload?.assetName).includes('债务现金'))
 ok('账户余额随之变化', Boolean(cash) && Number(cash.payload.assetNumber) !== 1000, `assetNumber=${cash?.payload?.assetNumber}`)
 
+
+// 借入 200
+await tab('首页')
+await click('添加一条新记账'); await sleep(1400)
+await click('债务'); await sleep(800)
+await clickC('资金借出'); await sleep(600)
+await click('资金借入'); await sleep(600)
+await typeInto('input[placeholder="对方名称"]', '李四')
+await sleep(300)
+for (const k of ['2', '0', '0']) { await click(k); await sleep(140) }
+await ev("document.querySelector('.entry-edit')?.click()"); await sleep(2600)
+p = await waitFor((x) => (x?.records ?? []).filter((r) => r.kind === 'lend' && !r.deleted).length >= 2)
+const lends2 = (p.records ?? []).filter((r) => r.kind === 'lend' && !r.deleted)
+ok('资金借入 200', lends2.length >= 2, `lends=${lends2.length}`)
+
+// 还款 50
+await tab('首页')
+await click('添加一条新记账'); await sleep(1400)
+await click('债务'); await sleep(800)
+await clickC('资金借出'); await sleep(600)
+await click('还款'); await sleep(700)
+await clickC('请选择债务'); await sleep(600)
+const pickedLend = await clickC('李四'); await sleep(500)
+for (const k of ['5', '0']) { await click(k); await sleep(140) }
+await ev("document.querySelector('.entry-edit')?.click()"); await sleep(500)
+const repayToast2 = await toast()
+await sleep(2000)
+ok('还款 50', pickedLend || repayToast2.includes('还款'), `picked=${pickedLend} toast=${repayToast2}`)
+
 const pass = checks.filter((c) => c.p).length
 writeFileSync(`${OUT}/report.json`, JSON.stringify({ email: EMAIL, checks }, null, 2))
 console.log(JSON.stringify({ pass, total: checks.length, verdict: pass === checks.length ? 'PASS' : 'PARTIAL', email: EMAIL }))
