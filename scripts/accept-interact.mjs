@@ -160,6 +160,14 @@ const customBody = await text()
 const dateInputs = await ev(`[...document.querySelectorAll('input[type="date"]')].map(i=>i.getAttribute('aria-label')||'').join('|')`)
 ok('统计自定义区间', customOk && dateInputs.includes('统计开始日期'), `inputs=${dateInputs}`)
 
+
+// 12. 统计 → 查看资产分布 → 资产页并弹出分布面板
+await click('统计'); await sleep(900)
+const distOk = await clickC('查看资产分布'); await sleep(1200)
+const distBody = await text()
+const dialogVisible = await ev("!!document.querySelector('[role=dialog]')")
+ok('查看资产分布入口', distOk && dialogVisible, `body=${distBody.slice(0, 50)} dialog=${dialogVisible}`)
+
 const pass = checks.filter((c) => c.p).length
 writeFileSync(`${OUT}/report.json`, JSON.stringify({ email: EMAIL, checks }, null, 2))
 console.log(JSON.stringify({ pass, total: checks.length, verdict: pass === checks.length ? 'PASS' : 'PARTIAL' }))

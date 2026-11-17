@@ -198,6 +198,7 @@ export default function App() {
 function Shell({ user, onLogout, syncWarning, dismissSyncWarning, bookPending }: { user: User; onLogout: () => void; syncWarning: string; dismissSyncWarning: () => void; bookPending: BookPendingStatus }) {
   const [tab, setTab] = useState<Tab>('home')
   const [addMode, setAddMode] = useState<'expense' | 'income' | 'transfer' | 'debt'>('expense')
+  const [assetPanel, setAssetPanel] = useState<'' | 'sankey'>('')
   const [searchOpen, setSearchOpen] = useState(false)
   const [focusBillId, setFocusBillId] = useState<string | number | null>(null)
   const changeTab = (next: Tab) => { setSearchOpen(false); setTab(next) }
@@ -303,8 +304,8 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning, bookPending }:
         {tab === 'calendar' && (
           <CalendarPage onAddBill={() => setTab('add')} onOpenMonthBills={() => setTab('home')} />
         )}
-        {tab === 'assets' && <Assets notify={notify} onOpenSettings={() => setTab('me')}  onOpenStats={() => setTab('stats')} onOpenSearch={() => setSearchOpen(true)} onAdd={(m: 'expense' | 'income' | 'transfer' | 'debt') => { setAddMode(m); setTab('add') }} />}
-        {tab === 'stats' && <Stats notify={notify} />}
+        {tab === 'assets' && <Assets notify={notify} onOpenSettings={() => setTab('me')}  onOpenStats={() => setTab('stats')} onOpenSearch={() => setSearchOpen(true)} onAdd={(m: 'expense' | 'income' | 'transfer' | 'debt') => { setAddMode(m); setTab('add') }} openPanel={assetPanel} onPanelOpened={() => setAssetPanel('')} />}
+        {tab === 'stats' && <Stats notify={notify} onOpenAssetDistribution={() => { setAssetPanel('sankey'); setTab('assets') }} />}
         {tab === 'me' && <Settings notify={notify} me={user} onLogout={onLogout} />}
         {tab === 'add' && <AddBill notify={notify} initialMode={addMode} onClose={() => { setAddMode('expense'); setTab('home') }} onNeedAsset={() => setTab('assets')} />}
       </main>

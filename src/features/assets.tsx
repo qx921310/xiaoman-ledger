@@ -40,12 +40,14 @@ function rangeOfMonth(key: string): string {
   return `${y}.${pad(m)}.01-${y}.${pad(m)}.${last}`
 }
 
-export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch, onAdd }: {
+export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch, onAdd, openPanel, onPanelOpened }: {
   notify: (m: string) => void
   onOpenSettings?: () => void
   onOpenStats?: () => void
   onOpenSearch?: () => void
   onAdd?: (mode: 'expense' | 'income' | 'transfer' | 'debt') => void
+  openPanel?: '' | 'sankey'
+  onPanelOpened?: () => void
 }) {
   const allAssets = useLedger((s) => s.assets)
   const currentBookId = useLedger((s) => s.currentBookId)
@@ -182,6 +184,11 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch, onAd
   // 一木 popup_asset_menu：搜索账户/还款提醒/生效账本/定期存款/资产统计/资产隐藏/资产分布/更多数据/资产组成
   const [settingOpen, setSettingOpen] = useState(false)
   const [sankeyOpen, setSankeyOpen] = useState(false)
+
+  // 统计页「查看资产分布」跳转过来时自动打开分布面板
+  useEffect(() => {
+    if (openPanel === 'sankey') { setSankeyOpen(true); onPanelOpened?.() }
+  }, [openPanel, onPanelOpened])
   const [repayOpen, setRepayOpen] = useState(false)
   const [depositOpen, setDepositOpen] = useState(false)
   const [assetStatsOpen, setAssetStatsOpen] = useState(false)

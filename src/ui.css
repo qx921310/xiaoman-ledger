@@ -1706,3 +1706,6 @@ section.card:has(.my-user) .page-title { display: none; }
 .stats-daily > .row2 > input,
 .stats-daily > .totals-3,
 .stats-daily > .hint { display: none; }
+
+/* 统计页：查看资产分布入口（右对齐） */
+.sb-more { display: block; margin-left: auto; margin-top: var(--sp-2); }

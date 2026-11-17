@@ -18,7 +18,7 @@ import { assetTrend as assetTrendOf } from '../domain/asset-trend'
 import { Modal } from '../ui/modal'
 import { IMPORTED_CATEGORY_COLOR } from '../default-colors'
 
-export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
+export function Stats({ notify, onOpenAssetDistribution }: { notify?: (m: string) => void; onOpenAssetDistribution?: () => void } = {}) {
   const bills = useLedger((s) => s.bills)
   const refunds = useLedger((s) => s.refunds)
   const defaultCurrency = useLedger((s) => s.defaultCurrency)
@@ -358,6 +358,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
             {assetPie.length === 0 && <p className="hint">暂无资产</p>}
           </div>
         </div>
+        <button type="button" className="link sb-more" onClick={onOpenAssetDistribution}>查看资产分布 ›</button>
         <label className="sb-check">
           <input type="checkbox" checked={hideTiny} onChange={(e) => setHideTiny(e.target.checked)} />
           过滤占比小于 1% 的资产
