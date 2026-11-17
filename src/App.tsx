@@ -302,7 +302,7 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning, bookPending }:
         {tab === 'calendar' && (
           <CalendarPage onAddBill={() => setTab('add')} onOpenMonthBills={() => setTab('home')} />
         )}
-        {tab === 'assets' && <Assets notify={notify} onOpenSettings={() => setTab('me')}  onOpenStats={() => setTab('stats')} onOpenSearch={() => setSearchOpen(true)} />}
+        {tab === 'assets' && <Assets notify={notify} onOpenSettings={() => setTab('me')}  onOpenStats={() => setTab('stats')} onOpenSearch={() => setSearchOpen(true)} onAdd={() => setTab('add')} />}
         {tab === 'stats' && <Stats notify={notify} />}
         {tab === 'me' && <Settings notify={notify} me={user} onLogout={onLogout} />}
         {tab === 'add' && <AddBill notify={notify} onClose={() => setTab('home')} onNeedAsset={() => setTab('assets')} />}

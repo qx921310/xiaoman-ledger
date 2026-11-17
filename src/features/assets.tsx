@@ -30,11 +30,12 @@ function iconLabel(key: string): string {
   return ''
 }
 
-export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
+export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch, onAdd }: {
   notify: (m: string) => void
   onOpenSettings?: () => void
   onOpenStats?: () => void
   onOpenSearch?: () => void
+  onAdd?: () => void
 }) {
   const allAssets = useLedger((s) => s.assets)
   const currentBookId = useLedger((s) => s.currentBookId)
@@ -379,6 +380,18 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
               ) : (
                 <span className="acct-prop-line">期初 {accountMoney(opening, account.currency, currencies, defaultCurrency)} · 共 {filtered.length} 笔</span>
               )}
+            </div>
+
+            <div className="acct-actions">
+              <button type="button" className="acct-action" onClick={() => onAdd?.()}>
+                <span className="acct-action-ico">＋</span><span>记账</span>
+              </button>
+              <button type="button" className="acct-action" onClick={() => onAdd?.()}>
+                <span className="acct-action-ico">↺</span><span>还款</span>
+              </button>
+              <button type="button" className="acct-action" onClick={() => onAdd?.()}>
+                <span className="acct-action-ico">⇄</span><span>转账</span>
+              </button>
             </div>
 
             <div className="seg acct-tabs">

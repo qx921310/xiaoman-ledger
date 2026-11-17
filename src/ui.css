@@ -1642,3 +1642,12 @@ section.card:has(.my-user) .page-title { display: none; }
 /* 账户详情 hero 属性区：两列两行（额度/剩余额度/出账日/还款日） */
 .acct-props { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-1) var(--sp-4); margin-top: var(--sp-2); font-size: var(--font-sm); opacity: .95; }
 .acct-prop-line { font-size: var(--font-sm); opacity: .9; }
+
+/* 账户详情快捷操作：记账 / 还款 / 转账 */
+.acct-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-2); margin: var(--sp-3) 0; }
+.acct-action {
+  display: flex; align-items: center; justify-content: center; gap: var(--sp-1);
+  padding: var(--sp-3) var(--sp-2); border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--card); color: var(--ink); font-size: var(--font-sm); cursor: pointer;
+}
+.acct-action-ico { color: var(--accent); font-size: var(--font-md); }
