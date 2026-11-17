@@ -113,6 +113,29 @@ function withSyncLock<T>(session: ReturnType<typeof captureSessionEpoch>, work: 
   }) as unknown as Promise<T>
 }
 
+/**
+ * 丢弃「没有云端基准」的历史冲突：这类记录是升级前写的，
+ * 账号数据以云端为准，静默丢弃即可，不该在首页打扰用户。
+ */
+export function discardBaselessConflicts(): number {
+  try {
+    const storageKey = `xiaoman-sync-v2:${getCurrentUid()}`
+    const raw = localStorage.getItem(storageKey)
+    if (!raw) return 0
+    const meta = JSON.parse(raw) as VersionedMeta
+    const conflicts = meta.conflicts ?? {}
+    let dropped = 0
+    for (const [key, reason] of Object.entries(conflicts)) {
+      if (String(reason).includes('没有云端基准')) { delete conflicts[key]; dropped += 1 }
+    }
+    if (dropped) {
+      meta.conflicts = conflicts
+      localStorage.setItem(storageKey, JSON.stringify(meta))
+    }
+    return dropped
+  } catch { return 0 }
+}
+
 export function getVersionedConflicts() {
   try {
     const raw = localStorage.getItem(`xiaoman-sync-v2:${getCurrentUid()}`)

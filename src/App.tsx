@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLedger } from './store'
 import { auth, books as bookApi, setCurrentUid, type BookInfo, type User } from './auth'
 import { loadAccountData } from './account-session'
-import { syncNow } from './sync'
+import { syncNow, discardBaselessConflicts } from './sync'
 import { clearAllBookPatches } from './features/book-pending'
 import { startAutoSync, stopAutoSync, getAutoSyncState } from './sync-auto'
 import { startMultiTab } from './multi-tab'
@@ -100,6 +100,8 @@ export default function App() {
     try {
       const r = await syncNow()
       const warn = r.denied ? `${r.denied} 条记录未能推送，请到设置页检查同步结果。` : ''
+      // 无云端基准的历史草稿：账号数据以云端为准，静默丢弃，不再打扰
+      discardBaselessConflicts()
       const kept = Number(r.conflictsKept ?? 0) + Number(r.conflicts ?? 0)
       // 云端已被清空（例如重置数据）时，本机残留的「待核对」不再有意义，直接清掉
       const cloudEmpty = Number(r.pulled ?? 0) === 0 && Number(r.pushed ?? 0) === 0 && kept > 0
