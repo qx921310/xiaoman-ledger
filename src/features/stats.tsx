@@ -198,6 +198,29 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
   const tagRows = useMemo(() => byTag(rangeBills, tags, parents, refunds), [rangeBills, tags, parents, refunds])
   const rangeSummary = useMemo(() => summarizeBills(rangeBills, parents, refunds), [rangeBills, parents, refunds])
 
+  /** 预算占比（一木 s27）：按分类预算 vs 区间内实际支出 */
+  const budgetPie = useMemo(() => {
+    const palette = ['var(--accent)', 'var(--in)', 'var(--out)', 'var(--muted)', 'var(--line)']
+    const spent = new Map<number, number>()
+    for (const b of rangeBills) {
+      if (b.notIntoTotal) continue
+      if (parents.find((p) => p.id === b.parentCategoryId)?.kind === 'income') continue
+      const key = b.parentCategoryId
+      spent.set(key, (spent.get(key) ?? 0) + billNetAmount(b, refunds))
+    }
+    return monthBudgets
+      .filter((b) => b.categoryId && b.amount > 0)
+      .map((b, i) => ({
+        id: String(b.categoryId),
+        name: parents.find((p) => p.id === b.categoryId)?.name ?? '未分类',
+        value: +Math.min(spent.get(b.categoryId) ?? 0, b.amount).toFixed(2),
+        budget: b.amount,
+        color: palette[i % palette.length]
+      }))
+      .filter((r) => r.value > 0)
+      .sort((a, b) => b.value - a.value)
+  }, [monthBudgets, rangeBills, parents, refunds])
+
   /** 资产汇总（一木 s27）：按账户余额做环形图与图例 */
   const assetPie = useMemo(() => {
     const palette = ['var(--accent)', 'var(--in)', 'var(--out)', 'var(--line)', 'var(--muted)']
@@ -339,6 +362,31 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
           <input type="checkbox" checked={hideTiny} onChange={(e) => setHideTiny(e.target.checked)} />
           过滤占比小于 1% 的资产
         </label>
+
+      <div className="stats-block">
+        <div className="sb-hd"><b>预算占比</b></div>
+        {budgetPie.length > 0 ? (
+          <div className="asset-donut">
+            <ResponsiveContainer width="55%" height={150}>
+              <PieChart>
+                <Pie data={budgetPie} dataKey="value" nameKey="name" innerRadius={38} outerRadius={64} stroke="none">
+                  {budgetPie.map((row) => <Cell key={row.id} fill={row.color} />)}
+                </Pie>
+                <Tooltip formatter={(v) => money(Number(v))} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="asset-legend">
+              {budgetPie.map((row) => (
+                <div key={row.id} className="al-row">
+                  <i style={{ background: row.color }} />
+                  <span className="grow">{row.name}</span>
+                  <b>{money(row.value)} / {money(row.budget)}</b>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : <p className="hint">暂无分类预算</p>}
+      </div>
       </div>
 
       {totalBudget > 0 && (
