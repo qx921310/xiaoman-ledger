@@ -333,7 +333,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch, onAd
               <span className="tag due">{dueHint(a.outAccountDate)}</span>
             )}
           </div>
-          <b className={a.assetNumber < 0 ? 'out' : ''}>{accountMoney(a.assetNumber, a.currency, currencies, defaultCurrency)}</b>
+          <b className={a.assetNumber < 0 ? 'out' : 'in'}>{accountMoney(a.assetNumber, a.currency, currencies, defaultCurrency)}</b>
           <button className="link" aria-label={`编辑账户 ${a.assetName}`} disabled={readOnlyBook}
             onClick={() => { if (readOnlyBook) { notify('当前账本只读，不能修改账户'); return } setEditingAsset(a) }}>改</button>
           <button className="del" aria-label={`删除账户 ${a.assetName}`} disabled={readOnlyBook} onClick={() => {
