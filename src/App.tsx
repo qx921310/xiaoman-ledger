@@ -3,6 +3,7 @@ import { useLedger } from './store'
 import { auth, books as bookApi, setCurrentUid, type BookInfo, type User } from './auth'
 import { loadAccountData } from './account-session'
 import { syncNow } from './sync'
+import { clearAllBookPatches } from './features/book-pending'
 import { startAutoSync, stopAutoSync, getAutoSyncState } from './sync-auto'
 import { startMultiTab } from './multi-tab'
 import { SelectShim } from './ui/select-shim'
@@ -260,7 +261,19 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning, bookPending }:
       </nav>
 
       <main className="main">
-        {syncWarning && <div className="warn" role="alert">{syncWarning} <button className="link" onClick={() => { setTab('me'); dismissSyncWarning() }}>查看同步</button></div>}
+        {syncWarning && (
+          <div className="warn" role="alert">
+            {syncWarning}
+            <button className="link" onClick={() => { setTab('me'); dismissSyncWarning() }}>查看同步</button>
+            <button className="link" onClick={async () => {
+              // 以云端为准：丢掉本机待核对草稿后重新同步（账号数据本来就在云端，本机只是缓存）
+              const n = await clearAllBookPatches()
+              dismissSyncWarning()
+              await syncNow()
+              notify(n ? `已丢弃 ${n} 条本机待核对记录，以云端为准` : '已重新同步')
+            }}>以云端为准</button>
+          </div>
+        )}
         {bookPending.pending > 0 && (
           <div className="warn" role="status">
             {bookPending.pending} 个账本修改待同步
