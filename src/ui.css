@@ -135,7 +135,14 @@ label.label { display: block; }
 .out { color: var(--out); }
 
 .group { margin-top: 14px; }
-.day { color: var(--muted); font-size: var(--font-xs); margin: 10px 0 4px; }
+.day {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--sp-2); flex-wrap: wrap;
+  color: var(--ink); font-size: var(--font-sm); font-weight: 500;
+  margin: var(--sp-3) 0 var(--sp-1);
+}
+.day small { color: var(--muted); font-size: var(--font-xs); font-weight: 400; }
+.day span { font-variant-numeric: tabular-nums; }
 .row { display: flex; align-items: center; gap: 10px; min-height: var(--row-h); padding: 9px 0; border-bottom: 1px solid var(--line); }
 .ledger-actions { display: flex; align-items: center; gap: 4px; flex: none; }
 .ledger-actions button { min-height: 44px; padding: 0 8px; }
@@ -1558,3 +1565,7 @@ section.card:has(.my-user) h3 { font-size: var(--font-xs); color: var(--muted); 
 
 /* 一木「我的」无页面大标题，靠卡片自解释 */
 section.card:has(.my-user) .page-title { display: none; }
+
+/* 统计页：时间范围标题与「模块」入口同一行 */
+.row2 > .row { min-height: 0; padding: 0; border-bottom: 0; }
+.row2 > .row .link { font-size: var(--font-xs); }
