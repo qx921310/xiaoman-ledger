@@ -1679,3 +1679,6 @@ section.card:has(.my-user) .page-title { display: none; }
   background: var(--surface-2); border-radius: var(--r-sm);
   color: var(--muted); font-size: var(--font-xs);
 }
+
+/* 一木账户详情没有「全部/账单/转账·其他」筛选，按真机帧隐藏 */
+.acct-tabs { display: none; }
