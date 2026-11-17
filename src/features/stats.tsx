@@ -253,6 +253,17 @@ export function Stats({ notify, onOpenAssetDistribution }: { notify?: (m: string
       )}
       {!drill && (<>
       <div className="row2">
+      <div className="stats-tabs" role="tablist" aria-label="统计视图">
+        {([['daily', '日常'], ['month', '月统计'], ['year', '年统计'], ['custom', '自定义']] as const).map(([key, label]) => (
+          <button key={key} type="button" role="tab"
+            aria-selected={rangeMode === key}
+            className={rangeMode === key ? 'on' : ''}
+            onClick={() => setRangeMode(key as 'daily' | 'month' | 'week' | 'year' | 'custom')}>
+            {label}
+          </button>
+        ))}
+      </div>
+
         <div className="stats-head">
           <span className="stats-head-label">时间范围</span>
           <button type="button" className="link" onClick={() => setModOpen(true)}>模块</button>
@@ -273,16 +284,7 @@ export function Stats({ notify, onOpenAssetDistribution }: { notify?: (m: string
         </div>
       )}
 
-      <div className="stats-tabs" role="tablist" aria-label="统计视图">
-        {([['daily', '日常'], ['month', '月统计'], ['year', '年统计'], ['custom', '自定义']] as const).map(([key, label]) => (
-          <button key={key} type="button" role="tab"
-            aria-selected={rangeMode === key}
-            className={rangeMode === key ? 'on' : ''}
-            onClick={() => setRangeMode(key as 'daily' | 'month' | 'week' | 'year' | 'custom')}>
-            {label}
-          </button>
-        ))}
-      </div>
+
 
       <select aria-label="统计范围" value={rangeMode} onChange={(e) => setRangeMode(e.target.value as 'daily' | 'month' | 'week' | 'year' | 'custom')}>
           <option value="month">按月</option>
