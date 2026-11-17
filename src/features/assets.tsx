@@ -201,8 +201,13 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
     unit: 'money' as const
   }))
   const mask = (v: number) => (hideAmount ? '••••' : money(v))
-  const deposit = assets.filter((a) => a.assetNumber > 0).reduce((s, a) => s + toBase(a.assetNumber, a.currency, currencies, defaultCurrency), 0)
-  const liability = Math.abs(assets.filter((a) => a.assetNumber < 0).reduce((s, a) => s + toBase(a.assetNumber, a.currency, currencies, defaultCurrency), 0))
+  // 一木口径：存款只算非信贷/非贷款类账户；负债只算信用卡、贷款、房贷类账户
+  const LIABILITY_TYPES = new Set([2, 8, 10])
+  const deposit = assets.filter((a) => !LIABILITY_TYPES.has(Number(a.assetType)))
+    .reduce((s, a) => s + toBase(Math.max(0, a.assetNumber), a.currency, currencies, defaultCurrency), 0)
+  const liability = assets.filter((a) => LIABILITY_TYPES.has(Number(a.assetType)))
+    .reduce((s, a) => s + toBase(Math.max(0, -a.assetNumber), a.currency, currencies, defaultCurrency), 0)
+
   const pendingList = reimbursements.filter((r) => r.status === 'pending')
   const pendingReimburseCount = pendingList.length
   const pendingReimburse = pendingList.reduce((s, r) => s + (r.number || 0), 0)

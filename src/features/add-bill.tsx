@@ -161,6 +161,24 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
     setCid(m === 'transfer' ? 0 : (first?.id ?? 0))
   }
 
+  // 一木 AddBillActivity：非信贷类账户余额不足时提示「余额不足」，信用卡/贷款超额度提示「额度不足」
+  const LIABILITY_TYPES = new Set([2, 8, 10])
+  const checkBalance = (assetId: number, amount: number): string | null => {
+    const acct = assets.find((a) => a.assetId === assetId)
+    if (!acct || !(amount > 0)) return null
+    const remain = acct.assetNumber - amount
+    if (LIABILITY_TYPES.has(Number(acct.assetType))) {
+      const quota = Number(acct.totalQuota ?? 0)
+      if (quota > 0 && Math.abs(remain) > quota) return '额度不足'
+      return null
+    }
+    if (remain < 0) {
+      const avail = accountMoney(acct.assetNumber, acct.currency, currencies, defaultCurrency)
+      return `余额不足（可用 ${avail}）`
+    }
+    return null
+  }
+
   const submit = (): boolean => {
     const fail = (message: string) => { notify(message); return false }
     const guard = (fn: () => boolean): boolean => {
@@ -206,6 +224,8 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
       if (f == null || f < 0 || tc == null || tc < 0) return fail('请输入有效的手续费和到账金额')
       const fromCurrency = assets.find((a) => a.assetId === aid)?.currency
       if (f > 0 && !hasCurrencyRate(fromCurrency, currencies, defaultCurrency)) return fail(`请先设置 ${fromCurrency} 汇率`)
+      const shortTransfer = checkBalance(aid, v + (f || 0))
+      if (shortTransfer) return fail(shortTransfer)
       return guard(() => {
         addTransfer({
           toCost: tc > 0 ? tc : undefined,
@@ -228,6 +248,10 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
     if (!hasCurrencyRate(currency, currencies, defaultCurrency)) return fail(`请先设置 ${currency} 汇率`)
     if (!hasCurrencyRate(accountCurrency, currencies, defaultCurrency)) return fail(`请先设置 ${accountCurrency} 汇率`)
     const foreign = currency !== defaultCurrency
+    if (mode !== 'income') {
+      const shortage = checkBalance(aid, foreign ? toBase(v, currency, currencies, defaultCurrency) : v)
+      if (shortage) return fail(shortage)
+    }
     if (!guard(() => {
       const created = addBill({
         cost: foreign ? toBase(v, currency, currencies, defaultCurrency) : v,

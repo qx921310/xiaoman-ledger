@@ -98,6 +98,9 @@ await clickText('首页'); await sleep(800)
 // ---- 1. 记一笔：选分类 → 键盘输入 12.34 → 完成 ----
 step('open-add', { ok: await clickText('添加一条新记账') }); await sleep(1500)
 step('pick-category', { ok: await clickContains('食品餐饮') }); await sleep(600)
+// 新账户才有余额；默认账户是 0 元的「现金」，会被余额守卫拦下
+await clickContains('现金'); await sleep(600)
+await clickContains('验收现金'); await sleep(500)
 for (const k of ['1', '2', '.', '3', '4']) { await clickText(k); await sleep(150) }
 step('typed', { body: (await text()).slice(0, 120) })
 // 顶部「完成」是 .entry-edit；页面上还有其它同名文案，按类名点更稳
