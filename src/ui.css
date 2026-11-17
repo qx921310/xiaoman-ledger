@@ -1472,8 +1472,13 @@ textarea:focus-visible {
 }
 
 /* 资产：账户详情整页（对齐一木 s22–s25） */
-.acct-hero { display: flex; flex-direction: column; gap: var(--sp-1); padding: var(--sp-4); margin: var(--sp-2) 0; background: var(--accent-soft); border-radius: var(--r-lg); }
-.acct-hero b { font-size: var(--font-display); font-weight: 600; color: var(--focus-ink); font-variant-numeric: tabular-nums; }
+.acct-hero {
+  display: flex; flex-direction: column; gap: var(--sp-1); padding: var(--sp-4);
+  margin: var(--sp-2) 0; background: var(--accent); color: var(--on-accent);
+  border-radius: var(--r-lg);
+}
+.acct-hero small, .acct-hero span, .acct-hero div { color: var(--on-accent); }
+.acct-hero b { font-size: var(--font-display); font-weight: 600; color: var(--on-accent); font-variant-numeric: tabular-nums; }
 .acct-tabs { margin: 6px 0 10px; }
 .acct-month { margin-top: 10px; }
 .acct-month .am-hd { display: flex; justify-content: space-between; padding: 6px 2px; color: var(--muted); font-size: var(--font-xs); }
