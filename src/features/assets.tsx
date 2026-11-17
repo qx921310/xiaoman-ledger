@@ -293,7 +293,10 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
               { name: '占净资产', amount: share, unit: 'percent' }
             ], '组头点击查看该类型的统计概览')
           }}>
-            <span>{ASSET_TYPE[Number(typeKey)] ?? '其他'} ›</span>
+            <span className="asset-group-name">
+              <span className="asset-badge"><AssetIcon type={Number(typeKey)} size={15} /></span>
+              {ASSET_TYPE[Number(typeKey)] ?? '其他'} ›
+            </span>
             <b>{mask(list.reduce((sum, a) => sum + toBase(a.assetNumber, a.currency, currencies, defaultCurrency), 0))}</b>
           </button>
           {list.map((a) => (
@@ -309,14 +312,10 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
                 }}>{a.simpleName || a.assetName}</button>
               {a.cardCode && <span className="tag">尾号 {a.cardCode}</span>}
             </div>
-            <small>
-              {ASSET_TYPE[a.assetType]}{a.groupName ? ' · ' + a.groupName : ''}
-              {a.inAccountDate ? ` · 账单日 ${a.inAccountDate}` : ''}
-              {a.outAccountDate ? ` · 还款日 ${a.outAccountDate}` : ''}
+            <small className="asset-sub">
+              {ASSET_TYPE[a.assetType]}
               {a.assetType === 2 && a.totalQuota ? ` · 额度 ${accountMoney(a.totalQuota, a.currency, currencies, defaultCurrency)}` : ''}
-              {a.reimAssetNumber ? ` · 报销额度 ${money(a.reimAssetNumber)}` : ''}
-              {a.shareQuotaAsset ? ` · 额度共享自 ${allAssets.find((x) => x.assetId === a.shareQuotaAsset)?.assetName ?? '已删除账户'}` : ''}
-              {a.outDayNotNext && a.outAccountDate ? ' · 还款顺延' : ''}
+              {a.assetType === 2 && a.outAccountDate ? ` · 还款日 ${a.outAccountDate}` : ''}
             </small>
             {a.assetType === 2 && dueHint(a.outAccountDate) && (
               <span className="tag due">{dueHint(a.outAccountDate)}</span>
