@@ -2,8 +2,10 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
 const css = readFileSync('src/ui.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
-const roots = [...css.matchAll(/:root\s*\{([^}]*)\}/g)].map((m) => m[1]).join('\n')
-const body = css.replace(/:root\s*\{[^}]*\}/g, '')
+// 令牌允许定义在 :root 与主题选择器（[data-theme='x']）里，换肤时覆盖同名令牌即可
+const TOKEN_SELECTOR = /(?::root|\[data-theme='[^']+'\])(?:\s*,\s*(?::root|\[data-theme='[^']+'\]))*\s*\{([^}]*)\}/g
+const roots = [...css.matchAll(TOKEN_SELECTOR)].map((m) => m[1]).join('\n')
+const body = css.replace(TOKEN_SELECTOR, '')
 const definitions = new Map([...roots.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]))
 const radii = ['--r-sm', '--r-md', '--r-lg', '--r-pill']
 const sizes = ['--font-xs', '--font-sm', '--font-md', '--font-lg', '--font-xl', '--font-display']

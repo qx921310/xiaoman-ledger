@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs'
 
 const css = readFileSync('src/ui.css', 'utf8')
-const root = css.match(/:root\s*\{([^}]*)\}/)?.[1] ?? ''
+// 令牌可能写在 :root 或主题选择器里（[data-theme='x']），这里合并读取
+const root = [...css.matchAll(/(?::root|\[data-theme='[^']+'\])(?:\s*,\s*(?::root|\[data-theme='[^']+'\]))*\s*\{([^}]*)\}/g)]
+  .map((m) => m[1]).join('\n')
 const token = (name) => {
   const value = root.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6}|var\\(--[a-z-]+\\))\\s*;`))?.[1]
   if (!value) throw new Error(`缺少颜色令牌 --${name}`)
