@@ -124,6 +124,7 @@ const ME_ICON_PATHS: Record<string, string> = {
   guide: 'M4 6a2 2 0 0 1 2-2h5v16H6a2 2 0 0 1-2-2ZM20 6a2 2 0 0 0-2-2h-5v16h5a2 2 0 0 0 2-2Z',
   invite: 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM3 20a6 6 0 0 1 12 0M18 8v6M15 11h6',
   about: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 11v6M12 7h.01',
+  evaluate: 'M12 3.6l2.5 5.1 5.6.8-4 3.9.9 5.6-5-2.6-5 2.6.9-5.6-4-3.9 5.6-.8Z',
   feedback: 'M4 5h16v11H9l-5 4V5ZM8 9h8M8 12h5',
 }
 
@@ -179,7 +180,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [prepayOpen, setPrepayOpen] = useState(false)
   const [pensionOpen, setPensionOpen] = useState(false)
   const [tool, setTool] = useState<'hourly' | 'inflation' | 'buyrent' | null>(null)
-  const [meScreen, setMeScreen] = useState<'book' | 'cat' | 'tag' | 'data' | 'currency' | null>(null)
+  const [meScreen, setMeScreen] = useState<'book' | 'cat' | 'tag' | 'data' | 'currency' | 'tools' | null>(null)
   const [cycleDrill, setCycleDrill] = useState<{ title: string; cycleId: string | number } | null>(null)
   const [backupOpen, setBackupOpen] = useState(false)
   // 一木 UserInfoActivity：昵称与头像可改（本地保存，账号维度）
@@ -616,10 +617,10 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         {([
           ['实用工具', 'tools', 'tools'], ['主题外观', 'theme', 'theme'], ['更多活动', 'activity', 'apps'],
           ['更多一木应用', 'apps', 'apps'], ['桌面小部件', 'widget', 'widget'], ['使用手册', 'guide', 'guide'],
-          ['邀请好友', 'invite', 'invite'], ['关于我们', 'about', 'about'], ['意见反馈', 'feedback', 'feedback'],
+          ['邀请好友', 'invite', 'invite'], ['建议与反馈', 'feedback', 'feedback'], ['给应用评分', 'evaluate', 'evaluate'], ['关于我们', 'about', 'about'],
         ] as Array<[string, string, string]>).map(([label, key, icon]) => (
           <button key={key} type="button" className="row my-row-btn" aria-label={label} onClick={() => {
-            if (key === 'tools') { document.getElementById('sec-tools')?.scrollIntoView({ behavior: 'smooth' }); return }
+            if (key === 'tools') { setMeScreen('tools'); window.scrollTo({ top: 0 }); return }
             if (key === 'theme') { notify('敬请期待：主题外观'); return }
             if (key === 'guide') { setGuideOpen(true); return }
             if (key === 'about') { setAboutOpen(true); return }
@@ -632,6 +633,8 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       </div>
       </>)}
 
+      {meScreen === 'tools' && (<>
+      <button type="button" className="link" onClick={() => setMeScreen(null)}>‹ 返回我的</button>
       <h3>实用工具</h3>
       <div className="my-grid">
         {([
@@ -653,6 +656,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
           <button key={label} type="button" className="my-grid-item" onClick={run}>{label}</button>
         ))}
       </div>
+      </>)}
 
       {meScreen === 'data' && (<>
       <button type="button" className="link" onClick={() => setMeScreen(null)}>‹ 返回我的</button>
@@ -1309,7 +1313,9 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         }}>添加</button>
       </div>
 
-      </>)}\n\n      <h3>云端同步</h3>
+      </>)}
+
+      <h3>云端同步</h3>
       <p className="hint">
         同步冲突时保留本地内容并提示。
       </p>
