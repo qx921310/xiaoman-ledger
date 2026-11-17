@@ -50,6 +50,30 @@ const clickC = (s2) => ev(`(() => { const e=[...document.querySelectorAll('butto
 const text = () => ev("document.body.innerText.replace(/\\s+/g,' ')")
 const shot = async (n) => { const x = await cdp.send('Page.captureScreenshot', { format: 'png' }, sid); if (x.result?.data) writeFileSync(`${OUT}/${n}.png`, Buffer.from(x.result.data, 'base64')) }
 
+// cookie 注入失败（staging 常见）时走 UI 表单登录
+if (await ev("!!document.querySelector('#auth-email')")) {
+  const fill = async (sel, val) => {
+    const r = await ev(`(() => { const i=document.querySelector(${JSON.stringify(sel)}); if(!i) return null; const b=i.getBoundingClientRect(); return {x:b.x+b.width/2,y:b.y+b.height/2} })()`)
+    if (!r) return false
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: r.x, y: r.y, button: 'left', clickCount: 1 }, sid)
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: r.x, y: r.y, button: 'left', clickCount: 1 }, sid)
+    // 先全选再输入，避免与已有内容拼接
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', modifiers: 2, key: 'a', code: 'KeyA', windowsVirtualKeyCode: 65 }, sid)
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', modifiers: 2, key: 'a', code: 'KeyA', windowsVirtualKeyCode: 65 }, sid)
+    await cdp.send('Input.insertText', { text: val }, sid)
+    await sleep(150)
+    return true
+  }
+  await fill('#auth-email', EMAIL)
+  await fill('#auth-password', PASSWORD)
+  // 页面上有两个「登录」（分段标签 + 提交按钮），点主按钮
+  const filled = await ev(`(() => { const e=document.querySelector('#auth-email'); const p=document.querySelector('#auth-password'); return (e?e.value:'') + ' / ' + (p?p.value.length:-1) })()`)
+  console.log('filled:', filled)
+  await ev("(() => { const b=document.querySelector('.auth-card button.primary'); if(!b) return false; b.click(); return true })()")
+  await sleep(3500)
+  console.log('form-login used, loggedIn=', !(await ev("!!document.querySelector('#auth-email')")))
+}
+
 // 1. 记账页：打开 → 点账户 chip → 弹层出现 → 取消 → 返回首页
 await click('添加一条新记账'); await sleep(1400)
 const entryOpen = (await text()).includes('完成')
@@ -63,7 +87,7 @@ await shot('entry')
 
 // 2. 日历：点 3 号，选中态跟着变
 await click('日历'); await sleep(1200)
-const cellText = await ev(`(() => { const b=[...document.querySelectorAll('.cal-cell')].find(x=>x.textContent.trim().startsWith('3')); if(!b) return 'no-cell'; b.click(); return b.className })()`)
+const cellText = await ev(`(() => { const b=[...document.querySelectorAll('.cal-cell')].find(x=>{ const em=x.querySelector('em'); return em && em.textContent.trim()==='3' }); if(!b) return 'no-cell'; b.click(); return b.className })()`)
 await sleep(500)
 const calBody = await text()
 ok('日历点选日期', cellText !== 'no-cell' && calBody.includes('11月3日'), `class=${cellText} body=${calBody.slice(0, 60)}`)
