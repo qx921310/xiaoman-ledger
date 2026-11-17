@@ -1592,3 +1592,9 @@ section.card:has(.my-user) .page-title { display: none; }
 /* 统计页：标题行与「模块」入口同一行 */
 .stats-head { display: flex; align-items: center; justify-content: space-between; padding: var(--sp-2) 0 var(--sp-1); }
 .stats-head-label { color: var(--muted); font-size: var(--font-xs); }
+
+/* 日历账单行：右侧金额 + 账户/币种小字，左侧标题下补子分类 */
+.cal-amt { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.cal-amt b { font-size: var(--font-lg); font-weight: 600; font-variant-numeric: tabular-nums; }
+.cal-amt .cal-acct { color: var(--muted); font-size: var(--font-xs); }
+.cal-sub { display: inline-block; margin-top: 2px; }

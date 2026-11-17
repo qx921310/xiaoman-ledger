@@ -11,6 +11,7 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
   const parents = useLedger((s) => s.parentCategories)
   const refunds = useLedger((s) => s.refunds)
   const assets = useLedger((s) => s.assets)
+  const allChildren = useLedger((s) => s.childCategories)
   const currencies = useLedger((s) => s.currencies)
   const defaultCurrency = useLedger((s) => s.defaultCurrency)
   const bookId = useLedger((s) => s.currentBookId)
@@ -23,7 +24,7 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
       ? pickedBooks.includes(String(b.bookId))
       : (bookId === 0 || String(b.bookId) === String(bookId))
   const [cursor, setCursor] = useState(() => new Date())
-  const [picked, setPicked] = useState<string | null>(null)
+  const [picked, setPicked] = useState<string | null>(fullDay(Date.now()))
   // 一木 CalendarLayout 支持月/周切换
   const [mode] = useState<'month' | 'week'>('month')
   // 一木 popup_calendar_menu：本月账单 / 多选账本 / 显示热力背景 / 热力图指标 / 更多设置
@@ -196,9 +197,9 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
     <section className="card">
       <div className="cal-toolbar">
         <div className="cal-title">
-          <button className="ghost" aria-label="上个月" onClick={() => setCursor(new Date(year, monthIdx - 1, 1))}>‹</button>
+          <button className="ghost" aria-label="上个月" onClick={() => { const d = new Date(year, monthIdx - 1, 1); setCursor(d); setPicked(fullDay(d.getTime())) }}>‹</button>
           <b>{year} 年 {monthIdx + 1} 月</b>
-          <button className="ghost" aria-label="下个月" onClick={() => setCursor(new Date(year, monthIdx + 1, 1))}>›</button>
+          <button className="ghost" aria-label="下个月" onClick={() => { const d = new Date(year, monthIdx + 1, 1); setCursor(d); setPicked(fullDay(d.getTime())) }}>›</button>
         </div>
         <div className="cal-totals">
           <div><small>收</small><b className="in">{money(monthTotals.income)}</b></div>
@@ -306,7 +307,7 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
 
       {monthDayGroups.length > 0 && (
         <div className="cal-list">
-          {monthDayGroups.map((g) => (
+          {monthDayGroups.filter((g) => !picked || g.key === picked).map((g) => (
             <div key={g.key} className="cal-daygroup">
               <div className="hf-head">
                 <span>
@@ -322,10 +323,19 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
                   <div className="grow">
                     <div>{parents.find((p) => p.id === b.parentCategoryId)?.name ?? '未分类'}{b.remark ? ` · ${b.remark}` : ''}</div>
                     <small>{new Date(b.time).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</small>
+                    {allChildren.find((c) => c.id === b.childCategoryId) && (
+                      <small className="cal-sub">{allChildren.find((c) => c.id === b.childCategoryId)?.name}</small>
+                    )}
                   </div>
-                  <b className={kindOf.get(b.parentCategoryId) === 'income' ? 'in' : 'out'}>
-                    {kindOf.get(b.parentCategoryId) === 'income' ? '+' : '-'}{money(kindOf.get(b.parentCategoryId) === 'income' ? b.cost : billNetAmount(b, refunds))}
-                  </b>
+                  <div className="cal-amt">
+                    <b className={kindOf.get(b.parentCategoryId) === 'income' ? 'in' : 'out'}>
+                      {kindOf.get(b.parentCategoryId) === 'income' ? '+' : '-'}{money(kindOf.get(b.parentCategoryId) === 'income' ? b.cost : billNetAmount(b, refunds))}
+                    </b>
+                    <small className="cal-acct">
+                      {currencies.some((c) => c.code === b.currencyInfo) ? b.currencyInfo + ' · ' : ''}
+                      {assets.find((a) => a.assetId === b.assetId)?.assetName ?? ''}
+                    </small>
+                  </div>
                 </div>
               ))}
             </div>
