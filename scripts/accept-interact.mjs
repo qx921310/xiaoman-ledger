@@ -39,7 +39,7 @@ await cdp.send('Network.enable', {}, sid)
 const login = await fetch(`${BASE}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: EMAIL, password: PASSWORD }) })
 const cookie = (login.headers.get('set-cookie') ?? '').split(';')[0]
 const [cn, cv] = cookie.split('=')
-await cdp.send('Network.setCookie', { name: cn, value: cv, domain: new URL(BASE).host, path: '/' }, sid)
+await cdp.send('Network.setCookie', { name: cn, value: cv, domain: new URL(BASE).host, path: '/', secure: true }, sid)
 await cdp.send('Page.navigate', { url: BASE }, sid)
 await sleep(4000)
 const errors = []
