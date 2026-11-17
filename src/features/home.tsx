@@ -117,12 +117,12 @@ export function Home({ me, onAdd, onOpenStats, onSearch, onMore, onScreenshot, n
               <b>{plain(summary.income)}</b>
             </button>
             <button type="button" className="hc-item" onClick={onOpenStats} disabled={!onOpenStats}>
-              <small>本月支出</small>
-              <b>{plain(used)}</b>
-            </button>
-            <button type="button" className="hc-item" onClick={onOpenStats} disabled={!onOpenStats}>
               <small>本月结余</small>
               <b>{plain(+(summary.income - used).toFixed(2))}</b>
+            </button>
+            <button type="button" className="hc-item" onClick={onOpenStats} disabled={!onOpenStats}>
+              <small>剩余月预算</small>
+              <b>{budgetTotal > 0 ? plain(+Math.max(0, budgetTotal - used).toFixed(2)) : '—'}</b>
             </button>
           </div>
           <button type="button" className="hc-big" onClick={onOpenStats} disabled={!onOpenStats}>
