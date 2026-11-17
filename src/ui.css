@@ -26,6 +26,28 @@
   --key-finish-bg: #ffc559;
   --key-finish-ink: var(--ink);
 }
+
+:root {
+  /* 间距阶梯：4 的倍数，页面/卡片/行统一从这里取 */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  /* 面层：卡片底色与更浅的分区块 */
+  --surface: var(--card);
+  --surface-2: var(--accent-soft);
+  /* 主色上的文字（对比度按 WCAG AA 选深墨色） */
+  --on-accent: var(--ink);
+  /* 强调色的文字态，用于状态徽标 */
+  --accent-ink: var(--focus-ink);
+  /* 底部导航高度 */
+  --nav-h: 56px;
+  /* 分类色：默认值，行内会覆盖 */
+  --category-color: var(--muted);
+  --category-bg: var(--accent-soft);
+}
 * { box-sizing: border-box; }
 body {
   margin: 0;
@@ -684,43 +706,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   padding: var(--sp-4);
   background: var(--surface-2);
   display: grid;
-  gap: var(--sp-3);
+  gap: var(--sp-2);
 }
 .asset-net-label { display: flex; align-items: center; gap: var(--sp-2); color: var(--muted); }
-.asset-net-value { font-size: var(--font-display); line-height: 1.1; }
-.asset-two { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
-.asset-two > div { display: grid; gap: 2px; }
-.asset-two small { color: var(--muted); font-size: var(--font-xs); }
-.asset-setting { justify-self: end; }
-.asset-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-2); margin: var(--sp-3) 0; }
-.asset-card {
-  display: grid; gap: 2px; text-align: left;
-  padding: var(--sp-3); border: 1px solid var(--line);
-  border-radius: var(--r-md); background: var(--surface);
-  font: inherit; color: inherit; cursor: pointer;
-}
-.asset-card small { color: var(--muted); font-size: var(--font-xs); }
-.asset-card b { font-size: var(--font-md); }
-.asset-card .dim { color: var(--muted); font-size: var(--font-xs); }
-.asset-group { margin-top: var(--sp-3); }
-.asset-group-head {
-  display: flex; justify-content: space-between; align-items: baseline;
-  padding: var(--sp-1) 0; border-bottom: 1px solid var(--line);
-  font-size: var(--font-sm); color: var(--muted);
-}
-.asset-group-head b { color: var(--ink); }
-
-/* 资产页：对齐一木的 banner / 汇总卡片 / 分组列表 */
-.asset-banner {
-  position: relative;
-  border-radius: var(--r-lg);
-  padding: var(--sp-4);
-  background: var(--surface-2);
-  display: grid;
-  gap: var(--sp-3);
-}
-.asset-net-label { display: flex; align-items: center; gap: var(--sp-2); color: var(--muted); }
-.asset-net-value { font-size: var(--font-display); line-height: 1.1; }
+button.asset-net-value { font-size: var(--font-display); line-height: 1.1; font-weight: 600; color: var(--ink); }
 .asset-two { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
 .asset-two > div { display: grid; gap: 2px; }
 .asset-two small { color: var(--muted); font-size: var(--font-xs); }
