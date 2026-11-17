@@ -1274,7 +1274,8 @@ button.day-btn {
 .sheet-row { display: flex; align-items: center; gap: 10px; width: 100%; background: transparent; border: 0; padding: 12px 0; cursor: pointer; font-size: var(--font-md); color: var(--ink); }
 .sheet-dot { width: 18px; height: 18px; border-radius: var(--r-pill); border: 2px solid var(--line); display: inline-block; }
 .sheet-dot.on { border-color: var(--accent); background: var(--accent); }
-.asset-row { display: flex; align-items: center; gap: 12px; width: 100%; background: transparent; border: 0; padding: 12px 0; cursor: pointer; }
+.asset-row { display: flex; align-items: center; gap: var(--sp-3); width: 100%; background: transparent; border: 0; padding: var(--sp-3) 0; cursor: pointer; }
+.asset-row b { font-size: var(--font-md); font-variant-numeric: tabular-nums; }
 .ar-icon { width: 36px; height: 36px; border-radius: var(--r-pill); display: grid; place-items: center; background: var(--surface-2); flex: none; }
 .ar-name { flex: 1; text-align: left; font-size: var(--font-md); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ar-bal { font-size: var(--font-md); font-variant-numeric: tabular-nums; color: var(--ink); }
@@ -1461,8 +1462,8 @@ textarea:focus-visible {
 }
 
 /* 资产：账户详情整页（对齐一木 s22–s25） */
-.acct-hero { display: flex; flex-direction: column; gap: 4px; padding: 14px 12px; margin: 8px 0; background: var(--accent-soft); border-radius: var(--r-md); }
-.acct-hero b { font-size: var(--font-display); }
+.acct-hero { display: flex; flex-direction: column; gap: var(--sp-1); padding: var(--sp-4); margin: var(--sp-2) 0; background: var(--accent-soft); border-radius: var(--r-lg); }
+.acct-hero b { font-size: var(--font-display); font-weight: 600; color: var(--focus-ink); font-variant-numeric: tabular-nums; }
 .acct-tabs { margin: 6px 0 10px; }
 .acct-month { margin-top: 10px; }
 .acct-month .am-hd { display: flex; justify-content: space-between; padding: 6px 2px; color: var(--muted); font-size: var(--font-xs); }
@@ -1474,7 +1475,7 @@ textarea:focus-visible {
 .entry-dual b { font-size: var(--font-sm); }
 
 /* 资产：新增账户入口用按钮样式，而非普通折叠标题 */
-.new-asset > summary { list-style: none; text-align: center; padding: 12px; border: 1px dashed var(--line); border-radius: var(--r-md); color: var(--accent); }
+.new-asset > summary { list-style: none; text-align: center; padding: var(--sp-3); border: 1px dashed var(--line); border-radius: var(--r-md); color: var(--focus-ink); font-weight: 600; }
 .new-asset > summary::-webkit-details-marker { display: none; }
 
 /* 统计：报表表格（替代不存在的 .table 类） */
