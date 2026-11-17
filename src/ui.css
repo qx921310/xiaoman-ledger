@@ -1580,3 +1580,7 @@ section.card:has(.my-user) .page-title { display: none; }
 /* 日历格：再多一像素也放得下「-582.00 / +1.0万」两行 */
 .cal-cell { min-height: 62px; gap: 2px; padding-bottom: 5px; }
 .cal-cell i { line-height: 1.1; }
+
+/* 统计页：标题行与「模块」入口同一行 */
+.stats-head { display: flex; align-items: center; justify-content: space-between; padding: var(--sp-2) 0 var(--sp-1); }
+.stats-head-label { color: var(--muted); font-size: var(--font-xs); }

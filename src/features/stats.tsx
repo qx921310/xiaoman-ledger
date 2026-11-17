@@ -214,12 +214,11 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
           onBack={() => setDetail(null)} />
       )}
       {!drill && (<>
-      <div className="label">时间范围</div>
       <div className="row2">
-        <div className="row">
-        <span className="grow" />
-        <button type="button" className="link" onClick={() => setModOpen(true)}>模块</button>
-      </div>
+        <div className="stats-head">
+          <span className="stats-head-label">时间范围</span>
+          <button type="button" className="link" onClick={() => setModOpen(true)}>模块</button>
+        </div>
 
       {modOpen && (
         <div className="menu-mask" onClick={() => setModOpen(false)}>
