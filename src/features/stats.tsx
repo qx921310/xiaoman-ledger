@@ -159,6 +159,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
   // 一木统计页的 11 个可勾选模块（StatisticsModule）
   const MODULES = ['收支统计', '收支对比', '资产走势', '支出占比', '标签占比', '标签数据', '支出数据', '账户收支', '本月总结', '报表统计', '成员收支'] as const
   const [modOpen, setModOpen] = useState(false)
+  const [hideTiny, setHideTiny] = useState(true)
   const [drill, setDrill] = useState<{ title: string; catId: number } | null>(null)
   const [detail, setDetail] = useState<{ kind: 'category' | 'tag' | 'account' | 'day'; title: string; bills: typeof bills } | null>(null)
   const [mods, setMods] = useState<Record<string, boolean>>(() => {
@@ -207,6 +208,13 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
       .map((a, i) => ({ id: a.assetId, name: a.simpleName || a.assetName, value: +Number(a.assetNumber).toFixed(2), color: palette[i % palette.length] }))
       .sort((a, b) => b.value - a.value)
   }, [assets, currentBookId, userId, currencies, defaultCurrency])
+
+  // 一木 s27：可过滤占比小于 1% 的资产（只影响环形图切片）
+  const assetPieShown = useMemo(() => {
+    if (!hideTiny) return assetPie
+    const total = assetPie.reduce((n, r) => n + r.value, 0) || 1
+    return assetPie.filter((r) => r.value / total >= 0.01)
+  }, [assetPie, hideTiny])
 
   /** 报表统计（一木 s28）：按月的支出/收入/结余 */
   const monthReport = useMemo(() => {
@@ -341,8 +349,8 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
         <div className="asset-donut">
           <ResponsiveContainer width="55%" height={150}>
             <PieChart>
-              <Pie data={assetPie} dataKey="value" nameKey="name" innerRadius={38} outerRadius={64} stroke="none">
-                {assetPie.map((row) => <Cell key={row.id} fill={row.color} />)}
+              <Pie data={assetPieShown} dataKey="value" nameKey="name" innerRadius={38} outerRadius={64} stroke="none">
+                {assetPieShown.map((row) => <Cell key={row.id} fill={row.color} />)}
               </Pie>
               <Tooltip formatter={(v) => money(Number(v))} />
             </PieChart>
@@ -358,6 +366,10 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
             {assetPie.length === 0 && <p className="hint">暂无资产</p>}
           </div>
         </div>
+        <label className="sb-check">
+          <input type="checkbox" checked={hideTiny} onChange={(e) => setHideTiny(e.target.checked)} />
+          过滤占比小于 1% 的资产
+        </label>
       </div>
 
       {totalBudget > 0 && (
