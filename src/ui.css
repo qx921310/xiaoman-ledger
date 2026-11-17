@@ -932,7 +932,8 @@ button.asset-net-value { font-size: var(--font-display); line-height: 1.1; font-
 }
 .hm-item:last-child { border-bottom: 0; }
 .hm-item.muted, .hm-item:disabled { color: var(--muted); cursor: default; }
-.ledger-row.simple small { display: none; }
+.ledger-row.simple small { display: block; }
+.cat-sub { color: var(--muted); font-size: var(--font-xs); }
 
 /* 账单搜索页（对齐 activity_bill_search）：搜索框 + 历史 + 结果汇总 */
 .search-page { display: grid; gap: var(--sp-3); }
@@ -1626,3 +1627,9 @@ section.card:has(.my-user) .page-title { display: none; }
 .cd-date { color: var(--ink); font-weight: 500; display: inline-flex; align-items: baseline; gap: var(--sp-1); }
 .cd-date small { color: var(--muted); font-size: var(--font-xs); font-weight: 400; }
 .cd-nums b { font-variant-numeric: tabular-nums; }
+
+/* 每天一张白卡（对齐一木 s01：日期头 + 当天流水在同一张圆角卡里） */
+.group { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg);
+  padding: var(--sp-2) var(--sp-3); margin-bottom: var(--sp-3); }
+.group > .day:first-child { margin-top: 0; }
+.group .ledger-row:last-child { border-bottom: 0; }
