@@ -718,7 +718,7 @@ button.asset-net-value { font-size: var(--font-display); line-height: 1.1; font-
 .asset-two { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
 .asset-two > div { display: grid; gap: 2px; }
 .asset-two small { color: var(--muted); font-size: var(--font-xs); }
-.asset-setting { justify-self: end; }
+.asset-setting { position: absolute; right: var(--sp-3); bottom: var(--sp-3); }
 .asset-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-2); margin: var(--sp-3) 0; }
 .asset-card {
   display: grid; gap: 2px; text-align: left;
