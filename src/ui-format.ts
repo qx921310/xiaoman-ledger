@@ -30,8 +30,10 @@ export function humanDay(day: string): string {
   const today = new Date()
   const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
   const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1)
-  if (sameDay(date, today)) return '今天'
-  if (sameDay(date, yesterday)) return '昨天'
   const week = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()]
-  return `${y}年${m}月${d}日 ${week}`
+  const base = `${m}月${d}日`
+  // 一木格式：11月14日 今天 周六（带日期，不用年份）
+  if (sameDay(date, today)) return `${base} 今天 ${week}`
+  if (sameDay(date, yesterday)) return `${base} 昨天 ${week}`
+  return `${base} ${week}`
 }

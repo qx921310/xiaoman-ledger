@@ -881,7 +881,7 @@ assert.equal(a97.assetNumber, 898, '转出 100 + 手续费 2')
 // 日期分组键必须是完整本地日期，避免 NaN
 assert.equal(fullDay(new Date(2026, 10, 11, 9).getTime()), '2026-11-11')
 assert.ok(humanDay('2025-03-05').includes('月'), 'humanDay 接受 YYYY-MM-DD')
-assert.equal(humanDay(fullDay(Date.now())), '今天', '当天显示今天')
+assert.match(humanDay(fullDay(Date.now())), /今天/, '当天显示今天（一木格式：11月14日 今天 周六）')
 
 // 预算身份：月预算与自定义预算并存，不互相覆盖
 state().reset()
