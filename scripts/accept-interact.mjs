@@ -87,6 +87,27 @@ ok('我的子页打开', subBody.includes('账本') && subBody.includes('返回�
 await shot('me-sub')
 await clickC('返回我的'); await sleep(700)
 
+
+// 5. 日历跨月：点下一月，标题变 12 月
+await click('日历'); await sleep(1000)
+const nextMonth = await ev(`(() => { const b=[...document.querySelectorAll('button')].find(x=>x.getAttribute('aria-label')==='下个月'); if(!b) return false; b.click(); return true })()`)
+await sleep(700)
+const decBody = await text()
+ok('日历切换月份', nextMonth && decBody.includes('12 月'), decBody.slice(0, 60))
+
+// 6. 统计：年统计
+await click('统计'); await sleep(1000)
+const yearOk = await click('年统计'); await sleep(900)
+const yearBody = await text()
+ok('统计年统计可用', yearOk && yearBody.includes('年'), yearBody.slice(0, 60))
+
+// 7. 我的：数据子页
+await click('我的'); await sleep(900)
+const dataOpen = await ev(`(() => { const b=[...document.querySelectorAll('.my-data button')][0]; if(!b) return false; b.click(); return true })()`)
+await sleep(800)
+const dataBody = await text()
+ok('我的数据子页', dataOpen && dataBody.includes('返回我的'), dataBody.slice(0, 60))
+
 const pass = checks.filter((c) => c.p).length
 writeFileSync(`${OUT}/report.json`, JSON.stringify({ email: EMAIL, checks }, null, 2))
 console.log(JSON.stringify({ pass, total: checks.length, verdict: pass === checks.length ? 'PASS' : 'PARTIAL' }))
