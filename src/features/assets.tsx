@@ -373,8 +373,11 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch, onAd
             <div className="subpage-head">
               <button type="button" className="link" onClick={() => { setScreen('assets'); setHistoryAsset(null); setAccountTab('all') }}>‹ 返回</button>
               <h3>{account.simpleName || account.assetName}</h3>
-              <button type="button" className="link" disabled={readOnlyBook}
-                onClick={() => { if (readOnlyBook) { notify('当前账本只读，不能修改账户'); return } setEditingAsset(account) }}>编辑</button>
+              <div className="acct-head-acts">
+                <button type="button" className="link" onClick={onOpenStats}>统计</button>
+                <button type="button" className="link" disabled={readOnlyBook}
+                  onClick={() => { if (readOnlyBook) { notify('当前账本只读，不能修改账户'); return } setEditingAsset(account) }}>编辑</button>
+              </div>
             </div>
 
             <div className="acct-hero">
@@ -410,7 +413,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch, onAd
               <button type="button" className={accountTab === 'other' ? 'on' : ''} onClick={() => setAccountTab('other')}>转账·其他</button>
             </div>
 
-            {groups.length === 0 && <p className="hint">这个账户还没有流水。</p>}
+            {groups.length === 0 && <p className="hint">该账户没有任何记账</p>}
             {groups.map((g) => (
               <details key={g.key} className="acct-month" open>
                 <summary className="am-hd">
@@ -436,9 +439,6 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch, onAd
               </details>
             ))}
 
-            <div className="modal-btns">
-              <button className="ghost" onClick={() => { setScreen('assets'); setHistoryAsset(null); setAccountTab('all') }}>关闭</button>
-            </div>
           </div>
         )
       })()}

@@ -1668,3 +1668,6 @@ section.card:has(.my-user) .page-title { display: none; }
   background: var(--card); color: var(--ink); font-size: var(--font-sm); cursor: pointer;
 }
 .acct-action-ico { color: var(--accent); font-size: var(--font-md); }
+
+/* 账户详情顶栏右侧动作组 */
+.acct-head-acts { display: flex; align-items: center; gap: var(--sp-3); }
