@@ -1569,3 +1569,13 @@ section.card:has(.my-user) .page-title { display: none; }
 /* 统计页：时间范围标题与「模块」入口同一行 */
 .row2 > .row { min-height: 0; padding: 0; border-bottom: 0; }
 .row2 > .row .link { font-size: var(--font-xs); }
+
+/* 账单行：图标与文字间距、金额层级收紧（首页/账单/搜索共用） */
+.ledger-row { gap: var(--sp-3); padding: var(--sp-2) 0; }
+.ledger-row > b { font-size: var(--font-lg); font-weight: 600; font-variant-numeric: tabular-nums; }
+.ledger-row .grow > div:first-child { font-size: var(--font-md); }
+.ledger-row small { margin-top: 2px; display: block; }
+
+/* 日历格：再多一像素也放得下「-582.00 / +1.0万」两行 */
+.cal-cell { min-height: 62px; gap: 2px; padding-bottom: 5px; }
+.cal-cell i { line-height: 1.1; }
