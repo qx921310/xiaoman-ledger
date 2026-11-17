@@ -216,20 +216,6 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
     return assetPie.filter((r) => r.value / total >= 0.01)
   }, [assetPie, hideTiny])
 
-  /** 报表统计（一木 s28）：按月的支出/收入/结余 */
-  const monthReport = useMemo(() => {
-    const map = new Map<string, { key: string; label: string; income: number; expense: number }>()
-    for (const b of rangeBills) {
-      if (b.notIntoTotal) continue
-      const d = new Date(b.time)
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-      const cur = map.get(key) ?? { key, label: `${d.getFullYear()}年${d.getMonth() + 1}月`, income: 0, expense: 0 }
-      if (parents.find((c) => c.id === b.parentCategoryId)?.kind === 'income') cur.income = +(cur.income + b.cost).toFixed(2)
-      else cur.expense = +(cur.expense + billNetAmount(b, refunds)).toFixed(2)
-      map.set(key, cur)
-    }
-    return [...map.values()].sort((a, b) => (a.key < b.key ? 1 : -1)).slice(0, 12)
-  }, [rangeBills, parents, refunds])
 
   return (
     <section className="card">
@@ -326,23 +312,6 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
         </div>
       </div>
 
-      <div className="stats-block">
-        <div className="sb-hd"><b>报表统计</b></div>
-        <table className="stats-report-table">
-          <thead><tr><th>月份</th><th>支出</th><th>收入</th><th>结余</th></tr></thead>
-          <tbody>
-            {monthReport.map((r) => (
-              <tr key={r.key}>
-                <td>{r.label}</td>
-                <td>{money(r.expense)}</td>
-                <td>{money(r.income)}</td>
-                <td>{money(r.income - r.expense)}</td>
-              </tr>
-            ))}
-            {monthReport.length === 0 && <tr><td colSpan={4}>这个时间范围暂无收支记录</td></tr>}
-          </tbody>
-        </table>
-      </div>
 
       <div className="stats-block">
         <div className="sb-hd"><b>资产汇总</b></div>
