@@ -1682,3 +1682,9 @@ section.card:has(.my-user) .page-title { display: none; }
 
 /* 一木账户详情没有「全部/账单/转账·其他」筛选，按真机帧隐藏 */
 .acct-tabs { display: none; }
+
+/* 资产列表对齐 s26：大图标 + 大账户名 + 金额按正负着色，去掉类型副标题 */
+.asset-row .asset-badge { width: 40px; height: 40px; }
+.asset-row .grow > div:first-child .link { font-size: var(--font-md); font-weight: 500; }
+.asset-row > b { font-size: var(--font-lg); font-weight: 600; font-variant-numeric: tabular-nums; }
+.asset-sub { display: none; }

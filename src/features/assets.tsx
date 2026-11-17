@@ -307,7 +307,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch, onAd
           }}>
             <span className="asset-group-name">
               <span className="asset-badge"><AssetIcon type={Number(typeKey)} size={15} /></span>
-              {ASSET_TYPE[Number(typeKey)] ?? '其他'} ›
+              {ASSET_TYPE[Number(typeKey)] ?? '其他'} ({list.length}) ›
             </span>
             <b>{mask(list.reduce((sum, a) => sum + toBase(a.assetNumber, a.currency, currencies, defaultCurrency), 0))}</b>
           </button>
