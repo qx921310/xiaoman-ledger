@@ -1698,3 +1698,11 @@ section.card:has(.my-user) .page-title { display: none; }
 
 /* 统计：过滤占比 <1% 勾选 */
 .sb-check { display: flex; align-items: center; gap: var(--sp-2); margin-top: var(--sp-2); color: var(--muted); font-size: var(--font-xs); }
+
+/* 统计「日常」视图：隐藏时间范围与范围合计（一木日常页只有近7日/资产汇总/预算占比） */
+.stats-daily > .stats-head,
+.stats-daily > select,
+.stats-daily > .row2 > select,
+.stats-daily > .row2 > input,
+.stats-daily > .totals-3,
+.stats-daily > .hint { display: none; }

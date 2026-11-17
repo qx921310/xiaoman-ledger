@@ -37,7 +37,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
   const removeBudget = useLedger((s) => s.removeBudget)
   const removeBudgetById = useLedger((s) => s.removeBudgetById)
   const [month, setMonth] = useState(monthOf(Date.now()))
-  const [rangeMode, setRangeMode] = useState<'month' | 'week' | 'year' | 'custom'>('month')
+  const [rangeMode, setRangeMode] = useState<'daily' | 'month' | 'week' | 'year' | 'custom'>('daily')
   const [weekDay, setWeekDay] = useState(toLocalInput(Date.now()).slice(0, 10))
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
@@ -241,7 +241,7 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
 
 
   return (
-    <section className="card">
+    <section className={"card stats-page" + (rangeMode === 'daily' ? ' stats-daily' : '')}>
       {drill && (
         <StatsDetail kind="category" title={drill.title}
           bills={rangeBills.filter((b) => b.parentCategoryId === drill.catId)}
@@ -274,17 +274,17 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
       )}
 
       <div className="stats-tabs" role="tablist" aria-label="统计视图">
-        {([['month', '月统计'], ['year', '年统计'], ['custom', '自定义']] as const).map(([key, label]) => (
+        {([['daily', '日常'], ['month', '月统计'], ['year', '年统计'], ['custom', '自定义']] as const).map(([key, label]) => (
           <button key={key} type="button" role="tab"
             aria-selected={rangeMode === key}
             className={rangeMode === key ? 'on' : ''}
-            onClick={() => setRangeMode(key as 'month' | 'week' | 'year' | 'custom')}>
+            onClick={() => setRangeMode(key as 'daily' | 'month' | 'week' | 'year' | 'custom')}>
             {label}
           </button>
         ))}
       </div>
 
-      <select aria-label="统计范围" value={rangeMode} onChange={(e) => setRangeMode(e.target.value as 'month' | 'week' | 'year' | 'custom')}>
+      <select aria-label="统计范围" value={rangeMode} onChange={(e) => setRangeMode(e.target.value as 'daily' | 'month' | 'week' | 'year' | 'custom')}>
           <option value="month">按月</option>
           <option value="week">按周</option>
           <option value="year">按年</option>

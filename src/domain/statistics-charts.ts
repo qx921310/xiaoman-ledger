@@ -1,7 +1,7 @@
 import { billNetAmount } from '../bill-amount'
 import type { Bill, Category, Refund } from '../types'
 
-export type RangeMode = 'month' | 'week' | 'year' | 'custom'
+export type RangeMode = 'daily' | 'month' | 'week' | 'year' | 'custom'
 export type ChartPoint = { key: string; label: string; income: number; expense: number }
 export type CategoryPoint = { id: number; name: string; icon?: string; amount: number; count: number }
 export type Bounds = { start: Date; end: Date }
