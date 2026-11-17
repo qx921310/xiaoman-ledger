@@ -90,7 +90,7 @@ await click('日历'); await sleep(1200)
 const cellText = await ev(`(() => { const b=[...document.querySelectorAll('.cal-cell')].find(x=>{ const em=x.querySelector('em'); return em && em.textContent.trim()==='3' }); if(!b) return 'no-cell'; b.click(); return b.className })()`)
 await sleep(500)
 const calBody = await text()
-ok('日历点选日期', cellText !== 'no-cell' && calBody.includes('11月3日'), `class=${cellText} body=${calBody.slice(0, 60)}`)
+ok('日历点选日期', cellText !== 'no-cell' && calBody.includes('11月3日'), `class=${cellText} body=${calBody.slice(0, 200)}`)
 await shot('calendar')
 
 // 3. 资产：进账户详情
