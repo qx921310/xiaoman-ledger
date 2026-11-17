@@ -6,6 +6,8 @@ export interface AccountEntry {
   /** 变动金额（账户币种，正=入账） */
   delta: number
   label: string
+  /** 子分类名（一木账户流水第三行） */
+  sub?: string
   detail?: string
   kind: 'bill' | 'transfer' | 'lend' | 'refund' | 'reimbursement' | 'flow'
   balance?: number
@@ -20,6 +22,7 @@ export interface AccountHistoryInput {
   refunds: Refund[]
   reimbursements: Reimbursement[]
   parents: Category[]
+  children?: Category[]
 }
 
 /**
@@ -33,6 +36,7 @@ export function accountHistory(input: AccountHistoryInput): { entries: AccountEn
   const { asset, bills, transfers, lends, refunds, reimbursements } = input
   const kindOf = new Map(input.parents.map((p) => [p.id, p.kind]))
   const nameOf = new Map(input.parents.map((p) => [p.id, p.name]))
+  const childNameOf = new Map((input.children ?? []).map((c) => [c.id, c.name]))
   const entries: AccountEntry[] = []
 
   for (const b of bills) {
@@ -45,7 +49,8 @@ export function accountHistory(input: AccountHistoryInput): { entries: AccountEn
       delta: (income ? 1 : -1) * amount,
       // 一木账户流水行显示分类名，而不是「收入/支出」
       label: `${nameOf.get(b.parentCategoryId) ?? (income ? '收入' : '支出')}${b.remark ? ' · ' + b.remark : ''}`,
-      kind: 'bill'
+      kind: 'bill',
+      sub: childNameOf.get(b.childCategoryId ?? 0)
     })
   }
 
