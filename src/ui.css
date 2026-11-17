@@ -15,8 +15,8 @@
 :root, [data-theme='amber'] {
   /* 主题扩展位：换肤时新增一个 [data-theme='新主题'] 选择器块，覆盖同名令牌即可，不需要改组件样式。 */
   /* 暖色主题：颜色、字号和圆角统一由下方令牌提供。 */
-  --bg: #fef9f3;
-  --card: #fffdf9;
+  --bg: #fbf3e8;
+  --card: #ffffff;
   --ink: #5a3a1e;
   --muted: #8a6a50;
   --line: #f0e4d2;
@@ -86,8 +86,9 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
 
 .main { padding: var(--sp-3) 18px 40px; flex: 1; }
 .card {
-  background: var(--card); border-radius: var(--r-md); padding: var(--page-pad);
-  box-shadow: 0 1px 2px var(--shade-4), 0 8px 24px var(--shade-5);
+  background: var(--card); border-radius: var(--r-lg); padding: var(--page-pad);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-1);
 }
 .main, .card, .grow { min-width: 0; }
 .grow { overflow-wrap: anywhere; }
@@ -1598,3 +1599,15 @@ section.card:has(.my-user) .page-title { display: none; }
 .cal-amt b { font-size: var(--font-lg); font-weight: 600; font-variant-numeric: tabular-nums; }
 .cal-amt .cal-acct { color: var(--muted); font-size: var(--font-xs); }
 .cal-sub { display: inline-block; margin-top: 2px; }
+
+/* 新增账户：展开后占满整屏，像一木那样「跳转到一个页面」 */
+.new-asset[open] {
+  position: fixed; inset: 0; z-index: 40; overflow-y: auto;
+  background: var(--bg); padding: var(--page-pad); border-radius: 0; margin: 0;
+}
+.new-asset[open] > summary {
+  position: sticky; top: 0; z-index: 1; background: var(--bg);
+  text-align: left; border: 0; padding: var(--sp-2) 0 var(--sp-3);
+  font-size: var(--font-lg); font-weight: 600; color: var(--ink);
+}
+.new-asset[open] > summary::before { content: '‹ '; color: var(--accent); }
