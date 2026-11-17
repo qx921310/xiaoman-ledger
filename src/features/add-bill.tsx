@@ -12,7 +12,7 @@ import { MobilePicker } from '../ui/mobile-picker'
 import { visibleAssets } from '../domain/asset-scope'
 import { sortCategories } from '../domain/category-order'
 
-export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) => void; onClose?: () => void; onNeedAsset?: () => void }) {
+export function AddBill({ notify, onClose, onNeedAsset, initialMode }: { notify: (m: string) => void; onClose?: () => void; onNeedAsset?: () => void; initialMode?: 'expense' | 'income' | 'transfer' | 'debt' }) {
   const accountBooks = useLedger((s) => s.accountBooks)
   const curBookId = useLedger((s) => s.currentBookId)
   const setBook = useLedger((s) => s.setBook)
@@ -45,7 +45,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
   const currencies = useLedger((s) => s.currencies)
   const defaultCurrency = useLedger((s) => s.defaultCurrency)
   const [currency, setCurrency] = useState(defaultCurrency)
-  const [mode, setMode] = useState<'expense' | 'income' | 'transfer' | 'debt'>('expense')
+  const [mode, setMode] = useState<'expense' | 'income' | 'transfer' | 'debt'>(initialMode ?? 'expense')
   // 债务模式（一木 AddBillActivity 的债务 tab：借出/借入/收款/还款）
   const [debtType, setDebtType] = useState<1 | 2 | 3 | 4>(1)
   const [counterparty, setCounterparty] = useState('')
