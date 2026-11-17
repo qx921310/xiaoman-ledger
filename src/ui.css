@@ -1494,8 +1494,8 @@ textarea:focus-visible {
 .am-title::before { content: ''; width: 3px; height: 16px; border-radius: var(--r-pill); background: var(--accent); }
 .am-range { grid-column: 1; color: var(--muted); font-size: var(--font-xs); padding-left: 11px; }
 .am-right { grid-column: 2; grid-row: 1 / span 2; display: flex; align-items: center; gap: var(--sp-1); }
-.am-sum { color: var(--muted); font-size: var(--font-xs); }
-.am-state { padding: 1px 8px; border-radius: var(--r-pill); background: var(--accent-soft); color: var(--focus-ink); font-size: var(--font-xs); }
+.am-sum { color: var(--muted); font-size: var(--font-xs); white-space: nowrap; }
+.am-state { padding: 1px 8px; border-radius: var(--r-pill); background: var(--accent-soft); color: var(--focus-ink); font-size: var(--font-xs); white-space: nowrap; }
 .am-state.done { background: var(--surface-2); color: var(--muted); }
 .am-chev { color: var(--muted); font-style: normal; }
 .acct-month[open] .am-chev { transform: rotate(90deg); }

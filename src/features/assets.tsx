@@ -417,7 +417,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch, onAd
             {groups.map((g) => (
               <details key={g.key} className="acct-month" open>
                 <summary className="am-hd">
-                  <span className="am-title">{g.label}</span>
+                  <span className="am-title">{g.label}账单</span>
                   <span className="am-range">{rangeOfMonth(g.key)}</span>
                   <span className="am-right">
                     <span className="am-sum">账单 {accountMoney(Math.abs(g.net), account.currency, currencies, defaultCurrency)}</span>
@@ -433,7 +433,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch, onAd
                       <div>{e.label}</div>
                       <small>{dayOf(e.time)}{e.detail ? ' · ' + e.detail : ''}</small>
                     </div>
-                    <b className={e.delta >= 0 ? 'in' : 'out'}>{e.delta >= 0 ? '+' : '-'}{accountMoney(Math.abs(e.delta), account.currency, currencies, defaultCurrency)}</b>
+                    <b className={e.delta >= 0 ? 'in' : 'out'}>{e.delta >= 0 ? '+' : '-'}{money(Math.abs(e.delta))}</b>
                   </div>
                 ))}
               </details>
