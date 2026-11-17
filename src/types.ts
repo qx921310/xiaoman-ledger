@@ -545,6 +545,8 @@ export interface Asset {
   assetName: string
   assetType: number
   assetNumber: number
+  /** 已归档账户：不计入默认列表，收进「归档」分组（对齐一木 s26） */
+  archived?: boolean
   /** Starting balance; assetNumber is a derived local display cache. */
   openingBalance?: number
   groupName: string

@@ -235,7 +235,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch, onAd
   const stockValue = stockAssets.reduce((s, h) => s + holdingValue(h.primeNum, h.primeCost, h.price ?? h.primeCost).market, 0)
   const stockProfit = stockAssets.reduce((s, h) => s + totalProfit(h.historyIncome, holdingValue(h.primeNum, h.primeCost, h.price ?? h.primeCost).floating), 0)
   const grouped = Object.entries(
-    assets.reduce<Record<string, Asset[]>>((acc, a) => {
+    assets.filter((a) => a.hide !== true).reduce<Record<string, Asset[]>>((acc, a) => {
       const k = String(a.assetType)
       ;(acc[k] ??= []).push(a)
       return acc
@@ -749,6 +749,30 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch, onAd
       </>)}
 
       {screen === 'assets' && (<>
+      {(() => {
+        const archived = assets.filter((a) => a.hide === true)
+        if (archived.length === 0) return null
+        const total = archived.reduce((n, a) => n + toBase(Number(a.assetNumber), a.currency, currencies, defaultCurrency), 0)
+        return (
+          <details className="archive-group">
+            <summary>
+              <span className="ag-title">归档</span>
+              <span className="ag-sum">
+                {mask(total)}
+                <i className="ag-chev" aria-hidden="true">⌄</i>
+              </span>
+            </summary>
+            {archived.map((a) => (
+              <div key={a.assetId} className="row asset-row">
+                <span className="asset-badge"><AssetIcon type={a.assetType} name={a.assetName} size={16} icon={a.assetIcon} /></span>
+                <div className="grow"><div>{a.simpleName || a.assetName}</div></div>
+                <b className={a.assetNumber < 0 ? 'out' : 'in'}>{accountMoney(a.assetNumber, a.currency, currencies, defaultCurrency)}</b>
+              </div>
+            ))}
+          </details>
+        )
+      })()}
+
       <details className="fold new-asset">
         <summary>＋ 新增账户</summary>
       {/* 字段顺序照一木 AddCapitalActivity / AddCreditCardActivity */}

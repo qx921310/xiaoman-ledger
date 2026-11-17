@@ -1709,3 +1709,12 @@ section.card:has(.my-user) .page-title { display: none; }
 
 /* 统计页：查看资产分布入口（右对齐） */
 .sb-more { display: block; margin-left: auto; margin-top: var(--sp-2); }
+
+/* 资产页「归档」折叠分组（对齐 s26） */
+.archive-group { margin: var(--sp-3) 0; padding: var(--sp-2) var(--sp-3); background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); }
+.archive-group > summary { display: flex; align-items: center; justify-content: space-between; list-style: none; cursor: pointer; padding: var(--sp-2) 0; }
+.archive-group > summary::-webkit-details-marker { display: none; }
+.ag-title { color: var(--ink); font-size: var(--font-md); font-weight: 600; }
+.ag-sum { display: inline-flex; align-items: center; gap: var(--sp-2); color: var(--muted); font-variant-numeric: tabular-nums; }
+.ag-chev { font-style: normal; }
+.archive-group[open] .ag-chev { transform: rotate(180deg); }
