@@ -449,7 +449,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch, onAd
                   <div className="row">
                     <div className="grow">
                       <div>{e.label}</div>
-                      <small>{dayOf(e.time)}{e.detail ? ' · ' + e.detail : ''}</small>
+                      <small>{new Date(e.time).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}{e.detail ? ' · ' + e.detail : ''}</small>
                     </div>
                     <b className={e.delta >= 0 ? 'in' : 'out'}>{e.delta >= 0 ? '+' : '-'}{money(Math.abs(e.delta))}</b>
                   </div>

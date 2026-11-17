@@ -32,6 +32,7 @@ export interface AccountHistoryInput {
 export function accountHistory(input: AccountHistoryInput): { entries: AccountEntry[]; opening: number; closing: number } {
   const { asset, bills, transfers, lends, refunds, reimbursements } = input
   const kindOf = new Map(input.parents.map((p) => [p.id, p.kind]))
+  const nameOf = new Map(input.parents.map((p) => [p.id, p.name]))
   const entries: AccountEntry[] = []
 
   for (const b of bills) {
@@ -42,7 +43,8 @@ export function accountHistory(input: AccountHistoryInput): { entries: AccountEn
       key: 'b' + String(b.billId),
       time: b.time,
       delta: (income ? 1 : -1) * amount,
-      label: `${income ? '收入' : '支出'}${b.remark ? ' · ' + b.remark : ''}`,
+      // 一木账户流水行显示分类名，而不是「收入/支出」
+      label: `${nameOf.get(b.parentCategoryId) ?? (income ? '收入' : '支出')}${b.remark ? ' · ' + b.remark : ''}`,
       kind: 'bill'
     })
   }
