@@ -108,6 +108,26 @@ await sleep(800)
 const dataBody = await text()
 ok('我的数据子页', dataOpen && dataBody.includes('返回我的'), dataBody.slice(0, 60))
 
+
+// 8. 记账页模式切换：收入 / 转账
+await click('首页'); await sleep(800)
+await click('添加一条新记账'); await sleep(1300)
+const incomeOk = await click('收入'); await sleep(600)
+const incomeBody = await text()
+const transferOk = await click('转账'); await sleep(600)
+const transferBody = await text()
+ok('记账四模式入口', incomeOk && transferOk && transferBody.includes('转出') && transferBody.includes('转入'),
+  `income=${incomeBody.slice(0, 40)} transfer=${transferBody.slice(0, 40)}`)
+await click('‹'); await sleep(700)
+
+// 9. 我的 → 分类管理子页
+await click('我的'); await sleep(900)
+const catOpen = await ev(`(() => { const b=document.querySelector('button.my-grid-item[aria-label="分类管理"]'); if(!b) return false; b.click(); return true })()`)
+await sleep(900)
+const catBody = await text()
+ok('分类管理子页', catOpen && (catBody.includes('新增大类') || catBody.includes('新增子分类')), catBody.slice(0, 60))
+await clickC('返回我的'); await sleep(600)
+
 const pass = checks.filter((c) => c.p).length
 writeFileSync(`${OUT}/report.json`, JSON.stringify({ email: EMAIL, checks }, null, 2))
 console.log(JSON.stringify({ pass, total: checks.length, verdict: pass === checks.length ? 'PASS' : 'PARTIAL' }))
