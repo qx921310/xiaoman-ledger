@@ -41,7 +41,12 @@ const click = (s2) => ev(`(() => { const e=[...document.querySelectorAll('button
 await click('资产'); await sleep(1200)
 const opened = await click('＋ 新增账户'); await sleep(900)
 const body = await ev("document.body.innerText.replace(/\\s+/g,' ').slice(0,120)")
+// 点「私有（只有我可见）」的选择器，验证弹层能盖在全屏表单之上
+await ev(`(() => { const s=document.querySelector('select[aria-label="新账户归属"]'); if(!s) return false; s.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true})); return true })()`)
+await sleep(700)
+const sheetVisible = await ev("(() => { const m=document.querySelector('.sheet-mask'); if(!m) return false; const s=getComputedStyle(m); return s.display!=='none' && Number(s.zIndex) > 40 })()")
+const sheetText = await ev(`(() => { const m=document.querySelector('.sheet-mask'); return m ? m.textContent.replace(/\\s+/g,' ').slice(0,60) : '' })()`)
 const shot = await cdp.send('Page.captureScreenshot', { format: 'png' }, sid)
 if (shot.result?.data) writeFileSync(`${OUT}/new-asset.png`, Buffer.from(shot.result.data, 'base64'))
-console.log(JSON.stringify({ opened, body }, null, 2))
+console.log(JSON.stringify({ opened, body, sheetVisible, sheetText }, null, 2))
 chrome.kill()

@@ -8,7 +8,7 @@ import { syncNow, getVersionedConflicts, getVersionedRecovery, keepLocalConflict
 import { syncNowImmediate, getLastSyncResult, subscribeAutoSync, type AutoSyncState } from '../sync-auto'
 import { money, fullDay } from '../ui-format'
 
-const APP_VERSION = 'v0.1.0'
+
 import { HiddenPage } from './hidden-page'
 import { AiTypeManager } from './ai-type'
 import { Guide } from './guide'
@@ -1368,33 +1368,12 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         </div>)}
       </div>}
 
-      <h3>账号</h3>
       {me && <p className="hint">当前登录：{me.email}</p>}
-      {onLogout && <button className="ghost wide" onClick={() => { if (confirm('确定退出登录吗？本机数据会保留。')) onLogout() }}>退出登录</button>}
-
-      <h3>财务工具</h3>
-
-      <h3>更多</h3>
-      <div className="my-links">
-        {[
-          ['安全设置', 'gesture'],
-          ['使用指南', 'guide'], ['意见反馈', 'feedback'], ['去评分', 'evaluate'],
-          ['邀请好友', 'invite'], ['活动中心', 'activity'], ['更多应用', 'apps'],
-          ['桌面小组件', 'widget'],
-          ['手势密码', 'gesture'] as const,
-        ].map(([label, key]) => (
-          <button key={key} type="button" className="my-link" onClick={() => notify('敬请期待')}>{label}</button>
-        ))}
-      </div>
-
-      <h3>关于</h3>
-      <div className="my-about">
-        <div className="row"><span className="grow">小满记账</span><span className="muted">{APP_VERSION}</span></div>
-        <div className="row"><span className="grow">备案号</span><span className="muted">—</span></div>
-      </div>
-      <p className="hint">
-        数据存在你自己的账号下，登录后自动同步。
-      </p>
+      {onLogout && (
+        <button type="button" className="row my-row-btn" onClick={() => { if (confirm('确定退出登录吗？本机数据会保留。')) onLogout() }}>
+          <span className="grow">退出登录</span>
+        </button>
+      )}
     </section>
   )
 }

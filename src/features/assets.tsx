@@ -102,7 +102,8 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
     addAsset({
       assetName: name.trim(),
       assetType: type,
-      assetNumber: Number(num) || 0,
+      // 信贷账户输入的是「已用额度」，入账记为负余额；其他账户直接是余额
+      assetNumber: type === 2 ? -Math.abs(Number(num) || 0) : (Number(num) || 0),
       assetIcon: newIcon || undefined,
       currency: newCurrency,
       simpleName: newSimple.trim() || undefined,
@@ -700,7 +701,18 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
         <input aria-label="卡号后四位" value={newCardCode} onChange={(e) => setNewCardCode(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="卡号后四位（可选）" />
       </div>
       <div className="row2">
-        <input aria-label="新账户余额" value={num} onChange={(e) => setNum(e.target.value.replace(/[^\d.-]/g, ''))} placeholder="余额（信用卡填负数）" />
+        {type === 2 ? (
+          <>
+            <input aria-label="信用额度" value={newQuota} onChange={(e) => setNewQuota(e.target.value.replace(/[^\d.]/g, ''))} placeholder="信用额度" />
+            <input aria-label="新账户余额" value={num} onChange={(e) => setNum(e.target.value.replace(/[^\d.-]/g, ''))} placeholder="已用（正数，表示已使用额度）" />
+            <div className="row2">
+              <input aria-label="账单日" value={newInDay} onChange={(e) => setNewInDay(e.target.value.replace(/\D/g, '').slice(0, 2))} placeholder="账单日（1-28）" />
+              <input aria-label="还款日" value={newOutDay} onChange={(e) => setNewOutDay(e.target.value.replace(/\D/g, '').slice(0, 2))} placeholder="还款日（1-28）" />
+            </div>
+          </>
+        ) : (
+          <input aria-label="新账户余额" value={num} onChange={(e) => setNum(e.target.value.replace(/[^\d.-]/g, ''))} placeholder="余额" />
+        )}
         <select aria-label="新账户归属" value={newBookId} onChange={(e) => setNewBookId(e.target.value)}>
           <option value="">私有（只有我可见）</option>
           {accountBooks.filter((b) => b.bookId != null).map((b) => (
@@ -709,13 +721,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
         </select>
       </div>
 
-      {type === 2 && (
-        <div className="row2">
-          <input aria-label="信用额度" value={newQuota} onChange={(e) => setNewQuota(e.target.value.replace(/[^\d.]/g, ''))} placeholder="信用额度" />
-          <input aria-label="账单日" value={newInDay} onChange={(e) => setNewInDay(e.target.value.replace(/\D/g, '').slice(0, 2))} placeholder="账单日（1-28）" />
-          <input aria-label="还款日" value={newOutDay} onChange={(e) => setNewOutDay(e.target.value.replace(/\D/g, '').slice(0, 2))} placeholder="还款日（1-28）" />
-        </div>
-      )}
+
 
       <div className="label">账户图标</div>
       <button type="button" className="icon-pick" onClick={() => setPickerOpen(true)}>
