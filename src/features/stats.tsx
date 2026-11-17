@@ -96,6 +96,27 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
     return { out: +out.toFixed(2), inc: +inc.toFixed(2), net: +(inc - out).toFixed(2), avg: +(out / 7).toFixed(2) }
   }, [bills, parents, refunds])
 
+  // 近 7 日逐日支出（对齐一木柱状图）
+  const weekBars = useMemo(() => {
+    const days: Array<{ label: string; out: number }> = []
+    const today = new Date()
+    for (let i = 6; i >= 0; i -= 1) {
+      const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i)
+      const from = d.getTime()
+      const to = from + 86400000
+      let out = 0
+      for (const b of bills) {
+        if (b.time < from || b.time >= to) continue
+        if (b.notIntoTotal) continue
+        if (parents.find((p) => p.id === b.parentCategoryId)?.kind === 'income') continue
+        out += billNetAmount(b, refunds)
+      }
+      const label = i === 0 ? '今天' : ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][d.getDay()]
+      days.push({ label, out: +out.toFixed(2) })
+    }
+    return days
+  }, [bills, parents, refunds])
+
   const daySeries = useMemo(() => {
     const map = new Map<string, number>()
     for (const b of monthBills) {
@@ -274,13 +295,26 @@ export function Stats({ notify }: { notify?: (m: string) => void } = {}) {
       {/* 近 7 日统计（真机首块） */}
       <div className="week-card">
         <div className="wc-hd"><b>近7日统计</b><span className="muted">支出 · 收入</span></div>
-        <div className="wc-row">
-          <div className="wc-item"><small>支出</small><b className="out">{money(weekStats.out)}</b></div>
-          <div className="wc-item"><small>收入</small><b className="in">{money(weekStats.inc)}</b></div>
+        <div className="week-bars" role="img" aria-label="近7日支出柱状图">
+          {weekBars.map((d) => {
+            const max = Math.max(...weekBars.map((x) => x.out), 1)
+            const h = Math.round((d.out / max) * 100)
+            return (
+              <div key={d.label} className="wb">
+                <span className="wb-val">{d.out > 0 ? money(d.out).replace('¥', '') : ''}</span>
+                <span className="wb-bar" style={{ height: `${Math.max(h, 2)}%` }} />
+                <span className="wb-day">{d.label}</span>
+              </div>
+            )
+          })}
         </div>
         <div className="wc-row">
-          <div className="wc-item"><small>结余</small><b>{money(weekStats.net)}</b></div>
+          <div className="wc-item"><small>总支出</small><b className="out">{money(weekStats.out)}</b></div>
           <div className="wc-item"><small>日均支出</small><b>{money(weekStats.avg)}</b></div>
+        </div>
+        <div className="wc-row">
+          <div className="wc-item"><small>总收入</small><b className="in">{money(weekStats.inc)}</b></div>
+          <div className="wc-item"><small>日均收入</small><b>{money(+(weekStats.inc / 7).toFixed(2))}</b></div>
         </div>
       </div>
 
