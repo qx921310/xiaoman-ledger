@@ -427,15 +427,35 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch, onAd
                     <i className="am-chev" aria-hidden="true">›</i>
                   </span>
                 </summary>
-                {g.rows.map((e) => (
-                  <div key={e.key} className="row">
+                {g.rows.map((e, idx) => {
+                  const d = new Date(e.time)
+                  const dayKey = `${d.getMonth() + 1}-${d.getDate()}`
+                  const prev = idx > 0 ? new Date(g.rows[idx - 1].time) : null
+                  const newDay = !prev || prev.getDate() !== d.getDate() || prev.getMonth() !== d.getMonth()
+                  const dayRows = g.rows.filter((x) => {
+                    const xd = new Date(x.time)
+                    return xd.getDate() === d.getDate() && xd.getMonth() === d.getMonth()
+                  })
+                  const dayInc = dayRows.filter((x) => x.delta > 0).reduce((n, x) => n + x.delta, 0)
+                  const dayExp = dayRows.filter((x) => x.delta < 0).reduce((n, x) => n + Math.abs(x.delta), 0)
+                  return (
+                  <div key={e.key} className="am-entry">
+                  {newDay && (
+                    <div className="am-daybar" key={'d' + dayKey}>
+                      <span>{d.getMonth() + 1}月{d.getDate()}日 {['周日','周一','周二','周三','周四','周五','周六'][d.getDay()]}</span>
+                      <span>收 {money(dayInc)} 支 {money(dayExp)}</span>
+                    </div>
+                  )}
+                  <div className="row">
                     <div className="grow">
                       <div>{e.label}</div>
                       <small>{dayOf(e.time)}{e.detail ? ' · ' + e.detail : ''}</small>
                     </div>
                     <b className={e.delta >= 0 ? 'in' : 'out'}>{e.delta >= 0 ? '+' : '-'}{money(Math.abs(e.delta))}</b>
                   </div>
-                ))}
+                  </div>
+                  )
+                })}
               </details>
             ))}
 
