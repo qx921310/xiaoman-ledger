@@ -1638,3 +1638,7 @@ section.card:has(.my-user) .page-title { display: none; }
   padding: var(--sp-2) var(--sp-3); margin-bottom: var(--sp-3); }
 .group > .day:first-child { margin-top: 0; }
 .group .ledger-row:last-child { border-bottom: 0; }
+
+/* 账户详情 hero 属性区：两列两行（额度/剩余额度/出账日/还款日） */
+.acct-props { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-1) var(--sp-4); margin-top: var(--sp-2); font-size: var(--font-sm); opacity: .95; }
+.acct-prop-line { font-size: var(--font-sm); opacity: .9; }

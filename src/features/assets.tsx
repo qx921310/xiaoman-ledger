@@ -367,11 +367,18 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch }: {
             </div>
 
             <div className="acct-hero">
-              <small>账户余额</small>
-              <b className={account.assetNumber < 0 ? 'out' : ''}>
-                {accountMoney(account.assetNumber, account.currency, currencies, defaultCurrency)}
-              </b>
-              <span className="muted">期初 {accountMoney(opening, account.currency, currencies, defaultCurrency)} · 共 {filtered.length} 笔</span>
+              <small>{account.assetType === 2 ? '剩余欠款' : '账户余额'}</small>
+              <b>{accountMoney(account.assetNumber, account.currency, currencies, defaultCurrency)}</b>
+              {account.assetType === 2 ? (
+                <div className="acct-props">
+                  <span>总额度：{account.totalQuota ? accountMoney(account.totalQuota, account.currency, currencies, defaultCurrency) : '未设置'}</span>
+                  <span>剩余额度：{account.totalQuota ? accountMoney(account.totalQuota + account.assetNumber, account.currency, currencies, defaultCurrency) : '未设置'}</span>
+                  <span>出账日：{account.inAccountDate ? `${account.inAccountDate} 号` : '未设置'}</span>
+                  <span>还款日：{account.outAccountDate ? `${account.outAccountDate} 号` : '未设置'}</span>
+                </div>
+              ) : (
+                <span className="acct-prop-line">期初 {accountMoney(opening, account.currency, currencies, defaultCurrency)} · 共 {filtered.length} 笔</span>
+              )}
             </div>
 
             <div className="seg acct-tabs">
