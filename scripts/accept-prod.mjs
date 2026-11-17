@@ -72,6 +72,12 @@ const out = {}
 for (const [name, tab] of steps) {
   if (tab) { const ok = await clickText(tab); await sleep(1200); out[`${name}_clicked`] = ok }
   out[name] = await text()
+  if (name === 'me') {
+    await ev(`(() => { const h=[...document.querySelectorAll('h3')].find(x=>x.textContent.includes('数据管理')); if (h) h.scrollIntoView({ block: 'start' }); return true })()`)
+    await sleep(600)
+    const r = await cdp.send('Page.captureScreenshot', { format: 'png' }, sid)
+    if (r.result?.data) writeFileSync(`${OUT}/me-lower.png`, Buffer.from(r.result.data, 'base64'))
+  }
   await shot(name)
 }
 console.log(JSON.stringify(out, null, 2))

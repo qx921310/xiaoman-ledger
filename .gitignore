@@ -81,3 +81,6 @@ server/.env
 
 # 余额验收产物
 .bal/
+
+# 验收截图
+.shots-me/

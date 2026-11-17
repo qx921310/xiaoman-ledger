@@ -1,5 +1,4 @@
 import { clearAllBookPatches } from './book-pending'
-import { SelectSheet } from '../ui/select-sheet'
 import { useEffect, useMemo, useState } from 'react'
 import { useLedger } from '../store'
 import type { Cycle } from '../types'
@@ -104,6 +103,40 @@ function describeCycle(c: Cycle): string {
 
 
 
+
+const ME_ICON_PATHS: Record<string, string> = {
+  auto: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM12 3v2M12 19v2M5 12H3M21 12h-2M6.3 6.3 4.9 4.9M19.1 19.1l-1.4-1.4M6.3 17.7 4.9 19.1M19.1 4.9l-1.4 1.4',
+  cycle: 'M20 12a8 8 0 1 1-2.3-5.7M20 4v4h-4',
+  dream: 'M6 4h12v16l-6-4-6 4Z',
+  ai: 'M4 5h16v11H9l-5 4V5Z',
+  book: 'M5 4h9a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4ZM17 7h2v13',
+  tag: 'M4 11V5h6l9 9-6 6-9-9ZM8 8h.01',
+  cat: 'M8 6.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3ZM16 6.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3ZM8 14.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3ZM16 14.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z',
+  more: 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM12 2.8a1.6 1.6 0 0 1 1.6 1.6c0 .3.2.6.4.7.3.1.6.1.8 0a1.6 1.6 0 1 1 1.7 2.5c-.2.1-.3.5-.3.8s.1.6.3.8a1.6 1.6 0 1 1-1.7 2.5c-.3-.1-.6-.1-.8 0-.3.1-.4.4-.4.7a1.6 1.6 0 1 1-3.2 0c0-.3-.1-.6-.4-.7-.2-.1-.5-.1-.8 0a1.6 1.6 0 1 1-1.7-2.5c.2-.2.3-.5.3-.8s-.1-.7-.3-.8A1.6 1.6 0 1 1 9.2 5c.3.1.6.1.8 0 .3-.1.4-.4.4-.7A1.6 1.6 0 0 1 12 2.8Z',
+  cloud: 'M7 18a4 4 0 0 1 .4-8 5 5 0 0 1 9.6 1.2A3.5 3.5 0 0 1 17 18H7Z',
+  backup: 'M4 8 12 4l8 4-8 4-8-4ZM4 8v8l8 4 8-4V8M12 12v8',
+  io: 'M12 4v10M12 14l3-3M12 14l-3-3M5 18h14',
+  image: 'M4 6h16v12H4ZM4 15l4-4 4 4 3-3 5 5',
+  tools: 'M5 4h14v16H5ZM8 8h2M14 8h2M8 12h2M14 12h2M8 16h8',
+  theme: 'M12 3a9 9 0 1 0 0 18c1.7 0 2-1 1.2-1.8-.9-.9-.3-2.2 1-2.2H18a4 4 0 0 0 4-4 9 9 0 0 0-10-10ZM8 9h.01M12 6h.01M16 9h.01',
+  apps: 'M4 4h6v6H4ZM14 4h6v6h-6ZM4 14h6v6H4ZM14 14h6v6h-6Z',
+  widget: 'M4 5h16v6H4ZM4 14h7v5H4ZM14 14h7v5h-7Z',
+  guide: 'M4 6a2 2 0 0 1 2-2h5v16H6a2 2 0 0 1-2-2ZM20 6a2 2 0 0 0-2-2h-5v16h5a2 2 0 0 0 2-2Z',
+  invite: 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM3 20a6 6 0 0 1 12 0M18 8v6M15 11h6',
+  about: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 11v6M12 7h.01',
+  feedback: 'M4 5h16v11H9l-5 4V5ZM8 9h8M8 12h5',
+}
+
+/** 我的页图标：统一 1.7 描边，与一木的线性图标风格一致 */
+function MeIcon({ name, size = 26 }: { name: string; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={ME_ICON_PATHS[name] ?? ME_ICON_PATHS.more} />
+    </svg>
+  )
+}
+
 export function Settings({ notify, me, onLogout }: { notify: (m: string) => void; me?: { id: number; email: string }; onLogout?: () => void }) {
   const seed = useLedger((s) => s.seed)
   const reset = useLedger((s) => s.reset)
@@ -207,9 +240,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [newTag, setNewTag] = useState('')
   const [addingTag, setAddingTag] = useState(false)
   const [newTagParent, setNewTagParent] = useState('')
-  const setBook = useLedger((s) => s.setBook)
   const updateBookMeta = useLedger((s) => s.updateBookMeta)
-  const currentBook = accountBooks.find((b) => b.bookId && String(b.bookId) === String(currentBookId))
   const lastSync = useLedger((s) => s.lastSync)
   const runSync = async () => {
     setSyncing(true)
@@ -392,7 +423,8 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         </span>
         <span className="grow">
           <b>{profile.nick || me?.email?.split('@')[0] || '我'}</b>
-          <span className="muted">坚持记账的第 {streak} 天 · 已记录 {bills.length} 条账单</span>
+          <span className="muted">坚持记账的第 {streak} 天</span>
+          <span className="muted">已记录 {bills.length} 条账单</span>
         </span>
       </button>
 
@@ -404,11 +436,6 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         <button type="button" className="vip-open" onClick={() => notify('敬请期待：会员功能')}>去开通</button>
       </div>
 
-      {/^尚未同步|从未/.test(syncLine) && (
-        <button type="button" className="my-backup-warn" onClick={() => { setMeScreen('data'); window.scrollTo({ top: 0 }) }}>
-          未开启任何备份方式，卸载后数据将丢失，点击查看备份状态
-        </button>
-      )}
 
       {(pull.progress > 0 || pull.busy) && !hiddenOpen && (
         <div className="pull-tip" role="status" aria-live="polite">
@@ -462,14 +489,6 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       )}
 
 
-      <div className="me-book">
-        <label className="label" htmlFor="me-book-switch">当前账本</label>
-        <SelectSheet ariaLabel="当前账本" value={String(currentBookId)}
-          options={accountBooks.filter((b) => b.bookId != null && !b.hidden)
-            .map((b) => ({ value: String(b.bookId), label: b.accountBookName }))}
-          onChange={(v) => setBook(v === '0' ? 0 : v)} />
-        <small className="muted">{currentBook?.hidden ? '已隐藏' : '仅自己可见'}</small>
-      </div>
 
       <div className="me-sync">
         {autoSync?.running ? '同步中…'
@@ -568,41 +587,47 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
             if (key === 'ai') { setAiTypeOpen(true); return }
             if (key === 'auto') { notify('自动记账需要 Android 通知/短信权限，网页版暂不支持'); return }
             notify('敬请期待')
-          }}>{label}</button>
+          }}>
+            <span className="me-ico"><MeIcon name={key === 'more' ? 'more' : key} /></span>
+            <span className="me-label">{label}</span>
+          </button>
         ))}
       </div>
 
       <h3>数据管理</h3>
       <div className="my-data">
-        <div className="row"><span className="grow">云同步</span><span className="muted">{syncLine}</span></div>
+        <div className="row"><span className="me-ico"><MeIcon name="cloud" size={22} /></span><span className="grow">云同步</span><span className="muted">{syncLine}</span></div>
         <button type="button" className="row my-row-btn" onClick={() => { setMeScreen('data'); window.scrollTo({ top: 0 }) }}>
-          <span className="grow">数据备份</span><span className="muted">JSON</span>
+          <span className="me-ico"><MeIcon name="backup" size={22} /></span><span className="grow">数据备份</span><span className="muted">JSON</span>
         </button>
         <button type="button" className="row my-row-btn" onClick={() => { setMeScreen('data'); window.scrollTo({ top: 0 }) }}>
-          <span className="grow">导入导出</span><span className="muted">Excel / CSV</span>
+          <span className="me-ico"><MeIcon name="io" size={22} /></span><span className="grow">导入导出</span><span className="muted">Excel / CSV</span>
         </button>
         <button type="button" className="row my-row-btn" onClick={() => { setMeScreen('currency'); window.scrollTo({ top: 0 }) }}>
-          <span className="grow">币种与汇率</span><span className="muted">{currencies.length} 种</span>
+          <span className="me-ico"><MeIcon name="theme" size={22} /></span><span className="grow">币种与汇率</span><span className="muted">{currencies.length} 种</span>
         </button>
         <button type="button" className="row my-row-btn" onClick={() => setFilesOpen(true)}>
-          <span className="grow">账单图片</span><span className="muted">{bills.filter((b) => (b.files?.length ?? 0) > 0).length} 笔</span>
+          <span className="me-ico"><MeIcon name="image" size={22} /></span><span className="grow">账单图片</span><span className="muted">{bills.filter((b) => (b.files?.length ?? 0) > 0).length} 笔</span>
         </button>
       </div>
 
       <h3>其他</h3>
-      <div className="my-grid">
+      <div className="my-data">
         {([
-          ['实用工具', 'tools'], ['主题外观', 'theme'], ['更多活动', 'activity'],
-          ['更多一木应用', 'apps'], ['桌面小部件', 'widget'], ['使用手册', 'guide'],
-          ['邀请好友', 'invite'], ['关于我们', 'about'], ['意见反馈', 'feedback'],
-        ] as Array<[string, string]>).map(([label, key]) => (
-          <button key={key} type="button" className="my-grid-item" aria-label={label} onClick={() => {
+          ['实用工具', 'tools', 'tools'], ['主题外观', 'theme', 'theme'], ['更多活动', 'activity', 'apps'],
+          ['更多一木应用', 'apps', 'apps'], ['桌面小部件', 'widget', 'widget'], ['使用手册', 'guide', 'guide'],
+          ['邀请好友', 'invite', 'invite'], ['关于我们', 'about', 'about'], ['意见反馈', 'feedback', 'feedback'],
+        ] as Array<[string, string, string]>).map(([label, key, icon]) => (
+          <button key={key} type="button" className="row my-row-btn" aria-label={label} onClick={() => {
             if (key === 'tools') { document.getElementById('sec-tools')?.scrollIntoView({ behavior: 'smooth' }); return }
             if (key === 'theme') { notify('敬请期待：主题外观'); return }
             if (key === 'guide') { setGuideOpen(true); return }
             if (key === 'about') { setAboutOpen(true); return }
             notify('敬请期待')
-          }}>{label}</button>
+          }}>
+            <span className="me-ico"><MeIcon name={icon} size={22} /></span>
+            <span className="grow">{label}</span>
+          </button>
         ))}
       </div>
       </>)}
