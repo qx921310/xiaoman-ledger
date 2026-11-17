@@ -203,11 +203,6 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
           <div><small>支出</small><b className="out">{money(monthTotals.expense)}</b></div>
           <div><small>收入</small><b className="in">{money(monthTotals.income)}</b></div>
         </div>
-        <div className="cal-actions">
-          <button type="button" className="cal-today" onClick={() => { const t = new Date(); setCursor(t); setPicked(fullDay(t.getTime())) }}>今天</button>
-          <button type="button" className="cal-today" aria-label="更多" onClick={() => setMenuOpen(true)}>⋯</button>
-          {onAddBill && <button type="button" className="cal-add" onClick={onAddBill}>记一笔</button>}
-        </div>
       </div>
         {bookPickOpen && (
         <div className="menu-mask" onClick={() => setBookPickOpen(false)}>
