@@ -30,6 +30,16 @@ function iconLabel(key: string): string {
   return ''
 }
 
+
+/** 月份键 → 账单周期文本（对齐一木「2026.10.01-2026.10.31」） */
+function rangeOfMonth(key: string): string {
+  const [y, m] = key.split('-').map(Number)
+  if (!y || !m) return ''
+  const last = new Date(y, m, 0).getDate()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${y}.${pad(m)}.01-${y}.${pad(m)}.${last}`
+}
+
 export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch, onAdd }: {
   notify: (m: string) => void
   onOpenSettings?: () => void
@@ -402,11 +412,18 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch, onAd
 
             {groups.length === 0 && <p className="hint">这个账户还没有流水。</p>}
             {groups.map((g) => (
-              <div key={g.key} className="acct-month">
-                <div className="am-hd">
-                  <span>{g.label}</span>
-                  <b className={g.net >= 0 ? 'in' : 'out'}>{g.net >= 0 ? '+' : '-'}{accountMoney(Math.abs(g.net), account.currency, currencies, defaultCurrency)}</b>
-                </div>
+              <details key={g.key} className="acct-month" open>
+                <summary className="am-hd">
+                  <span className="am-title">{g.label}</span>
+                  <span className="am-range">{rangeOfMonth(g.key)}</span>
+                  <span className="am-right">
+                    <span className="am-sum">账单 {accountMoney(Math.abs(g.net), account.currency, currencies, defaultCurrency)}</span>
+                    <span className={'am-state' + (Math.abs(g.net) > 0 ? '' : ' done')}>
+                      {Math.abs(g.net) > 0 ? '本期' : '已还清'}
+                    </span>
+                    <i className="am-chev" aria-hidden="true">›</i>
+                  </span>
+                </summary>
                 {g.rows.map((e) => (
                   <div key={e.key} className="row">
                     <div className="grow">
@@ -416,7 +433,7 @@ export function Assets({ notify, onOpenSettings, onOpenStats, onOpenSearch, onAd
                     <b className={e.delta >= 0 ? 'in' : 'out'}>{e.delta >= 0 ? '+' : '-'}{accountMoney(Math.abs(e.delta), account.currency, currencies, defaultCurrency)}</b>
                   </div>
                 ))}
-              </div>
+              </details>
             ))}
 
             <div className="modal-btns">

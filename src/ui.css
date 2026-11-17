@@ -1480,8 +1480,25 @@ textarea:focus-visible {
 .acct-hero small, .acct-hero span, .acct-hero div { color: var(--on-accent); }
 .acct-hero b { font-size: var(--font-display); font-weight: 600; color: var(--on-accent); font-variant-numeric: tabular-nums; }
 .acct-tabs { margin: 6px 0 10px; }
-.acct-month { margin-top: 10px; }
-.acct-month .am-hd { display: flex; justify-content: space-between; padding: 6px 2px; color: var(--muted); font-size: var(--font-xs); }
+.acct-month {
+  margin: var(--sp-3) 0; padding: var(--sp-3) var(--sp-3) var(--sp-1);
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg);
+}
+.acct-month > summary { list-style: none; cursor: pointer; }
+.acct-month > summary::-webkit-details-marker { display: none; }
+.acct-month .am-hd {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px var(--sp-2);
+  align-items: center; padding: 0 0 var(--sp-2);
+}
+.am-title { display: flex; align-items: center; gap: var(--sp-2); color: var(--ink); font-size: var(--font-md); font-weight: 600; }
+.am-title::before { content: ''; width: 3px; height: 16px; border-radius: var(--r-pill); background: var(--accent); }
+.am-range { grid-column: 1; color: var(--muted); font-size: var(--font-xs); padding-left: 11px; }
+.am-right { grid-column: 2; grid-row: 1 / span 2; display: flex; align-items: center; gap: var(--sp-1); }
+.am-sum { color: var(--muted); font-size: var(--font-xs); }
+.am-state { padding: 1px 8px; border-radius: var(--r-pill); background: var(--accent-soft); color: var(--focus-ink); font-size: var(--font-xs); }
+.am-state.done { background: var(--surface-2); color: var(--muted); }
+.am-chev { color: var(--muted); font-style: normal; }
+.acct-month[open] .am-chev { transform: rotate(90deg); }
 
 /* 记账页：账户币种 / 统计币种 两行（一木 p11） */
 .entry-dual { display: flex; gap: var(--sp-3); padding: 6px 2px; }
