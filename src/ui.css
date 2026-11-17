@@ -604,12 +604,19 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: var(--sp-1); }
 .cal-weekdays span { text-align: center; font-size: var(--font-xs); color: var(--muted); padding: var(--sp-1) 0; }
 .cal-cell {
-  min-height: 52px; padding: var(--sp-1) 2px; border: 1px solid var(--line); border-radius: var(--r-sm);
-  background: var(--card); display: flex; flex-direction: column; align-items: center; gap: 1px;
-  font-size: var(--font-xs); cursor: pointer; overflow: hidden;
+  min-height: 74px; padding: var(--sp-2) 2px; border: 0; border-radius: var(--r-md);
+  background: transparent; display: flex; flex-direction: column; align-items: center; gap: 1px;
+  font-size: var(--font-xs); cursor: pointer; overflow: visible;
 }
-.cal-cell.empty { border: 0; background: transparent; cursor: default; }
-.cal-cell.on { border-color: var(--accent); background: var(--accent-soft); }
+.cal-cell.empty { background: transparent; cursor: default; }
+.cal-cell em { font-style: normal; color: var(--ink); font-size: var(--font-lg); font-weight: 500; line-height: 1.15; }
+.cal-cell i { font-style: normal; font-size: var(--font-xs); white-space: nowrap; line-height: 1.15; }
+.cal-cell .out { color: var(--out); }
+.cal-cell .in { color: var(--in); }
+.cal-cell .cal-lunar { color: var(--muted); }
+.cal-cell.on { background: var(--accent); }
+.cal-cell.on em, .cal-cell.on i, .cal-cell.on .cal-lunar { color: var(--on-accent); }
+.cal-cell.has em { font-size: var(--font-lg); }
 .cal-cell em { font-style: normal; color: var(--ink); }
 .cal-cell i { font-style: normal; font-size: var(--font-xs); white-space: nowrap; }
 .cal-list { margin-top: 14px; }
@@ -800,10 +807,11 @@ button.asset-net-value { font-size: var(--font-display); line-height: 1.1; font-
 /* 日历页工具栏：一木 tool_bar 的月收入/月支出/月结余 + 返回今天/记一笔 */
 .cal-toolbar { display: grid; gap: var(--sp-2); padding-bottom: var(--sp-2); border-bottom: 1px solid var(--line); }
 .cal-title { display: flex; align-items: center; justify-content: center; gap: var(--sp-2); }
-.cal-totals { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-2); }
-.cal-totals > div { display: grid; gap: 1px; }
+.cal-totals { display: flex; align-items: baseline; gap: var(--sp-3); }
+.cal-totals > div { display: flex; align-items: baseline; gap: 2px; }
 .cal-totals small { color: var(--muted); font-size: var(--font-xs); }
-.cal-totals b { font-size: var(--font-md); }
+.cal-totals b { font-size: var(--font-sm); font-variant-numeric: tabular-nums; }
+.cal-cell em.today { color: var(--focus-ink); }
 .cal-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 6px; }
 .cal-today, .cal-add {
   flex: 0 0 auto; white-space: nowrap; cursor: pointer;

@@ -56,7 +56,8 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
 
   const year = cursor.getFullYear()
   const monthIdx = cursor.getMonth()
-  const firstWeekday = new Date(year, monthIdx, 1).getDay()
+  // 一木日历以「周一」为第一天
+  const firstWeekday = (new Date(year, monthIdx, 1).getDay() + 6) % 7
   const daysInMonth = new Date(year, monthIdx + 1, 0).getDate()
   const cells: (number | null)[] = [
     ...Array.from({ length: firstWeekday }, () => null),
@@ -200,8 +201,9 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
           <button className="ghost" aria-label="下个月" onClick={() => setCursor(new Date(year, monthIdx + 1, 1))}>›</button>
         </div>
         <div className="cal-totals">
-          <div><small>支出</small><b className="out">{money(monthTotals.expense)}</b></div>
-          <div><small>收入</small><b className="in">{money(monthTotals.income)}</b></div>
+          <div><small>收</small><b className="in">{money(monthTotals.income)}</b></div>
+          <div><small>支</small><b className="out">{money(monthTotals.expense)}</b></div>
+          <div><small>余</small><b>{money(monthTotals.income - monthTotals.expense)}</b></div>
         </div>
       </div>
         {bookPickOpen && (
@@ -260,7 +262,7 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
       )}
 
       <div className="cal-grid cal-weekdays">
-        {['日', '一', '二', '三', '四', '五', '六'].map((w) => <span key={w}>{w}</span>)}
+        {['一', '二', '三', '四', '五', '六', '日'].map((w) => <span key={w}>{w}</span>)}
       </div>
       {mode === 'week' ? (
       <div className="cal-grid">
@@ -271,7 +273,7 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
               <button key={key} className={'cal-cell' + (picked === key ? ' on' : '')}
               style={heat ? { background: heatStyle(stat) } : undefined}
                 onClick={() => setPicked(key)} aria-label={`${date.getMonth() + 1}月${date.getDate()}日`}>
-                <em>{key === todayKey ? '今' : date.getDate()}</em>
+                <em className={key === todayKey ? 'today' : undefined}>{date.getDate()}</em>
                 {showLunar && <i className="cal-lunar">{lunarOfDate(date)}</i>}
                 {stat.expense ? <i className="out">{'-'}{cellAmount(stat.expense)}</i> : null}
                 {stat.income ? <i className="in">+{cellAmount(stat.income)}</i> : null}
@@ -286,13 +288,16 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
           if (day == null) return <span key={'e' + i} className="cal-cell empty" />
           const stat = daily.get(keyOf(day))
           return (
-            <button key={day} className={'cal-cell' + (picked === keyOf(day) ? ' on' : '')}
+            <button key={day} className={'cal-cell' + (picked === keyOf(day) ? ' on' : '') + (stat ? ' has' : '')}
               style={heat ? { background: heatStyle(daily.get(keyOf(day))) } : undefined}
               onClick={() => setPicked(keyOf(day))} aria-label={`${monthIdx + 1}月${day}日`}>
-              <em>{isToday(day) ? '今' : day}</em>
-              {showLunar && <i className="cal-lunar">{lunarOf(day)}</i>}
-              {showAmount && stat?.expense ? <i className="out">{'-'}{cellAmount(stat.expense)}</i> : null}
-              {showAmount && stat?.income ? <i className="in">+{cellAmount(stat.income)}</i> : null}
+              <em className={isToday(day) ? 'today' : undefined}>{day}</em>
+              {stat ? (
+                <>
+                  <i className="out">-{cellAmount(stat.expense || 0)}</i>
+                  <i className="in">+{cellAmount(stat.income || 0)}</i>
+                </>
+              ) : (showLunar && <i className="cal-lunar">{lunarOf(day)}</i>)}
             </button>
           )
         })}
