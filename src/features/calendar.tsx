@@ -305,6 +305,24 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
       </div>
       )}
 
+      {picked && (() => {
+        const g = monthDayGroups.find((x) => x.key === picked)
+        const exp = g?.expense ?? 0
+        const inc = g?.income ?? 0
+        const dayNum = Number(picked.slice(8, 10))
+        return (
+          <div className="cal-daysum">
+            <span className="cd-date">
+              {picked === todayKey ? '今天' : `${Number(picked.slice(5, 7))}月${dayNum}日`}
+              <small>{g?.lunar ?? lunarOf(dayNum)}</small>
+            </span>
+            <span className="cd-nums">
+              收 <b className="in">{money(inc)}</b> 支 <b className="out">{money(exp)}</b> 余 <b>{money(inc - exp)}</b>
+            </span>
+          </div>
+        )
+      })()}
+
       {monthDayGroups.length > 0 && (
         <div className="cal-list">
           {monthDayGroups.filter((g) => !picked || g.key === picked).map((g) => (

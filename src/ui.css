@@ -1616,3 +1616,13 @@ section.card:has(.my-user) .page-title { display: none; }
 .asset-group-name { display: inline-flex; align-items: center; gap: var(--sp-2); }
 .asset-group-name .asset-badge { background: var(--accent-soft); color: var(--focus-ink); }
 .asset-sub { color: var(--muted); font-size: var(--font-xs); }
+
+/* 日历：选中日汇总行（今天/日期 + 农历 + 收/支/余），当天无账也显示 */
+.cal-daysum {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-1) var(--sp-2); margin-top: var(--sp-3);
+  border-top: 1px solid var(--line); color: var(--muted); font-size: var(--font-sm);
+}
+.cd-date { color: var(--ink); font-weight: 500; display: inline-flex; align-items: baseline; gap: var(--sp-1); }
+.cd-date small { color: var(--muted); font-size: var(--font-xs); font-weight: 400; }
+.cd-nums b { font-variant-numeric: tabular-nums; }
