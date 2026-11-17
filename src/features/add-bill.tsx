@@ -178,6 +178,10 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
     }
     return null
   }
+  // 一木在账户旁常驻「余额不足 / 额度不足」提示，保存仍可继续
+  const liveAmount = evaluateAmount(cost) || 0
+  const needsOutflow = mode === 'expense' || mode === 'transfer' || (mode === 'debt' && (debtType === 1 || debtType === 4))
+  const balanceWarn = needsOutflow && liveAmount > 0 ? checkBalance(aid, liveAmount) : null
 
   const submit = (): boolean => {
     const fail = (message: string) => { notify(message); return false }
@@ -225,7 +229,7 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
       const fromCurrency = assets.find((a) => a.assetId === aid)?.currency
       if (f > 0 && !hasCurrencyRate(fromCurrency, currencies, defaultCurrency)) return fail(`请先设置 ${fromCurrency} 汇率`)
       const shortTransfer = checkBalance(aid, v + (f || 0))
-      if (shortTransfer) return fail(shortTransfer)
+      if (shortTransfer) notify(shortTransfer)
       return guard(() => {
         addTransfer({
           toCost: tc > 0 ? tc : undefined,
@@ -250,7 +254,8 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
     const foreign = currency !== defaultCurrency
     if (mode !== 'income') {
       const shortage = checkBalance(aid, foreign ? toBase(v, currency, currencies, defaultCurrency) : v)
-      if (shortage) return fail(shortage)
+      // 一木：余额不足只是提示，不阻断保存
+      if (shortage) notify(shortage)
     }
     if (!guard(() => {
       const created = addBill({
@@ -410,6 +415,8 @@ export function AddBill({ notify, onClose, onNeedAsset }: { notify: (m: string) 
               <em>{currencySymbol(currencies, displayCurrency, defaultCurrency)}</em>{cost === '' ? '0.00' : formatAmount(cost)}
             </span>
           </div>
+
+          {balanceWarn && <p className="hint warn entry-balance-warn" role="status">{balanceWarn}，仍可记账</p>}
 
           <div className="entry-line-b">
             <button type="button" className="chip" onClick={() => setDateOpen(true)}>
