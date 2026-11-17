@@ -128,6 +128,14 @@ const catBody = await text()
 ok('分类管理子页', catOpen && (catBody.includes('新增大类') || catBody.includes('新增子分类')), catBody.slice(0, 60))
 await clickC('返回我的'); await sleep(600)
 
+
+// 10. 统计自定义区间：出现起止日期输入
+await click('统计'); await sleep(900)
+const customOk = await click('自定义'); await sleep(800)
+const customBody = await text()
+const dateInputs = await ev(`[...document.querySelectorAll('input[type="date"]')].map(i=>i.getAttribute('aria-label')||'').join('|')`)
+ok('统计自定义区间', customOk && dateInputs.includes('统计开始日期'), `inputs=${dateInputs}`)
+
 const pass = checks.filter((c) => c.p).length
 writeFileSync(`${OUT}/report.json`, JSON.stringify({ email: EMAIL, checks }, null, 2))
 console.log(JSON.stringify({ pass, total: checks.length, verdict: pass === checks.length ? 'PASS' : 'PARTIAL' }))
