@@ -759,9 +759,12 @@ export const useLedger = create<LedgerState>()(
             bookId: s.currentBookId === 0 ? undefined : s.currentBookId }, ...s.aiTypeRules]
         }
       }),
-      updateAiTypeRule: (ruleId, patch) => set((s) => ({
+      updateAiTypeRule: (ruleId, patch) => {
+        if (!bookWritable((get().aiTypeRules.find((x) => x.ruleId === ruleId) as { bookId?: string | number } | undefined)?.bookId ?? get().currentBookId, get().accountBooks)) return
+        set((s) => ({
         aiTypeRules: s.aiTypeRules.map((r) => r.ruleId === ruleId ? { ...r, ...patch, updateTime: NOW() } : r)
-      })),
+      }))
+      },
       deleteAiTypeRule: (ruleId) => set((s) => {
         if (!bookWritable((s.aiTypeRules.find((x) => x.ruleId === ruleId) as { bookId?: string | number } | undefined)?.bookId ?? s.currentBookId, s.accountBooks)) return {}
         const rec = s.aiTypeRules.find((r) => r.ruleId === ruleId)
@@ -786,9 +789,12 @@ export const useLedger = create<LedgerState>()(
         }
         return { dreams: [rec, ...s.dreams] }
       }),
-      updateDream: (dreamId, patch) => set((s) => ({
+      updateDream: (dreamId, patch) => {
+        if (!bookWritable((get().dreams.find((x) => x.dreamId === dreamId) as { bookId?: string | number } | undefined)?.bookId ?? get().currentBookId, get().accountBooks)) return
+        set((s) => ({
         dreams: s.dreams.map((d) => d.dreamId === dreamId ? { ...d, ...patch, updateTime: NOW() } : d)
-      })),
+      }))
+      },
       deleteDream: (dreamId) => set((s) => {
         if (!bookWritable((s.dreams.find((x) => x.dreamId === dreamId) as { bookId?: string | number } | undefined)?.bookId ?? s.currentBookId, s.accountBooks)) return {}
         const rec = s.dreams.find((d) => d.dreamId === dreamId)
