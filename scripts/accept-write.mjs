@@ -6,7 +6,7 @@ import { mkdirSync, writeFileSync, rmSync } from 'node:fs'
 
 const BASE = (process.argv[2] ?? 'https://staging.ledger.yele.win').replace(/\/$/, '')
 if (/ledger\.yele\.win$/.test(BASE) && !BASE.includes('staging.')) {
-  console.error('拒绝在���产执行写操作走查；请显式传入 staging 地址')
+  console.error('拒绝在生产执行写操作走查；请显式传入 staging 地址')
   process.exit(1)
 }
 const OUT = '.shots-interact'

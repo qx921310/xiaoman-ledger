@@ -76,7 +76,12 @@ export function assetMovements(input: TrendInput): Map<number, Array<{ time: num
     push(r.assetId ?? bill?.assetId ?? 0, r.time ?? r.updateTime ?? bill?.time ?? 0, r.number)
   }
   for (const r of input.reimbursements) {
-    if (r.status === 'done') push(r.assetId, r.settledAt ?? r.updateTime ?? 0, r.accountAmount ?? r.number)
+    if (r.status === 'done') {
+      // 缺 accountAmount 快照时按账户币种折算，不能直接拿本位币金额入走势（CR-2026-11-18 P2）
+      const cur = input.assets.find((a) => a.assetId === r.assetId)?.currency
+      const rate = !cur || cur === input.defaultCurrency ? 1 : (input.currencies.find((c) => c.code === cur)?.rate ?? 1)
+      push(r.assetId, r.settledAt ?? r.updateTime ?? 0, r.accountAmount ?? r.number / (rate || 1))
+    }
   }
   for (const f of input.assetFlows) push(f.assetId, f.time, f.delta)
   return out
