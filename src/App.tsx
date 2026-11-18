@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLedger } from './store'
 import { auth, books as bookApi, setCurrentUid, type BookInfo, type User } from './auth'
 import { loadAccountData } from './account-session'
-import { syncNow, discardBaselessConflicts, getVersionedConflicts } from './sync'
+import { syncNow, discardBaselessConflicts, dropOrphanConflicts, getVersionedConflicts } from './sync'
 import { clearAllBookPatches } from './features/book-pending'
 import { startAutoSync, stopAutoSync, getAutoSyncState } from './sync-auto'
 import { startMultiTab } from './multi-tab'
@@ -105,7 +105,17 @@ export default function App() {
   // 打开应用时自动同步一次；失败不打扰用户，手动同步仍可用
   const autoSyncOnce = async () => {
     try {
-      // 先清理「无云端基准/代次未知」的历史冲突，再同步，避免每次刷新都重新提示
+      // 清理两类噪音：①本地已无对应记录的孤立标记 ②无基准/代次未知的历史标记
+      const st = useLedger.getState()
+      const keys = new Set<string>([
+        ...st.bills.map((b) => JSON.stringify(['bill', String(b.billId)])),
+        ...st.transfers.map((t) => JSON.stringify(['transfer', String(t.transferId)])),
+        ...st.lends.map((l) => JSON.stringify(['lend', String(l.lendId)])),
+        ...st.refunds.map((r) => JSON.stringify(['refund', String(r.refundId)])),
+        ...st.reimbursements.map((r) => JSON.stringify(['reimbursement', String(r.reimbursementId)])),
+        ...st.cycles.map((c) => JSON.stringify(['cycle', String(c.cycleId)]))
+      ])
+      dropOrphanConflicts(keys)
       discardBaselessConflicts()
       const r = await syncNow()
       const warn = r.denied ? `${r.denied} 条记录未能推送，请到设置页检查同步结果。` : ''

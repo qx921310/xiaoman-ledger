@@ -117,6 +117,30 @@ function withSyncLock<T>(session: ReturnType<typeof captureSessionEpoch>, work: 
  * 丢弃「没有云端基准」的历史冲突：这类记录是升级前写的，
  * 账号数据以云端为准，静默丢弃即可，不该在首页打扰用户。
  */
+/**
+ * 删除「本地已经没有这条记录」的冲突标记。
+ * 冲突标记是给人核对用的；对应实体都删掉后它只剩噪音，
+ * 应当自动清掉，而不是让人反复处理一条不存在的账。
+ */
+export function dropOrphanConflicts(existingKeys: Set<string>): number {
+  try {
+    const storageKey = `xiaoman-sync-v2:${getCurrentUid()}`
+    const raw = localStorage.getItem(storageKey)
+    if (!raw) return 0
+    const meta = JSON.parse(raw) as VersionedMeta
+    const conflicts = meta.conflicts ?? {}
+    let dropped = 0
+    for (const key of Object.keys(conflicts)) {
+      if (!existingKeys.has(key)) { delete conflicts[key]; dropped += 1 }
+    }
+    if (dropped) {
+      meta.conflicts = conflicts
+      localStorage.setItem(storageKey, JSON.stringify(meta))
+    }
+    return dropped
+  } catch { return 0 }
+}
+
 export function discardBaselessConflicts(): number {
   try {
     const storageKey = `xiaoman-sync-v2:${getCurrentUid()}`
