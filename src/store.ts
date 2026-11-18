@@ -799,10 +799,13 @@ export const useLedger = create<LedgerState>()(
         }
       }),
 
-      setStockHidden: (stockAssetId, hidden) => set((s) => ({
+      setStockHidden: (stockAssetId, hidden) => {
+        if (!bookWritable((get().stockAssets.find((x) => x.stockAssetId === stockAssetId) as { bookId?: string | number } | undefined)?.bookId ?? get().currentBookId, get().accountBooks)) return
+        set((s) => ({
         stockAssets: s.stockAssets.map((st) => st.stockAssetId === stockAssetId
           ? { ...st, hide: hidden, updateTime: NOW() } : st)
-      })),
+      }))
+      },
 
       addStockAsset: (patch) => {
         const s = get()
@@ -826,14 +829,17 @@ export const useLedger = create<LedgerState>()(
         return rec
       },
 
-      deleteStockAsset: (stockAssetId) => set((s) => ({
+      deleteStockAsset: (stockAssetId) => {
+        if (!bookWritable((get().stockAssets.find((x) => x.stockAssetId === stockAssetId) as { bookId?: string | number } | undefined)?.bookId ?? get().currentBookId, get().accountBooks)) return
+        set((s) => ({
         stockAssets: s.stockAssets.filter((x) => x.stockAssetId !== stockAssetId),
         stockInfos: s.stockInfos.filter((x) => x.stockAssetId !== stockAssetId),
         tombstones: [...s.tombstones,
           { kind: 'stockAsset', id: String(stockAssetId), bookId: s.stockAssets.find((x) => x.stockAssetId === stockAssetId)?.bookId, updatedAt: NOW() },
           ...s.stockInfos.filter((x) => x.stockAssetId === stockAssetId)
             .map((x) => ({ kind: 'stockInfo', id: String(x.stockInfoId), bookId: x.bookId, updatedAt: NOW() }))]
-      })),
+      }))
+      },
 
       tradeStock: (stockAssetId, type, num, amount, fee = 0, time) => {
         const s = get()
@@ -869,15 +875,21 @@ export const useLedger = create<LedgerState>()(
         return true
       },
 
-      setStockCostMethod: (stockAssetId, method) => set((s) => ({
+      setStockCostMethod: (stockAssetId, method) => {
+        if (!bookWritable((get().stockAssets.find((x) => x.stockAssetId === stockAssetId) as { bookId?: string | number } | undefined)?.bookId ?? get().currentBookId, get().accountBooks)) return
+        set((s) => ({
         stockAssets: s.stockAssets.map((x) => x.stockAssetId === stockAssetId
           ? { ...x, costMethod: method, updateTime: NOW() } : x)
-      })),
+      }))
+      },
 
-      setStockPrice: (stockAssetId, price) => set((s) => ({
+      setStockPrice: (stockAssetId, price) => {
+        if (!bookWritable((get().stockAssets.find((x) => x.stockAssetId === stockAssetId) as { bookId?: string | number } | undefined)?.bookId ?? get().currentBookId, get().accountBooks)) return
+        set((s) => ({
         stockAssets: s.stockAssets.map((x) => x.stockAssetId === stockAssetId
           ? { ...x, price, updateTime: NOW() } : x)
-      })),
+      }))
+      },
 
       addTemplate: (patch) => {
         const s = get()
@@ -979,10 +991,13 @@ export const useLedger = create<LedgerState>()(
         return loan
       },
 
-      deleteHomeLoan: (loanId) => set((s) => ({
+      deleteHomeLoan: (loanId) => {
+        if (!bookWritable((get().homeLoans.find((x) => x.loanId === loanId) as { bookId?: string | number } | undefined)?.bookId ?? get().currentBookId, get().accountBooks)) return
+        set((s) => ({
         homeLoans: s.homeLoans.filter((x) => x.loanId !== loanId),
         tombstones: [...s.tombstones, { kind: 'homeLoan', id: String(loanId), bookId: s.homeLoans.find((x) => x.loanId === loanId)?.bookId, updatedAt: NOW() }]
-      })),
+      }))
+      },
 
       addInstalment: (patch) => {
         const s = get()
@@ -993,10 +1008,13 @@ export const useLedger = create<LedgerState>()(
         return rec
       },
 
-      deleteInstalment: (instalmentId) => set((s) => ({
+      deleteInstalment: (instalmentId) => {
+        if (!bookWritable((get().instalments.find((x) => x.instalmentId === instalmentId) as { bookId?: string | number } | undefined)?.bookId ?? get().currentBookId, get().accountBooks)) return
+        set((s) => ({
         instalments: s.instalments.filter((x) => x.instalmentId !== instalmentId),
         tombstones: [...s.tombstones, { kind: 'instalment', id: String(instalmentId), bookId: s.instalments.find((x) => x.instalmentId === instalmentId)?.bookId, updatedAt: NOW() }]
-      })),
+      }))
+      },
 
       // 把分期计划的每期本金+手续费生成账单（支出），只生成一次
       postInstalmentBills: (instalmentId) => {
