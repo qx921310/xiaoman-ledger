@@ -1735,24 +1735,24 @@ export const useLedger = create<LedgerState>()(
 
       runCycles: () => {
         const s = get()
+        // 只读账本的周期规则在规划阶段就剔除，避免 plan.bills/assetDelta 仍包含它们（CR-2026-11-18 P0）
+        const writableCycle = (bookId?: string | number) => bookWritable(bookId, s.accountBooks)
+        const allowedCycles = s.cycles.filter((c) => writableCycle((c as { bookId?: string | number }).bookId))
         const plan = planCycles({
-          cycles: s.cycles, bills: s.bills, assets: s.assets,
+          cycles: allowedCycles, bills: s.bills, assets: s.assets,
           parentCategories: s.parentCategories, childCategories: s.childCategories,
           currentBookId: s.currentBookId, currencies: s.currencies, defaultCurrency: s.defaultCurrency,
           userId: s.userId, uid: getCurrentUid() || undefined
         })
         if (!plan.count) return 0
-        // 只读账本的周期规则不生成账单（CR-2026-11-18 P1）
-        const writable = (bookId?: string | number) => bookWritable(bookId, s.accountBooks)
-        plan.cycles = plan.cycles.filter((c) => writable((c as { bookId?: string | number }).bookId))
-        if (plan.transfers) plan.transfers = plan.transfers.filter((t) => writable((t as { bookId?: string | number }).bookId))
         if (!plan.cycles.length && !(plan.transfers?.length)) return 0
         const cycleMap = new Map(plan.cycles.map((c) => [c.cycleId, c]))
         // 周期转账先走 addTransfer（它会自己带出手续费账单），再落周期状态
         for (const t of plan.transfers ?? []) {
           get().addTransfer({
             fromAssetId: t.fromAssetId, toAssetId: t.toAssetId,
-            cost: t.cost, serviceCharge: t.serviceCharge, time: t.time, remark: t.remark
+            cost: t.cost, serviceCharge: t.serviceCharge, time: t.time, remark: t.remark,
+            bookId: (t as { bookId?: string | number }).bookId
           })
         }
         set((st) => ({
