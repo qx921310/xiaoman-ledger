@@ -1561,7 +1561,7 @@ section.card:has(.my-user) { background: transparent; box-shadow: none; border: 
 }
 .my-avatar {
   width: 68px; height: 68px; border-radius: var(--r-pill); display: grid; place-items: center;
-  font-size: var(--font-lg); margin: 0 auto 2px; color: var(--focus-ink);
+  font-size: var(--font-lg); margin: 0 auto 2px; color: var(--on-accent);
   background: var(--accent); box-shadow: var(--shadow-2); position: relative;
 }
 .my-user .grow { display: flex; flex-direction: column; align-items: center; gap: 2px; }

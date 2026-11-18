@@ -422,8 +422,11 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       <h2 className="page-title">我的</h2>
 
       <button type="button" className="my-user" onClick={() => setProfileOpen(true)}>
-        <span className="my-avatar" aria-hidden="true" style={profile.avatar ? { background: profile.avatar } : undefined}>
-          {profile.avatar ? '' : (profile.nick || '我')[0].toUpperCase()}
+        <span className="my-avatar" aria-hidden="true"
+          style={profile.avatar
+            ? { background: profile.avatar, color: 'var(--on-accent)' }
+            : undefined}>
+          {(profile.nick || me?.email?.split('@')[0] || '我')[0].toUpperCase()}
         </span>
         <span className="grow">
           <b>{profile.nick || me?.email?.split('@')[0] || '我'}</b>
