@@ -1436,6 +1436,14 @@ export const useLedger = create<LedgerState>()(
         if (!bookWritable(targetBook, s.accountBooks)) return false
         const feeBill = old.billId ? s.bills.find((b) => b.billId === old.billId) : undefined
         const feeBack = feeBill ? feeBill.cost : 0
+        // 先预校验，避免「旧转账已撤销、新转账创建失败」导致整笔丢失（CR-2026-11-18 P2）
+        const nextFrom = patch.fromAssetId ?? old.fromAssetId
+        const nextTo = patch.toAssetId ?? old.toAssetId
+        const fromAsset = s.assets.find((a) => a.assetId === nextFrom)
+        const toAsset = s.assets.find((a) => a.assetId === nextTo)
+        if (!fromAsset || !toAsset || nextFrom === nextTo) return false
+        if (!bookWritable(fromAsset.bookId ?? targetBook, s.accountBooks)) return false
+        if (!bookWritable(toAsset.bookId ?? targetBook, s.accountBooks)) return false
 
         set((st) => ({
           transfers: st.transfers.filter((t) => t.transferId !== transferId),
