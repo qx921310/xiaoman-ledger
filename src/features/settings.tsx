@@ -1,6 +1,7 @@
 import { clearAllBookPatches } from './book-pending'
 import { userStorage, getCurrentUid } from '../auth'
 import { DataRepair } from './data-repair'
+import { MeMiscPage } from './me-misc'
 import { useEffect, useMemo, useState } from 'react'
 import { useLedger } from '../store'
 import type { Cycle } from '../types'
@@ -182,7 +183,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [prepayOpen, setPrepayOpen] = useState(false)
   const [pensionOpen, setPensionOpen] = useState(false)
   const [tool, setTool] = useState<'hourly' | 'inflation' | 'buyrent' | null>(null)
-  const [meScreen, setMeScreen] = useState<'book' | 'cat' | 'tag' | 'data' | 'currency' | 'tools' | 'sync' | null>(null)
+  const [meScreen, setMeScreen] = useState<'book' | 'cat' | 'tag' | 'data' | 'currency' | 'tools' | 'sync' | 'theme' | 'activity' | 'apps' | 'widget' | 'invite' | 'feedback' | 'evaluate' | null>(null)
   const [cycleDrill, setCycleDrill] = useState<{ title: string; cycleId: string | number } | null>(null)
   const [backupOpen, setBackupOpen] = useState(false)
   // 一木 UserInfoActivity：昵称与头像可改（本地保存，账号维度）
@@ -638,9 +639,11 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         ] as Array<[string, string, string]>).map(([label, key, icon]) => (
           <button key={key} type="button" className="row my-row-btn" aria-label={label} onClick={() => {
             if (key === 'tools') { setMeScreen('tools'); window.scrollTo({ top: 0 }); return }
-            if (key === 'theme') { notify('敬请期待：主题外观'); return }
             if (key === 'guide') { setGuideOpen(true); return }
             if (key === 'about') { setAboutOpen(true); return }
+            if (['theme', 'activity', 'apps', 'widget', 'invite', 'feedback', 'evaluate'].includes(key)) {
+              setMeScreen(key as 'theme' | 'activity' | 'apps' | 'widget' | 'invite' | 'feedback' | 'evaluate'); window.scrollTo({ top: 0 }); return
+            }
             notify('敬请期待')
           }}>
             <span className="me-ico"><MeIcon name={icon} size={22} /></span>
@@ -1331,6 +1334,10 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       </div>
 
       </>)}
+
+      {meScreen && ['theme', 'activity', 'apps', 'widget', 'invite', 'feedback', 'evaluate'].includes(meScreen) && (
+        <MeMiscPage name={meScreen} onBack={() => setMeScreen(null)} />
+      )}
 
       {meScreen === 'sync' && (<>
         <div className="subpage-head">
