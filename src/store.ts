@@ -998,6 +998,8 @@ export const useLedger = create<LedgerState>()(
         const s = get()
         const rec = s.instalments.find((x) => x.instalmentId === instalmentId)
         if (!rec || !rec.assetId) return 0
+        // 分期账单必须落在分期计划所属账本，且该账本可写（CR-2026-11-18 P1）
+        if (!bookWritable(rec.bookId, s.accountBooks)) return 0
         const plan = planInstalment({ total: rec.totalNumber, periods: rec.periods, serviceRate: rec.serviceRate, serviceType: rec.serviceType })
         const start = new Date(`${rec.accountMonth}-01T00:00:00`)
         let created = 0
@@ -1008,8 +1010,9 @@ export const useLedger = create<LedgerState>()(
           get().addBill({
             assetId: rec.assetId, parentCategoryId: 4, cost: p.total, time,
             remark: `分期第 ${p.period}/${rec.periods} 期${p.service ? '（含手续费 ' + p.service + '）' : ''}`,
-            notIntoTotal: false
-          })
+            notIntoTotal: false,
+            bookId: rec.bookId
+          } as never)
           created++
         }
         return created
@@ -1586,7 +1589,17 @@ export const useLedger = create<LedgerState>()(
         set((state) => {
           const current = state.reimbursements.find((r) => r.reimbursementId === reimbursementId)
           if (!current) return {}
-          const refundBack = current.status === 'done' ? current.number : 0
+          // 结算时按账户币种冻结了 accountAmount；删除时要用同一口径回冲，
+          // 否则外币报销账户会被按本位币金额多减（CR-2026-11-18 P0）
+          const doneAssets = state.assets.find((a) => a.assetId === current.assetId)
+          const ledgerRate = !doneAssets?.currency || doneAssets.currency === state.defaultCurrency
+            ? 1
+            : (state.currencies.find((c) => c.code === doneAssets.currency)?.rate ?? 1)
+          const refundBack = current.status === 'done'
+            ? (Number.isFinite(current.accountAmount) && current.accountAmount
+              ? Number(current.accountAmount)
+              : current.number / (ledgerRate || 1))
+            : 0
           const rest = state.reimbursements.filter((r) => r.reimbursementId !== reimbursementId && r.billId === current.billId)
           const remainTotal = +rest.reduce((sum, r) => sum + (Number(r.number) || 0), 0).toFixed(2)
           return {
@@ -1669,6 +1682,11 @@ export const useLedger = create<LedgerState>()(
           userId: s.userId, uid: getCurrentUid() || undefined
         })
         if (!plan.count) return 0
+        // 只读账本的周期规则不生成账单（CR-2026-11-18 P1）
+        const writable = (bookId?: string | number) => bookWritable(bookId, s.accountBooks)
+        plan.cycles = plan.cycles.filter((c) => writable((c as { bookId?: string | number }).bookId))
+        if (plan.transfers) plan.transfers = plan.transfers.filter((t) => writable((t as { bookId?: string | number }).bookId))
+        if (!plan.cycles.length && !(plan.transfers?.length)) return 0
         const cycleMap = new Map(plan.cycles.map((c) => [c.cycleId, c]))
         // 周期转账先走 addTransfer（它会自己带出手续费账单），再落周期状态
         for (const t of plan.transfers ?? []) {

@@ -1,15 +1,19 @@
 #!/usr/bin/env node
-/** 生产只读交互走查：打开/取消弹层、点日历日期、进账户详情、进我的子页。不写入任何数据。 */
+/** 写操作走查：新增标签 / 新增账户 / 退出登录 / 重新登录。只能在 staging 跑，默认目标即 staging。 */
 import { spawn } from 'node:child_process'
 import { resolve } from 'node:path'
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs'
 
-const BASE = (process.argv[2] ?? 'https://ledger.yele.win').replace(/\/$/, '')
+const BASE = (process.argv[2] ?? 'https://staging.ledger.yele.win').replace(/\/$/, '')
+if (/ledger\.yele\.win$/.test(BASE) && !BASE.includes('staging.')) {
+  console.error('拒绝在���产执行写操作走查；请显式传入 staging 地址')
+  process.exit(1)
+}
 const OUT = '.shots-interact'
 const PORT = 9671
 const CHROME = process.env.CHROME_PATH ?? 'C:/Program Files/Google/Chrome/Application/chrome.exe'
-const EMAIL = process.env.ACC_EMAIL ?? 'hello@xiaoman.test'
-const PASSWORD = process.env.ACC_PASSWORD ?? 'hello12345'
+const EMAIL = process.env.ACC_EMAIL ?? 'staging@xiaoman.test'
+const PASSWORD = process.env.ACC_PASSWORD ?? 'staging12345'
 rmSync(OUT, { recursive: true, force: true }); mkdirSync(OUT, { recursive: true })
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const checks = []
