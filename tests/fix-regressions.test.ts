@@ -820,3 +820,21 @@ test('AA 分账不得引用其它账本的群组', () => {
   useLedger.setState({ currentBookId: 1 } as never)
   assert.equal(st().applySplit(bill.billId, group.splitGroupId, 0), false, '跨账本群组必须拒绝')
 })
+
+// CR-2026-11-18 P1：模板/愿望/AI 规则的删除在只读账本下必须无效
+test('只读账本不能删除模板、愿望与 AI 规则', () => {
+  reset()
+  useLedger.setState({
+    currentBookId: 1,
+    accountBooks: [{ accountBookId: 1, bookId: 1, accountBookName: 'A', memberCount: 1, role: 'silent' }],
+    templates: [{ templateId: 901, name: '早饭', mode: 'bill', bookId: 1, updateTime: Date.now() }],
+    dreams: [{ dreamId: 902, name: '旅行', totalNum: 1000, startNum: 0, bookId: 1, updateTime: Date.now() }],
+    aiTypeRules: [{ ruleId: 903, keywords: ['奶茶'], categoryId: 7, bookId: 1, updateTime: Date.now() }]
+  } as never)
+  st().deleteTemplate(901)
+  st().deleteDream(902)
+  st().deleteAiTypeRule(903)
+  assert.ok(st().templates.some((t) => t.templateId === 901), '只读账本删除模板应无效')
+  assert.ok(st().dreams.some((d) => d.dreamId === 902), '只读账本删除愿望应无效')
+  assert.ok(st().aiTypeRules.some((r) => r.ruleId === 903), '只读账本删除 AI 规则应无效')
+})

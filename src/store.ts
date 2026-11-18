@@ -763,6 +763,7 @@ export const useLedger = create<LedgerState>()(
         aiTypeRules: s.aiTypeRules.map((r) => r.ruleId === ruleId ? { ...r, ...patch, updateTime: NOW() } : r)
       })),
       deleteAiTypeRule: (ruleId) => set((s) => {
+        if (!bookWritable((s.aiTypeRules.find((x) => x.ruleId === ruleId) as { bookId?: string | number } | undefined)?.bookId ?? s.currentBookId, s.accountBooks)) return {}
         const rec = s.aiTypeRules.find((r) => r.ruleId === ruleId)
         return {
           aiTypeRules: s.aiTypeRules.filter((r) => r.ruleId !== ruleId),
@@ -789,6 +790,7 @@ export const useLedger = create<LedgerState>()(
         dreams: s.dreams.map((d) => d.dreamId === dreamId ? { ...d, ...patch, updateTime: NOW() } : d)
       })),
       deleteDream: (dreamId) => set((s) => {
+        if (!bookWritable((s.dreams.find((x) => x.dreamId === dreamId) as { bookId?: string | number } | undefined)?.bookId ?? s.currentBookId, s.accountBooks)) return {}
         const rec = s.dreams.find((d) => d.dreamId === dreamId)
         return {
           dreams: s.dreams.filter((d) => d.dreamId !== dreamId),
@@ -887,6 +889,7 @@ export const useLedger = create<LedgerState>()(
       },
 
       deleteTemplate: (templateId) => set((s) => {
+        if (!bookWritable((s.templates.find((x) => x.templateId === templateId) as { bookId?: string | number } | undefined)?.bookId ?? s.currentBookId, s.accountBooks)) return {}
         const t = s.templates.find((x) => x.templateId === templateId)
         return {
           templates: s.templates.filter((x) => x.templateId !== templateId),
