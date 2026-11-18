@@ -1966,7 +1966,9 @@ export const useLedger = create<LedgerState>()(
       // 预算身份：自定义预算用 budgetId（可并存多个），月/年预算用 type+分类
       setBudget: (budget) => set((s) => {
         if (!bookWritable(s.currentBookId, s.accountBooks)) return {}
-        const sameKey = (b: typeof budget) => budget.type === 'custom'
+        // 预算按账本隔离：匹配键必须带 bookId，否则会误删别的账本（含只读账本）的预算
+        const sameBook = (b: { bookId?: string | number }) => String(b.bookId ?? s.currentBookId) === String(budget.bookId ?? s.currentBookId)
+        const sameKey = (b: typeof budget) => !sameBook(b) ? false : budget.type === 'custom'
           ? b.type === 'custom' && b.budgetId === budget.budgetId
           : (b.type ?? 'month') === (budget.type ?? 'month') && b.categoryId === budget.categoryId
         const rest = s.budgets.filter((b) => !sameKey(b))
@@ -1982,12 +1984,13 @@ export const useLedger = create<LedgerState>()(
 
       removeBudget: (month, categoryId) => set((s) => {
         if (!bookWritable(s.currentBookId, s.accountBooks)) return {}
+        const inBook = (b: { bookId?: string | number }) => String(b.bookId ?? s.currentBookId) === String(s.currentBookId)
         const target = s.budgets.find((b) => b.month === month && b.categoryId === categoryId
-          && (b.type ?? 'month') === 'month')
+          && (b.type ?? 'month') === 'month' && inBook(b))
         const id = budgetIdentity({ type: target?.type, month, categoryId, budgetId: target?.budgetId })
         return {
           budgets: s.budgets.filter((b) => !(b.month === month && b.categoryId === categoryId
-            && (b.type ?? 'month') === 'month')),
+            && (b.type ?? 'month') === 'month' && inBook(b))),
           tombstones: [...s.tombstones, { kind: 'budget', id, updatedAt: NOW() }]
         }
       }),
