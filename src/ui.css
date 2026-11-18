@@ -1737,3 +1737,7 @@ section.card:has(.my-user) .page-title { display: none; }
 .cat-children { display: grid; gap: var(--sp-2); width: 100%; }
 .cat-child { display: grid; grid-template-columns: 1fr auto auto auto; gap: var(--sp-2); align-items: center; width: 100%; }
 .cat-child input { width: 100%; }
+
+/* 账单行：账户名放在右侧金额下方（对齐一木） */
+.cost-cell { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.cost-acct { color: var(--muted); font-size: var(--font-xs); }

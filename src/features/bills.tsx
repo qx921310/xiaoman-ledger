@@ -394,8 +394,7 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
                     return sub ? <small className="cat-sub">{sub.name}</small> : null
                   })()}
                   <small>
-                    {[a?.assetName ?? '无账户', BILL_TYPE[b.billType]].filter(Boolean).join(' · ')}
-                    {b.notIntoTotal ? ' · 不计收支' : ''}
+                    {(b.notIntoTotal ? '不计收支' : '')}
                     {b.notIntoBudget ? ' · 不计预算' : ''}
                     {b.currencyInfo && b.currencyAssetNumber
                       ? ` · ${b.currencyInfo} ${b.currencyAssetNumber.toFixed(2)}`
@@ -424,6 +423,7 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
                     <s className="old-cost">{money(+(b.cost + (b.discountNumber ?? 0)).toFixed(2))}</s>
                   )}
                   <b className={inc ? 'in' : 'out'}>{inc ? '+' : '-'}{money(inc ? b.cost : billNetAmount(b, refunds))}</b>
+                  {a?.assetName && <small className="cost-acct">{a.assetName}</small>}
                 </span>
                 {!simpleView && <div className="ledger-actions">
                   <button className="link" aria-label={`查看${p?.name ?? '账单'}明细`} onClick={() => setDetail(b)}>明细</button>
