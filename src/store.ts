@@ -1333,6 +1333,11 @@ export const useLedger = create<LedgerState>()(
         // 归属变更必须走专用移动命令并校验源/目标双方权限；普通编辑一律拒绝，
         // 否则可写账本的账单能被改挂到只读账本。
         if (patch.bookId != null && String(patch.bookId) !== String(old.bookId ?? '')) return false
+        // 换账户时目标账户所属账本必须可写，否则会把余额写进只读账本（CR-2026-11-18 P0）
+        if (patch.assetId != null && patch.assetId !== old.assetId) {
+          const target = s.assets.find((a) => a.assetId === patch.assetId)
+          if (target && !bookWritable(target.bookId ?? old.bookId, s.accountBooks)) return false
+        }
         const refunded = s.refunds.filter((r) => String(r.billId) === String(billId)).reduce((sum, r) => sum + (r.baseAmount ?? 0), 0)
         if (patch.cost != null && (!Number.isFinite(patch.cost) || patch.cost < refunded)) return false
         const deltaOf = (b: Bill) =>
