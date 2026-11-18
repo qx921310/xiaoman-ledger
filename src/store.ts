@@ -689,6 +689,9 @@ export const useLedger = create<LedgerState>()(
       addAssetFlow: (patch) => set((s) => {
         const bookId = patch.bookId ?? (s.currentBookId === 0 ? undefined : s.currentBookId)
         if (!bookWritable(bookId, s.accountBooks)) return {}
+        // 目标资产所属账本也必须可写（CR-2026-11-18 P1）
+        const flowAsset = s.assets.find((a) => a.assetId === patch.assetId)
+        if (flowAsset && !bookWritable(flowAsset.bookId ?? bookId, s.accountBooks)) return {}
         // 用 UUID 做身份：两台设备同一毫秒各自新增也不会撞号
         let flowId: number | string = globalThis.crypto?.randomUUID?.() ?? Date.now()
         while (s.assetFlows.some((f) => String(f.flowId) === String(flowId))) flowId = `f-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -709,6 +712,8 @@ export const useLedger = create<LedgerState>()(
         while (st.fixedDeposits.some((d) => d.depositId === depositId)) depositId++
         const amt = Number(patch.amount) || 0
         const sourceAsset = patch.assetId == null ? undefined : st.assets.find((a) => a.assetId === patch.assetId)
+        // 源资产所属账本必须可写，否则会改只读资产余额（CR-2026-11-18 P1）
+        if (sourceAsset && !bookWritable(sourceAsset.bookId ?? st.currentBookId, st.accountBooks)) return
         const toAsset = !!patch.toAsset && !!sourceAsset
         set((s) => ({
           // 一木：写入资产流水「新增定存」，余额由流水推导，不改期初
