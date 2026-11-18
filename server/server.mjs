@@ -882,11 +882,16 @@ if (path === '/api/books/members' && req.method === 'GET') {
       const member = db.prepare('SELECT role FROM book_members WHERE user_id = ? AND book_id = ?').get(user.id, bookId)
       if (!member) return fail(res, '没有该账本权限')
       if (member.role === 'silent') return fail(res, '只读账本不能清空云端')
-      const tx = db.transaction(() => {
+      // node:sqlite 的 DatabaseSync 没有 transaction()，用显式事务
+      db.exec('BEGIN')
+      try {
         db.prepare('DELETE FROM records WHERE book_id = ?').run(bookId)
         db.prepare('UPDATE books SET generation = generation + 1 WHERE book_id = ?').run(bookId)
-      })
-      tx()
+        db.exec('COMMIT')
+      } catch (error) {
+        db.exec('ROLLBACK')
+        throw error
+      }
       return ok(res, { bookId, cleared: true })
     }
 
