@@ -4,7 +4,7 @@ import { useLedger } from '../store'
 import type { Cycle } from '../types'
 import type { ImportPlan } from '../importer'
 import { books as bookApi } from '../auth'
-import { syncNow, getVersionedConflicts, getVersionedRecovery, keepLocalConflict, acceptRemoteConflict, previewVersionedConflict } from '../sync'
+import { syncNow, discardBaselessConflicts, getVersionedConflicts, getVersionedRecovery, keepLocalConflict, acceptRemoteConflict, previewVersionedConflict } from '../sync'
 import { syncNowImmediate, getLastSyncResult, subscribeAutoSync, type AutoSyncState } from '../sync-auto'
 import { money, fullDay } from '../ui-format'
 
@@ -567,7 +567,15 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
           <p className="hint">云端保存的是账目数据，附件 30 天后销毁。</p>
           <div className="modal-btns">
             <button type="button" className="ghost" onClick={() => setBackupOpen(false)}>关闭</button>
-            <button type="button" className="primary" onClick={async () => { try { await syncNowImmediate(); notify('已同步') } catch { notify('同步失败') } }}>立即同步</button>
+            <button type="button" className="primary" onClick={async () => {
+              try {
+                await syncNowImmediate()
+                // 手动同步后同样清理「没有云端基准」的历史冲突，否则提示会一直挂着
+                const dropped = discardBaselessConflicts()
+                setSyncConflicts(getVersionedConflicts())
+                notify(dropped ? `已同步，清理 ${dropped} 条历史待核对` : '已同步')
+              } catch { notify('同步失败') }
+            }}>立即同步</button>
           </div>
         </Modal>
       )}

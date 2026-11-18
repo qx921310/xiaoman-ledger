@@ -272,9 +272,11 @@ function Shell({ user, onLogout, syncWarning, dismissSyncWarning, bookPending }:
             <button className="link" onClick={async () => {
               // 以云端为准：丢掉本机待核对草稿后重新同步（账号数据本来就在云端，本机只是缓存）
               const n = await clearAllBookPatches()
+              // 版本化冲突（meta.conflicts）也要一起清，否则提示不会消失
+              const dropped = discardBaselessConflicts()
               dismissSyncWarning()
               await syncNow()
-              notify(n ? `已丢弃 ${n} 条本机待核对记录，以云端为准` : '已重新同步')
+              notify(n || dropped ? `已按云端为准清理 ${n + dropped} 条待核对` : '已重新同步')
             }}>以云端为准</button>
           </div>
         )}
