@@ -749,6 +749,7 @@ export const useLedger = create<LedgerState>()(
       },
 
       addAiTypeRule: (patch) => set((s) => {
+        if (!bookWritable(s.currentBookId, s.accountBooks)) return {}
         let ruleId = Date.now()
         while (s.aiTypeRules.some((r) => r.ruleId === ruleId)) ruleId++
         return {
@@ -771,6 +772,7 @@ export const useLedger = create<LedgerState>()(
       }),
 
       addDream: (patch) => set((s) => {
+        if (!bookWritable(s.currentBookId, s.accountBooks)) return {}
         let dreamId = Date.now()
         while (s.dreams.some((d) => d.dreamId === dreamId)) dreamId++
         const rec: import('./types').Dream = {
