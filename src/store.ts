@@ -1801,6 +1801,9 @@ export const useLedger = create<LedgerState>()(
             : (s.currentBookId === 0 ? undefined : s.currentBookId)
           if (amt <= 0 || !assetId || !bookWritable(targetBook, s.accountBooks)) return {}
           const cashAsset = (type === 2 || type === 4) && repaymentAssetId ? repaymentAssetId : assetId
+          // 动账账户所属账本也必须可写（CR-2026-11-18 P1）
+          const cashAcc = s.assets.find((a) => a.assetId === cashAsset)
+          if (cashAcc && !bookWritable(cashAcc.bookId ?? targetBook, s.accountBooks)) return {}
           const sign = type === 1 || type === 4 ? -1 : 1
           let lendId = Date.now()
           while (s.lends.some((l) => l.lendId === lendId)) lendId++
