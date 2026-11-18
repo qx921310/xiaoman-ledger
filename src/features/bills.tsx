@@ -388,12 +388,13 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
                     {b.conflict && <span className="foreign" title="并发冲突：与他人同一秒记账撞了 ID，可能有一条未并入 — 点「明细」查看">❗</span>}
                     {b.remark ? <span className="remark"> · {b.remark}</span> : null}
                   </div>
+                  <small className="cat-time">{hhmm(b.time)}</small>
                   {(() => {
                     const sub = resolveBillChild(b, children)
                     return sub ? <small className="cat-sub">{sub.name}</small> : null
                   })()}
                   <small>
-                    {[a?.assetName ?? '无账户', hhmm(b.time), BILL_TYPE[b.billType]].filter(Boolean).join(' · ')}
+                    {[a?.assetName ?? '无账户', BILL_TYPE[b.billType]].filter(Boolean).join(' · ')}
                     {b.notIntoTotal ? ' · 不计收支' : ''}
                     {b.notIntoBudget ? ' · 不计预算' : ''}
                     {b.currencyInfo && b.currencyAssetNumber
