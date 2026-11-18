@@ -873,6 +873,35 @@ if (path === '/api/books/members' && req.method === 'GET') {
       return ok(res, { accepted, skipped, denied, duplicates, conflicts, authoritative, conflicted, results, at: Date.now() })
     }
 
+    // 一木「重新云同步」：清空该账本云端记录并抬代次，随后客户端全量上传本地
+    if (path === '/api/data/reset-cloud' && req.method === 'POST') {
+      const user = currentUser(req)
+      if (!user) return fail(res, '请先登录')
+      const body = await readBody(req)
+      const bookId = String(body?.bookId || '').trim()
+      const member = db.prepare('SELECT role FROM book_members WHERE user_id = ? AND book_id = ?').get(user.id, bookId)
+      if (!member) return fail(res, '没有该账本权限')
+      if (member.role === 'silent') return fail(res, '只读账本不能清空云端')
+      const tx = db.transaction(() => {
+        db.prepare('DELETE FROM records WHERE book_id = ?').run(bookId)
+        db.prepare('UPDATE books SET generation = generation + 1 WHERE book_id = ?').run(bookId)
+      })
+      tx()
+      return ok(res, { bookId, cleared: true })
+    }
+
+    // 一木「数据修复」用的数量对比：按账本统计云端账单条数（不含墓碑）
+    if (path === '/api/data/counts' && req.method === 'GET') {
+      const user = currentUser(req)
+      if (!user) return fail(res, '请先登录')
+      const bookId = String(url.searchParams.get('bookId') || '').trim()
+      const member = db.prepare('SELECT 1 FROM book_members WHERE user_id = ? AND book_id = ?').get(user.id, bookId)
+      if (!member) return fail(res, '没有该账本权限')
+      const row = db.prepare("SELECT COUNT(*) AS n FROM records WHERE book_id = ? AND kind = 'bill' AND deleted = 0").get(bookId)
+      const total = db.prepare('SELECT COUNT(*) AS n FROM records WHERE book_id = ? AND deleted = 0').get(bookId)
+      return ok(res, { bookId, bills: row?.n ?? 0, records: total?.n ?? 0 })
+    }
+
     if (path === '/api/data/pull' && req.method === 'GET') {
       const user = currentUser(req)
       if (!user) return fail(res, '请先登录')

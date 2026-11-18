@@ -1329,7 +1329,21 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
 
       {meScreen === 'sync' && (<>
         <div className="subpage-head">
-        <DataRepair />
+        <DataRepair
+          onResetCloud={async () => {
+            const bookId = String(useLedger.getState().currentBookId ?? '')
+            const r = await fetch('/api/data/reset-cloud', {
+              method: 'POST', credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ bookId })
+            })
+            const j = await r.json()
+            if (j?.code !== 0) throw new Error(j?.message ?? '清空云端失败')
+            // 代次已抬升：清掉本地同步元数据后重新加载，触发全量上传
+            localStorage.removeItem(`xiaoman-sync-v2:${useLedger.getState().userId}`)
+            window.location.reload()
+          }}
+        />
           <button type="button" className="link" onClick={() => setMeScreen(null)}>‹ 返回我的</button>
           <h3>云同步</h3>
         </div>
