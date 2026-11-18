@@ -183,7 +183,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [prepayOpen, setPrepayOpen] = useState(false)
   const [pensionOpen, setPensionOpen] = useState(false)
   const [tool, setTool] = useState<'hourly' | 'inflation' | 'buyrent' | null>(null)
-  const [meScreen, setMeScreen] = useState<'book' | 'cat' | 'tag' | 'data' | 'currency' | 'tools' | 'sync' | 'theme' | 'activity' | 'apps' | 'widget' | 'invite' | 'feedback' | 'evaluate' | null>(null)
+  const [meScreen, setMeScreen] = useState<'book' | 'cat' | 'tag' | 'data' | 'more' | 'currency' | 'tools' | 'sync' | 'theme' | 'activity' | 'apps' | 'widget' | 'invite' | 'feedback' | 'evaluate' | null>(null)
   const [cycleDrill, setCycleDrill] = useState<{ title: string; cycleId: string | number } | null>(null)
   const [backupOpen, setBackupOpen] = useState(false)
   // 一木 UserInfoActivity：昵称与头像可改（本地保存，账号维度）
@@ -599,7 +599,8 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
             if (key === 'book') { setMeScreen('book'); window.scrollTo({ top: 0 }); return }
             if (key === 'cat') { setMeScreen('cat'); window.scrollTo({ top: 0 }); return }
             if (key === 'tag') { setMeScreen('tag'); window.scrollTo({ top: 0 }); return }
-            if (key === 'cycle' || key === 'more') { setMeScreen('data'); window.scrollTo({ top: 0 }); return }
+            if (key === 'cycle') { setMeScreen('data'); window.scrollTo({ top: 0 }); return }
+            if (key === 'more') { setMeScreen('more'); window.scrollTo({ top: 0 }); return }
             if (key === 'dream') { setDreamOpen(true); return }
             if (key === 'ai') { setAiTypeOpen(true); return }
             if (key === 'auto') { notify('自动记账需要 Android 通知/短信权限，网页版暂不支持'); return }
@@ -616,10 +617,10 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         <button type="button" className="row my-row-btn" onClick={() => { setMeScreen('sync'); window.scrollTo({ top: 0 }) }}>
           <span className="me-ico"><MeIcon name="cloud" size={22} /></span><span className="grow">云同步</span><span className="muted">{syncLine}</span>
         </button>
-        <button type="button" className="row my-row-btn" onClick={() => { setMeScreen('data'); window.scrollTo({ top: 0 }) }}>
+        <button type="button" className="row my-row-btn" onClick={() => { setMeScreen('data'); window.scrollTo({ top: 0 }); setTimeout(() => document.getElementById('sec-backup')?.scrollIntoView({ block: 'start' }), 120) }}>
           <span className="me-ico"><MeIcon name="backup" size={22} /></span><span className="grow">数据备份</span><span className="muted">JSON</span>
         </button>
-        <button type="button" className="row my-row-btn" onClick={() => { setMeScreen('data'); window.scrollTo({ top: 0 }) }}>
+        <button type="button" className="row my-row-btn" onClick={() => { setMeScreen('data'); window.scrollTo({ top: 0 }); setTimeout(() => document.getElementById('sec-io')?.scrollIntoView({ block: 'start' }), 120) }}>
           <span className="me-ico"><MeIcon name="io" size={22} /></span><span className="grow">导入导出</span><span className="muted">Excel / CSV</span>
         </button>
         <button type="button" className="row my-row-btn" onClick={() => { setMeScreen('currency'); window.scrollTo({ top: 0 }) }}>
@@ -1335,7 +1336,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
 
       </>)}
 
-      {meScreen && ['theme', 'activity', 'apps', 'widget', 'invite', 'feedback', 'evaluate'].includes(meScreen) && (
+      {meScreen && ['theme', 'activity', 'apps', 'widget', 'invite', 'feedback', 'evaluate', 'more'].includes(meScreen) && (
         <MeMiscPage name={meScreen} onBack={() => setMeScreen(null)} />
       )}
 
