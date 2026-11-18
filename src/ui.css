@@ -1727,3 +1727,8 @@ section.card:has(.my-user) .page-title { display: none; }
 .me-warn { display: block; width: 100%; text-align: left; margin: var(--sp-2) 0; padding: var(--sp-3);
   background: var(--accent-soft); color: var(--focus-ink); border: 0; border-radius: var(--r-md);
   font-size: var(--font-sm); cursor: pointer; }
+
+/* 进入二级页时隐藏一级页的头部信息块，避免「返回」挤在页面中间 */
+.card.subpage .my-user,
+.card.subpage .my-vip,
+.card.subpage .me-sync { display: none; }

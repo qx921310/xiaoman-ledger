@@ -418,7 +418,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   }
 
   return (
-    <section className="card">
+    <section className={'card' + (meScreen ? ' subpage' : '')}>
       <h2 className="page-title">我的</h2>
 
       <button type="button" className="my-user" onClick={() => setProfileOpen(true)}>
