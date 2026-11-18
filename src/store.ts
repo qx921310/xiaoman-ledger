@@ -1471,6 +1471,14 @@ export const useLedger = create<LedgerState>()(
         const target = s.assets.find((a) => a.assetId === assetId)
         if (!target) return {}
         if (!bookWritable(target.bookId ?? s.currentBookId, s.accountBooks)) return {}
+        // 有引用时拒绝删除，避免账单/转账/借贷/报销指向已删账户（CR-2026-11-18 P2）
+        const hasRefs = s.bills.some((b) => b.assetId === assetId)
+          || s.transfers.some((t) => t.fromAssetId === assetId || t.toAssetId === assetId)
+          || s.lends.some((l) => l.assetId === assetId || l.repaymentAssetId === assetId)
+          || s.refunds.some((r) => r.assetId === assetId)
+          || s.reimbursements.some((r) => r.assetId === assetId)
+          || s.cycles.some((c) => c.assetId === assetId)
+        if (hasRefs) return {}
         return {
         assets: s.assets.filter((a) => a.assetId !== assetId),
         tombstones: [...s.tombstones, {
