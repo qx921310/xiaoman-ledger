@@ -418,7 +418,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   }
 
   return (
-    <section className={'card' + (meScreen ? ' subpage' : '')}>
+    <section className={'card' + (meScreen || dreamOpen ? ' subpage' : '')}>
       <h2 className="page-title">我的</h2>
 
       <button type="button" className="my-user" onClick={() => setProfileOpen(true)}>
@@ -506,7 +506,6 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       </div>
 
 
-      {dreamOpen && <DreamList notify={notify} onBack={() => setDreamOpen(false)} />}
       {aiTypeOpen && <AiTypeManager onBack={() => setAiTypeOpen(false)} notify={notify} />}
       {cycleDrill && (
         <FilteredBills title={cycleDrill.title}
@@ -587,7 +586,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         </Modal>
       )}
 
-      {!meScreen && (<>
+      {!meScreen && !dreamOpen && (<>
       <button type="button" className="me-warn" onClick={() => { setMeScreen('data'); window.scrollTo({ top: 0 }) }}>
         未开启任何备份方式，卸载后数据将丢失，点击查看备份状态
       </button>
