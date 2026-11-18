@@ -1368,12 +1368,8 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
           <button type="button" className="link" onClick={() => setMeScreen(null)}>‹ 返回我的</button>
           <h3>云同步</h3>
         </div>
-      <h3>云端同步</h3>
-      <p className="hint">
-        同步冲突时保留本地内容并提示。
-      </p>
       <div className="btns">
-        <button onClick={runSync} disabled={syncing}>{syncing ? '同步中…' : '立即同步'}</button>
+        <button type="button" className="primary" onClick={runSync} disabled={syncing}>{syncing ? '同步中…' : '立即同步'}</button>
       </div>
       {lastSync > 0 && <p className="hint">上次同步：{new Date(lastSync).toLocaleString('zh-CN')}</p>}
       {syncMsg && <p className="hint">{syncMsg}</p>}
