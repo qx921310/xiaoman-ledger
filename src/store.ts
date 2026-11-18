@@ -2202,6 +2202,7 @@ export const useLedger = create<LedgerState>()(
       // 新增分类：parentId=0 表示大类，否则是子分类
       addCategory: (patch) => {
         const s = get()
+        if (!bookWritable(s.currentBookId, s.accountBooks)) throw new Error('当前账本只读，不能新增分类')
         const sameLevel = patch.parentId === 0 ? s.parentCategories.filter((c) => c.kind === patch.kind) : s.childCategories.filter((c) => c.parentId === patch.parentId)
         let id = Date.now()
         while ([...s.parentCategories, ...s.childCategories].some((c) => c.id === id)) id++
@@ -2216,14 +2217,18 @@ export const useLedger = create<LedgerState>()(
         return cat
       },
 
-      updateCategory: (id, patch) => set((s) => ({
+      updateCategory: (id, patch) => set((s) => {
+        if (!bookWritable(s.currentBookId, s.accountBooks)) return {}
+        return ({
         parentCategories: s.parentCategories.map((c) => c.id === id ? { ...c, ...patch, updateTime: NOW() } : c),
         childCategories: s.childCategories.map((c) => c.id === id ? { ...c, ...patch, updateTime: NOW() } : c)
-      })),
+        })
+      }),
 
       // 删除分类：大类会连子分类一起删；被账单引用时拒绝，避免历史账目丢失分类
       deleteCategory: (id) => {
         const s = get()
+        if (!bookWritable(s.currentBookId, s.accountBooks)) return false
         const isParent = s.parentCategories.some((c) => c.id === id)
         const childIds = s.childCategories.filter((c) => c.parentId === id).map((c) => c.id)
         const used = s.bills.some((b) => b.parentCategoryId === id || childIds.includes(b.childCategoryId ?? -1))
@@ -2243,6 +2248,7 @@ export const useLedger = create<LedgerState>()(
 
       // 排序：同级重排后统一重新编号，避免权重重复导致“交换等于没换”
       moveCategory: (id, dir) => set((s) => {
+        if (!bookWritable(s.currentBookId, s.accountBooks)) return {}
         const inParent = s.parentCategories.some((c) => c.id === id)
         const list = inParent ? s.parentCategories : s.childCategories
         const target = list.find((c) => c.id === id)
