@@ -1643,7 +1643,9 @@ export const useLedger = create<LedgerState>()(
         return true
       },
 
-      addCycle: (patch) => set((s) => ({
+      addCycle: (patch) => {
+        if (!bookWritable(get().currentBookId, get().accountBooks)) return
+        set((s) => ({
         cycles: [...s.cycles, {
           ...patch,
           bookId: s.currentBookId || 1,
@@ -1654,33 +1656,46 @@ export const useLedger = create<LedgerState>()(
           userId: s.userId,
           updateTime: NOW()
         } as Cycle]
-      })),
+      }))
+      },
 
-      deleteCycle: (cycleId) => set((s) => ({
+      deleteCycle: (cycleId) => {
+        if (!bookWritable((get().cycles.find((c) => c.cycleId === cycleId) as { bookId?: string | number } | undefined)?.bookId ?? get().currentBookId, get().accountBooks)) return
+        set((s) => ({
         cycles: s.cycles.filter((c) => c.cycleId !== cycleId),
         tombstones: [...s.tombstones, {
           kind: 'cycle', id: String(cycleId),
           bookId: s.cycles.find((c) => c.cycleId === cycleId)?.bookId,
           updatedAt: NOW()
         }]
-      })),
+      }))
+      },
 
-      toggleCycle: (cycleId) => set((s) => ({
+      toggleCycle: (cycleId) => {
+        if (!bookWritable((get().cycles.find((c) => c.cycleId === cycleId) as { bookId?: string | number } | undefined)?.bookId ?? get().currentBookId, get().accountBooks)) return
+        set((s) => ({
         cycles: s.cycles.map((c) => c.cycleId === cycleId ? { ...c, enabled: !c.enabled, updateTime: NOW() } : c)
-      })),
+      }))
+      },
 
       // 补生成所有到期未生成的周期账单；返回本次生成条数
       // 旧周期规则确认账本归属（用户显式操作，不做静默推断）
-      bindCycleBook: (cycleId, bookId) => set((s) => ({
+      bindCycleBook: (cycleId, bookId) => {
+        if (!bookWritable(get().currentBookId, get().accountBooks) && bookWritable(bookId, get().accountBooks)) return
+        set((s) => ({
         cycles: s.cycles.map((c) => c.cycleId === cycleId ? { ...c, bookId, updateTime: NOW() } : c)
-      })),
+      }))
+      },
 
       // 跳过某一期：记进 skipDates，这期不再生成，后续不受影响
-      skipCycleDate: (cycleId, key) => set((s) => ({
+      skipCycleDate: (cycleId, key) => {
+        if (!bookWritable((get().cycles.find((c) => c.cycleId === cycleId) as { bookId?: string | number } | undefined)?.bookId ?? get().currentBookId, get().accountBooks)) return
+        set((s) => ({
         cycles: s.cycles.map((c) => c.cycleId === cycleId
           ? { ...c, skipDates: Array.from(new Set([...(c.skipDates ?? []), key])), updateTime: NOW() }
           : c)
-      })),
+      }))
+      },
 
       // 周期账单去重：必须走这层 set，才能触发余额重算并把墓碑写入待同步队列
       dedupeCycleBills: () => {
