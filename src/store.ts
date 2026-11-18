@@ -1393,6 +1393,8 @@ export const useLedger = create<LedgerState>()(
         // 2) 手续费：单独一条支出账单（内部会给转出方再扣一次）
         let billId: string | number = 0
         if (fee > 0) {
+          // 手续费账单创建失败时回滚本金，避免「余额已变但没有转账记录」（CR-2026-11-18 P2）
+          try {
           const bill = get().addBill({
             cost: toBase(fee, s.assets.find(a => a.assetId === patch.fromAssetId)?.currency, s.currencies, s.defaultCurrency),
             accountAmount: fee,
@@ -1406,6 +1408,16 @@ export const useLedger = create<LedgerState>()(
             bookId: patch.bookId ?? (s.currentBookId === 0 ? undefined : s.currentBookId)
           })
           billId = bill.billId
+          } catch (error) {
+            set((st) => ({
+              assets: st.assets.map((a) => {
+                if (a.assetId === patch.fromAssetId) return { ...a, assetNumber: +(a.assetNumber + patch.cost).toFixed(2), updateTime: NOW() }
+                if (a.assetId === patch.toAssetId) return { ...a, assetNumber: +(a.assetNumber - toCost).toFixed(2), updateTime: NOW() }
+                return a
+              })
+            }))
+            throw error
+          }
         }
 
         const t: Transfer = {
