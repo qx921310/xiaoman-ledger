@@ -354,6 +354,7 @@ export const useLedger = create<LedgerState>()(
           }
           if (bookId != null) {
             const book = s.accountBooks.find((bk) => String(bk.bookId ?? bk.accountBookId) === String(bookId))
+            if (!book && s.accountBooks.some((bk) => bk.role === 'silent')) return '账本不存在或不可写，请选择可写账本'
             if (book?.role === 'silent') return '当前账本只读，不能记账'
             const assetId = patch.assetId
             // -1 是一木的「无账户」哨兵，不算非法账户
@@ -1966,6 +1967,8 @@ export const useLedger = create<LedgerState>()(
       // 预算身份：自定义预算用 budgetId（可并存多个），月/年预算用 type+分类
       setBudget: (budget) => set((s) => {
         if (!bookWritable(s.currentBookId, s.accountBooks)) return {}
+        // 传入的 budget.bookId 也必须可写（CR-2026-11-18 P1）
+        if (budget.bookId != null && !bookWritable(budget.bookId, s.accountBooks)) return {}
         // 预算按账本隔离：匹配键必须带 bookId，否则会误删别的账本（含只读账本）的预算
         const sameBook = (b: { bookId?: string | number }) => String(b.bookId ?? s.currentBookId) === String(budget.bookId ?? s.currentBookId)
         const sameKey = (b: typeof budget) => !sameBook(b) ? false : budget.type === 'custom'
