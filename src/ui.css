@@ -1718,3 +1718,7 @@ section.card:has(.my-user) .page-title { display: none; }
 .ag-sum { display: inline-flex; align-items: center; gap: var(--sp-2); color: var(--muted); font-variant-numeric: tabular-nums; }
 .ag-chev { font-style: normal; }
 .archive-group[open] .ag-chev { transform: rotate(180deg); }
+
+/* 我的 → 云同步：数据修复区块（一木 dialog_data_sync_*） */
+.fix-block { margin: var(--sp-3) 0; padding: var(--sp-3); background: var(--surface-2); border-radius: var(--r-md); display: grid; gap: var(--sp-2); }
+.fix-block .btns { display: flex; gap: var(--sp-2); }

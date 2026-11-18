@@ -1,4 +1,5 @@
 import { clearAllBookPatches } from './book-pending'
+import { DataRepair } from './data-repair'
 import { useEffect, useMemo, useState } from 'react'
 import { useLedger } from '../store'
 import type { Cycle } from '../types'
@@ -1328,6 +1329,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
 
       {meScreen === 'sync' && (<>
         <div className="subpage-head">
+        <DataRepair />
           <button type="button" className="link" onClick={() => setMeScreen(null)}>‹ 返回我的</button>
           <h3>云同步</h3>
         </div>
