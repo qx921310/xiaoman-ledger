@@ -689,7 +689,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         <button type="button" className="row my-row-btn" onClick={() => setBackupOpen(true)}>
           <span className="grow">云备份</span><span className="muted">{syncLine}</span>
         </button>
-        <div className="row"><span className="grow">导出备份</span><span className="muted">JSON</span></div>
+        <div className="row" id="sec-backup"><span className="grow">导出备份</span><span className="muted">JSON</span></div>
         <button type="button" className="row my-row-btn" onClick={async () => {
           const n = await clearAllBookPatches()
           localStorage.removeItem('xiaoman-sync-warning')
@@ -704,7 +704,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         <span className="grow">{attachmentCount === 0 ? '还没有附件' : `共 ${attachmentCount} 个附件`}</span>
         <button type="button" className="link" onClick={() => setFilesOpen(true)}>查看账单图片</button>
       </div>
-      <h3>从其他记账软件迁移</h3>
+      <h3 id="sec-io">从其他记账软件迁移</h3>
       <p className="hint">支持 Excel/CSV 与转账流水表，重复账单会提示核对。</p>
 
       <label className="filebtn big">
