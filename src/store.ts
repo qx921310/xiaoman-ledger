@@ -1385,6 +1385,12 @@ export const useLedger = create<LedgerState>()(
         const toCost = Number(patch.toCost ?? patch.cost)
         const bookId = patch.bookId ?? (s.currentBookId === 0 ? undefined : s.currentBookId)
         if (!bookWritable(bookId, s.accountBooks)) throw new Error('当前账本只读或不存在，不能新增转账')
+        // 收付双方账户所属账本也必须可写（CR-2026-11-18 P1）
+        const fromAcc = s.assets.find((a) => a.assetId === patch.fromAssetId)
+        const toAcc = s.assets.find((a) => a.assetId === patch.toAssetId)
+        // 账户可能尚未同步到本地（离线场景），找不到时保持原行为，只对已知账户校验
+        if (fromAcc && !bookWritable(fromAcc.bookId ?? bookId, s.accountBooks)) throw new Error('转出账户所属账本只读，不能转账')
+        if (toAcc && !bookWritable(toAcc.bookId ?? bookId, s.accountBooks)) throw new Error('转入账户所属账本只读，不能转账')
 
         // 1) 本金：转出方 -，转入方 +
         set((st) => ({
