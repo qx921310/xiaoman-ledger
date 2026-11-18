@@ -1115,13 +1115,26 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       <button type="button" className="link" onClick={() => setMeScreen(null)}>‹ 返回我的</button>
       </>)}
       {meScreen === 'book' && (<>
-      <button type="button" className="link" onClick={() => setMeScreen(null)}>‹ 返回我的</button>
-      <h3>账本</h3>
+      <div className="subpage-head">
+        <button type="button" className="link" onClick={() => setMeScreen(null)}>‹ 返回我的</button>
+        <h3>账本</h3>
+        <button type="button" className="link" style={{ marginLeft: 'auto' }} onClick={() => setBooksOpen(true)}>管理</button>
+      </div>
       <p className="hint">账本只属于你自己，同一账号可多设备登录同一账本。</p>
       <div className="row">
         <span className="grow">共 {accountBooks.filter((b) => !b.hidden).length} 个账本（已隐藏 {accountBooks.filter((b) => b.hidden).length} 个）</span>
-        <button type="button" className="link" onClick={() => setBooksOpen(true)}>账本管理</button>
       </div>
+      {accountBooks.filter((b) => !b.hidden).map((b) => {
+        const id = String(b.bookId ?? b.accountBookId)
+        const on = id === String(currentBookId)
+        return (
+          <button key={id} type="button" className="row my-row-btn" onClick={() => { useLedger.getState().setBook(b.bookId ?? b.accountBookId); notify(`已切换到「${b.accountBookName}」`) }}>
+            <span className="me-ico"><MeIcon name="book" size={22} /></span>
+            <span className="grow">{b.accountBookName}{on ? '（当前）' : ''}</span>
+            <span className="muted">{b.memberCount ? `${b.memberCount} 人` : '仅自己'}</span>
+          </button>
+        )
+      })}
 
       </>)}
       {meScreen === 'cat' && (<>
