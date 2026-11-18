@@ -358,6 +358,11 @@ export const useLedger = create<LedgerState>()(
             const assetId = patch.assetId
             // -1 是一木的「无账户」哨兵，不算非法账户
             if (assetId != null && assetId !== -1 && !s.assets.some((a) => a.assetId === assetId)) return '账户不存在'
+            // 账户自身所属账本也必须可写，否则会改动只读账本账户的余额（CR-2026-11-18 P1）
+            if (assetId != null && assetId !== -1) {
+              const target = s.assets.find((a) => a.assetId === assetId)
+              if (target && !bookWritable(target.bookId ?? bookId, s.accountBooks)) return '该账户所属账本只读，不能记账'
+            }
           }
           return null
         }
