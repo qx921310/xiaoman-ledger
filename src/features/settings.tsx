@@ -216,12 +216,12 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
     [bills]
   )
 
+  // 一木口径：「已同步 N 条账单」/「未开启，数据仅存本地」
+  const billsSynced = useLedger((s2) => s2.bills.length)
   const syncLine = autoSync?.running ? '同步中…'
     : autoSync?.lastError ? '同步失败'
-    : (autoSync?.incomplete ?? 0) > 0 ? `${autoSync?.incomplete} 条待核对`
-    : autoSync?.pending ? '待同步'
-    : autoSync?.lastOkAt ? new Date(autoSync.lastOkAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-    : '尚未同步'
+    : autoSync?.lastOkAt ? (billsSynced > 0 ? `已同步 ${billsSynced} 条账单` : '已同步 0 条账单')
+    : '未开启，数据仅存本地'
   const [rateBusy, setRateBusy] = useState(false)
   const setBudget = useLedger((s2) => s2.setBudget)
   const pull = usePullRefresh(async () => setHiddenOpen(true), 64,
@@ -584,6 +584,10 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       )}
 
       {!meScreen && (<>
+      <button type="button" className="me-warn" onClick={() => { setMeScreen('data'); window.scrollTo({ top: 0 }) }}>
+        未开启任何备份方式，卸载后数据将丢失，点击查看备份状态
+      </button>
+
       <h3>功能</h3>
       <div className="my-grid">
         {([

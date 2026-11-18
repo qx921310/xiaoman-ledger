@@ -1722,3 +1722,8 @@ section.card:has(.my-user) .page-title { display: none; }
 /* 我的 → 云同步：数据修复区块（一木 dialog_data_sync_*） */
 .fix-block { margin: var(--sp-3) 0; padding: var(--sp-3); background: var(--surface-2); border-radius: var(--r-md); display: grid; gap: var(--sp-2); }
 .fix-block .btns { display: flex; gap: var(--sp-2); }
+
+/* 我的页：备份方式提示横幅（对齐 fragment_my.xml） */
+.me-warn { display: block; width: 100%; text-align: left; margin: var(--sp-2) 0; padding: var(--sp-3);
+  background: var(--accent-soft); color: var(--focus-ink); border: 0; border-radius: var(--r-md);
+  font-size: var(--font-sm); cursor: pointer; }
