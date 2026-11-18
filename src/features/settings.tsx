@@ -1330,6 +1330,17 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       {meScreen === 'sync' && (<>
         <div className="subpage-head">
         <DataRepair
+          onDownloadAll={async () => {
+            // 一木「重新下载备份」：先用云端覆盖本地
+            // 先备份本地到 localStorage，避免误点丢数据
+            const uid = useLedger.getState().userId
+            const storageKey = `xiaoman-data:${uid || 'anon'}`
+            const raw = localStorage.getItem(storageKey)
+            if (raw) localStorage.setItem(`xiaoman-restore-backup:${Date.now()}`, raw)
+            localStorage.removeItem(storageKey)
+            localStorage.removeItem(`xiaoman-sync-v2:${uid}`)
+            window.location.reload()
+          }}
           onResetCloud={async () => {
             const bookId = String(useLedger.getState().currentBookId ?? '')
             const r = await fetch('/api/data/reset-cloud', {
