@@ -1711,7 +1711,7 @@ export const useLedger = create<LedgerState>()(
       // 补生成所有到期未生成的周期账单；返回本次生成条数
       // 旧周期规则确认账本归属（用户显式操作，不做静默推断）
       bindCycleBook: (cycleId, bookId) => {
-        if (!bookWritable(get().currentBookId, get().accountBooks) && bookWritable(bookId, get().accountBooks)) return
+        if (!bookWritable(get().currentBookId, get().accountBooks) || !bookWritable(bookId, get().accountBooks)) return
         set((s) => ({
         cycles: s.cycles.map((c) => c.cycleId === cycleId ? { ...c, bookId, updateTime: NOW() } : c)
       }))
