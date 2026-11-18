@@ -1,4 +1,5 @@
 import { clearAllBookPatches } from './book-pending'
+import { userStorage, getCurrentUid } from '../auth'
 import { DataRepair } from './data-repair'
 import { useEffect, useMemo, useState } from 'react'
 import { useLedger } from '../store'
@@ -1334,11 +1335,16 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
             // 一木「重新下载备份」：先用云端覆盖本地
             // 先备份本地到 localStorage，避免误点丢数据
             const uid = useLedger.getState().userId
-            const storageKey = `xiaoman-data:${uid || 'anon'}`
-            const raw = localStorage.getItem(storageKey)
-            if (raw) localStorage.setItem(`xiaoman-restore-backup:${Date.now()}`, raw)
-            localStorage.removeItem(storageKey)
-            localStorage.removeItem(`xiaoman-sync-v2:${uid}`)
+            // 走 userStorage / getCurrentUid，避免手拼键名与持久化层不一致
+            const raw = userStorage.getItem('xiaoman-data')
+            if (raw) {
+              // 仅保留最近 3 份回滚快照
+              const keys = Object.keys(localStorage).filter((k) => k.startsWith('xiaoman-restore-backup:'))
+              keys.sort().slice(0, Math.max(0, keys.length - 2)).forEach((k) => localStorage.removeItem(k))
+              localStorage.setItem(`xiaoman-restore-backup:${Date.now()}`, raw)
+            }
+            userStorage.removeItem('xiaoman-data')
+            localStorage.removeItem(`xiaoman-sync-v2:${getCurrentUid() || uid}`)
             window.location.reload()
           }}
           onResetCloud={async () => {

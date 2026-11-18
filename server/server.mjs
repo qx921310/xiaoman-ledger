@@ -881,7 +881,8 @@ if (path === '/api/books/members' && req.method === 'GET') {
       const bookId = String(body?.bookId || '').trim()
       const member = db.prepare('SELECT role FROM book_members WHERE user_id = ? AND book_id = ?').get(user.id, bookId)
       if (!member) return fail(res, '没有该账本权限')
-      if (member.role === 'silent') return fail(res, '只读账本不能清空云端')
+      // 清空云端是不可逆操作：仅账本管理员（创建者/管理员）可执行
+      if (!isAdmin(member.role)) return fail(res, '只有账本管理员可以清空云端备份', 'BOOK_FORBIDDEN')
       // node:sqlite 的 DatabaseSync 没有 transaction()，用显式事务
       db.exec('BEGIN')
       try {
