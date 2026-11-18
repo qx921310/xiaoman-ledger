@@ -180,7 +180,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const [prepayOpen, setPrepayOpen] = useState(false)
   const [pensionOpen, setPensionOpen] = useState(false)
   const [tool, setTool] = useState<'hourly' | 'inflation' | 'buyrent' | null>(null)
-  const [meScreen, setMeScreen] = useState<'book' | 'cat' | 'tag' | 'data' | 'currency' | 'tools' | null>(null)
+  const [meScreen, setMeScreen] = useState<'book' | 'cat' | 'tag' | 'data' | 'currency' | 'tools' | 'sync' | null>(null)
   const [cycleDrill, setCycleDrill] = useState<{ title: string; cycleId: string | number } | null>(null)
   const [backupOpen, setBackupOpen] = useState(false)
   // 一木 UserInfoActivity：昵称与头像可改（本地保存，账号维度）
@@ -605,7 +605,9 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
 
       <h3>数据管理</h3>
       <div className="my-data">
-        <div className="row"><span className="me-ico"><MeIcon name="cloud" size={22} /></span><span className="grow">云同步</span><span className="muted">{syncLine}</span></div>
+        <button type="button" className="row my-row-btn" onClick={() => { setMeScreen('sync'); window.scrollTo({ top: 0 }) }}>
+          <span className="me-ico"><MeIcon name="cloud" size={22} /></span><span className="grow">云同步</span><span className="muted">{syncLine}</span>
+        </button>
         <button type="button" className="row my-row-btn" onClick={() => { setMeScreen('data'); window.scrollTo({ top: 0 }) }}>
           <span className="me-ico"><MeIcon name="backup" size={22} /></span><span className="grow">数据备份</span><span className="muted">JSON</span>
         </button>
@@ -1323,6 +1325,11 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
 
       </>)}
 
+      {meScreen === 'sync' && (<>
+        <div className="subpage-head">
+          <button type="button" className="link" onClick={() => setMeScreen(null)}>‹ 返回我的</button>
+          <h3>云同步</h3>
+        </div>
       <h3>云端同步</h3>
       <p className="hint">
         同步冲突时保留本地内容并提示。
@@ -1382,6 +1389,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
           <span className="grow">退出登录</span>
         </button>
       )}
+      </>)}
     </section>
   )
 }

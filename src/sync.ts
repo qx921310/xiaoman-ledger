@@ -128,7 +128,9 @@ export function discardBaselessConflicts(): number {
     // archives 在本文件其它路径是数组，这里必须保持同一形状（CR-2026-11-18 P1）
     if (!Array.isArray(meta.archives)) meta.archives = []
     for (const [key, reason] of Object.entries(conflicts)) {
-      if (String(reason).includes('没有云端基准')) {
+      const why = String(reason)
+      // 「没有云端基准」「账本次代次未知」同属历史草稿：账号数据以云端为准，清理掉
+      if (why.includes('没有云端基准') || why.includes('代次未知')) {
         // 先留档再删，便于排查（CR-2026-11-18：不要静默丢掉痕迹）
         meta.archives.push({ at: Date.now(), key, reason: String(reason) } as never)
         delete conflicts[key]
