@@ -1971,6 +1971,9 @@ export const useLedger = create<LedgerState>()(
 
       // 老数据的 bookId 是数字（本地账本），切到服务端账本后要把它们迁过去，否则会被过滤掉
       migrateBookIds: (targetBookId) => {
+        // 跨账本迁移属管理操作：当前账本与目标账本都必须可写（CR-2026-11-18 P2）
+        if (!bookWritable(get().currentBookId, get().accountBooks)) return 0
+        if (!bookWritable(targetBookId, get().accountBooks)) return 0
         let n = 0
         set((s) => ({
           bills: s.bills.map((b) => {

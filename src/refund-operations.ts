@@ -25,7 +25,9 @@ export function addRefundChanges(s: RefundState, input: NewRefund, now: number) 
   const existing = s.refunds.filter((r) => r.billId === bill.billId)
   if (existing.some((r) => r.baseAmount == null)) return {}
   const refunded = existing.reduce((sum, r) => sum + (r.baseAmount ?? 0), 0)
-  if (!Number.isFinite(base) || base <= 0 || base > +(bill.cost - refunded).toFixed(2)) return {}
+  // 用整数分比较，避免浮点误差把「刚好退完」判成超额（CR-2026-11-18 P2）
+  const cents = (v: number) => Math.round(v * 100)
+  if (!Number.isFinite(base) || base <= 0 || cents(base) > cents(bill.cost) - cents(refunded)) return {}
   let refundId = now
   while (s.refunds.some((r) => r.refundId === refundId) || s.tombstones.some((t) => t.kind === 'refund' && t.id === String(refundId))) refundId++
   const rec: Refund = {
