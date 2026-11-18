@@ -1881,6 +1881,9 @@ export const useLedger = create<LedgerState>()(
         const state = get()
         const owner = state.bills.find((b) => String(b.billId) === String(patch.billId))
         if (!bookWritable(owner?.bookId, state.accountBooks)) return false
+        // 退款入账账户所属账本也必须可写（CR-2026-11-18 P1）
+        const refundAcc = state.assets.find((a) => a.assetId === (patch.assetId ?? owner?.assetId))
+        if (refundAcc && !bookWritable(refundAcc.bookId ?? owner?.bookId, state.accountBooks)) return false
         const changes = addRefundChanges(state, patch, NOW())
         if (!changes || Object.keys(changes).length === 0) return false
         set(changes as never)
