@@ -1901,6 +1901,7 @@ export const useLedger = create<LedgerState>()(
 
       // 预算身份：自定义预算用 budgetId（可并存多个），月/年预算用 type+分类
       setBudget: (budget) => set((s) => {
+        if (!bookWritable(s.currentBookId, s.accountBooks)) return {}
         const sameKey = (b: typeof budget) => budget.type === 'custom'
           ? b.type === 'custom' && b.budgetId === budget.budgetId
           : (b.type ?? 'month') === (budget.type ?? 'month') && b.categoryId === budget.categoryId
@@ -1916,6 +1917,7 @@ export const useLedger = create<LedgerState>()(
       }),
 
       removeBudget: (month, categoryId) => set((s) => {
+        if (!bookWritable(s.currentBookId, s.accountBooks)) return {}
         const target = s.budgets.find((b) => b.month === month && b.categoryId === categoryId
           && (b.type ?? 'month') === 'month')
         const id = budgetIdentity({ type: target?.type, month, categoryId, budgetId: target?.budgetId })
@@ -1927,10 +1929,13 @@ export const useLedger = create<LedgerState>()(
       }),
 
       // 自定义预算删除：按 budgetId 精确定位
-      removeBudgetById: (budgetId: number) => set((s) => ({
+      removeBudgetById: (budgetId: number) => set((s) => {
+        if (!bookWritable(s.currentBookId, s.accountBooks)) return {}
+        return ({
         budgets: s.budgets.filter((b) => b.budgetId !== budgetId),
         tombstones: [...s.tombstones, { kind: 'budget', id: `custom:${budgetId}`, updatedAt: NOW() }]
-      })),
+        })
+      }),
 
       updateAsset: (asset) => set((s) => {
         // 只读校验必须看「状态里既有账户」的归属，不能信调用方传入的 bookId
