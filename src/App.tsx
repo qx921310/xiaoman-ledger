@@ -100,8 +100,8 @@ export default function App() {
     try {
       const r = await syncNow()
       const warn = r.denied ? `${r.denied} 条记录未能推送，请到设置页检查同步结果。` : ''
-      // 无云端基准的历史草稿：账号数据以云端为准，静默丢弃，不再打扰
-      discardBaselessConflicts()
+      // 只有本次同步完全干净时才清理历史草稿；有 denied/新冲突时保留待用户处理
+      if (!r.denied && !Number(r.conflicts ?? 0)) discardBaselessConflicts()
       const kept = Number(r.conflictsKept ?? 0) + Number(r.conflicts ?? 0)
       // 云端已被清空（例如重置数据）时，本机残留的「待核对」不再有意义，直接清掉
       const cloudEmpty = Number(r.pulled ?? 0) === 0 && Number(r.pushed ?? 0) === 0 && kept > 0
