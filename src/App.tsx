@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLedger } from './store'
 import { auth, books as bookApi, setCurrentUid, type BookInfo, type User } from './auth'
 import { loadAccountData } from './account-session'
-import { syncNow, discardBaselessConflicts } from './sync'
+import { syncNow, discardBaselessConflicts, getVersionedConflicts } from './sync'
 import { clearAllBookPatches } from './features/book-pending'
 import { startAutoSync, stopAutoSync, getAutoSyncState } from './sync-auto'
 import { startMultiTab } from './multi-tab'
@@ -105,11 +105,13 @@ export default function App() {
   // 打开应用时自动同步一次；失败不打扰用户，手动同步仍可用
   const autoSyncOnce = async () => {
     try {
+      // 先清理「无云端基准/代次未知」的历史冲突，再同步，避免每次刷新都重新提示
+      discardBaselessConflicts()
       const r = await syncNow()
       const warn = r.denied ? `${r.denied} 条记录未能推送，请到设置页检查同步结果。` : ''
-      // 只有本次同步完全干净时才清理历史草稿；有 denied/新冲突时保留待用户处理
-      if (!r.denied && !Number(r.conflicts ?? 0)) discardBaselessConflicts()
-      const kept = Number(r.conflictsKept ?? 0) + Number(r.conflicts ?? 0)
+      if (!r.denied) discardBaselessConflicts()
+      // 以「清理后真实剩余的冲突」为准，而不是同步返回的历史计数
+      const kept = Number(r.conflictsKept ?? 0) + getVersionedConflicts().length
       // 云端已被清空（例如重置数据）时，本机残留的「待核对」不再有意义，直接清掉
       const cloudEmpty = Number(r.pulled ?? 0) === 0 && Number(r.pushed ?? 0) === 0 && kept > 0
       setSyncWarning(warn || (cloudEmpty ? '' : kept ? `有 ${kept} 条记录待核对（冲突或未推送），请到设置页处理。` : ''))
