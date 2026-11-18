@@ -856,6 +856,9 @@ export const useLedger = create<LedgerState>()(
         const s = get()
         const rec = s.stockAssets.find((x) => x.stockAssetId === stockAssetId)
         if (!rec || !(num > 0) || !bookWritable(rec.bookId, s.accountBooks)) return false
+        // 交易会调整现金账户（当前取第一个账户），该账户所属账本也必须可写（CR-2026-11-18 P1）
+        const cash = s.assets[0]
+        if (cash && !bookWritable(cash.bookId ?? rec.bookId, s.accountBooks)) return false
         const h = { num: rec.primeNum, cost: rec.primeCost, realized: rec.historyIncome, lots: rec.lots }
         const method = rec.costMethod ?? 0
         const next = type === 1 ? applyBuyWithLot(h, num, amount, fee) : applySellByMethod(h, method, num, amount, fee)
