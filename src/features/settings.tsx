@@ -1342,6 +1342,10 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
 
       {meScreen === 'sync' && (<>
         <div className="subpage-head">
+
+          <button type="button" className="link" onClick={() => setMeScreen(null)}>‹ 返回我的</button>
+          <h3>云同步</h3>
+        </div>
         <DataRepair
           onDownloadAll={async () => {
             // 一木「重新下载备份」：先用云端覆盖本地
@@ -1373,9 +1377,6 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
             window.location.reload()
           }}
         />
-          <button type="button" className="link" onClick={() => setMeScreen(null)}>‹ 返回我的</button>
-          <h3>云同步</h3>
-        </div>
       <div className="btns">
         <button type="button" className="primary" onClick={runSync} disabled={syncing}>{syncing ? '同步中…' : '立即同步'}</button>
       </div>

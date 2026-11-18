@@ -55,6 +55,10 @@ for (const name of items) {
   await sleep(900)
   const body = await text()
   const hasBack = await ev("!!document.querySelector('.subpage-head')")
+  if (name.includes('云同步')) {
+    const shot = await cdp.send('Page.captureScreenshot', { format: 'png' }, sid)
+    if (shot.result?.data) writeFileSync(`${OUT}/sync.png`, Buffer.from(shot.result.data, 'base64'))
+  }
   rows.push({ name, opened, len: body.length, hasBack, head: body.slice(body.indexOf('我的') + 2, body.indexOf('我的') + 120) })
 }
 writeFileSync(`${OUT}/audit.json`, JSON.stringify(rows, null, 2))
