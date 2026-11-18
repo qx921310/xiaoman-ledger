@@ -1486,6 +1486,8 @@ export const useLedger = create<LedgerState>()(
           || s.refunds.some((r) => r.assetId === assetId)
           || s.reimbursements.some((r) => r.assetId === assetId)
           || s.cycles.some((c) => c.assetId === assetId)
+          || s.assetFlows.some((f) => (f as { assetId?: number }).assetId === assetId)
+          || s.fixedDeposits.some((d) => (d as { assetId?: number }).assetId === assetId)
         if (hasRefs) return {}
         return {
         assets: s.assets.filter((a) => a.assetId !== assetId),

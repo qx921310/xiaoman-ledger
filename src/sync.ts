@@ -125,11 +125,18 @@ export function discardBaselessConflicts(): number {
     const meta = JSON.parse(raw) as VersionedMeta
     const conflicts = meta.conflicts ?? {}
     let dropped = 0
+    const archives = (meta as { archives?: Record<string, string> }).archives ?? {}
     for (const [key, reason] of Object.entries(conflicts)) {
-      if (String(reason).includes('没有云端基准')) { delete conflicts[key]; dropped += 1 }
+      if (String(reason).includes('没有云端基准')) {
+        // 先留档再删，便于排查（CR-2026-11-18：不要静默丢掉痕迹）
+        archives[key] = String(reason)
+        delete conflicts[key]
+        dropped += 1
+      }
     }
     if (dropped) {
       meta.conflicts = conflicts
+      ;(meta as { archives?: Record<string, string> }).archives = archives
       localStorage.setItem(storageKey, JSON.stringify(meta))
     }
     return dropped
