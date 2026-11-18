@@ -1611,6 +1611,8 @@ export const useLedger = create<LedgerState>()(
         if (!pending || pending.status === 'done' || !account || !hasCurrencyRate(account.currency, before.currencies, before.defaultCurrency)) return false
         const bill = before.bills.find((b) => String(b.billId) === String(pending.billId))
         if (!bookWritable(pending.bookId ?? bill?.bookId, before.accountBooks)) return false
+        // 入账账户所属账本也必须可写（CR-2026-11-18 P1）
+        if (account && !bookWritable(account.bookId ?? pending.bookId ?? bill?.bookId, before.accountBooks)) return false
         const rate = !account.currency || account.currency === before.defaultCurrency ? 1
           : before.currencies.find((c) => c.code === account.currency)!.rate
         set((s) => {
