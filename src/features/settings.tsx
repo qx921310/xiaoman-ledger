@@ -572,6 +572,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
                 await syncNowImmediate()
                 // 手动同步后同样清理「没有云端基准」的历史冲突，否则提示会一直挂着
                 const dropped = discardBaselessConflicts()
+                if (dropped) window.dispatchEvent(new CustomEvent('xiaoman-conflict-cleared'))
                 setSyncConflicts(getVersionedConflicts())
                 notify(dropped ? `已同步，清理 ${dropped} 条历史待核对` : '已同步')
               } catch { notify('同步失败') }

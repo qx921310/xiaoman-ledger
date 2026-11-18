@@ -95,6 +95,13 @@ export default function App() {
     })
   }, [])
 
+  // 子页里手动清理冲突后，通知首页把顶部提示撤掉
+  useEffect(() => {
+    const onCleared = () => setSyncWarning('')
+    window.addEventListener('xiaoman-conflict-cleared', onCleared)
+    return () => window.removeEventListener('xiaoman-conflict-cleared', onCleared)
+  }, [])
+
   // 打开应用时自动同步一次；失败不打扰用户，手动同步仍可用
   const autoSyncOnce = async () => {
     try {
