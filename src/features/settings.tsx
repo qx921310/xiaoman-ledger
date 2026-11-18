@@ -602,7 +602,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
             if (key === 'book') { setMeScreen('book'); window.scrollTo({ top: 0 }); return }
             if (key === 'cat') { setMeScreen('cat'); window.scrollTo({ top: 0 }); return }
             if (key === 'tag') { setMeScreen('tag'); window.scrollTo({ top: 0 }); return }
-            if (key === 'cycle') { setMeScreen('data'); window.scrollTo({ top: 0 }); return }
+            if (key === 'cycle') { setMeScreen('data'); window.scrollTo({ top: 0 }); setTimeout(() => document.getElementById('sec-cycle')?.scrollIntoView({ block: 'start' }), 120); return }
             if (key === 'more') { setMeScreen('more'); window.scrollTo({ top: 0 }); return }
             if (key === 'dream') { setDreamOpen(true); return }
             if (key === 'ai') { setAiTypeOpen(true); return }
@@ -878,7 +878,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         </Modal>
       )}
 
-      <h3>周期记账</h3>
+      <h3 id="sec-cycle">周期记账</h3>
       <p className="hint"></p>
       {(() => {
         const pending = cycles.filter((c) => c.enabled).flatMap((c) => pendingDates(c).map((d) => ({ c, key: dateKey(d) })))
@@ -1141,13 +1141,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
                     onChange={(e) => updateCategory(p.id, { name: e.target.value })} />
                   <small>{childCategories.filter((c) => c.parentId === p.id).length} 个子分类</small>
                 </div>
-                <select aria-label={`${p.name} 图标`} value={p.icon ?? ''}
-                  onChange={(e) => updateCategory(p.id, { icon: e.target.value || undefined })}>
-                  <option value="">默认</option>
-                  {(kind === 'income' ? PARENT_ICONS : PARENT_ICONS).map((k) => (
-                    <option key={k} value={k}>{k.replace('ic_parent_', '')}</option>
-                  ))}
-                </select>
+                {/* 图标选择器先移除：内部资源键会直接暴露在界面上（一木是图标面板） */}
                 <input aria-label={`${p.name} 颜色`} className="color" type="color" value={p.color}
                   onChange={(e) => updateCategory(p.id, { color: e.target.value })} />
                 <button className="link" aria-label={`${p.name} 在本账本${(p.bookIds ?? []).some((b) => String(b) === String(currentBookId)) ? '可用（点击移出）' : '不可用（点击加入）'}`}
@@ -1168,11 +1162,6 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
                   <div key={c.id} className="cat-child">
                     <input aria-label={`${c.name} 子分类名称`} value={c.name}
                       onChange={(e) => updateCategory(c.id, { name: e.target.value })} />
-                    <select aria-label={`${c.name} 图标`} value={c.icon ?? ''}
-                      onChange={(e) => updateCategory(c.id, { icon: e.target.value || undefined })}>
-                      <option value="">默认</option>
-                      {CHILD_ICONS.map((k) => <option key={k} value={k}>{k.replace('ic_', '')}</option>)}
-                    </select>
                     <button className="link" aria-label={`${c.name} 上移`} onClick={() => moveVisibleCategory(c.id, -1)}>↑</button>
                     <button className="link" aria-label={`${c.name} 下移`} onClick={() => moveVisibleCategory(c.id, 1)}>↓</button>
                     <button className="del" aria-label={`删除子分类 ${c.name}`} onClick={() => {
@@ -1200,7 +1189,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
           <select aria-label="分类图标" value={newCat.icon}
             onChange={(e) => setNewCat({ ...newCat, icon: e.target.value })}>
             <option value="">默认</option>
-            {(newCat.parentId === 0 ? PARENT_ICONS : CHILD_ICONS).map((k) => <option key={k} value={k}>{k}</option>)}
+            {(newCat.parentId === 0 ? PARENT_ICONS : CHILD_ICONS).map((k, i) => <option key={k} value={k}>{`图标 ${i + 1}`}</option>)}
           </select>
           <label className="row">
             <span className="grow">仅在本账本显示</span>

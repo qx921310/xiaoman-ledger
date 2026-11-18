@@ -1732,3 +1732,8 @@ section.card:has(.my-user) .page-title { display: none; }
 .card.subpage .my-user,
 .card.subpage .my-vip,
 .card.subpage .me-sync { display: none; }
+
+/* 分类管理：子分类行占满宽度，不显示内部图标键 */
+.cat-children { display: grid; gap: var(--sp-2); width: 100%; }
+.cat-child { display: grid; grid-template-columns: 1fr auto auto auto; gap: var(--sp-2); align-items: center; width: 100%; }
+.cat-child input { width: 100%; }
