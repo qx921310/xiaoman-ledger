@@ -1911,6 +1911,8 @@ export const useLedger = create<LedgerState>()(
         if (!bill || !bookWritable(rec.bookId ?? bill?.bookId, s.accountBooks)) return false
         const asset = s.assets.find((a) => a.assetId === (patch.assetId ?? rec.assetId ?? bill.assetId))
         if (!asset || !hasCurrencyRate(asset.currency, s.currencies, s.defaultCurrency)) return false
+        // 编辑退款会改账户余额，目标账户所属账本必须可写（CR-2026-11-18 P1 第 7/7）
+        if (!bookWritable(asset.bookId ?? rec.bookId ?? bill.bookId, s.accountBooks)) return false
         const currency = asset.currency ?? s.defaultCurrency
         const accountChanged = asset.assetId !== rec.assetId
 
