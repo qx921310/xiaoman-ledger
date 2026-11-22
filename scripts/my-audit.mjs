@@ -55,6 +55,19 @@ for (const name of items) {
   await sleep(900)
   const body = await text()
   const hasBack = await ev("!!document.querySelector('.subpage-head')")
+  {
+    const safe = name.replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g, '_').slice(0, 24)
+    const shotAll = await cdp.send('Page.captureScreenshot', { format: 'png' }, sid)
+    if (shotAll.result?.data) writeFileSync(`${OUT}/item-${safe}.png`, Buffer.from(shotAll.result.data, 'base64'))
+  }
+  if (name.includes('云同步')) {
+    await ev(`(() => { const b=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='重新云同步'); if(b) b.click(); return !!b })()`)
+    await sleep(700)
+    const dlg = await cdp.send('Page.captureScreenshot', { format: 'png' }, sid)
+    if (dlg.result?.data) writeFileSync(`${OUT}/repair-dialog.png`, Buffer.from(dlg.result.data, 'base64'))
+    await ev(`(() => { const b=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='取消'); if(b) b.click(); return !!b })()`)
+    await sleep(300)
+  }
   if (name.includes('云同步')) {
     const shot = await cdp.send('Page.captureScreenshot', { format: 'png' }, sid)
     if (shot.result?.data) writeFileSync(`${OUT}/sync.png`, Buffer.from(shot.result.data, 'base64'))

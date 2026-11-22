@@ -1761,3 +1761,6 @@ section.card:has(.my-user) .page-title { display: none; }
 /* 账单行：账户名放在右侧金额下方（对齐一木） */
 .cost-cell { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 .cost-acct { color: var(--muted); font-size: var(--font-xs); }
+
+/* 弹窗本身不显示键盘焦点描边（点击后会出现黑框） */
+.modal:focus, .modal:focus-visible { outline: none; }

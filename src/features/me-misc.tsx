@@ -50,16 +50,23 @@ export function MeMiscPage({ name, onBack }: { name: string; onBack: () => void 
     const next = { ...modules, [k]: !modules[k] }
     setModules(next)
     localStorage.setItem('xiaoman-home-modules', JSON.stringify(next))
+    window.dispatchEvent(new CustomEvent('xiaoman-home-modules', { detail: next }))
   }
+  const currentBookName = useLedger((st) => st.accountBooks.find((b) => String(b.bookId) === String(st.currentBookId))?.accountBookName ?? '—')
   const [theme, setTheme] = useState<string>(() => localStorage.getItem('xiaoman-theme') ?? 'amber')
   useEffect(() => {
     document.documentElement.dataset.theme = theme
     localStorage.setItem('xiaoman-theme', theme)
   }, [theme])
   const clearCache = async () => {
-    const { clearAllBookPatches } = await import('./book-pending')
-    const n = await clearAllBookPatches()
-    alert(n ? `已清理 ${n} 条本机待同步修改` : '没有需要清理的本机修改')
+    if (!window.confirm('清理本机同步缓存会删除这台设备上尚未上传的修改与冲突草稿，且无法恢复。继续？')) return
+    try {
+      const { clearAllBookPatches } = await import('./book-pending')
+      const n = await clearAllBookPatches()
+      alert(n ? `已清理 ${n} 条本机待同步修改` : '没有需要清理的本机修改')
+    } catch {
+      alert('清理失败，请稍后重试')
+    }
   }
   return (
     <>
@@ -85,7 +92,7 @@ export function MeMiscPage({ name, onBack }: { name: string; onBack: () => void 
             <span className="grow">清理本机同步缓存</span>
             <span className="muted">仅本机</span>
           </button>
-          <p className="hint">当前账本：{useLedger.getState().accountBooks.find((b) => String(b.bookId) === String(useLedger.getState().currentBookId))?.accountBookName ?? '—'}</p>
+          <p className="hint">当前账本：{currentBookName}</p>
         </>
       ) : name === 'theme' ? (
         <>

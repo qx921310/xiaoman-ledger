@@ -201,6 +201,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
   const budgets = useLedger((s2) => s2.budgets)
 
   // 连续记账天数：从今天（或昨天）往前数，直到断档
+  // 同步状态只在「数据管理 · 云同步」行展示，避免与状态条重复
   const streak = useMemo(() => {
     const days = new Set(bills.map((b) => fullDay(b.time)))
     let n = 0
@@ -497,13 +498,6 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
 
 
 
-      <div className="me-sync">
-        {autoSync?.running ? '同步中…'
-          : autoSync?.lastError ? `同步失败：${autoSync.lastError}（点下方「立即同步」重试）`
-          : autoSync?.pending ? '有改动待同步'
-          : autoSync?.lastOkAt ? `上次同步 ${new Date(autoSync.lastOkAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`
-          : '尚未同步'}
-      </div>
 
 
       {aiTypeOpen && <AiTypeManager onBack={() => setAiTypeOpen(false)} notify={notify} />}
@@ -656,8 +650,8 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       </div>
       </>)}
 
-      {me && <p className="hint">当前登录：{me.email}</p>}
-      {onLogout && (
+      {!meScreen && me && <p className="hint">当前登录：{me.email}</p>}
+      {!meScreen && onLogout && (
         <button type="button" className="row my-row-btn" aria-label="退出登录" onClick={() => { if (confirm('确定退出登录吗？本机数据会保留。')) onLogout() }}>
           <span className="grow">退出登录</span>
         </button>
