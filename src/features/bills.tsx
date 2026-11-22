@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { readPrefs, type Prefs } from '../prefs'
 import { SelectSheet } from '../ui/select-sheet'
 import { useLedger } from '../store'
 import { BILL_TYPE } from '../types'
@@ -41,6 +42,16 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
   const duplicate = useLedger((s) => s.duplicateBill)
   const restore = useLedger((s) => s.restoreBill)
   const [undoBill, setUndoBill] = useState<Bill | null>(null)
+  // 更多设置 → 账单设置（只影响展示）
+  const [prefs, setPrefs] = useState<Prefs>(() => readPrefs())
+  useEffect(() => {
+    const onPrefs = (e: Event) => {
+      const detail = (e as CustomEvent<Prefs>).detail
+      if (detail) setPrefs(detail)
+    }
+    window.addEventListener('xiaoman-prefs', onPrefs)
+    return () => window.removeEventListener('xiaoman-prefs', onPrefs)
+  }, [])
   const removeWithUndo = (bill: Bill) => { del(bill.billId); setUndoBill(bill) }
   const delTransfer = useLedger((s) => s.deleteTransfer)
   const updateBill = useLedger((s) => s.updateBill)
@@ -383,12 +394,17 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
                 </span>
                 <div className="grow">
                   <div>
-                    {p?.name ?? '未分类'}
+                    {(() => {
+                      const child = resolveBillChild(b, children)
+                      if (prefs.remarkFirst && b.remark) return b.remark
+                      if (prefs.simpleCategory && child) return child.name
+                      return p?.name ?? '未分类'
+                    })()}
                     {!!b.childCategoryId && !resolveBillChild(b, children) && <span className="tag">分类待核对</span>}
                     {b.conflict && <span className="foreign" title="并发冲突：与他人同一秒记账撞了 ID，可能有一条未并入 — 点「明细」查看">❗</span>}
-                    {b.remark ? <span className="remark"> · {b.remark}</span> : null}
+                    {b.remark && !prefs.remarkFirst ? <span className="remark"> · {b.remark}</span> : null}
                   </div>
-                  <small className="cat-time">{hhmm(b.time)}</small>
+                  {prefs.showTime && <small className="cat-time">{hhmm(b.time)}</small>}
                   {(() => {
                     const sub = resolveBillChild(b, children)
                     return sub ? <small className="cat-sub">{sub.name}</small> : null
@@ -419,10 +435,10 @@ export function Bills({ me, onAdd, embedded = false, rangeAll = false, simpleVie
                   )}
                 </div>
                 <span className="cost-cell">
-                  {(b.discountNumber ?? 0) > 0 && (
+                  {prefs.showOriginAmount && (b.discountNumber ?? 0) > 0 && (
                     <s className="old-cost">{money(+(b.cost + (b.discountNumber ?? 0)).toFixed(2))}</s>
                   )}
-                  <b className={inc ? 'in' : 'out'}>{inc ? '+' : '-'}{money(inc ? b.cost : billNetAmount(b, refunds))}</b>
+                  <b className={prefs.colorMoney ? (inc ? 'in' : 'out') : ''}>{inc ? '+' : '-'}{money(inc ? b.cost : billNetAmount(b, refunds))}</b>
                   {a?.assetName && <small className="cost-acct">{a.assetName}</small>}
                 </span>
                 {!simpleView && <div className="ledger-actions">

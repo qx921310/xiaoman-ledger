@@ -1764,3 +1764,10 @@ section.card:has(.my-user) .page-title { display: none; }
 
 /* 弹窗本身不显示键盘焦点描边（点击后会出现黑框） */
 .modal:focus, .modal:focus-visible { outline: none; }
+
+/* 更多设置：带说明的开关行 */
+.me-switch { align-items: flex-start; padding: var(--sp-3) 0; }
+.me-switch .grow { display: flex; flex-direction: column; gap: 2px; }
+.me-switch-label { color: var(--ink); font-size: var(--font-md); }
+.me-switch small { color: var(--muted); font-size: var(--font-xs); }
+.my-row-btn small { display: block; color: var(--muted); font-size: var(--font-xs); margin-top: 2px; }

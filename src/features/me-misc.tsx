@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLedger } from '../store'
+import { readPrefs, writePrefs, type Prefs } from '../prefs'
 
 /**
  * 我的页里「一木有、我们暂未实现」的入口落地页。
@@ -40,24 +41,27 @@ const PAGES: Record<string, { title: string; body: string[] }> = {
   }
 }
 
-export function MeMiscPage({ name, onBack }: { name: string; onBack: () => void }) {
+export function MeMiscPage({ name, onBack, onOpenCurrency }: { name: string; onBack: () => void; onOpenCurrency?: () => void }) {
   const page = PAGES[name] ?? { title: '敬请期待', body: ['这个功能还在开发中。'] }
-  const [modules, setModules] = useState<{ summary: boolean; budget: boolean; flow: boolean }>(() => {
-    try { return { summary: true, budget: true, flow: true, ...(JSON.parse(localStorage.getItem('xiaoman-home-modules') ?? '{}')) } }
-    catch { return { summary: true, budget: true, flow: true } }
-  })
-  const toggle = (k: 'summary' | 'budget' | 'flow') => {
-    const next = { ...modules, [k]: !modules[k] }
-    setModules(next)
-    localStorage.setItem('xiaoman-home-modules', JSON.stringify(next))
-    window.dispatchEvent(new CustomEvent('xiaoman-home-modules', { detail: next }))
-  }
   const currentBookName = useLedger((st) => st.accountBooks.find((b) => String(b.bookId) === String(st.currentBookId))?.accountBookName ?? '—')
+  const defaultCurrency = useLedger((st) => st.defaultCurrency)
+  const currencies = useLedger((st) => st.currencies)
+  const setDefaultCurrency = useLedger((st) => st.setDefaultCurrency)
+  const [prefs, setPrefs] = useState<Prefs>(() => readPrefs())
   const [theme, setTheme] = useState<string>(() => localStorage.getItem('xiaoman-theme') ?? 'amber')
+  const [baseOpen, setBaseOpen] = useState(false)
+
   useEffect(() => {
     document.documentElement.dataset.theme = theme
     localStorage.setItem('xiaoman-theme', theme)
   }, [theme])
+
+  const toggle = (key: keyof Prefs) => {
+    const next = { ...prefs, [key]: !prefs[key] }
+    setPrefs(next)
+    writePrefs(next)
+  }
+
   const clearCache = async () => {
     if (!window.confirm('清理本机同步缓存会删除这台设备上尚未上传的修改与冲突草稿，且无法恢复。继续？')) return
     try {
@@ -68,43 +72,91 @@ export function MeMiscPage({ name, onBack }: { name: string; onBack: () => void 
       alert('清理失败，请稍后重试')
     }
   }
+
+  const Switch = ({ label, desc, k }: { label: string; desc: string; k: keyof Prefs }) => (
+    <label className="row me-switch">
+      <span className="grow">
+        <span className="me-switch-label">{label}</span>
+        <small>{desc}</small>
+      </span>
+      <input type="checkbox" checked={prefs[k]} onChange={() => toggle(k)} />
+    </label>
+  )
+
+  if (name === 'theme') {
+    return (
+      <>
+        <div className="subpage-head">
+          <button type="button" className="link" onClick={onBack}>‹ 返回我的</button>
+          <h3>{page.title}</h3>
+        </div>
+        <p className="hint">切换后立即生效，选择会记在这台设备上。</p>
+        {([['amber', '琥珀暖调'], ['night', '夜色']] as const).map(([key, label]) => (
+          <button key={key} type="button" className="row my-row-btn" onClick={() => setTheme(key)}>
+            <span className="grow">{label}</span>
+            <span className="muted">{theme === key ? '使用中' : ''}</span>
+          </button>
+        ))}
+      </>
+    )
+  }
+
+  if (name !== 'more') {
+    return (
+      <>
+        <div className="subpage-head">
+          <button type="button" className="link" onClick={onBack}>‹ 返回我的</button>
+          <h3>{page.title}</h3>
+        </div>
+        {page.body.map((line) => <p key={line} className="hint">{line}</p>)}
+      </>
+    )
+  }
+
   return (
     <>
       <div className="subpage-head">
         <button type="button" className="link" onClick={onBack}>‹ 返回我的</button>
-        <h3>{page.title}</h3>
+        <h3>更多设置</h3>
       </div>
-      {name === 'more' ? (
+
+      <h3>账单设置</h3>
+      <Switch label="多币种" desc="为账单、账户设置币种" k="multiCurrency" />
+      {prefs.multiCurrency && (
         <>
-          <h3>首页显示内容</h3>
-          {([
-            ['summary', '收支汇总卡'],
-            ['budget', '预算进度'],
-            ['flow', '最近流水'],
-          ] as const).map(([k, label]) => (
-            <label key={k} className="row">
-              <span className="grow">{label}</span>
-              <input type="checkbox" checked={modules[k]} onChange={() => toggle(k)} />
-            </label>
-          ))}
-          <h3>维护</h3>
-          <button type="button" className="row my-row-btn" onClick={() => void clearCache()}>
-            <span className="grow">清理本机同步缓存</span>
-            <span className="muted">仅本机</span>
+          <button type="button" className="row my-row-btn" onClick={() => setBaseOpen((v) => !v)}>
+            <span className="grow">本位币<small>设置软件的默认币种</small></span>
+            <span className="muted">{currencies.find((c) => c.code === defaultCurrency)?.name ?? '人民币'}</span>
           </button>
-          <p className="hint">当前账本：{currentBookName}</p>
-        </>
-      ) : name === 'theme' ? (
-        <>
-          <p className="hint">切换后立即生效，选择会记在这台设备上。</p>
-          {([['amber', '琥珀暖调'], ['night', '夜色']] as const).map(([key, label]) => (
-            <button key={key} type="button" className="row my-row-btn" onClick={() => setTheme(key)}>
-              <span className="grow">{label}</span>
-              <span className="muted">{theme === key ? '使用中' : ''}</span>
+          {baseOpen && currencies.map((c) => (
+            <button key={c.code} type="button" className="row my-row-btn" onClick={() => { setDefaultCurrency(c.code); setBaseOpen(false) }}>
+              <span className="grow">{c.name} {c.code}</span>
+              <span className="muted">{c.code === defaultCurrency ? '使用中' : `1 ${c.code} = ${c.rate} CNY`}</span>
             </button>
           ))}
+          {onOpenCurrency && (
+            <button type="button" className="row my-row-btn" onClick={onOpenCurrency}>
+              <span className="grow">币种与汇率<small>增删币种、修改汇率</small></span>
+              <span className="muted">{currencies.length} 种 ›</span>
+            </button>
+          )}
         </>
-      ) : page.body.map((line) => <p key={line} className="hint">{line}</p>)}
+      )}
+      <Switch label="备注优先显示" desc="将备注作为标题，分类作为描述" k="remarkFirst" />
+      <Switch label="分类精简" desc="拥有二级分类的账单将不显示一级分类" k="simpleCategory" />
+      <Switch label="显示账单时间" desc="在账单流水中显示账单的具体时间" k="showTime" />
+      <Switch label="显示原金额" desc="退款、优惠账单显示原金额" k="showOriginAmount" />
+      <Switch label="显示账户图标" desc="在流水中显示账户图标" k="showAssetIcon" />
+      <Switch label="金额颜色" desc="支出红色，收入绿色" k="colorMoney" />
+
+      <h3>偏好设置</h3>
+      <div className="row"><span className="grow">当前账本</span><span className="muted">{currentBookName}</span></div>
+
+      <h3>维护</h3>
+      <button type="button" className="row my-row-btn" onClick={() => void clearCache()}>
+        <span className="grow">清理本机同步缓存</span>
+        <span className="muted">仅本机</span>
+      </button>
     </>
   )
 }

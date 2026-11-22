@@ -207,6 +207,7 @@ interface LedgerState {
   deleteTag: (tagId: number) => void
   ensureTags: (names: string[]) => number
   setCurrencyRate: (code: string, rate: number) => void
+  setDefaultCurrency: (code: string) => void
   addCurrency: (c: Currency) => void
   removeCurrency: (code: string) => void
   applyRemote: (records: SyncIncoming[]) => void
@@ -2271,6 +2272,12 @@ export const useLedger = create<LedgerState>()(
           currencies: s.currencies.map((c) => c.code === code
             ? { ...c, rate: c.code === s.defaultCurrency ? 1 : r } : c)
         }
+      }),
+      // 一木：更多设置 → 账单设置 → 本位币
+      setDefaultCurrency: (code) => set((s) => {
+        if (!bookWritable(s.currentBookId, s.accountBooks)) return {}
+        if (!s.currencies.some((c) => c.code === code) && code !== s.defaultCurrency) return {}
+        return { defaultCurrency: code }
       }),
 
       addCurrency: (c) => set((s) => s.currencies.some((x) => x.code === c.code)

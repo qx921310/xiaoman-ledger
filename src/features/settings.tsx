@@ -619,9 +619,6 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         <button type="button" className="row my-row-btn" onClick={() => { setMeScreen('data'); window.scrollTo({ top: 0 }); setTimeout(() => document.getElementById('sec-io')?.scrollIntoView({ block: 'start' }), 120) }}>
           <span className="me-ico"><MeIcon name="io" size={22} /></span><span className="grow">导入导出</span><span className="muted">Excel / CSV</span>
         </button>
-        <button type="button" className="row my-row-btn" onClick={() => { setMeScreen('currency'); window.scrollTo({ top: 0 }) }}>
-          <span className="me-ico"><MeIcon name="theme" size={22} /></span><span className="grow">币种与汇率</span><span className="muted">{currencies.length} 种</span>
-        </button>
         <button type="button" className="row my-row-btn" onClick={() => setFilesOpen(true)}>
           <span className="me-ico"><MeIcon name="image" size={22} /></span><span className="grow">账单图片</span><span className="muted">{bills.filter((b) => (b.files?.length ?? 0) > 0).length} 笔</span>
         </button>
@@ -1343,7 +1340,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       </>)}
 
       {meScreen && ['theme', 'activity', 'apps', 'widget', 'invite', 'feedback', 'evaluate', 'more'].includes(meScreen) && (
-        <MeMiscPage name={meScreen} onBack={() => setMeScreen(null)} />
+        <MeMiscPage name={meScreen} onBack={() => setMeScreen(null)} onOpenCurrency={() => setMeScreen('currency')} />
       )}
 
       {meScreen === 'sync' && (<>
