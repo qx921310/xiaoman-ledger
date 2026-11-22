@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLedger } from '../store'
 
 /**
@@ -51,6 +51,11 @@ export function MeMiscPage({ name, onBack }: { name: string; onBack: () => void 
     setModules(next)
     localStorage.setItem('xiaoman-home-modules', JSON.stringify(next))
   }
+  const [theme, setTheme] = useState<string>(() => localStorage.getItem('xiaoman-theme') ?? 'amber')
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    localStorage.setItem('xiaoman-theme', theme)
+  }, [theme])
   const clearCache = async () => {
     const { clearAllBookPatches } = await import('./book-pending')
     const n = await clearAllBookPatches()
@@ -81,6 +86,16 @@ export function MeMiscPage({ name, onBack }: { name: string; onBack: () => void 
             <span className="muted">仅本机</span>
           </button>
           <p className="hint">当前账本：{useLedger.getState().accountBooks.find((b) => String(b.bookId) === String(useLedger.getState().currentBookId))?.accountBookName ?? '—'}</p>
+        </>
+      ) : name === 'theme' ? (
+        <>
+          <p className="hint">切换后立即生效，选择会记在这台设备上。</p>
+          {([['amber', '琥珀暖调'], ['night', '夜色']] as const).map(([key, label]) => (
+            <button key={key} type="button" className="row my-row-btn" onClick={() => setTheme(key)}>
+              <span className="grow">{label}</span>
+              <span className="muted">{theme === key ? '使用中' : ''}</span>
+            </button>
+          ))}
         </>
       ) : page.body.map((line) => <p key={line} className="hint">{line}</p>)}
     </>

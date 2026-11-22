@@ -23,8 +23,12 @@ for (const [, value] of body.matchAll(/\bfont-size\s*:\s*([^;}]+)/g)) {
 }
 const literal = /#[\da-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\s*\(/i
 if (literal.test(body)) throw new Error('主题颜色和透明色只能定义在 :root 令牌中')
-const hex = new Set([...roots.matchAll(/#[\da-f]{3,8}\b/gi)].map((m) => m[0].toLowerCase()))
-if (hex.size > 12) throw new Error(`主题色超过 12 种：${hex.size}`)
+// 每个主题块（:root / [data-theme='x']）最多 12 种颜色，跨主题可以复用同一批色值
+const blocks = [...css.matchAll(TOKEN_SELECTOR)].map((m) => m[1])
+blocks.forEach((block, i) => {
+  const hex = new Set([...block.matchAll(/#[\da-f]{3,8}\b/gi)].map((m) => m[0].toLowerCase()))
+  if (hex.size > 12) throw new Error(`第 ${i + 1} 个主题块颜色超过 12 种：${hex.size}`)
+})
 // TSX presentation must not bypass the shared tokens. Data defaults and user
 // colors live in data modules and are intentionally outside this check.
 function scanComponents(directory) {
@@ -39,4 +43,5 @@ function scanComponents(directory) {
   }
 }
 scanComponents('src')
-console.log(`视觉令牌检查通过：${radii.length} 档圆角、${sizes.length} 档字号、${hex.size} 种主题色；TSX 颜色字面量为零`)
+const themeColorCount = Math.max(...blocks.map((b) => new Set([...b.matchAll(/#[\da-f]{3,8}\b/gi)].map((m) => m[0].toLowerCase())).size))
+console.log(`视觉令牌检查通过：${radii.length} 档圆角、${sizes.length} 档字号、每主题最多 ${themeColorCount} 色（${blocks.length} 个主题块）；TSX 颜色字面量为零`)

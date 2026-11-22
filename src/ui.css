@@ -31,6 +31,23 @@
   --key-finish-ink: var(--ink);
 }
 
+:root[data-theme='night'], [data-theme='night'] {
+  --bg: #17130f;
+  --card: #221c16;
+  --ink: #f4ece1;
+  --muted: #b09a83;
+  --line: #362c22;
+  --accent: #e0a53c;
+  --accent-soft: #2f2519;
+  --in: #86b34a;
+  --out: #f08a5d;
+  --action-ink: var(--ink);
+  --danger-ink: #ef8f76;
+  --focus-ink: #f0b95e;
+  --key-finish-bg: #e0a53c;
+  --key-finish-ink: #1b1712;
+}
+
 :root {
   /* 间距阶梯：4 的倍数，页面/卡片/行统一从这里取 */
   --sp-1: 4px;
