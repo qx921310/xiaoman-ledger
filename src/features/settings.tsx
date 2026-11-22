@@ -656,6 +656,13 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
       </div>
       </>)}
 
+      {me && <p className="hint">当前登录：{me.email}</p>}
+      {onLogout && (
+        <button type="button" className="row my-row-btn" aria-label="退出登录" onClick={() => { if (confirm('确定退出登录吗？本机数据会保留。')) onLogout() }}>
+          <span className="grow">退出登录</span>
+        </button>
+      )}
+
       {meScreen === 'tools' && (<>
       <button type="button" className="link" onClick={() => setMeScreen(null)}>‹ 返回我的</button>
       <h3>实用工具</h3>
@@ -1336,6 +1343,7 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
           addCurrency({ code: preset.code, name: preset.name, symbol: preset.symbol, rate: preset.rate, positionWeight: currencies.length })
           setNewCurrency('')
         }}>添加</button>
+
       </div>
 
       </>)}
@@ -1430,12 +1438,6 @@ export function Settings({ notify, me, onLogout }: { notify: (m: string) => void
         </div>)}
       </div>}
 
-      {me && <p className="hint">当前登录：{me.email}</p>}
-      {onLogout && (
-        <button type="button" className="row my-row-btn" onClick={() => { if (confirm('确定退出登录吗？本机数据会保留。')) onLogout() }}>
-          <span className="grow">退出登录</span>
-        </button>
-      )}
       </>)}
     </section>
   )

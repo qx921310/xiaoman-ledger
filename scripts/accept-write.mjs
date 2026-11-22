@@ -133,7 +133,8 @@ ok('新增账户（整页）', openNew && saveAcc && accBody.includes('走查现
 // 3. 退出登录 → 重新登录，数据仍在
 await click('我的'); await sleep(900)
 const billsBefore = await cloudBills()
-const logout = await ev(`(() => { const b=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='退出登录'); if(!b) return false; b.click(); return true })()`)
+console.log('at logout page:', (await text()).slice(0,120))
+const logout = await ev(`(() => { const b=document.querySelector('button[aria-label="退出登录"]') || [...document.querySelectorAll('button')].find(x=>x.textContent.includes('退出登录')); if(!b) return false; b.click(); return true })()`)
 await sleep(1500)
 const loggedOut = await ev("!!document.querySelector('#auth-email')")
 ok('退出登录', logout && loggedOut, `logout=${logout} page=${loggedOut}`)
