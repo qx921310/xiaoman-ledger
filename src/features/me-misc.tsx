@@ -1,3 +1,6 @@
+import { useState } from 'react'
+import { useLedger } from '../store'
+
 /**
  * 我的页里「一木有、我们暂未实现」的入口落地页。
  * 原则：点了必须有内容，不能原地不动（一木这些项都对应独立页面）。
@@ -39,13 +42,47 @@ const PAGES: Record<string, { title: string; body: string[] }> = {
 
 export function MeMiscPage({ name, onBack }: { name: string; onBack: () => void }) {
   const page = PAGES[name] ?? { title: '敬请期待', body: ['这个功能还在开发中。'] }
+  const [modules, setModules] = useState<{ summary: boolean; budget: boolean; flow: boolean }>(() => {
+    try { return { summary: true, budget: true, flow: true, ...(JSON.parse(localStorage.getItem('xiaoman-home-modules') ?? '{}')) } }
+    catch { return { summary: true, budget: true, flow: true } }
+  })
+  const toggle = (k: 'summary' | 'budget' | 'flow') => {
+    const next = { ...modules, [k]: !modules[k] }
+    setModules(next)
+    localStorage.setItem('xiaoman-home-modules', JSON.stringify(next))
+  }
+  const clearCache = async () => {
+    const { clearAllBookPatches } = await import('./book-pending')
+    const n = await clearAllBookPatches()
+    alert(n ? `已清理 ${n} 条本机待同步修改` : '没有需要清理的本机修改')
+  }
   return (
     <>
       <div className="subpage-head">
         <button type="button" className="link" onClick={onBack}>‹ 返回我的</button>
         <h3>{page.title}</h3>
       </div>
-      {page.body.map((line) => <p key={line} className="hint">{line}</p>)}
+      {name === 'more' ? (
+        <>
+          <h3>首页显示内容</h3>
+          {([
+            ['summary', '收支汇总卡'],
+            ['budget', '预算进度'],
+            ['flow', '最近流水'],
+          ] as const).map(([k, label]) => (
+            <label key={k} className="row">
+              <span className="grow">{label}</span>
+              <input type="checkbox" checked={modules[k]} onChange={() => toggle(k)} />
+            </label>
+          ))}
+          <h3>维护</h3>
+          <button type="button" className="row my-row-btn" onClick={() => void clearCache()}>
+            <span className="grow">清理本机同步缓存</span>
+            <span className="muted">仅本机</span>
+          </button>
+          <p className="hint">当前账本：{useLedger.getState().accountBooks.find((b) => String(b.bookId) === String(useLedger.getState().currentBookId))?.accountBookName ?? '—'}</p>
+        </>
+      ) : page.body.map((line) => <p key={line} className="hint">{line}</p>)}
     </>
   )
 }

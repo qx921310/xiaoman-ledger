@@ -275,7 +275,8 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
               style={heat ? { background: heatStyle(stat) } : undefined}
                 onClick={() => setPicked(key)} aria-label={`${date.getMonth() + 1}月${date.getDate()}日`}>
                 <em className={key === todayKey ? 'today' : undefined}>{date.getDate()}</em>
-                {showLunar && <i className="cal-lunar">{lunarOfDate(date)}</i>}
+                {/* 有账的格子只显示金额，不再叠加农历（与一木一致） */}
+                {!stat.expense && !stat.income && showLunar && <i className="cal-lunar">{lunarOfDate(date)}</i>}
                 {stat.expense ? <i className="out">{'-'}{cellAmount(stat.expense)}</i> : null}
                 {stat.income ? <i className="in">+{cellAmount(stat.income)}</i> : null}
               </button>
@@ -340,10 +341,13 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
                 <div key={String(b.billId)} className="row">
                   <div className="grow">
                     <div>{parents.find((p) => p.id === b.parentCategoryId)?.name ?? '未分类'}{b.remark ? ` · ${b.remark}` : ''}</div>
-                    <small>{new Date(b.time).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</small>
-                    {allChildren.find((c) => c.id === b.childCategoryId) && (
-                      <small className="cal-sub">{allChildren.find((c) => c.id === b.childCategoryId)?.name}</small>
-                    )}
+                    <small>
+                      {new Date(b.time).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                      {(() => {
+                        const sub = allChildren.find((c) => c.id === b.childCategoryId)?.name
+                        return sub ? ` · ${sub}` : ''
+                      })()}
+                    </small>
                   </div>
                   <div className="cal-amt">
                     <b className={kindOf.get(b.parentCategoryId) === 'income' ? 'in' : 'out'}>

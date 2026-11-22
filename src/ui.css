@@ -1604,7 +1604,10 @@ section.card:has(.my-user) .page-title { display: none; }
 .row2 > .row .link { font-size: var(--font-xs); }
 
 /* 账单行：图标与文字间距、金额层级收紧（首页/账单/搜索共用） */
-.ledger-row { gap: var(--sp-3); padding: var(--sp-2) 0; }
+.ledger-row { gap: var(--sp-3); padding: 6px 0; }
+/* 行内三行小字收紧行距，整体高度贴近一木 */
+.ledger-row .grow > div { line-height: 1.25; }
+.ledger-row .cat-time, .ledger-row .cat-sub { line-height: 1.15; display: block; }
 .ledger-row > b { font-size: var(--font-lg); font-weight: 600; font-variant-numeric: tabular-nums; }
 .ledger-row .grow > div:first-child { font-size: var(--font-md); }
 .ledger-row small { margin-top: 2px; display: block; }
@@ -1690,7 +1693,7 @@ section.card:has(.my-user) .page-title { display: none; }
 .asset-sub { display: none; }
 
 /* 统计页近7日柱状图（对齐 s27） */
-.week-bars { display: flex; align-items: flex-end; gap: var(--sp-2); height: 150px; padding: var(--sp-2) 0; }
+.week-bars { display: flex; align-items: flex-end; gap: var(--sp-2); height: 150px; padding: var(--sp-2) var(--sp-3); }
 .wb { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; height: 100%; }
 .wb-val { color: var(--muted); font-size: var(--font-xs); }
 .wb-bar { width: 60%; max-width: 22px; background: var(--out); border-radius: var(--r-sm) var(--r-sm) 0 0; min-height: 2px; }
