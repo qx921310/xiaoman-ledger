@@ -41,7 +41,7 @@ const PAGES: Record<string, { title: string; body: string[] }> = {
   }
 }
 
-export function MeMiscPage({ name, onBack, onOpenCurrency }: { name: string; onBack: () => void; onOpenCurrency?: () => void }) {
+export function MeMiscPage({ name, onBack, onOpenCurrency, onLogout }: { name: string; onBack: () => void; onOpenCurrency?: () => void; onLogout?: () => void }) {
   const page = PAGES[name] ?? { title: '敬请期待', body: ['这个功能还在开发中。'] }
   const currentBookName = useLedger((st) => st.accountBooks.find((b) => String(b.bookId) === String(st.currentBookId))?.accountBookName ?? '—')
   const defaultCurrency = useLedger((st) => st.defaultCurrency)
@@ -56,7 +56,7 @@ export function MeMiscPage({ name, onBack, onOpenCurrency }: { name: string; onB
     localStorage.setItem('xiaoman-theme', theme)
   }, [theme])
 
-  const toggle = (key: keyof Prefs) => {
+  const toggle = (key: Exclude<keyof Prefs, 'weekStart'>) => {
     const next = { ...prefs, [key]: !prefs[key] }
     setPrefs(next)
     writePrefs(next)
@@ -73,13 +73,13 @@ export function MeMiscPage({ name, onBack, onOpenCurrency }: { name: string; onB
     }
   }
 
-  const Switch = ({ label, desc, k }: { label: string; desc: string; k: keyof Prefs }) => (
+  const Switch = ({ label, desc, k }: { label: string; desc: string; k: Exclude<keyof Prefs, 'weekStart'> }) => (
     <label className="row me-switch">
       <span className="grow">
         <span className="me-switch-label">{label}</span>
         <small>{desc}</small>
       </span>
-      <input type="checkbox" checked={prefs[k]} onChange={() => toggle(k)} />
+      <input type="checkbox" checked={Boolean(prefs[k])} onChange={() => toggle(k)} />
     </label>
   )
 
@@ -120,6 +120,10 @@ export function MeMiscPage({ name, onBack, onOpenCurrency }: { name: string; onB
         <h3>更多设置</h3>
       </div>
 
+      <h3>安全锁</h3>
+      <div className="row me-switch"><span className="grow"><span className="me-switch-label">生物解锁</span><small>打开应用时执行指纹、人脸等安全认证</small></span><span className="muted">Web 版暂不支持</span></div>
+      <div className="row me-switch"><span className="grow"><span className="me-switch-label">手势解锁</span><small>启动应用时或指纹识别失败时进行认证</small></span><span className="muted">Web 版暂不支持</span></div>
+
       <h3>账单设置</h3>
       <Switch label="多币种" desc="为账单、账户设置币种" k="multiCurrency" />
       {prefs.multiCurrency && (
@@ -137,7 +141,7 @@ export function MeMiscPage({ name, onBack, onOpenCurrency }: { name: string; onB
           {onOpenCurrency && (
             <button type="button" className="row my-row-btn" onClick={onOpenCurrency}>
               <span className="grow">币种与汇率<small>增删币种、修改汇率</small></span>
-              <span className="muted">{currencies.length} 种 ›</span>
+              <span className="muted">{currencies.length} 种</span>
             </button>
           )}
         </>
@@ -150,13 +154,29 @@ export function MeMiscPage({ name, onBack, onOpenCurrency }: { name: string; onB
       <Switch label="金额颜色" desc="支出红色，收入绿色" k="colorMoney" />
 
       <h3>偏好设置</h3>
+      <button type="button" className="row my-row-btn" onClick={() => { const next = { ...prefs, weekStart: prefs.weekStart === 1 ? 0 : 1 } as Prefs; setPrefs(next); writePrefs(next) }}>
+        <span className="grow">日历周起始日<small>设置日历视图中每周的起始日期</small></span>
+        <span className="muted">{prefs.weekStart === 1 ? '周一' : '周日'}</span>
+      </button>
       <div className="row"><span className="grow">当前账本</span><span className="muted">{currentBookName}</span></div>
+
+      <h3>通用设置</h3>
+      <div className="row me-switch"><span className="grow"><span className="me-switch-label">字体大小</span><small>设置软件内显示的字体大小</small></span><span className="muted">标准</span></div>
+      <div className="row me-switch"><span className="grow"><span className="me-switch-label">导航栏文字</span><small>首页底部导航栏显示文字信息</small></span><span className="muted">显示</span></div>
+
+      <h3>应用设置</h3>
+      <div className="row me-switch"><span className="grow"><span className="me-switch-label">退出时提示</span><small>点击返回键退出应用时，需要再次点击确认</small></span><span className="muted">浏览器接管</span></div>
 
       <h3>维护</h3>
       <button type="button" className="row my-row-btn" onClick={() => void clearCache()}>
         <span className="grow">清理本机同步缓存</span>
         <span className="muted">仅本机</span>
       </button>
+      {onLogout && (
+        <button type="button" className="row my-row-btn" aria-label="退出登录" onClick={() => { if (confirm('确定退出登录吗？本机数据会保留。')) onLogout() }}>
+          <span className="grow">退出登录</span>
+        </button>
+      )}
     </>
   )
 }

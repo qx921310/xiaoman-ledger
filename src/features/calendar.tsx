@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Solar } from 'lunar-typescript'
 import { useLedger } from '../store'
+import { readPrefs, type Prefs } from '../prefs'
 import { money, fullDay } from '../ui-format'
 import { toBase } from '../money'
 import { billNetAmount } from '../bill-amount'
@@ -57,8 +58,15 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
 
   const year = cursor.getFullYear()
   const monthIdx = cursor.getMonth()
+  // 周起始日可在「更多设置 → 偏好设置」切换
+  const [prefs, setPrefs] = useState<Prefs>(() => readPrefs())
+  useEffect(() => {
+    const onPrefs = (e: Event) => { const d = (e as CustomEvent<Prefs>).detail; if (d) setPrefs(d) }
+    window.addEventListener('xiaoman-prefs', onPrefs)
+    return () => window.removeEventListener('xiaoman-prefs', onPrefs)
+  }, [])
   // 一木日历以「周一」为第一天
-  const firstWeekday = (new Date(year, monthIdx, 1).getDay() + 6) % 7
+  const firstWeekday = prefs.weekStart === 1 ? (new Date(year, monthIdx, 1).getDay() + 6) % 7 : new Date(year, monthIdx, 1).getDay()
   const daysInMonth = new Date(year, monthIdx + 1, 0).getDate()
   const cells: (number | null)[] = [
     ...Array.from({ length: firstWeekday }, () => null),
@@ -99,13 +107,13 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
   const weekDays = useMemo(() => {
     const base = new Date(`${picked ?? fullDay(Date.now())}T00:00:00`)
     const start = new Date(base)
-    start.setDate(base.getDate() - base.getDay())
+    start.setDate(base.getDate() - (prefs.weekStart === 1 ? (base.getDay() + 6) % 7 : base.getDay()))
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(start)
       d.setDate(start.getDate() + i)
       return d
     })
-  }, [picked])
+  }, [picked, prefs.weekStart])
 
   /** 任意日期当天的收入/支出（周视图跨月时不能只查当月 daily） */
   const statOf = (date: Date) => {
@@ -263,7 +271,7 @@ export function CalendarPage({ onAddBill, onOpenMonthBills }: { onAddBill?: () =
       )}
 
       <div className="cal-grid cal-weekdays">
-        {['一', '二', '三', '四', '五', '六', '日'].map((w) => <span key={w}>{w}</span>)}
+        {(prefs.weekStart === 1 ? ['一', '二', '三', '四', '五', '六', '日'] : ['日', '一', '二', '三', '四', '五', '六']).map((w) => <span key={w}>{w}</span>)}
       </div>
       {mode === 'week' ? (
       <div className="cal-grid">
